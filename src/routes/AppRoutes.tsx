@@ -36,7 +36,8 @@ import ManuscriptsPage from '@/pages/mangaka/ManuscriptsPage'
 import AssistantDashboardPage from '@/pages/assistant/AssistantDashboardPage'
 import TasksPage from '@/pages/assistant/TasksPage'
 import SubmissionsPage from '@/pages/assistant/SubmissionsPage'
-import IncomePage from '@/pages/assistant/IncomePage'
+import AssistantFeedbackPage from '@/pages/assistant/FeedbackPage'
+import AssistantReportsPage from '@/pages/assistant/ReportsPage'
 
 // Tantou Editor pages
 import TantouDashboardPage from '@/pages/tantou-editor/TantouDashboardPage'
@@ -88,7 +89,8 @@ export default function AppRoutes() {
         <Route index element={<AssistantDashboardPage />} />
         <Route path="tasks" element={<TasksPage />} />
         <Route path="submissions" element={<SubmissionsPage />} />
-        <Route path="income" element={<IncomePage />} />
+        <Route path="feedback" element={<AssistantFeedbackPage />} />
+        <Route path="reports" element={<AssistantReportsPage />} />
       </Route>
 
       {/* Tantou Editor Dashboard */}

@@ -5,10 +5,10 @@ import { ToastProvider } from './contexts/ToastContext'
 
 export default function App() {
   return (
-    <ToastProvider>
-      <BrowserRouter>
+    <BrowserRouter>
+      <ToastProvider>
         <AppRoutes />
-      </BrowserRouter>
-    </ToastProvider>
+      </ToastProvider>
+    </BrowserRouter>
   )
 }

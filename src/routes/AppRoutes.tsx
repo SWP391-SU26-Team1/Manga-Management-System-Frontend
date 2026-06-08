@@ -28,8 +28,6 @@ import PageViewerPage from '@/pages/mangaka/PageViewerPage'
 import SeriesDetailPage from '@/pages/mangaka/SeriesDetailPage'
 import CreateChapterPage from '@/pages/mangaka/CreateChapterPage'
 import ManuscriptsPage from '@/pages/mangaka/ManuscriptsPage'
-import ProfilePage from '@/pages/mangaka/ProfilePage'
-
 // Assistant pages
 import AssistantDashboardPage from '@/pages/assistant/AssistantDashboardPage'
 import TasksPage from '@/pages/assistant/TasksPage'
@@ -80,7 +78,6 @@ export default function AppRoutes() {
         <Route path="page-viewer/:pageId" element={<PageViewerPage />} />
         <Route path="series/:seriesId" element={<SeriesDetailPage />} />
         <Route path="series/:seriesId/create-chapter" element={<CreateChapterPage />} />
-        <Route path="profile" element={<ProfilePage />} />
       </Route>
 
       {/* Assistant Dashboard */}

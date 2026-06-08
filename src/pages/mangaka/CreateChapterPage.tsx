@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router'
-import { ArrowLeft, Save, FilePlus, AlertCircle } from 'lucide-react'
+import { Save, FilePlus, AlertCircle } from 'lucide-react'
 import { mangakaStore, Series } from '@/data/mangakaMockData'
 
 export default function CreateChapterPage() {
@@ -56,9 +56,6 @@ export default function CreateChapterPage() {
   return (
     <div className="p-8 max-w-3xl mx-auto">
       <div className="flex items-center gap-4 mb-8">
-        <button onClick={() => navigate(-1)} className="p-2 border-2 border-manga-ink hover:bg-gray-100 bg-white">
-          <ArrowLeft className="w-6 h-6" />
-        </button>
         <div>
           <h1 className="font-manga text-4xl font-bold uppercase text-manga-red tracking-wide flex items-center gap-3">
             <FilePlus className="w-8 h-8" />

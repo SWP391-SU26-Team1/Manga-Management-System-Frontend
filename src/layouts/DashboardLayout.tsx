@@ -55,7 +55,6 @@ export default function DashboardLayout({ role }: DashboardLayoutProps) {
     )
   }
 
-
   // For other roles, use a simple layout
   return (
     <div className="flex h-screen bg-[#fafafa] font-sans text-manga-ink overflow-hidden">

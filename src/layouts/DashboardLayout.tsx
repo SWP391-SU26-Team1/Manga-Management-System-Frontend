@@ -1,5 +1,5 @@
 import React from 'react'
-import { Outlet, Navigate } from 'react-router'
+import { Outlet, Navigate, useNavigate, useLocation } from 'react-router'
 import { Sidebar } from '@/components/mangaka/Sidebar'
 import { Header } from '@/components/mangaka/Header'
 
@@ -14,6 +14,9 @@ interface DashboardLayoutProps {
 }
 
 export default function DashboardLayout({ role }: DashboardLayoutProps) {
+  const navigate = useNavigate()
+  const location = useLocation()
+
   // Simple auth check — redirect to login if no user in localStorage
   const storedUser = localStorage.getItem('mangaflow_user')
   if (!storedUser) {

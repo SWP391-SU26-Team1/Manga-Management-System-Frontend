@@ -20,24 +20,26 @@ import MangakaDashboardPage from '@/pages/mangaka/MangakaDashboardPage'
 import SeriesPage from '@/pages/mangaka/SeriesPage'
 import SubmissionPage from '@/pages/mangaka/SubmissionPage'
 import AssignTaskPage from '@/pages/mangaka/AssignTaskPage'
-import AssistantsPage from '@/pages/mangaka/AssistantsPage'
 import RankingPage from '@/pages/mangaka/RankingPage'
 import CreateSeriesPage from '@/pages/mangaka/CreateSeriesPage'
 import FeedbackPage from '@/pages/mangaka/FeedbackPage'
-import BoardReviewPage from '@/pages/mangaka/BoardReviewPage'
-import RiskAlertsPage from '@/pages/mangaka/RiskAlertsPage'
-import MangakaRecoveryProposalPage from '@/pages/mangaka/RecoveryProposalPage'
 import MangakaNotificationsPage from '@/pages/mangaka/NotificationsPage'
 import PageViewerPage from '@/pages/mangaka/PageViewerPage'
 import SeriesDetailPage from '@/pages/mangaka/SeriesDetailPage'
 import CreateChapterPage from '@/pages/mangaka/CreateChapterPage'
 import ManuscriptsPage from '@/pages/mangaka/ManuscriptsPage'
+import ProfilePage from '@/pages/mangaka/ProfilePage'
+
 // Assistant pages
 import AssistantDashboardPage from '@/pages/assistant/AssistantDashboardPage'
 import TasksPage from '@/pages/assistant/TasksPage'
 import SubmissionsPage from '@/pages/assistant/SubmissionsPage'
 import AssistantFeedbackPage from '@/pages/assistant/FeedbackPage'
 import AssistantReportsPage from '@/pages/assistant/ReportsPage'
+import DrawingStudioPage from '@/pages/assistant/DrawingStudioPage'
+import DraftsPage from '@/pages/assistant/DraftsPage'
+import AssistantProfilePage from '@/pages/assistant/ProfilePage'
+import AssistantSettingsPage from '@/pages/assistant/SettingsPage'
 
 // Tantou Editor pages
 import TantouDashboardPage from '@/pages/tantou-editor/TantouDashboardPage'
@@ -71,17 +73,14 @@ export default function AppRoutes() {
         <Route path="create-series" element={<CreateSeriesPage />} />
         <Route path="submission" element={<SubmissionPage />} />
         <Route path="assign-task" element={<AssignTaskPage />} />
-        <Route path="assistants" element={<AssistantsPage />} />
         <Route path="ranking" element={<RankingPage />} />
         <Route path="feedback" element={<FeedbackPage />} />
-        <Route path="board-review" element={<BoardReviewPage />} />
-        <Route path="risk-alerts" element={<RiskAlertsPage />} />
-        <Route path="recovery-proposal" element={<MangakaRecoveryProposalPage />} />
         <Route path="notifications" element={<MangakaNotificationsPage />} />
         <Route path="manuscripts" element={<ManuscriptsPage />} />
         <Route path="page-viewer/:pageId" element={<PageViewerPage />} />
         <Route path="series/:seriesId" element={<SeriesDetailPage />} />
         <Route path="series/:seriesId/create-chapter" element={<CreateChapterPage />} />
+        <Route path="profile" element={<ProfilePage />} />
       </Route>
 
       {/* Assistant Dashboard */}
@@ -91,6 +90,10 @@ export default function AppRoutes() {
         <Route path="submissions" element={<SubmissionsPage />} />
         <Route path="feedback" element={<AssistantFeedbackPage />} />
         <Route path="reports" element={<AssistantReportsPage />} />
+        <Route path="drafts" element={<DraftsPage />} />
+        <Route path="drawing" element={<DrawingStudioPage />} />
+        <Route path="profile" element={<AssistantProfilePage />} />
+        <Route path="settings" element={<AssistantSettingsPage />} />
       </Route>
 
       {/* Tantou Editor Dashboard */}

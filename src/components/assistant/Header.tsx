@@ -1,13 +1,40 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
-import { Bell, Search, AlertTriangle, CheckCircle2, MessageSquare, ExternalLink } from 'lucide-react'
+import { Bell, Search, AlertTriangle, CheckCircle2, MessageSquare, ExternalLink, User, Settings, LogOut } from 'lucide-react'
 import { assistantStore } from '@/data/assistantMockData'
+import { MOCK_USERS } from '@/data/mockUsers'
 
 export function Header() {
   const location = useLocation()
   const navigate = useNavigate()
   const [unreadCount, setUnreadCount] = useState(4) // Matches the 4 mockup items
   const [showNotifications, setShowNotifications] = useState(false)
+  const [showProfile, setShowProfile] = useState(false)
+  const profileRef = useRef<HTMLDivElement>(null)
+
+  const [user, setUser] = useState<any>(() => {
+    const storedUser = localStorage.getItem('mangaflow_user')
+    return storedUser ? JSON.parse(storedUser) : null
+  })
+
+  useEffect(() => {
+    const handleProfileUpdate = () => {
+      const storedUser = localStorage.getItem('mangaflow_user')
+      setUser(storedUser ? JSON.parse(storedUser) : null)
+    }
+    window.addEventListener('mangaflow_profile_updated', handleProfileUpdate)
+    return () => {
+      window.removeEventListener('mangaflow_profile_updated', handleProfileUpdate)
+    }
+  }, [])
+
+  const displayName = user?.fullName || 'Kenji Tanaka'
+  const userInitials = displayName === 'Kenji Tanaka' ? 'KT' : (displayName.split(' ').pop()?.slice(0, 2).toUpperCase() || 'KT')
+
+  const handleLogout = () => {
+    localStorage.removeItem('mangaflow_user')
+    navigate('/login')
+  }
 
   const dropdownNotifications = [
     {
@@ -45,17 +72,18 @@ export function Header() {
   ]
 
   useEffect(() => {
-    if (showNotifications) {
-      const handleOutsideClick = (e: MouseEvent) => {
-        const target = e.target as HTMLElement
-        if (!target.closest('#notification-bell-btn') && !target.closest('#notification-dropdown')) {
-          setShowNotifications(false)
-        }
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (showNotifications && !target.closest('#notification-bell-btn') && !target.closest('#notification-dropdown')) {
+        setShowNotifications(false)
       }
-      document.addEventListener('click', handleOutsideClick)
-      return () => document.removeEventListener('click', handleOutsideClick)
+      if (showProfile && profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setShowProfile(false)
+      }
     }
-  }, [showNotifications])
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
+  }, [showNotifications, showProfile])
 
   // Determine breadcrumb based on current path
   const getBreadcrumb = () => {
@@ -230,9 +258,53 @@ export function Header() {
         {/* Vertical divider */}
         <div className="h-6 w-px bg-gray-200" />
 
-        {/* User avatar circular box */}
-        <div className="w-8 h-8 rounded-full bg-zinc-900 text-white font-bold text-xs flex items-center justify-center border border-gray-200 shadow-sm">
-          A
+        {/* User avatar circular box with dropdown wrapper */}
+        <div className="relative" ref={profileRef}>
+          <button 
+            onClick={() => { setShowProfile(!showProfile); setShowNotifications(false); }}
+            className="w-10 h-10 rounded-full overflow-hidden border-2 border-manga-ink hover:border-[#E63946] transition-all bg-zinc-900 flex items-center justify-center text-white font-bold cursor-pointer relative shadow-sm hover:scale-105 active:scale-95"
+          >
+            {user?.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt={displayName}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-sm">{userInitials}</span>
+            )}
+          </button>
+
+          {showProfile && (
+            <div className="absolute top-12 right-0 w-52 bg-white border-[3px] border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] flex flex-col z-50">
+              <Link 
+                to="/dashboard/assistant/profile" 
+                onClick={() => setShowProfile(false)}
+                className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 hover:bg-zinc-50 transition-colors"
+              >
+                <User className="w-4 h-4 text-black" />
+                <span className="text-sm font-bold text-black">Hồ sơ cá nhân</span>
+              </Link>
+              <Link 
+                to="/dashboard/assistant/settings" 
+                onClick={() => setShowProfile(false)}
+                className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 hover:bg-zinc-50 transition-colors"
+              >
+                <Settings className="w-4 h-4 text-black" />
+                <span className="text-sm font-bold text-black">Cài đặt</span>
+              </Link>
+              <button 
+                onClick={() => {
+                  setShowProfile(false);
+                  handleLogout();
+                }}
+                className="flex items-center gap-3 px-4 py-3 text-[#E63946] bg-red-50/50 hover:bg-red-100/50 transition-colors w-full text-left font-bold border-0 cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="text-sm">Đăng xuất</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>

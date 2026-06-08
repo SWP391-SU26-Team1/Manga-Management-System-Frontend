@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router'
+import { useToast } from '@/contexts/ToastContext'
 import {
   Clock,
   CheckCircle2,
@@ -232,6 +233,7 @@ const mockFeedbackTasks: FeedbackTask[] = [
 
 export default function FeedbackPage() {
   const navigate = useNavigate()
+  const { showToast } = useToast()
   const [tasks, setTasks] = useState<FeedbackTask[]>(mockFeedbackTasks)
   const [selectedTaskId, setSelectedTaskId] = useState<string>('#1042')
   
@@ -240,7 +242,6 @@ export default function FeedbackPage() {
   const [version, setVersion] = useState('v2.0')
   const [dateStr, setDateStr] = useState('18/05/2026')
   const [fileName, setFileName] = useState('')
-  const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
   const activeTask = tasks.find(t => t.id === selectedTaskId) || tasks[0]
 
@@ -260,7 +261,6 @@ export default function FeedbackPage() {
     setSelectedTaskId(id)
     setNote('')
     setFileName('')
-    setSuccessMsg(null)
     // Dynamic defaults for form versions
     if (id === '#1042') {
       setVersion('v2.0')
@@ -280,12 +280,12 @@ export default function FeedbackPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!note.trim()) {
-      alert('Vui lòng điền ghi chú chỉnh sửa!')
+      showToast('Vui lòng điền ghi chú chỉnh sửa!')
       return
     }
 
     // Simulate sending revision
-    setSuccessMsg(`Đã gửi bản sửa đổi (${version}) cho Task ${selectedTaskId} thành công!`)
+    showToast(`Đã gửi bản sửa đổi (${version}) cho Task ${selectedTaskId} thành công!`)
     
     // Update local task status to REVIEW (submitted for review)
     setTasks(prev => prev.map(t => {
@@ -307,10 +307,6 @@ export default function FeedbackPage() {
     // Reset uploader
     setNote('')
     setFileName('')
-
-    setTimeout(() => {
-      setSuccessMsg(null)
-    }, 5000)
   }
 
   return (
@@ -333,14 +329,6 @@ export default function FeedbackPage() {
           Xem xét góp ý từ tổ sản xuất và nộp bản sửa đổi bản vẽ
         </p>
       </div>
-
-      {/* Success alert message banner */}
-      {successMsg && (
-        <div className="bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-700 font-bold mb-6 rounded-lg shadow-sm flex items-center gap-2 animate-fade-in">
-          <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-          {successMsg}
-        </div>
-      )}
 
       {/* Main 3-Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">

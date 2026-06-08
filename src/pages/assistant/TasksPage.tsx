@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
+import { useToast } from '@/contexts/ToastContext'
 import {
   ClipboardList,
   AlertTriangle,
@@ -33,9 +34,9 @@ export default function TasksPage() {
   const [submitNote, setSubmitNote] = useState('')
   const [previewUrl, setPreviewUrl] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
   const navigate = useNavigate()
+  const { showToast } = useToast()
 
   // New Modals state
   const [downloadTask, setDownloadTask] = useState<AssistantTask | null>(null)
@@ -119,12 +120,8 @@ export default function TasksPage() {
 
       setIsSubmitting(false)
       setSelectedTask(null)
-      setSuccessMsg(`Đã nộp thành công bản vẽ cho ${selectedTask.seriesTitle} (Chương ${selectedTask.chapterNumber})!`)
+      showToast(`Đã nộp thành công bản vẽ cho ${selectedTask.seriesTitle} (Chương ${selectedTask.chapterNumber})!`)
       loadTasks()
-
-      setTimeout(() => {
-        setSuccessMsg(null)
-      }, 4000)
     }, 800)
   }
 
@@ -204,7 +201,7 @@ export default function TasksPage() {
   }
 
   const handleDownloadAll = (task: AssistantTask) => {
-    alert(`Đang chuẩn bị nén toàn bộ tài nguyên cho Task #${task.id}...`)
+    showToast(`Đang chuẩn bị nén toàn bộ tài nguyên cho Task #${task.id}...`)
   }
 
   const toggleChecklistItem = (taskId: string, index: number) => {
@@ -247,21 +244,13 @@ export default function TasksPage() {
 
         {/* Outline "+ NHIỆM VỤ MỚI" Button */}
         <button
-          onClick={() => alert('Chức năng tạo nhiệm vụ dành cho Mangaka/Sensei.')}
+          onClick={() => showToast('Chức năng tạo nhiệm vụ dành cho Mangaka/Sensei.')}
           className="border border-dashed border-gray-300 text-gray-500 rounded-lg hover:bg-gray-50 transition-all font-bold px-4 py-2 text-xs flex items-center gap-1.5 uppercase tracking-wide"
         >
           <Clock className="w-4 h-4" />
           <span>Nhiệm vụ mới</span>
         </button>
       </div>
-
-      {/* Success Toast */}
-      {successMsg && (
-        <div className="bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-700 font-bold mb-6 rounded-lg shadow-sm flex items-center gap-2 animate-fade-in">
-          <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-          {successMsg}
-        </div>
-      )}
 
       {/* Statistics boxes row */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-8">
@@ -430,7 +419,7 @@ export default function TasksPage() {
                           
                           {/* View button */}
                           <button
-                            onClick={() => alert(`Ghi chú Sensei: "${task.note}"`)}
+                            onClick={() => showToast(`Ghi chú Sensei: "${task.note}"`)}
                             className="p-1 border border-gray-200 rounded hover:bg-gray-50 text-gray-500 transition-all flex-1 flex justify-center"
                             title="Xem chi tiết"
                           >
@@ -649,7 +638,7 @@ export default function TasksPage() {
                 </span>
                 <span className="text-xs font-bold text-gray-400 mr-auto ml-2">Tổng ~12 MB</span>
                 <button
-                  onClick={() => handleDownloadAll(downloadTask)}
+                  onClick={() => showToast('Đang tải xuống tất cả các tài nguyên liên quan...')}
                   className="bg-[#E63946] text-white font-extrabold text-[10px] px-4 py-2 hover:bg-red-600 transition-colors uppercase tracking-wider flex items-center gap-1.5 border border-[#E63946] rounded-none cursor-pointer"
                 >
                   <FileDown className="w-3.5 h-3.5" />
@@ -682,7 +671,7 @@ export default function TasksPage() {
                     <div className="flex items-center gap-3">
                       <span className="text-[10px] text-gray-400 font-bold">3.4 MB</span>
                       <button
-                        onClick={() => alert(`Tải xuống tài liệu tham khảo cho ${downloadTask.seriesTitle}`)}
+                        onClick={() => showToast(`Đang tải tài liệu tham khảo cho ${downloadTask.seriesTitle}...`)}
                         className="bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 font-extrabold text-[9px] px-3 py-1.5 uppercase tracking-wide flex items-center gap-1.5 transition-all cursor-pointer"
                       >
                         <FileDown className="w-3.5 h-3.5" />
@@ -715,7 +704,7 @@ export default function TasksPage() {
                     <div className="flex items-center gap-3">
                       <span className="text-[10px] text-gray-400 font-bold">8.3 MB</span>
                       <button
-                        onClick={() => alert(`Tải xuống kịch bản chi tiết cho ${downloadTask.seriesTitle}`)}
+                        onClick={() => showToast(`Đang tải kịch bản chi tiết cho ${downloadTask.seriesTitle}...`)}
                         className="bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 font-extrabold text-[9px] px-3 py-1.5 uppercase tracking-wide flex items-center gap-1.5 transition-all cursor-pointer"
                       >
                         <FileDown className="w-3.5 h-3.5" />

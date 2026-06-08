@@ -7,7 +7,8 @@ import {
   MessageSquare,
   PenTool,
   Settings,
-  LogOut
+  LogOut,
+  FileEdit
 } from 'lucide-react'
 
 const assistantMenuItems = [
@@ -33,6 +34,11 @@ const assistantMenuItems = [
     icon: MessageSquare
   },
   {
+    label: "Bản Nháp",
+    path: "/dashboard/assistant/drafts",
+    icon: FileEdit
+  },
+  {
     label: "Vẽ & Chỉnh Sửa",
     path: "/dashboard/assistant/drawing",
     icon: PenTool
@@ -55,12 +61,26 @@ export function Sidebar() {
     return location.pathname.startsWith(item.path)
   }
 
-  // Fallback profile if localStorage has none
-  const storedUser = localStorage.getItem('mangaflow_user')
-  const user = storedUser ? JSON.parse(storedUser) : null
+  // Dynamic user profile state and listener
+  const [user, setUser] = React.useState<any>(() => {
+    const storedUser = localStorage.getItem('mangaflow_user')
+    return storedUser ? JSON.parse(storedUser) : null
+  })
+
+  React.useEffect(() => {
+    const handleProfileUpdate = () => {
+      const storedUser = localStorage.getItem('mangaflow_user')
+      setUser(storedUser ? JSON.parse(storedUser) : null)
+    }
+    window.addEventListener('mangaflow_profile_updated', handleProfileUpdate)
+    return () => {
+      window.removeEventListener('mangaflow_profile_updated', handleProfileUpdate)
+    }
+  }, [])
+
   const displayName = user?.fullName || 'Kenji Tanaka'
   const userRoleText = user?.role === 'ASSISTANT' ? 'Manga Assistant' : 'Manga Assistant'
-  const userInitials = displayName === 'Kenji Tanaka' ? 'TA' : (displayName.split(' ').pop()?.slice(0, 2).toUpperCase() || 'NK')
+  const userInitials = displayName === 'Kenji Tanaka' ? 'KT' : (displayName.split(' ').pop()?.slice(0, 2).toUpperCase() || 'KT')
 
   return (
     <aside className="w-64 h-screen bg-white border-r-4 border-manga-ink flex flex-col justify-between fixed top-0 left-0 z-40">
@@ -126,8 +146,12 @@ export function Sidebar() {
 
         {/* Profile info with neo-brutalist styling */}
         <div className="flex items-center gap-2 p-2 border-2 border-manga-ink bg-white rounded-none">
-          <div className="w-8 h-8 rounded-full bg-red-500 text-white border-2 border-manga-ink flex items-center justify-center font-extrabold text-xs shadow-sm flex-shrink-0">
-            {userInitials}
+          <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-manga-ink flex items-center justify-center font-extrabold text-xs shadow-sm flex-shrink-0 bg-red-500 text-white">
+            {user?.avatarUrl ? (
+              <img src={user.avatarUrl} alt={displayName} className="w-full h-full object-cover" />
+            ) : (
+              userInitials
+            )}
           </div>
           <div className="min-w-0">
             <p className="text-xs font-bold text-manga-ink truncate max-w-[150px] leading-tight">

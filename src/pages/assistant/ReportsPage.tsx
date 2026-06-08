@@ -7,6 +7,7 @@ import {
   ChevronDown,
   CheckCircle2
 } from 'lucide-react'
+import { useToast } from '@/contexts/ToastContext'
 
 interface MonthlyReport {
   month: string
@@ -76,11 +77,12 @@ const mockMonthlyReports: MonthlyReport[] = [
 
 export default function ReportsPage() {
   const navigate = useNavigate()
+  const { showToast } = useToast()
   const [selectedMonth, setSelectedMonth] = useState('Tháng 5, 2026')
   const [selectedWeek, setSelectedWeek] = useState('Tuần 3')
 
   const handleDownloadPDF = (report: MonthlyReport) => {
-    alert(`Đang khởi tạo tải xuống báo cáo hiệu suất dạng PDF cho "${report.month}"...`)
+    showToast(`Đang khởi tạo tải xuống báo cáo hiệu suất dạng PDF cho "${report.month}"...`)
   }
 
   // Weekly data for bar chart (mockup values)

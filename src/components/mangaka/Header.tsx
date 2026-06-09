@@ -12,6 +12,11 @@ export function Header() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [feedbacks, setFeedbacks] = useState<EditorFeedback[]>([]);
 
+  const [user, setUser] = useState<any>(() => {
+    const storedUser = localStorage.getItem('mangaflow_user')
+    return storedUser ? JSON.parse(storedUser) : null
+  });
+
   const notifRef = useRef<HTMLDivElement>(null);
   const feedbackRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -32,8 +37,21 @@ export function Header() {
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+
+    const handleProfileUpdate = () => {
+      const storedUser = localStorage.getItem('mangaflow_user')
+      setUser(storedUser ? JSON.parse(storedUser) : null)
+    }
+    window.addEventListener('mangaflow_profile_updated', handleProfileUpdate)
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener('mangaflow_profile_updated', handleProfileUpdate);
+    }
   }, []);
+
+  const displayName = user?.fullName || 'Tokuda Oda'
+  const userInitials = displayName === 'Tokuda Oda' ? 'TO' : (displayName.split(' ').pop()?.slice(0, 2).toUpperCase() || 'TO')
 
   const unreadNotifs = notifications.filter(n => !n.isRead).length;
   const unreadFeedbacks = feedbacks.filter(f => f.status === "Open").length;
@@ -166,13 +184,17 @@ export function Header() {
         <div className="relative" ref={profileRef}>
           <button 
             onClick={() => { setShowProfile(!showProfile); setShowNotif(false); setShowFeedback(false); }}
-            className="w-10 h-10 rounded-full overflow-hidden border-2 border-manga-ink hover:border-manga-red transition-colors ml-2"
+            className="w-10 h-10 rounded-full overflow-hidden border-2 border-manga-ink hover:border-manga-red transition-colors ml-2 bg-manga-red flex items-center justify-center text-white font-bold"
           >
-            <img
-              src="https://i.pravatar.cc/150?u=mangaka_sensei"
-              alt="Avatar"
-              className="w-full h-full object-cover"
-            />
+            {user?.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt={displayName}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-sm">{userInitials}</span>
+            )}
           </button>
 
           {showProfile && (

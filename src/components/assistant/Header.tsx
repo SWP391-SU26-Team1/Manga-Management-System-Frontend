@@ -143,7 +143,7 @@ export function Header() {
   // Load state or simulate count
   useEffect(() => {
     const tasks = assistantStore.getTasks()
-    const needFixCount = tasks.filter(t => t.status === 'Need Fix' || t.priority === 'Urgent').length
+    const needFixCount = tasks.filter((t: any) => t.status === 'Need Fix' || t.priority === 'Urgent').length
     setUnreadCount(needFixCount || 4)
   }, [location.pathname])
 

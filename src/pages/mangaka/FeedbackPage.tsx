@@ -49,11 +49,13 @@ export default function FeedbackPage() {
       {/* Header */}
       <div className="mb-6">
         <h1 className="font-manga text-4xl font-bold uppercase text-manga-ink leading-none mb-1">
-          GÓP Ý TỪ BIÊN TẬP VIÊN
+          NHẬN XÉT TỪ TANTOU EDITOR
         </h1>
         <div className="h-1.5 w-24 bg-manga-red mb-3" />
         <p className="text-sm font-bold text-gray-600">
-          Xem nhận xét của Editor (Biên tập viên) về kịch bản nháp, phác thảo nhân vật, chì chi tiết hoặc các yêu cầu chỉnh sửa khẩn cấp trước khi xuất bản.
+          Xem nhận xét của Tantou Editor (Biên tập viên phụ trách) về kịch bản, phác thảo nhân vật, 
+          chì chi tiết hoặc các yêu cầu chỉnh sửa trước khi nộp bản thảo lên Ban biên tập.
+          Ðây là luồng phản hồi riêng biệt với việc duyệt kết quả trợ lý.
         </p>
       </div>
 

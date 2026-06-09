@@ -4,7 +4,8 @@ import { Sidebar } from '@/components/mangaka/Sidebar'
 import { Header } from '@/components/mangaka/Header'
 import { Sidebar as AssistantSidebar } from '@/components/assistant/Sidebar'
 import { Header as AssistantHeader } from '@/components/assistant/Header'
-import { LayoutDashboard, ClipboardList, CheckSquare, LogOut } from 'lucide-react'
+import { LayoutDashboard, ClipboardList, CheckSquare, LogOut, ArrowLeft } from 'lucide-react'
+
 
 interface DashboardLayoutProps {
   role: 'mangaka' | 'assistant' | 'tantou-editor' | 'editorial-board' | 'user'
@@ -33,6 +34,15 @@ export default function DashboardLayout({ role }: DashboardLayoutProps) {
         <div className="flex-1 flex flex-col ml-64 h-full overflow-hidden">
           <Header />
           <main className="flex-1 p-8 overflow-y-auto">
+            {location.pathname !== '/dashboard/mangaka' && (
+              <button
+                onClick={() => navigate(-1)}
+                className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-manga-ink hover:text-manga-red transition-colors mb-6 focus:outline-none"
+              >
+                <ArrowLeft className="w-4 h-4 shrink-0" />
+                <span>Quay lại</span>
+              </button>
+            )}
             <Outlet />
           </main>
         </div>

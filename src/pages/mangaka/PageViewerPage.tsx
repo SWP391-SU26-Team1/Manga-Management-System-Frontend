@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router'
-import { ArrowLeft, Layers, Image as ImageIcon, ClipboardList, Eye, Settings, FileCheck } from 'lucide-react'
+import { Layers, Image as ImageIcon, ClipboardList, Eye, Settings, FileCheck } from 'lucide-react'
 import { mangakaStore, MangaPage, Chapter, Series } from '@/data/mangakaMockData'
 
 export default function PageViewerPage() {
@@ -52,9 +52,6 @@ export default function PageViewerPage() {
     <div className="p-8 h-screen flex flex-col">
       <div className="flex items-center justify-between mb-4 shrink-0">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="p-2 border-2 border-manga-ink hover:bg-gray-100 bg-white">
-            <ArrowLeft className="w-6 h-6" />
-          </button>
           <div>
             <h1 className="font-manga text-2xl font-bold uppercase text-manga-red tracking-wide flex items-center gap-2">
               {series.title} - Ch.{chapter.chapterNumber} - Page {page.pageNumber}

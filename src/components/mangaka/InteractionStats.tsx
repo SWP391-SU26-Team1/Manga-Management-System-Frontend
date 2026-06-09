@@ -36,7 +36,7 @@ export function InteractionStats() {
         <h3 className="font-manga text-xl font-bold uppercase tracking-widest text-manga-ink mb-4">
           Xếp hạng tuần
         </h3>
-        
+
         {/* Rank Badge */}
         <div className="relative mb-4 transform -rotate-3 hover:rotate-0 transition-transform">
           <div className="absolute inset-0 bg-manga-ink translate-x-1 translate-y-1"></div>

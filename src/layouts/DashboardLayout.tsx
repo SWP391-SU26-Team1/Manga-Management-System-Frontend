@@ -1,53 +1,18 @@
 import React from 'react'
-import { Outlet, Navigate, useNavigate, useLocation } from 'react-router'
-import { Sidebar } from '@/components/mangaka/Sidebar'
-import { Header } from '@/components/mangaka/Header'
-
-
-import { Sidebar as AssistantSidebar } from '@/components/assistant/Sidebar'
-import { Header as AssistantHeader } from '@/components/assistant/Header'
-import { LayoutDashboard, ClipboardList, CheckSquare, LogOut, ArrowLeft } from 'lucide-react'
-
+import { Outlet, Navigate } from 'react-router'
 
 interface DashboardLayoutProps {
-  role: 'mangaka' | 'assistant' | 'tantou-editor' | 'editorial-board' | 'user'
+  role: 'user'
 }
 
 export default function DashboardLayout({ role }: DashboardLayoutProps) {
-  const navigate = useNavigate()
-  const location = useLocation()
-
   // Simple auth check — redirect to login if no user in localStorage
   const storedUser = localStorage.getItem('mangaflow_user')
   if (!storedUser) {
     return <Navigate to="/login" replace />
   }
 
-  // For mangaka role, use the existing Sidebar + Header components
-  if (role === 'mangaka') {
-    return (
-      <div className="flex h-screen bg-[#fafafa] font-sans text-manga-ink overflow-hidden">
-        <Sidebar />
-        <div className="flex-1 flex flex-col ml-64 h-full overflow-hidden">
-          <Header />
-          <main className="flex-1 p-8 overflow-y-auto">
-            {location.pathname !== '/dashboard/mangaka' && (
-              <button
-                onClick={() => navigate(-1)}
-                className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-manga-ink hover:text-manga-red transition-colors mb-6 focus:outline-none"
-              >
-                <ArrowLeft className="w-4 h-4 shrink-0" />
-                <span>Quay lại</span>
-              </button>
-            )}
-            <Outlet />
-          </main>
-        </div>
-      </div>
-    )
-  }
-
-  // For other roles, use a simple layout
+  // Base fallback layout for user role
   return (
     <div className="flex h-screen bg-[#fafafa] font-sans text-manga-ink overflow-hidden">
       <aside className="w-64 h-screen bg-white border-r-4 border-manga-ink flex flex-col fixed top-0 left-0 z-40">
@@ -56,7 +21,7 @@ export default function DashboardLayout({ role }: DashboardLayoutProps) {
             MANGAFLOW
           </h1>
           <p className="font-bold text-manga-ink mt-1 text-sm leading-tight capitalize">
-            {role.replace('-', ' ')} Panel
+            {role} Panel
           </p>
         </div>
       </aside>

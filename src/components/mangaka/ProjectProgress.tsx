@@ -45,14 +45,14 @@ export function ProjectProgress({
     if (activeSeries) {
       const chapters = mangakaStore.getChapters(activeSeries.id);
       const activeChapter = chapters.find(c => c.status !== "Completed") || chapters[chapters.length - 1];
-      
+
       if (activeChapter) {
         // Calculate progress percentage based on page overall statuses
         const pages = mangakaStore.getPages(activeChapter.id);
         const approvedPages = pages.filter(p => p.overallStatus === "Approved").length;
         const total = pages.length || 1;
         const percent = Math.round((approvedPages / total) * 100);
-        
+
         setData({
           seriesTitle: activeSeries.title,
           chapterTitle: `Hoàn thiện Chương ${activeChapter.chapterNumber}: ${activeChapter.title}`,
@@ -114,8 +114,8 @@ export function ProjectProgress({
             <span className="font-manga text-3xl font-bold text-manga-red">{data.progressPercent}%</span>
           </div>
           <div className="h-6 w-full bg-gray-100 border-2 border-manga-ink flex">
-            <div 
-              className="h-full bg-manga-red border-r-2 border-manga-ink transition-all duration-500" 
+            <div
+              className="h-full bg-manga-red border-r-2 border-manga-ink transition-all duration-500"
               style={{ width: `${data.progressPercent}%` }}
             ></div>
           </div>
@@ -134,31 +134,31 @@ export function ProjectProgress({
             <form onSubmit={handleSave} className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Tên Series</label>
-                <input 
-                  type="text" 
-                  value={editForm.seriesTitle} 
-                  onChange={e => setEditForm({...editForm, seriesTitle: e.target.value})}
+                <input
+                  type="text"
+                  value={editForm.seriesTitle}
+                  onChange={e => setEditForm({ ...editForm, seriesTitle: e.target.value })}
                   className="w-full border-2 border-manga-ink p-2 font-bold focus:ring-2 focus:ring-manga-red"
                   required
                 />
               </div>
               <div>
                 <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Deadline</label>
-                <input 
-                  type="text" 
-                  value={editForm.deadline} 
-                  onChange={e => setEditForm({...editForm, deadline: e.target.value})}
+                <input
+                  type="text"
+                  value={editForm.deadline}
+                  onChange={e => setEditForm({ ...editForm, deadline: e.target.value })}
                   className="w-full border-2 border-manga-ink p-2 font-bold focus:ring-2 focus:ring-manga-red"
                   required
                 />
               </div>
               <div>
                 <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Mức tiến độ (Tùy chỉnh thủ công)</label>
-                <input 
-                  type="range" 
+                <input
+                  type="range"
                   min="0" max="100"
-                  value={editForm.progressPercent} 
-                  onChange={e => setEditForm({...editForm, progressPercent: parseInt(e.target.value)})}
+                  value={editForm.progressPercent}
+                  onChange={e => setEditForm({ ...editForm, progressPercent: parseInt(e.target.value) })}
                   className="w-full accent-manga-red"
                 />
                 <div className="text-right text-xs font-bold text-manga-red mt-1">{editForm.progressPercent}%</div>

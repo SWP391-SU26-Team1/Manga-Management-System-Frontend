@@ -112,9 +112,8 @@ export default function MangakaDashboardPage() {
             <Link
               key={item.label}
               to={item.href}
-              className={`bg-white border-2 border-manga-ink p-4 flex items-center justify-between manga-shadow-sm hover:translate-y-[-2px] hover:manga-shadow transition-all ${
-                item.alert ? 'border-manga-red bg-red-50/10' : ''
-              }`}
+              className={`bg-white border-2 border-manga-ink p-4 flex items-center justify-between manga-shadow-sm hover:translate-y-[-2px] hover:manga-shadow transition-all ${item.alert ? 'border-manga-red bg-red-50/10' : ''
+                }`}
             >
               <div>
                 <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">{item.label}</span>

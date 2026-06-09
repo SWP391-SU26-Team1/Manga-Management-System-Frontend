@@ -108,7 +108,7 @@ export default function ProfilePage() {
           {isEditing && (
             <button 
               onClick={handleSave}
-              className="flex items-center gap-2 bg-manga-red text-white font-bold uppercase px-6 py-3 border-2 border-manga-ink hover:bg-red-700 transition-colors shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none text-sm">
+              className="flex items-center gap-2 bg-manga-red text-white font-bold uppercase px-6 py-3 border-2 border-manga-ink hover:bg-red-700 transition-colors shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none text-sm cursor-pointer">
               <Save className="w-4 h-4" />
               <span>Lưu thay đổi</span>
             </button>
@@ -118,7 +118,7 @@ export default function ProfilePage() {
                if (isEditing) handleCancel(); 
                else setIsEditing(true);
             }}
-            className="flex items-center gap-2 bg-manga-ink text-white font-bold uppercase px-6 py-3 border-2 border-manga-ink hover:bg-gray-800 transition-colors shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none text-sm">
+            className="flex items-center gap-2 bg-manga-ink text-white font-bold uppercase px-6 py-3 border-2 border-manga-ink hover:bg-gray-800 transition-colors shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none text-sm cursor-pointer">
             {isEditing ? <X className="w-4 h-4" /> : <Edit3 className="w-4 h-4" />}
             <span>{isEditing ? 'Hủy' : 'Chỉnh sửa hồ sơ'}</span>
           </button>

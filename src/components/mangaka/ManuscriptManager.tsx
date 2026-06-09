@@ -44,8 +44,8 @@ export function ManuscriptManager() {
         <h2 className="font-manga text-2xl font-bold uppercase tracking-wider">
           Quản lý bản thảo
         </h2>
-        <Link 
-          to="/dashboard/mangaka/series" 
+        <Link
+          to="/dashboard/mangaka/series"
           className="text-manga-red text-sm font-bold uppercase tracking-widest hover:text-white transition-colors flex items-center gap-1"
         >
           Xem tất cả <ArrowRight className="w-4 h-4" />
@@ -71,14 +71,14 @@ export function ManuscriptManager() {
                   </span>
                   <StatusIcon className={`w-5 h-5 ${iconColor}`} />
                 </div>
-                
+
                 {/* Visual Preview */}
                 <div className="aspect-[4/3] bg-gray-200 border-2 border-manga-ink mb-4 relative overflow-hidden group-hover:manga-shadow-sm transition-shadow">
                   {chapter.status === "Completed" || chapter.status === "Drawing" ? (
-                    <img 
-                      src={coverImg} 
-                      alt={`Chương ${chapter.chapterNumber}`} 
-                      className="w-full h-full object-cover grayscale contrast-125" 
+                    <img
+                      src={coverImg}
+                      alt={`Chương ${chapter.chapterNumber}`}
+                      className="w-full h-full object-cover grayscale contrast-125"
                     />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 border-2 border-dashed border-gray-300">
@@ -91,7 +91,7 @@ export function ManuscriptManager() {
                 <h3 className="font-bold text-xl mb-3 truncate" title={chapter.title}>
                   {chapter.title}
                 </h3>
-                
+
                 <div className="border-t-2 border-dashed border-manga-ink pt-3 flex justify-between items-center">
                   <span className="text-xs font-bold uppercase tracking-widest text-gray-500">Trạng thái</span>
                   <span className={`px-2 py-0.5 border font-bold text-sm uppercase ${badgeStyle}`}>

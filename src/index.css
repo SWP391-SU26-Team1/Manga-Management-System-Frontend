@@ -7,7 +7,7 @@
   --color-manga-ink: #0f0f0f;
   --color-manga-paper: #fefce8;
   --color-manga-red: #E63946;
-  
+
   --font-sans: 'Inter', sans-serif;
   --font-manga: 'Oswald', sans-serif;
 }
@@ -16,16 +16,16 @@
   body {
     @apply bg-white text-manga-ink antialiased font-sans;
   }
-  
+
   /* Utilities for the Manga editorial style */
   .manga-border {
     @apply border-2 border-manga-ink;
   }
-  
+
   .manga-shadow {
     box-shadow: 4px 4px 0px 0px rgba(15, 15, 15, 1);
   }
-  
+
   .manga-shadow-sm {
     box-shadow: 2px 2px 0px 0px rgba(15, 15, 15, 1);
   }

@@ -26,8 +26,8 @@ export default function SettingsPage() {
             Tùy chỉnh trải nghiệm và cấu hình tài khoản mangaka của bạn
           </p>
         </div>
-        
-        <button 
+
+        <button
           onClick={handleSave}
           className="flex items-center gap-2 bg-manga-red text-white font-bold uppercase px-6 py-3 border-2 border-manga-ink hover:bg-red-700 transition-all shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none text-sm cursor-pointer">
           <Save className="w-4 h-4" />
@@ -54,11 +54,11 @@ export default function SettingsPage() {
                 <span className="font-bold block text-sm">Thông báo qua Email</span>
                 <span className="text-xs text-gray-500 font-semibold">Nhận email cập nhật khi trợ lý gửi báo cáo hoặc hoàn thành nhiệm vụ</span>
               </div>
-              <input 
-                type="checkbox" 
-                checked={emailNotif} 
+              <input
+                type="checkbox"
+                checked={emailNotif}
                 onChange={() => setEmailNotif(!emailNotif)}
-                className="w-5 h-5 accent-manga-red cursor-pointer" 
+                className="w-5 h-5 accent-manga-red cursor-pointer"
               />
             </label>
             <label className="flex items-center justify-between p-3 bg-gray-50 border-2 border-manga-ink shadow-[2px_2px_0px_rgba(0,0,0,1)] cursor-pointer hover:bg-red-50/20 transition-colors">
@@ -66,11 +66,11 @@ export default function SettingsPage() {
                 <span className="font-bold block text-sm">Thông báo trên trình duyệt</span>
                 <span className="text-xs text-gray-500 font-semibold">Đẩy thông báo thời gian thực về bình luận từ Editor và yêu cầu chỉnh sửa</span>
               </div>
-              <input 
-                type="checkbox" 
-                checked={pushNotif} 
+              <input
+                type="checkbox"
+                checked={pushNotif}
                 onChange={() => setPushNotif(!pushNotif)}
-                className="w-5 h-5 accent-manga-red cursor-pointer" 
+                className="w-5 h-5 accent-manga-red cursor-pointer"
               />
             </label>
           </div>
@@ -89,11 +89,10 @@ export default function SettingsPage() {
                 <button
                   key={mode}
                   onClick={() => setTheme(mode)}
-                  className={`p-3 border-2 border-manga-ink font-bold text-xs uppercase transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] cursor-pointer ${
-                    theme === mode 
-                      ? 'bg-manga-red text-white' 
+                  className={`p-3 border-2 border-manga-ink font-bold text-xs uppercase transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] cursor-pointer ${theme === mode
+                      ? 'bg-manga-red text-white'
                       : 'bg-white hover:bg-gray-50 text-black'
-                  }`}
+                    }`}
                 >
                   {mode === 'light' ? 'Sáng' : mode === 'dark' ? 'Tối' : 'Manga Noir'}
                 </button>
@@ -113,11 +112,11 @@ export default function SettingsPage() {
               <span className="font-bold block text-sm">Chế độ hồ sơ công khai</span>
               <span className="text-xs text-gray-500 font-semibold">Cho phép các trợ lý tìm thấy tin tuyển dụng hoặc dự án của bạn</span>
             </div>
-            <input 
-              type="checkbox" 
-              checked={profilePublic} 
+            <input
+              type="checkbox"
+              checked={profilePublic}
               onChange={() => setProfilePublic(!profilePublic)}
-              className="w-5 h-5 accent-manga-red cursor-pointer" 
+              className="w-5 h-5 accent-manga-red cursor-pointer"
             />
           </label>
         </div>
@@ -130,7 +129,6 @@ export default function SettingsPage() {
           </h3>
           <select className="w-full bg-white border-2 border-manga-ink p-3 font-bold text-sm outline-none focus:ring-2 focus:ring-manga-red">
             <option value="vi">Tiếng Việt (Mặc định)</option>
-            <option value="ja">日本語 (Japanese)</option>
             <option value="en">English (US)</option>
           </select>
         </div>

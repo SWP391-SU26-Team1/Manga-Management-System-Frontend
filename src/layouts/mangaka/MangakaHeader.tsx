@@ -97,7 +97,7 @@ export function Header() {
       <div className="flex items-center gap-4">
         {/* Notifications Dropdown */}
         <div className="relative" ref={notifRef}>
-          <button 
+          <button
             onClick={() => { setShowNotif(!showNotif); setShowFeedback(false); setShowProfile(false); }}
             className="relative text-manga-ink hover:text-manga-red transition-colors mt-2"
           >
@@ -108,7 +108,7 @@ export function Header() {
               </span>
             )}
           </button>
-          
+
           {showNotif && (
             <div className="absolute top-12 right-0 w-80 bg-white border-2 border-manga-ink manga-shadow-sm flex flex-col z-50">
               <div className="p-3 border-b-2 border-manga-ink bg-gray-50 flex justify-between items-center">
@@ -117,8 +117,8 @@ export function Header() {
               </div>
               <div className="max-h-80 overflow-y-auto">
                 {notifications.slice(0, 5).map(n => (
-                  <div 
-                    key={n.id} 
+                  <div
+                    key={n.id}
                     onClick={() => handleNotifClick(n.id, n.link)}
                     className={`p-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${!n.isRead ? 'bg-red-50/50' : ''}`}
                   >
@@ -137,7 +137,7 @@ export function Header() {
 
         {/* Feedbacks Dropdown */}
         <div className="relative" ref={feedbackRef}>
-          <button 
+          <button
             onClick={() => { setShowFeedback(!showFeedback); setShowNotif(false); setShowProfile(false); }}
             className="relative text-manga-ink hover:text-manga-red transition-colors mt-2"
           >
@@ -157,8 +157,8 @@ export function Header() {
               </div>
               <div className="max-h-80 overflow-y-auto">
                 {feedbacks.filter(f => f.status === "Open").slice(0, 5).map(f => (
-                  <Link 
-                    key={f.id} 
+                  <Link
+                    key={f.id}
                     to="/dashboard/mangaka/feedback"
                     onClick={() => setShowFeedback(false)}
                     className="block p-3 border-b border-gray-100 hover:bg-gray-50"
@@ -182,7 +182,7 @@ export function Header() {
 
         {/* Profile Dropdown */}
         <div className="relative" ref={profileRef}>
-          <button 
+          <button
             onClick={() => { setShowProfile(!showProfile); setShowNotif(false); setShowFeedback(false); }}
             className="w-10 h-10 rounded-full overflow-hidden border-2 border-manga-ink hover:border-manga-red transition-colors ml-2 bg-manga-red flex items-center justify-center text-white font-bold"
           >
@@ -199,23 +199,23 @@ export function Header() {
 
           {showProfile && (
             <div className="absolute top-14 right-0 w-48 bg-white border-2 border-manga-ink manga-shadow-sm flex flex-col z-50">
-              <Link 
-                to="/dashboard/mangaka/profile" 
+              <Link
+                to="/dashboard/mangaka/profile"
                 onClick={() => setShowProfile(false)}
                 className="flex items-center gap-2 p-3 border-b border-gray-100 hover:bg-gray-50"
               >
                 <User className="w-4 h-4" />
                 <span className="text-sm font-bold">Hồ sơ cá nhân</span>
               </Link>
-              <Link 
-                to="/dashboard/mangaka/settings" 
+              <Link
+                to="/dashboard/mangaka/settings"
                 onClick={() => setShowProfile(false)}
                 className="flex items-center gap-2 p-3 border-b border-gray-100 hover:bg-gray-50"
               >
                 <Settings className="w-4 h-4" />
                 <span className="text-sm font-bold">Cài đặt</span>
               </Link>
-              <button 
+              <button
                 onClick={handleLogout}
                 className="flex items-center gap-2 p-3 text-red-600 hover:bg-red-50 w-full text-left"
               >

@@ -84,11 +84,10 @@ export function Sidebar() {
             <Link
               key={item.label}
               to={item.path}
-              className={`flex items-center gap-3 px-4 py-3 font-bold text-base transition-all rounded-none ${
-                active
+              className={`flex items-center gap-3 px-4 py-3 font-bold text-base transition-all rounded-none ${active
                   ? 'bg-[#E63946] text-white border-2 border-black'
                   : 'bg-white text-black hover:bg-gray-50 border-2 border-transparent'
-              }`}
+                }`}
             >
               <Icon className="w-5 h-5 flex-shrink-0" />
               <span className="leading-tight">{item.label}</span>
@@ -102,11 +101,10 @@ export function Sidebar() {
         {/* Settings link */}
         <Link
           to="/dashboard/mangaka/settings"
-          className={`flex items-center gap-3 px-4 py-3 font-bold text-sm transition-all border-2 w-full ${
-            location.pathname === '/dashboard/mangaka/settings'
+          className={`flex items-center gap-3 px-4 py-3 font-bold text-sm transition-all border-2 w-full ${location.pathname === '/dashboard/mangaka/settings'
               ? 'bg-[#E63946] text-white border-black'
               : 'bg-white text-black hover:bg-red-50 border-transparent'
-          }`}
+            }`}
         >
           <Settings className="w-4 h-4 flex-shrink-0" />
           <span>Cài đặt</span>

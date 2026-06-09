@@ -5,7 +5,7 @@ export interface AssistantTask {
   seriesTitle: string;
   chapterNumber: number;
   pageNumber: number;
-  layerType: 'Panel Frame' | 'Line Art' | 'Speech Balloon' | 'Background' | 'SFX' | 'Coloring';
+  layerType: string;
   assignedBy: string; // Họa sĩ chính (Mangaka)
   deadline: string;
   status: 'Not Started' | 'In Progress' | 'Submitted' | 'Need Fix' | 'Approved';
@@ -42,11 +42,83 @@ export const ASSISTANT_LOGIN_CREDENTIALS = {
 
 export const ASSISTANT_TASKS: AssistantTask[] = [
   {
+    id: '1042',
+    seriesTitle: 'Sakura High',
+    chapterNumber: 3,
+    pageNumber: 1,
+    layerType: 'Character Lineart',
+    assignedBy: 'Akira Tanaka',
+    deadline: '2026-05-24',
+    status: 'Need Fix', // REVISION
+    priority: 'High',
+    note: 'Biểu cảm nhân vật cần mạnh hơn ở panel 3-5. Đặc biệt ánh mắt của Hiroshi khi đối đầu với kẻ địch cần thể hiện sự giận dữ và kiên quyết hơn.'
+  },
+  {
+    id: '1040',
+    seriesTitle: 'Cyber Ronin',
+    chapterNumber: 2,
+    pageNumber: 1,
+    layerType: 'Character Design Sheet',
+    assignedBy: 'Akira Tanaka',
+    deadline: '2026-05-19',
+    status: 'Need Fix', // REVISION
+    priority: 'Medium',
+    note: 'Nếp gấp quần áo của nhân vật chính trong tư thế chiến đấu trông hơi cứng. Cần làm cho nó mềm mại và tự nhiên hơn.'
+  },
+  {
+    id: '1051',
+    seriesTitle: 'Dark Rising Chronicles',
+    chapterNumber: 15,
+    pageNumber: 1,
+    layerType: 'SFX Design',
+    assignedBy: 'Akira Tanaka',
+    deadline: '2026-05-21',
+    status: 'Need Fix', // REVISION
+    priority: 'Urgent',
+    note: 'Hiệu ứng chữ \'BOOM\' cần nét vẽ gai góc và sắc nhọn hơn để thể hiện uy lực của cú đấm.'
+  },
+  {
+    id: '1041',
+    seriesTitle: 'Dark Rising Chronicles',
+    chapterNumber: 14,
+    pageNumber: 1,
+    layerType: 'Tone & Effect',
+    assignedBy: 'Akira Tanaka',
+    deadline: '2026-05-23',
+    status: 'Submitted', // REVIEW
+    priority: 'Medium',
+    note: 'Độ phân giải hiệu ứng lưới sàng (screentone) ở trang 14 bị moiré. Hãy xuất file ảnh chất lượng cao hơn hoặc đổi kiểu screentone khác.'
+  },
+  {
+    id: '1045',
+    seriesTitle: 'Phantom Guild',
+    chapterNumber: 9,
+    pageNumber: 1,
+    layerType: 'Action Sequence Lineart',
+    assignedBy: 'Akira Tanaka',
+    deadline: '2026-05-19',
+    status: 'Submitted', // REVIEW
+    priority: 'High',
+    note: 'Đi nét phân cảnh hành động chiến đấu trên nóc tòa nhà. Tốc độ di chuyển của nhân vật chưa được lột tả rõ.'
+  },
+  {
+    id: '1039',
+    seriesTitle: 'Moonlight Academy',
+    chapterNumber: 7,
+    pageNumber: 1,
+    layerType: 'Thêm Nền',
+    assignedBy: 'Akira Tanaka',
+    deadline: '2026-05-20',
+    status: 'In Progress', // PENDING
+    priority: 'Medium',
+    note: 'Cảnh nền phòng học đang hơi trống trải. Hãy thêm một vài quyển sách trên bàn và một bức tranh vẽ trên bảng đen.'
+  },
+  {
     id: '1032',
     seriesTitle: 'Phantom Guild',
     chapterNumber: 1,
     pageNumber: 1,
-    layerType: 'Background', // Character Sheet Vol.1
+    layerType: 'Background',
     assignedBy: 'Akira Tanaka',
     deadline: '2026-04-28',
     status: 'Approved',
@@ -58,7 +130,7 @@ export const ASSISTANT_TASKS: AssistantTask[] = [
     seriesTitle: 'Sakura High',
     chapterNumber: 2,
     pageNumber: 1,
-    layerType: 'Coloring', // Cover Vol.2
+    layerType: 'Coloring',
     assignedBy: 'Akira Tanaka',
     deadline: '2026-05-05',
     status: 'Approved',
@@ -70,7 +142,7 @@ export const ASSISTANT_TASKS: AssistantTask[] = [
     seriesTitle: 'Moonlight Academy',
     chapterNumber: 8,
     pageNumber: 4,
-    layerType: 'Background', // Background Ch.8
+    layerType: 'Background',
     assignedBy: 'Akira Tanaka',
     deadline: '2026-05-08',
     status: 'Approved',
@@ -82,7 +154,7 @@ export const ASSISTANT_TASKS: AssistantTask[] = [
     seriesTitle: 'Steel Warriors',
     chapterNumber: 11,
     pageNumber: 2,
-    layerType: 'Line Art', // Lineart Ch.11
+    layerType: 'Line Art',
     assignedBy: 'Akira Tanaka',
     deadline: '2026-05-10',
     status: 'Approved',
@@ -94,7 +166,7 @@ export const ASSISTANT_TASKS: AssistantTask[] = [
     seriesTitle: 'Dark Rising Chronicles',
     chapterNumber: 5,
     pageNumber: 1,
-    layerType: 'Background', // Background Lineart
+    layerType: 'Background',
     assignedBy: 'Akira Tanaka',
     deadline: '2026-05-14',
     status: 'Approved',
@@ -106,38 +178,13 @@ export const ASSISTANT_TASKS: AssistantTask[] = [
     seriesTitle: 'Steel Warriors',
     chapterNumber: 3,
     pageNumber: 1,
-    layerType: 'Coloring', // Cover Art
+    layerType: 'Coloring',
     assignedBy: 'Akira Tanaka',
     deadline: '2026-05-16',
     status: 'Approved',
     priority: 'High',
     note: 'Tô màu poster quảng bá chương mới (Cover Art). Dùng màu tương phản cao.'
   },
-  {
-    id: '1038',
-    seriesTitle: 'Dark Rising Chronicles',
-    chapterNumber: 6,
-    pageNumber: 3,
-    layerType: 'Line Art', // Character Lineart
-    assignedBy: 'Akira Tanaka',
-    deadline: '2026-05-18',
-    status: 'In Progress',
-    priority: 'High',
-    note: 'Vẽ nét biểu cảm khuôn mặt của nhân vật phản diện chính ở trang 3 (Character Lineart).'
-  },
-  {
-    id: '1045',
-    seriesTitle: 'Phantom Guild',
-    chapterNumber: 12,
-    pageNumber: 5,
-    layerType: 'Line Art', // Action Sequence Lineart
-    assignedBy: 'Akira Tanaka',
-    deadline: '2026-05-18',
-    status: 'Submitted', // Review
-    priority: 'High',
-    note: 'Đi nét phân cảnh hành động chiến đấu trên nóc tòa nhà (Action Sequence Lineart).'
-  },
-  // Adding remaining 11 tasks to reach 19 tasks matching the mockup statistics
   {
     id: '1046',
     seriesTitle: 'Moonlight Academy',
@@ -199,18 +246,6 @@ export const ASSISTANT_TASKS: AssistantTask[] = [
     note: 'Vẽ nền khoang lái robot.'
   },
   {
-    id: '1051',
-    seriesTitle: 'Moonlight Academy',
-    chapterNumber: 9,
-    pageNumber: 1,
-    layerType: 'Line Art',
-    assignedBy: 'Akira Tanaka',
-    deadline: '2026-05-28',
-    status: 'Need Fix', // Revision
-    priority: 'High',
-    note: 'Sửa lại cơ mặt nhân vật chính lúc ngạc nhiên. Nét vẽ hiện tại chưa đủ lực.'
-  },
-  {
     id: '1052',
     seriesTitle: 'Steel Warriors',
     chapterNumber: 13,
@@ -218,7 +253,7 @@ export const ASSISTANT_TASKS: AssistantTask[] = [
     layerType: 'SFX',
     assignedBy: 'Akira Tanaka',
     deadline: '2026-05-30',
-    status: 'Need Fix', // Revision
+    status: 'Need Fix',
     priority: 'High',
     note: 'Chỉnh lại hiệu ứng tia lửa điện. Đang bị thưa quá.'
   },
@@ -230,7 +265,7 @@ export const ASSISTANT_TASKS: AssistantTask[] = [
     layerType: 'Coloring',
     assignedBy: 'Akira Tanaka',
     deadline: '2026-05-31',
-    status: 'Need Fix', // Revision
+    status: 'Need Fix',
     priority: 'Medium',
     note: 'Sửa lại tông màu da của nhân vật phụ dưới nắng chiều.'
   },

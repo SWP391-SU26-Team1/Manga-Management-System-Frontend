@@ -1,934 +1,1538 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router'
-import { useToast } from '@/contexts/ToastContext'
-import {
-  ClipboardList,
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
-  Upload,
+import { 
+  Search, 
+  ChevronDown, 
+  Download, 
+  Edit2, 
+  Eye, 
+  Check, 
+  Clock, 
+  ChevronLeft, 
+  ChevronRight, 
+  Filter,
   X,
-  Search,
+  PenTool,
+  FileText,
+  MessageSquare,
+  Save,
   FileDown,
-  Edit2,
-  Eye,
-  ChevronDown,
+  CheckCircle2,
+  Send,
+  AlertTriangle,
+  ArrowLeft,
+  ZoomIn,
+  ZoomOut,
+  ChevronUp,
+  User,
   Paperclip,
-  Check,
-  FolderOpen,
-  MessageSquare
+  Upload
 } from 'lucide-react'
 import { assistantStore, AssistantTask } from '@/data/assistantMockData'
 
 export default function TasksPage() {
-  const [tasks, setTasks] = useState<AssistantTask[]>([])
-  const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'IN_PROGRESS' | 'PENDING' | 'REVIEW' | 'REVISION' | 'APPROVED'>('ALL')
-  const [sortBy, setSortBy] = useState<'deadline' | 'id'>('deadline')
-  const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 8
-
-  // Submit drawing modal state
-  const [selectedTask, setSelectedTask] = useState<AssistantTask | null>(null)
-  const [fileName, setFileName] = useState('')
-  const [submitNote, setSubmitNote] = useState('')
-  const [previewUrl, setPreviewUrl] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
   const navigate = useNavigate()
-  const { showToast } = useToast()
+  const [tasks, setTasks] = useState<AssistantTask[]>([])
+  
+  // Modal State for EDIT (SỬA) action
+  const [selectedTaskForModal, setSelectedTaskForModal] = useState<AssistantTask | null>(null)
 
-  // New Modals state
-  const [downloadTask, setDownloadTask] = useState<AssistantTask | null>(null)
-  const [workspaceTask, setWorkspaceTask] = useState<AssistantTask | null>(null)
-  const [checklistStates, setChecklistStates] = useState<Record<string, boolean[]>>({})
-  const [progressNotes, setProgressNotes] = useState<Record<string, string>>({})
+  // Modal State for SUBMIT (NỘP) action
+  const [submittingTask, setSubmittingTask] = useState<AssistantTask | null>(null)
+  const [submitNotes, setSubmitNotes] = useState('')
+  const [submitVersion, setSubmitVersion] = useState('v1.0')
+  const [attachedFile, setAttachedFile] = useState<{ name: string; size: string } | null>(null)
 
-  const loadTasks = () => {
-    setTasks(assistantStore.getTasks())
-  }
-
-  useEffect(() => {
-    loadTasks()
-  }, [])
-
-  // Dynamic statistics based on current database state
-  const totalCount = tasks.length
-  const inProgressCount = tasks.filter(t => t.status === 'In Progress').length
-  const pendingCount = tasks.filter(t => t.status === 'Not Started').length
-  const reviewCount = tasks.filter(t => t.status === 'Submitted').length
-  const revisionCount = tasks.filter(t => t.status === 'Need Fix').length
-  const approvedCount = tasks.filter(t => t.status === 'Approved').length
-
-  // Filter tasks based on search and status
-  const filteredTasks = tasks.filter((task) => {
-    // Search match
-    const matchesSearch =
-      task.id.includes(searchTerm) ||
-      task.seriesTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      task.layerType.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      task.note.toLowerCase().includes(searchTerm.toLowerCase())
-
-    // Status match
-    if (statusFilter === 'ALL') return matchesSearch
-    if (statusFilter === 'IN_PROGRESS') return matchesSearch && task.status === 'In Progress'
-    if (statusFilter === 'PENDING') return matchesSearch && task.status === 'Not Started'
-    if (statusFilter === 'REVIEW') return matchesSearch && task.status === 'Submitted'
-    if (statusFilter === 'REVISION') return matchesSearch && task.status === 'Need Fix'
-    if (statusFilter === 'APPROVED') return matchesSearch && task.status === 'Approved'
-    return false
-  })
-
-  // Sort tasks
-  const sortedTasks = [...filteredTasks].sort((a, b) => {
-    if (sortBy === 'deadline') {
-      return new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
-    }
-    return a.id.localeCompare(b.id)
-  })
-
-  // Paginated tasks
-  const totalPages = Math.ceil(sortedTasks.length / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const paginatedTasks = sortedTasks.slice(startIndex, startIndex + itemsPerPage)
-
-  const handleOpenSubmit = (task: AssistantTask) => {
-    setSelectedTask(task)
-    setFileName(`${task.layerType.toLowerCase().replace(' ', '_')}_ch${task.chapterNumber}_p${task.pageNumber}_draft.png`)
-    setSubmitNote('')
-    setPreviewUrl('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=600&auto=format&fit=crop')
-  }
-
-  const handleSubmitDraw = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selectedTask) return
-
-    setIsSubmitting(true)
-
-    // Simulate server response
-    setTimeout(() => {
-      assistantStore.addSubmission({
-        taskId: selectedTask.id,
-        seriesTitle: selectedTask.seriesTitle,
-        chapterNumber: selectedTask.chapterNumber,
-        pageNumber: selectedTask.pageNumber,
-        layerType: selectedTask.layerType,
-        fileName: fileName,
-        previewUrl: previewUrl,
-        note: submitNote,
-      })
-
-      setIsSubmitting(false)
-      setSelectedTask(null)
-      showToast(`Đã nộp thành công bản vẽ cho ${selectedTask.seriesTitle} (Chương ${selectedTask.chapterNumber})!`)
-      loadTasks()
-    }, 800)
-  }
-
-  // Format date display dd/mm/yyyy
-  const formatDateString = (dateStr: string) => {
-    return dateStr.split('-').reverse().join('/')
-  }
-
-  // Status Badge Mapper
-  const renderStatusBadge = (status: AssistantTask['status']) => {
-    switch (status) {
-      case 'Approved':
-        return (
-          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded border border-emerald-300 text-emerald-600 bg-emerald-50/50 uppercase tracking-wide">
-            APPROVED
-          </span>
-        )
-      case 'In Progress':
-        return (
-          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded border border-blue-300 text-blue-600 bg-blue-50/50 uppercase tracking-wide">
-            IN PROGRESS
-          </span>
-        )
-      case 'Submitted':
-        return (
-          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded border border-purple-300 text-purple-600 bg-purple-50/50 uppercase tracking-wide">
-            REVIEW
-          </span>
-        )
-      case 'Need Fix':
-        return (
-          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded border border-red-300 text-[#E63946] bg-red-50/50 uppercase tracking-wide">
-            REVISION
-          </span>
-        )
-      case 'Not Started':
-      default:
-        return (
-          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded border border-amber-300 text-amber-600 bg-amber-50/50 uppercase tracking-wide">
-            PENDING
-          </span>
-        )
-    }
-  }
-
-  // Priority Dot Mapper
-  const renderPriority = (priority: AssistantTask['priority']) => {
-    switch (priority) {
-      case 'Low':
-        return (
-          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-500">
-            <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-            THẤP
-          </span>
-        )
-      case 'Medium':
-        return (
-          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-500">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-            TRUNG BÌNH
-          </span>
-        )
-      case 'High':
-      case 'Urgent':
-      default:
-        return (
-          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#E63946]">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#E63946]" />
-            CAO
-          </span>
-        )
-    }
-  }
-
-  const handleDownloadFile = (task: AssistantTask) => {
-    setDownloadTask(task)
-  }
-
-  const handleDownloadAll = (task: AssistantTask) => {
-    showToast(`Đang chuẩn bị nén toàn bộ tài nguyên cho Task #${task.id}...`)
-  }
-
-  const toggleChecklistItem = (taskId: string, index: number) => {
-    const current = checklistStates[taskId] || [false, false, false, false, false, false]
-    const updated = [...current]
-    updated[index] = !updated[index]
-    setChecklistStates(prev => ({ ...prev, [taskId]: updated }))
-  }
-
-  const checklistItems = [
+  // Modal State for DOWNLOAD (TẢI FILE) action
+  const [downloadingTask, setDownloadingTask] = useState<AssistantTask | null>(null)
+  
+  // Canvas Workspace State for VIEW (VIEW) action
+  const [viewingTaskId, setViewingTaskId] = useState<string | null>(null)
+  const [zoomLevel, setZoomLevel] = useState(55) // Default 55% from figma mockup
+  const [activeTab, setActiveTab] = useState<'info' | 'feedback' | 'resources'>('info')
+  const [isTimelineExpanded, setIsTimelineExpanded] = useState(true)
+  
+  // Checklist item labels
+  const CHECKLIST_ITEMS = [
     'Đọc kỹ brief & yêu cầu nhiệm vụ',
     'Tải đầy đủ file nguồn & tài nguyên',
     'Hoàn thành phần việc chính',
     'Tự kiểm tra chất lượng',
     'Chuẩn bị file nộp đúng định dạng',
-    'Viết ghi chú mô tả thay đổi'
+    'Nộp bài và báo cáo tiến độ'
   ]
 
-  return (
-    <div className="max-w-7xl mx-auto pb-16 font-sans text-gray-900">
-      
-      {/* Back Button */}
-      <button
-        onClick={() => navigate(-1)}
-        className="flex items-center gap-1 text-xs font-extrabold text-[#E63946] hover:text-black transition-colors uppercase mb-3 bg-transparent border-0 p-0 cursor-pointer"
-      >
-        &larr; Quay lại
-      </button>
+  // Checklist states: Record<taskId, boolean[]>
+  const [checklistStates, setChecklistStates] = useState<Record<string, boolean[]>>(() => {
+    const saved = localStorage.getItem('assistant_task_checklists')
+    return saved ? JSON.parse(saved) : {}
+  })
 
-      {/* Page Title & Add Button */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 uppercase">
-            DANH SÁCH NHIỆM VỤ
-          </h1>
-          <p className="text-sm font-medium text-gray-500 mt-1">
-            Quản lý và theo dõi tất cả nhiệm vụ được giao
-          </p>
-        </div>
+  // Progress notes: Record<taskId, string>
+  const [progressNotes, setProgressNotes] = useState<Record<string, string>>(() => {
+    const saved = localStorage.getItem('assistant_task_notes')
+    return saved ? JSON.parse(saved) : {}
+  })
 
-        {/* Outline "+ NHIỆM VỤ MỚI" Button */}
-        <button
-          onClick={() => showToast('Chức năng tạo nhiệm vụ dành cho Mangaka/Sensei.')}
-          className="border border-dashed border-gray-300 text-gray-500 rounded-lg hover:bg-gray-50 transition-all font-bold px-4 py-2 text-xs flex items-center gap-1.5 uppercase tracking-wide"
-        >
-          <Clock className="w-4 h-4" />
-          <span>Nhiệm vụ mới</span>
-        </button>
-      </div>
+  // Current editing progress note text in modal
+  const [editingNote, setEditingNote] = useState('')
+  
+  // Toast notifications
+  const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
-      {/* Statistics boxes row */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-8">
-        {[
-          { count: totalCount, label: 'Tổng nhiệm vụ', color: 'text-gray-900' },
-          { count: inProgressCount, label: 'Đang thực hiện', color: 'text-blue-600' },
-          { count: pendingCount, label: 'Chờ xử lý', color: 'text-amber-600' },
-          { count: revisionCount, label: 'Cần sửa đổi', color: 'text-[#E63946]' },
-          { count: approvedCount, label: 'Đã duyệt', color: 'text-emerald-600' },
-        ].map((item, idx) => (
-          <div key={idx} className="bg-white border-2 border-black rounded-none p-4 shadow-xs flex items-center gap-4">
-            <span className={`text-3xl font-black ${item.color}`}>
-              {item.count}
-            </span>
-            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider leading-tight">
-              {item.label}
-            </span>
-          </div>
-        ))}
-      </div>
+  // Filters state
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'In Progress' | 'Not Started' | 'Submitted' | 'Need Fix' | 'Approved'>('ALL')
+  const [sortByDeadline, setSortByDeadline] = useState(true)
 
-      {/* Filter and Search Action bar */}
-      <div className="bg-white border-2 border-black rounded-none p-4 shadow-sm mb-6 flex flex-col lg:flex-row justify-between items-center gap-4">
-        
-        {/* Search */}
-        <div className="relative w-full lg:w-72">
-          <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value)
-              setCurrentPage(1)
-            }}
-            placeholder="Tìm Task ID, manga, loại..."
-            className="w-full pl-9 pr-4 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#E63946] focus:bg-white font-sans text-gray-700 bg-gray-50/50"
-          />
-        </div>
+  useEffect(() => {
+    loadTasksData()
+  }, [])
 
-        {/* Middle: Status filters */}
-        <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto w-full lg:w-auto justify-start lg:justify-center whitespace-nowrap scrollbar-none">
-          <span className="text-xs font-bold text-gray-400 uppercase mr-1">Trạng thái:</span>
-          {[
-            { filter: 'ALL', label: 'TẤT CẢ', count: totalCount },
-            { filter: 'IN_PROGRESS', label: 'IN PROGRESS', count: inProgressCount },
-            { filter: 'PENDING', label: 'PENDING', count: pendingCount },
-            { filter: 'REVIEW', label: 'REVIEW', count: reviewCount },
-            { filter: 'REVISION', label: 'REVISION', count: revisionCount },
-            { filter: 'APPROVED', label: 'APPROVED', count: approvedCount },
-          ].map((tab) => (
-            <button
-              key={tab.filter}
-              onClick={() => {
-                setStatusFilter(tab.filter as any)
-                setCurrentPage(1)
-              }}
-              className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase transition-all whitespace-nowrap ${
-                statusFilter === tab.filter
-                  ? 'bg-[#E63946] text-white shadow-xs'
-                  : 'bg-gray-50 hover:bg-gray-100 text-gray-500 border border-gray-100'
-              }`}
-            >
-              {tab.label} ({tab.count})
-            </button>
-          ))}
-        </div>
+  const loadTasksData = () => {
+    try {
+      const fetchedTasks = assistantStore.getTasks();
+      setTasks(Array.isArray(fetchedTasks) ? fetchedTasks : []);
+    } catch (e) {
+      console.error("Error fetching tasks:", e);
+      setTasks([]);
+    }
+  }
+  
+  const safeTasks = Array.isArray(tasks) ? tasks : [];
+  
+  const totalTasks = safeTasks.length
+  const inProgressTasks = safeTasks.filter(t => t?.status === 'In Progress').length
+  const pendingTasks = safeTasks.filter(t => t?.status === 'Not Started').length
+  const reviewTasks = safeTasks.filter(t => t?.status === 'Submitted').length
+  const revisionTasks = safeTasks.filter(t => t?.status === 'Need Fix').length
+  const approvedTasks = safeTasks.filter(t => t?.status === 'Approved').length
 
-        {/* Right: Sorting selection */}
-        <div className="relative w-full lg:w-auto flex justify-end">
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
-            className="appearance-none pl-3 pr-8 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#E63946] font-bold text-gray-600 bg-white cursor-pointer"
+  const getPriorityColor = (priority?: string) => {
+    switch (priority) {
+      case 'Urgent':
+      case 'High': return 'text-[#E63946]'
+      case 'Medium': return 'text-[#F4A261]'
+      case 'Low': return 'text-[#A0AEC0]'
+      default: return 'text-gray-400'
+    }
+  }
+
+  const getPriorityText = (priority?: string) => {
+    if (!priority) return 'UNASSIGNED';
+    switch (priority) {
+      case 'Urgent': return 'KHẨN CẤP'
+      case 'High': return 'CAO'
+      case 'Medium': return 'TRUNG BÌNH'
+      case 'Low': return 'THẤP'
+      default: return priority.toUpperCase()
+    }
+  }
+
+  // Get task reward payment helper (bỏ ký hiệu $)
+  const getTaskPayment = (taskId: string) => {
+    return '850.000 ₫'
+  }
+
+  const getStatusBadge = (status?: string) => {
+    switch (status) {
+      case 'Approved':
+        return <span className="bg-[#E6FFFA] text-[#38B2AC] px-2 py-1 text-[10px] font-bold uppercase tracking-wider">APPROVED</span>
+      case 'In Progress':
+        return <span className="bg-[#EBF8FF] text-[#4299E1] px-2 py-1 text-[10px] font-bold uppercase tracking-wider">IN PROGRESS</span>
+      case 'Submitted':
+        return <span className="bg-[#FAF5FF] text-[#9F7AEA] px-2 py-1 text-[10px] font-bold uppercase tracking-wider">REVIEW</span>
+      case 'Need Fix':
+        return <span className="bg-[#FFF5F5] text-[#F56565] px-2 py-1 text-[10px] font-bold uppercase tracking-wider">REVISION</span>
+      case 'Not Started':
+        return <span className="bg-[#FFFDF0] text-[#D69E2E] px-2 py-1 text-[10px] font-bold uppercase tracking-wider">CHỜ NHẬN</span>
+      default:
+        return <span className="bg-gray-100 text-gray-500 px-2 py-1 text-[10px] font-bold uppercase tracking-wider">{status || 'UNKNOWN'}</span>
+    }
+  }
+
+  const getActionButton = (task: AssistantTask) => {
+    switch (task.status) {
+      case 'Approved':
+        return (
+          <button 
+            onClick={() => handleOpenModal(task)}
+            className="w-full flex items-center justify-center gap-1 mt-1.5 px-2 py-1 text-[10px] font-bold text-[#38B2AC] border border-[#38B2AC] hover:bg-[#E6FFFA] transition-colors cursor-pointer bg-white"
           >
-            <option value="deadline">Deadline (gần nhất)</option>
-            <option value="id">Mã nhiệm vụ (ID)</option>
-          </select>
-          <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-        </div>
-      </div>
+            <Check className="w-3 h-3" /> DONE
+          </button>
+        )
+      case 'In Progress':
+      case 'Not Started':
+        return (
+          <button 
+            onClick={() => handleOpenSubmitModal(task)}
+            className="w-full mt-1.5 px-2 py-1 text-[10px] font-bold text-white bg-[#E63946] border border-[#E63946] hover:bg-white hover:text-[#E63946] transition-colors cursor-pointer"
+          >
+            NỘP
+          </button>
+        )
+      case 'Submitted':
+        return (
+          <button 
+            onClick={() => handleOpenModal(task)}
+            className="w-full mt-1.5 px-2 py-1 text-[10px] font-bold text-[#9F7AEA] border border-[#9F7AEA] hover:bg-[#FAF5FF] transition-colors cursor-pointer bg-white"
+          >
+            CHỜ DUYỆT
+          </button>
+        )
+      case 'Need Fix':
+        return (
+          <button 
+            onClick={() => handleOpenModal(task)}
+            className="w-full mt-1.5 px-2 py-1 text-[10px] font-bold text-[#F56565] border border-[#F56565] hover:bg-[#FFF5F5] transition-colors cursor-pointer bg-white"
+          >
+            SỬA LẠI
+          </button>
+        )
+      default:
+        return null
+    }
+  }
 
-      {/* Main Tasks Table */}
-      <div className="bg-white border-2 border-black rounded-none shadow-sm overflow-hidden mb-6">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-black text-white text-[10px] font-black uppercase tracking-wider border-b-2 border-black">
-                <th className="py-4 px-6 text-center text-white">TASK ID</th>
-                <th className="py-4 px-6 text-white">MANGA TITLE</th>
-                <th className="py-4 px-6 text-white">LOẠI NHIỆM VỤ</th>
-                <th className="py-4 px-6 text-white">DEADLINE</th>
-                <th className="py-4 px-6 text-white">TRẠNG THÁI</th>
-                <th className="py-4 px-6 text-white">ƯU TIÊN</th>
-                <th className="py-4 px-6 text-white text-center">TÀI NGUYÊN</th>
-                <th className="py-4 px-6 text-white text-center">HÀNH ĐỘNG</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 text-sm font-semibold text-gray-700">
-              {paginatedTasks.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="py-16 text-center text-gray-400 font-bold">
-                    <ClipboardList className="w-12 h-12 text-gray-200 mx-auto mb-2" />
-                    Không tìm thấy nhiệm vụ nào phù hợp!
-                  </td>
-                </tr>
-              ) : (
-                paginatedTasks.map((task) => (
-                  <tr key={task.id} className="hover:bg-gray-50/50 transition-colors">
-                    
-                    {/* Task ID */}
-                    <td className="py-4 px-6 text-center font-bold text-[#E63946]">
-                      #{task.id}
-                    </td>
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return '';
+    try {
+      return dateStr.split('-').reverse().join('/');
+    } catch {
+      return dateStr;
+    }
+  }
 
-                    {/* Manga Title */}
-                    <td className="py-4 px-6 font-extrabold text-gray-900">
-                      {task.seriesTitle}
-                    </td>
+  // Handle opening EDIT details modal
+  const handleOpenModal = (task: AssistantTask) => {
+    setSelectedTaskForModal(task)
+    
+    // Initialize checklist if not exists
+    if (!checklistStates[task.id]) {
+      const defaultChecked = task.status === 'Approved' 
+        ? [true, true, true, true, true, true] 
+        : task.status === 'Submitted'
+          ? [true, true, true, true, true, false]
+          : [true, true, false, false, false, false]
+      
+      const newChecklists = { ...checklistStates, [task.id]: defaultChecked }
+      setChecklistStates(newChecklists)
+      localStorage.setItem('assistant_task_checklists', JSON.stringify(newChecklists))
+    }
 
-                    {/* Task Type / Layer Type */}
-                    <td className="py-4 px-6 text-gray-500 font-medium">
-                      {task.layerType} Ch.{task.chapterNumber}
-                    </td>
+    setEditingNote(progressNotes[task.id] || '')
+  }
 
-                    {/* Deadline */}
-                    <td className="py-4 px-6 text-gray-500 text-xs font-bold">
-                      <span className="flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-gray-400" />
-                        {formatDateString(task.deadline)}
-                      </span>
-                    </td>
+  // Handle toggle checklist item
+  const handleToggleChecklist = (taskId: string, index: number) => {
+    const current = checklistStates[taskId] || [false, false, false, false, false, false]
+    const updated = [...current]
+    updated[index] = !updated[index]
+    
+    const newChecklists = { ...checklistStates, [taskId]: updated }
+    setChecklistStates(newChecklists)
+    localStorage.setItem('assistant_task_checklists', JSON.stringify(newChecklists))
+  }
 
-                    {/* Status badge */}
-                    <td className="py-4 px-6">
-                      {renderStatusBadge(task.status)}
-                    </td>
+  // Handle saving notes
+  const handleSaveNotes = (taskId: string) => {
+    const newNotes = { ...progressNotes, [taskId]: editingNote }
+    setProgressNotes(newNotes)
+    localStorage.setItem('assistant_task_notes', JSON.stringify(newNotes))
+    showToast('success', 'Đã lưu ghi chú tiến độ thành công!')
+  }
 
-                    {/* Priority dot */}
-                    <td className="py-4 px-6">
-                      {renderPriority(task.priority)}
-                    </td>
+  const showToast = (type: 'success' | 'error', text: string) => {
+    setToastMessage({ type, text })
+    setTimeout(() => {
+      setToastMessage(null)
+    }, 3000)
+  }
 
-                    {/* Resources */}
-                    <td className="py-4 px-6 text-center">
-                      <button
-                        onClick={() => handleDownloadFile(task)}
-                        className="bg-zinc-800 text-white font-extrabold text-[9px] px-2.5 py-1.5 rounded uppercase tracking-wider flex items-center gap-1 mx-auto hover:bg-zinc-950 transition-colors"
-                      >
-                        <FileDown className="w-3 h-3" />
-                        Tải File
-                      </button>
-                    </td>
+  // Navigate to Feedback page and select the task
+  const handleViewFeedbackPage = (taskId: string) => {
+    setSelectedTaskForModal(null)
+    setViewingTaskId(null)
+    navigate('/dashboard/assistant/feedback', { state: { selectedTaskId: taskId } })
+  }
 
-                    {/* Action button layout */}
-                    <td className="py-4 px-6 text-center">
-                      <div className="flex flex-col gap-1 w-24 mx-auto">
-                        <div className="flex gap-1 justify-center">
-                          {/* Edit button */}
-                          <button
-                            onClick={() => setWorkspaceTask(task)}
-                            className="p-1 border border-gray-200 rounded hover:bg-gray-50 text-gray-500 transition-all flex-1 flex justify-center cursor-pointer"
-                            title="Sửa"
-                          >
-                            <Edit2 className="w-3 h-3" />
-                          </button>
-                          
-                          {/* View button */}
-                          <button
-                            onClick={() => showToast(`Ghi chú Sensei: "${task.note}"`)}
-                            className="p-1 border border-gray-200 rounded hover:bg-gray-50 text-gray-500 transition-all flex-1 flex justify-center"
-                            title="Xem chi tiết"
-                          >
-                            <Eye className="w-3 h-3" />
-                          </button>
-                        </div>
+  // Open submission modal
+  const handleOpenSubmitModal = (task: AssistantTask) => {
+    setSubmittingTask(task)
+    setSubmitNotes('')
+    setSubmitVersion('v1.5') // we can default to v1.5 or v1.0, figma screenshot says v1.0 but maybe task version is higher. Let's do v1.0.
+    setAttachedFile(null)
+  }
 
-                        {/* Status change actions */}
-                        {task.status === 'Approved' ? (
-                          <span className="w-full flex items-center justify-center gap-1 border border-emerald-500 bg-emerald-500 text-white rounded py-1 text-[9px] font-extrabold tracking-wider uppercase">
-                            <CheckCircle2 className="w-3 h-3" />
-                            DONE
-                          </span>
-                        ) : task.status === 'Submitted' ? (
-                          <span className="w-full flex items-center justify-center gap-1 border border-purple-500 bg-purple-500 text-white rounded py-1 text-[9px] font-extrabold tracking-wider uppercase">
-                            <Clock className="w-3 h-3 animate-pulse" />
-                            Chờ kết
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => handleOpenSubmit(task)}
-                            className="w-full flex items-center justify-center gap-1 border border-red-500 bg-[#E63946] text-white rounded py-1 text-[9px] font-extrabold tracking-wider uppercase hover:bg-red-600 transition-colors shadow-xs"
-                          >
-                            <Upload className="w-3 h-3" />
-                            Nộp
-                          </button>
-                        )}
-                      </div>
-                    </td>
+  // Handle final submission in the modal
+  const handleSubmitResult = (taskId: string) => {
+    assistantStore.updateTaskStatus(taskId, 'Submitted')
+    loadTasksData()
+    setSubmittingTask(null)
+    showToast('success', `Nộp kết quả thành công cho Task #${taskId}!`)
+  }
 
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+  // Submit revision / open submit modal from edit modal
+  const handleModalSubmitAction = (task: AssistantTask) => {
+    setSelectedTaskForModal(null)
+    handleOpenSubmitModal(task)
+  }
 
-        {/* Table Pagination Footer */}
-        {totalPages > 1 && (
-          <div className="bg-gray-50 border-t border-gray-100 py-3.5 px-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs font-bold text-gray-400">
+  // Accept task handler for the drawing workspace
+  const handleAcceptTask = (task: AssistantTask) => {
+    assistantStore.updateTaskStatus(task.id, 'In Progress')
+    loadTasksData() // refresh tasks in table and view
+    showToast('success', `Đã nhận thành công Nhiệm vụ #${task.id}! Bắt đầu vẽ nào.`)
+  }
+
+  // Get status color config for modal
+  const getStatusConfigForModal = (status: AssistantTask['status']) => {
+    switch (status) {
+      case 'Approved':
+        return { label: 'ĐÃ DUYỆT', bg: 'bg-[#E6FFFA]', text: 'text-[#38B2AC]', border: 'border-[#38B2AC]' }
+      case 'Submitted':
+        return { label: 'REVIEW', bg: 'bg-[#FAF5FF]', text: 'text-[#9F7AEA]', border: 'border-[#9F7AEA]' }
+      case 'Need Fix':
+        return { label: 'REVISION', bg: 'bg-[#FFF5F5]', text: 'text-[#F56565]', border: 'border-[#F56565]' }
+      default:
+        return { label: 'IN PROGRESS', bg: 'bg-[#EBF8FF]', text: 'text-[#4299E1]', border: 'border-[#4299E1]' }
+    }
+  }
+
+  // Get dot color for priority
+  const getPriorityDotColor = (priority?: string) => {
+    switch (priority) {
+      case 'Urgent':
+      case 'High': return 'bg-[#E63946]'
+      case 'Medium': return 'bg-[#F4A261]'
+      case 'Low': return 'bg-[#A0AEC0]'
+      default: return 'bg-gray-400'
+    }
+  }
+
+  // Remaining days label helper for modal
+  const getRemainingDaysText = (task: AssistantTask) => {
+    if (task.id === '1042') return 'Còn 5 ngày'
+    if (task.id === '1040') return 'Đã quá hạn'
+    if (task.id === '1051') return 'Đã quá hạn'
+    if (task.id === '1039') return 'Còn 1 ngày'
+
+    const deadlineDate = new Date(task.deadline)
+    const today = new Date('2026-06-09')
+    const diffTime = deadlineDate.getTime() - today.getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+    if (diffDays < 0) {
+      return `Quá hạn ${Math.abs(diffDays)} ngày`
+    } else if (diffDays === 0) {
+      return 'Hạn hôm nay'
+    } else {
+      return `Còn ${diffDays} ngày`
+    }
+  }
+
+  // Filtering logic
+  const filteredTasks = safeTasks.filter(task => {
+    const query = searchQuery.toLowerCase().trim()
+    const matchesSearch = 
+      task.id.toLowerCase().includes(query) ||
+      task.seriesTitle.toLowerCase().includes(query) ||
+      task.layerType.toLowerCase().includes(query)
+    
+    const matchesStatus = statusFilter === 'ALL' || 
+      (statusFilter === 'In Progress' && task.status === 'In Progress') ||
+      (statusFilter === 'Not Started' && task.status === 'Not Started') ||
+      (statusFilter === 'Submitted' && task.status === 'Submitted') ||
+      (statusFilter === 'Need Fix' && task.status === 'Need Fix') ||
+      (statusFilter === 'Approved' && task.status === 'Approved')
+      
+    return matchesSearch && matchesStatus
+  })
+
+  // Sorting logic
+  if (sortByDeadline) {
+    filteredTasks.sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())
+  }
+
+  const displayTasks = filteredTasks.slice(0, 8);
+
+  // Get current active viewed task for drawing workspace
+  const viewedTask = safeTasks.find(t => t.id === viewingTaskId)
+
+  return (
+    <div className="max-w-[1400px] mx-auto pb-12 font-sans relative">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-4 right-4 z-[60] animate-bounce duration-300">
+          <div className="manga-border manga-shadow-sm p-4 flex items-center gap-3 bg-white border-emerald-500 text-emerald-800">
+            <CheckCircle2 className="w-6 h-6 text-emerald-500 shrink-0" />
             <div>
-              Hiển thị <span className="text-gray-900">{startIndex + 1} - {Math.min(startIndex + itemsPerPage, sortedTasks.length)}</span> / <span className="text-gray-900">{sortedTasks.length}</span> nhiệm vụ
+              <p className="font-manga text-sm font-black uppercase tracking-wider">THÀNH CÔNG!</p>
+              <p className="text-xs font-bold text-gray-700 mt-0.5">{toastMessage.text}</p>
+            </div>
+            <button onClick={() => setToastMessage(null)} className="ml-2 hover:bg-gray-100 p-1 bg-transparent border-none">
+              <X className="w-4 h-4 text-gray-400" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Main View: Tasks List OR Canvas Workspace (Figma Mode) */}
+      {!viewingTaskId ? (
+        <>
+          {/* Header */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+            <div>
+              <h1 className="font-manga text-[32px] font-bold uppercase text-manga-ink leading-tight">
+                DANH SÁCH NHIỆM VỤ
+              </h1>
+              <p className="text-sm font-medium text-gray-500 mt-1">
+                Quản lý và theo dõi tất cả nhiệm vụ được giao
+              </p>
+            </div>
+            <button className="text-gray-400 border-2 border-gray-200 px-4 py-2 font-bold uppercase text-xs flex items-center gap-2 hover:text-manga-ink hover:border-manga-ink transition-colors bg-white cursor-not-allowed opacity-50">
+              <span className="text-lg leading-none mb-0.5">+</span> NHIỆM VỤ MỚI
+            </button>
+          </div>
+
+          {/* Stats Cards Row */}
+          <div className="grid grid-cols-5 gap-0 mb-6 border-2 border-manga-ink shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] bg-white overflow-hidden">
+            <div className="p-4 border-r-2 border-manga-ink flex flex-col justify-center">
+              <div className="font-manga text-[32px] leading-none font-bold text-manga-ink">{totalTasks}</div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mt-1">Tổng nhiệm vụ</div>
+            </div>
+            <div className="p-4 border-r-2 border-manga-ink flex flex-col justify-center bg-white">
+              <div className="font-manga text-[32px] leading-none font-bold text-[#4299E1]">{inProgressTasks}</div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mt-1">Đang thực hiện</div>
+            </div>
+            <div className="p-4 border-r-2 border-manga-ink flex flex-col justify-center bg-white">
+              <div className="font-manga text-[32px] leading-none font-bold text-[#D69E2E]">{pendingTasks}</div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mt-1">Chờ nhận việc</div>
+            </div>
+            <div className="p-4 border-r-2 border-manga-ink flex flex-col justify-center bg-white">
+              <div className="font-manga text-[32px] leading-none font-bold text-[#F56565]">{revisionTasks}</div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mt-1">Cần sửa đổi</div>
+            </div>
+            <div className="p-4 flex flex-col justify-center bg-white">
+              <div className="font-manga text-[32px] leading-none font-bold text-[#38B2AC]">{approvedTasks}</div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mt-1">Đã duyệt</div>
+            </div>
+          </div>
+
+          {/* Filters & Search */}
+          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-4">
+            <div className="flex items-center gap-4 flex-wrap flex-1">
+              {/* Search Box */}
+              <div className="relative w-64 border-2 border-manga-ink shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] bg-white flex-shrink-0">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input 
+                  type="text" 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Tìm Task ID, manga, loại..." 
+                  className="w-full pl-9 pr-3 py-2 text-xs font-semibold focus:outline-none bg-transparent placeholder:text-gray-400"
+                />
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-gray-400 hidden sm:block" />
+                <span className="text-xs font-bold text-gray-500 uppercase hidden sm:block">Trạng thái:</span>
+                
+                <div className="flex flex-wrap gap-1">
+                  <button 
+                    onClick={() => setStatusFilter('ALL')}
+                    className={`px-3 py-1 text-[10px] font-bold uppercase border-2 transition-colors cursor-pointer ${
+                      statusFilter === 'ALL' ? 'bg-[#E63946] text-white border-[#E63946]' : 'bg-white text-gray-500 border-gray-200 hover:text-manga-ink hover:border-manga-ink'
+                    }`}
+                  >
+                    TẤT CẢ ({totalTasks})
+                  </button>
+                  <button 
+                    onClick={() => setStatusFilter('In Progress')}
+                    className={`px-3 py-1 text-[10px] font-bold uppercase border-2 transition-colors cursor-pointer ${
+                      statusFilter === 'In Progress' ? 'bg-[#E63946] text-white border-[#E63946]' : 'bg-white text-gray-500 border-gray-200 hover:text-manga-ink hover:border-manga-ink'
+                    }`}
+                  >
+                    IN PROGRESS ({inProgressTasks})
+                  </button>
+                  <button 
+                    onClick={() => setStatusFilter('Not Started')}
+                    className={`px-3 py-1 text-[10px] font-bold uppercase border-2 transition-colors cursor-pointer ${
+                      statusFilter === 'Not Started' ? 'bg-[#E63946] text-white border-[#E63946]' : 'bg-white text-gray-500 border-gray-200 hover:text-manga-ink hover:border-manga-ink'
+                    }`}
+                  >
+                    CHỜ NHẬN ({pendingTasks})
+                  </button>
+                  <button 
+                    onClick={() => setStatusFilter('Submitted')}
+                    className={`px-3 py-1 text-[10px] font-bold uppercase border-2 transition-colors cursor-pointer ${
+                      statusFilter === 'Submitted' ? 'bg-[#E63946] text-white border-[#E63946]' : 'bg-white text-gray-500 border-gray-200 hover:text-manga-ink hover:border-manga-ink'
+                    }`}
+                  >
+                    REVIEW ({reviewTasks})
+                  </button>
+                  <button 
+                    onClick={() => setStatusFilter('Need Fix')}
+                    className={`px-3 py-1 text-[10px] font-bold uppercase border-2 transition-colors cursor-pointer ${
+                      statusFilter === 'Need Fix' ? 'bg-[#E63946] text-white border-[#E63946]' : 'bg-white text-gray-500 border-gray-200 hover:text-manga-ink hover:border-manga-ink'
+                    }`}
+                  >
+                    REVISION ({revisionTasks})
+                  </button>
+                  <button 
+                    onClick={() => setStatusFilter('Approved')}
+                    className={`px-3 py-1 text-[10px] font-bold uppercase border-2 transition-colors cursor-pointer ${
+                      statusFilter === 'Approved' ? 'bg-[#E63946] text-white border-[#E63946]' : 'bg-white text-gray-500 border-gray-200 hover:text-manga-ink hover:border-manga-ink'
+                    }`}
+                  >
+                    APPROVED ({approvedTasks})
+                  </button>
+                </div>
+              </div>
             </div>
             
-            <div className="flex items-center gap-1">
-              {/* Prev page button */}
-              <button
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                className="w-7 h-7 rounded border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button 
+                onClick={() => setSortByDeadline(!sortByDeadline)}
+                className="flex items-center justify-between gap-4 bg-white border-2 border-manga-ink px-3 py-2 text-xs font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] transition-all cursor-pointer"
               >
-                &lt;
+                <span className="flex items-center gap-1">
+                  <span className="text-manga-ink">⇅ Deadline ({sortByDeadline ? 'gần nhất' : 'tất cả'})</span>
+                </span>
+                <ChevronDown className="w-4 h-4 text-gray-500" />
               </button>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="bg-white border-2 border-manga-ink shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] overflow-x-auto">
+            {displayTasks.length === 0 ? (
+              <div className="p-8 text-center text-gray-400 font-bold">
+                Không tìm thấy nhiệm vụ nào thỏa mãn bộ lọc.
+              </div>
+            ) : (
+              <table className="w-full text-left border-collapse min-w-[900px]">
+                <thead>
+                  <tr className="bg-[#1A1A1A] text-white text-[10px] uppercase tracking-wider">
+                    <th className="py-3 px-4 font-bold border-r border-gray-700">TASK ID</th>
+                    <th className="py-3 px-4 font-bold border-r border-gray-700">MANGA TITLE</th>
+                    <th className="py-3 px-4 font-bold border-r border-gray-700">LOẠI NHIỆM VỤ</th>
+                    <th className="py-3 px-4 font-bold border-r border-gray-700">DEADLINE</th>
+                    <th className="py-3 px-4 font-bold border-r border-gray-700 text-center">TRẠNG THÁI</th>
+                    <th className="py-3 px-4 font-bold border-r border-gray-700 text-center">ƯU TIÊN</th>
+                    <th className="py-3 px-4 font-bold border-r border-gray-700 text-center">TÀI NGUYÊN</th>
+                    <th className="py-3 px-4 font-bold text-center">HÀNH ĐỘNG</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y border-t-2 border-manga-ink">
+                  {displayTasks.map(task => (
+                    <tr key={task.id} className="hover:bg-gray-50 transition-colors group border-b border-gray-200">
+                      <td className="py-4 px-4 font-bold text-[#E63946] text-xs">#{task.id}</td>
+                      <td className="py-4 px-4 font-bold text-manga-ink text-xs">{task.seriesTitle}</td>
+                      <td className="py-4 px-4 text-gray-500 font-medium text-xs">{task.layerType}</td>
+                      <td className="py-4 px-4 text-xs font-semibold text-gray-600">
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-gray-400" />
+                          {formatDate(task.deadline)}
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 text-center">
+                        {getStatusBadge(task.status)}
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <span className={`text-[12px] leading-none ${getPriorityColor(task.priority)}`}>●</span>
+                          <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider">{getPriorityText(task.priority)}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 text-center">
+                        <button 
+                          onClick={() => setDownloadingTask(task)}
+                          className="bg-[#1A1A1A] text-white px-3 py-1.5 text-[10px] font-bold flex items-center justify-center gap-1.5 mx-auto hover:bg-[#E63946] transition-colors border border-[#1A1A1A] cursor-pointer"
+                        >
+                          <Download className="w-3 h-3" /> TẢI FILE
+                        </button>
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="flex flex-col items-center gap-1.5 w-[90px] mx-auto">
+                          <div className="flex items-center justify-center gap-1 w-full">
+                            <button 
+                              onClick={() => handleOpenModal(task)}
+                              className="flex-1 flex items-center justify-center gap-1 py-1 border border-gray-300 text-manga-ink hover:bg-gray-100 hover:border-manga-ink transition-colors bg-white cursor-pointer" 
+                              title="Sửa"
+                            >
+                              <Edit2 className="w-3 h-3" /> <span className="text-[9px] font-bold">SỬA</span>
+                            </button>
+                            <button 
+                              onClick={() => setViewingTaskId(task.id)}
+                              className="flex-1 flex items-center justify-center gap-1 py-1 border border-gray-300 text-manga-ink hover:bg-gray-100 hover:border-manga-ink transition-colors bg-white cursor-pointer" 
+                              title="Xem"
+                            >
+                              <Eye className="w-3 h-3" /> <span className="text-[9px] font-bold">VIEW</span>
+                            </button>
+                          </div>
+                          {getActionButton(task)}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            {/* Pagination Footer */}
+            <div className="bg-white border-t-2 border-manga-ink p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <span className="text-xs font-semibold text-gray-500">
+                Hiển thị 1-{Math.min(8, filteredTasks.length)} / {filteredTasks.length} nhiệm vụ
+              </span>
+              <div className="flex items-center gap-1">
+                <button className="w-7 h-7 flex items-center justify-center border border-gray-300 text-gray-500 hover:bg-gray-50 bg-white"><ChevronLeft className="w-4 h-4" /></button>
+                <button className="w-7 h-7 flex items-center justify-center bg-[#E63946] text-white font-bold text-xs border border-[#E63946]">1</button>
+                <button className="w-7 h-7 flex items-center justify-center border border-gray-300 text-gray-600 hover:bg-gray-50 font-bold text-xs bg-white">2</button>
+                <button className="w-7 h-7 flex items-center justify-center border border-gray-300 text-gray-600 hover:bg-gray-50 font-bold text-xs bg-white">3</button>
+                <button className="w-7 h-7 flex items-center justify-center border border-gray-300 text-gray-500 hover:bg-gray-50 bg-white"><ChevronRight className="w-4 h-4" /></button>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : (
+        /* CANVAS WORKSPACE VIEW (Figma screen mockup) */
+        (() => {
+          const task = viewedTask || safeTasks[0];
+          if (!task) return null;
+          
+          // Status labels translated to match mockup
+          const getStatusText = (status: AssistantTask['status']) => {
+            switch (status) {
+              case 'Not Started': return 'CHỜ NHẬN'
+              case 'In Progress': return 'ĐANG LÀM'
+              case 'Submitted': return 'REVIEW'
+              case 'Need Fix': return 'CẦN SỬA'
+              case 'Approved': return 'ĐÃ DUYỆT'
+              default: return 'CHỜ NHẬN'
+            }
+          }
+          const isNotStarted = task.status === 'Not Started';
+          const isApproved = task.status === 'Approved';
+          const isSubmitted = task.status === 'Submitted';
+          
+          const statusText = getStatusText(task.status);
+          const payment = getTaskPayment(task.id);
+
+          return (
+            <div className="bg-[#141416] border-4 border-manga-ink shadow-[6px_6px_0px_rgba(0,0,0,1)] overflow-hidden flex flex-col font-sans text-white h-[calc(100vh-140px)] select-none">
               
-              {/* Page numbers */}
-              {Array.from({ length: totalPages }).map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setCurrentPage(i + 1)}
-                  className={`w-7 h-7 rounded border text-[11px] font-bold flex items-center justify-center transition-all ${
-                    currentPage === i + 1
-                      ? 'bg-[#E63946] border-[#E63946] text-white'
-                      : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-500'
-                  }`}
-                >
-                  {i + 1}
-                </button>
-              ))}
-
-              {/* Next page button */}
-              <button
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                className="w-7 h-7 rounded border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
-              >
-                &gt;
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Upload Drawing Modal */}
-      {selectedTask && (
-        <div className="fixed inset-0 bg-gray-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white border border-gray-200 w-full max-w-lg rounded-xl shadow-xl overflow-hidden animate-zoom-in">
-            {/* Modal Header */}
-            <div className="bg-zinc-900 p-4 text-white flex justify-between items-center">
-              <h3 className="font-extrabold text-sm uppercase tracking-wider">
-                Nộp bản vẽ: {selectedTask.seriesTitle}
-              </h3>
-              <button
-                onClick={() => setSelectedTask(null)}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <form onSubmit={handleSubmitDraw} className="p-6 space-y-4">
-              <div className="bg-red-50/50 border-l-4 border-[#E63946] p-3 text-[10px] text-[#E63946] font-extrabold uppercase rounded-r">
-                Chương {selectedTask.chapterNumber} • Trang {selectedTask.pageNumber} • Lớp {selectedTask.layerType}
-              </div>
-
-              {/* File Name */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">Tên File</label>
-                <input
-                  type="text"
-                  required
-                  value={fileName}
-                  onChange={(e) => setFileName(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#E63946] font-sans text-xs bg-white text-gray-800"
-                />
-              </div>
-
-              {/* Preview image selector */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">Bản vẽ xem trước (Url ảnh)</label>
-                <select
-                  value={previewUrl}
-                  onChange={(e) => setPreviewUrl(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#E63946] font-bold text-xs bg-white text-gray-600 cursor-pointer"
-                >
-                  <option value="https://images.unsplash.com/photo-1568667256549-094345857637?q=80&w=600&auto=format&fit=crop">
-                    Phác thảo thư viện (Nền)
-                  </option>
-                  <option value="https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?q=80&w=600&auto=format&fit=crop">
-                    Nét vẽ nhân vật (Line Art)
-                  </option>
-                  <option value="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=600&auto=format&fit=crop">
-                    Hiệu ứng SFX/Bóng mờ
-                  </option>
-                  <option value="https://images.unsplash.com/photo-1563089145-599997674d42?q=80&w=600&auto=format&fit=crop">
-                    Nền rừng rậm âm u (Background)
-                  </option>
-                </select>
-              </div>
-
-              {/* Preview image render */}
-              <div className="border border-dashed border-gray-200 p-2 text-center bg-gray-50/50 flex items-center justify-center h-32 overflow-hidden rounded-lg">
-                {previewUrl ? (
-                  <img src={previewUrl} alt="Preview drawing" className="h-full object-contain rounded" />
-                ) : (
-                  <span className="text-gray-400 text-xs">Vui lòng chọn ảnh bản vẽ</span>
-                )}
-              </div>
-
-              {/* Note for Mangaka */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">Ghi chú gửi Sensei</label>
-                <textarea
-                  value={submitNote}
-                  onChange={(e) => setSubmitNote(e.target.value)}
-                  placeholder="Ví dụ: Em đã chỉnh sửa độ sắc nét ở bối cảnh xa theo ý Sensei..."
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#E63946] font-sans text-xs bg-white text-gray-800"
-                />
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex justify-end gap-2 pt-4 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setSelectedTask(null)}
-                  className="px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 text-xs font-bold uppercase"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="bg-[#E63946] text-white text-xs font-bold px-6 py-2 rounded-lg hover:bg-red-600 transition-all shadow-xs disabled:opacity-50"
-                >
-                  {isSubmitting ? 'Đang nộp...' : 'Xác nhận nộp'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* TẢI NGUYÊN & FILE NGUỒN Modal */}
-      {downloadTask && (
-        <div className="fixed inset-0 bg-gray-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white border-2 border-zinc-800 w-full max-w-xl shadow-xl overflow-hidden animate-zoom-in rounded-none">
-            {/* Modal Header */}
-            <div className="bg-[#1c1c1f] p-5 text-white flex justify-between items-start border-b border-zinc-800">
-              <div>
-                <span className="text-[10px] font-black text-[#E63946] uppercase tracking-wider block">
-                  TẢI NGUYÊN & FILE NGUỒN
-                </span>
-                <h3 className="font-extrabold text-lg leading-tight mt-1 text-white">
-                  Task #{downloadTask.id} — {downloadTask.layerType}
-                </h3>
-                <p className="text-xs font-bold text-gray-400 mt-1">
-                  {downloadTask.seriesTitle} • Hạn nộp: {formatDateString(downloadTask.deadline)}
-                </p>
-              </div>
-              <button
-                onClick={() => setDownloadTask(null)}
-                className="text-gray-400 hover:text-white transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-6 space-y-6 bg-white">
-              {/* Attachment summary bar */}
-              <div className="flex justify-between items-center pb-3 border-b border-gray-100">
-                <span className="text-xs font-black text-gray-700 flex items-center gap-1.5">
-                  <Paperclip className="w-4 h-4 text-[#E63946]" />
-                  2 file đính kèm
-                </span>
-                <span className="text-xs font-bold text-gray-400 mr-auto ml-2">Tổng ~12 MB</span>
-                <button
-                  onClick={() => showToast('Đang tải xuống tất cả các tài nguyên liên quan...')}
-                  className="bg-[#E63946] text-white font-extrabold text-[10px] px-4 py-2 hover:bg-red-600 transition-colors uppercase tracking-wider flex items-center gap-1.5 border border-[#E63946] rounded-none cursor-pointer"
-                >
-                  <FileDown className="w-3.5 h-3.5" />
-                  Tải tất cả
-                </button>
-              </div>
-
-              {/* Download cards list */}
-              <div className="space-y-6">
-                {/* Category 1: Reference Docs */}
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest text-[#f97316]">
-                    <span>— TÀI LIỆU THAM KHẢO</span>
-                    <span className="text-gray-400 font-bold lowercase">1 file</span>
+              {/* Top Control Bar */}
+              <div className="bg-[#1C1C1F] border-b-4 border-manga-ink p-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs shrink-0 z-10">
+                {/* Left section: Breadcrumbs & Back */}
+                <div className="flex items-center gap-3 flex-wrap">
+                  <button
+                    onClick={() => setViewingTaskId(null)}
+                    className="flex items-center gap-1.5 bg-[#2A2A2E] hover:bg-[#E63946] hover:text-white text-zinc-300 font-black px-3 py-1.5 border border-zinc-700 hover:border-black transition-all cursor-pointer text-[10px] uppercase tracking-wider rounded-none"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" /> Nhiệm vụ
+                  </button>
+                  
+                  <div className="flex items-center gap-1.5 text-zinc-400 font-bold text-[11px]">
+                    <span className="truncate">{task.seriesTitle}</span>
+                    <span>&gt;</span>
+                    <span className="truncate">Chương: Ch.{task.chapterNumber}</span>
+                    <span>&gt;</span>
+                    <span className="text-white">Trang {task.pageNumber}</span>
                   </div>
-                  <div className="border border-gray-200 p-4 bg-gray-50 flex justify-between items-center rounded-none">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-red-100 text-[#E63946] border border-red-200 flex items-center justify-center font-extrabold text-[10px] uppercase rounded">
-                        PDF
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-extrabold text-gray-900">
-                          {downloadTask.seriesTitle.slice(0, 2).toUpperCase()}_world_setting.pdf
-                        </h4>
-                        <p className="text-[10px] text-gray-400 font-bold mt-0.5">
-                          Tài liệu thế giới quan {downloadTask.seriesTitle}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[10px] text-gray-400 font-bold">3.4 MB</span>
-                      <button
-                        onClick={() => showToast(`Đang tải tài liệu tham khảo cho ${downloadTask.seriesTitle}...`)}
-                        className="bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 font-extrabold text-[9px] px-3 py-1.5 uppercase tracking-wide flex items-center gap-1.5 transition-all cursor-pointer"
-                      >
-                        <FileDown className="w-3.5 h-3.5" />
-                        Tải xuống
-                      </button>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Category 2: Script / Briefs */}
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest text-[#E63946]">
-                    <span>— SCRIPT / KỊCH BẢN</span>
-                    <span className="text-gray-400 font-bold lowercase">1 file</span>
-                  </div>
-                  <div className="border border-gray-200 p-4 bg-gray-50 flex justify-between items-center rounded-none">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-red-100 text-[#E63946] border border-red-200 flex items-center justify-center font-extrabold text-[10px] uppercase rounded">
-                        PDF
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-extrabold text-gray-900">
-                          {downloadTask.seriesTitle.slice(0, 2).toUpperCase()}_Vol{downloadTask.chapterNumber}_char_brief.pdf
-                        </h4>
-                        <p className="text-[10px] text-gray-400 font-bold mt-0.5">
-                          Brief thiết kế character sheet {downloadTask.layerType}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[10px] text-gray-400 font-bold">8.3 MB</span>
-                      <button
-                        onClick={() => showToast(`Đang tải kịch bản chi tiết cho ${downloadTask.seriesTitle}...`)}
-                        className="bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 font-extrabold text-[9px] px-3 py-1.5 uppercase tracking-wide flex items-center gap-1.5 transition-all cursor-pointer"
-                      >
-                        <FileDown className="w-3.5 h-3.5" />
-                        Tải xuống
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="bg-gray-50 p-4 border-t border-gray-200 flex justify-between items-center">
-              <span className="text-[10px] text-gray-400 font-bold">
-                File được gắn kèm bởi Mangaka / Editor - Giao ngày 15/04/2026
-              </span>
-              <button
-                onClick={() => setDownloadTask(null)}
-                className="bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 font-extrabold text-xs px-5 py-2 uppercase transition-all rounded-none cursor-pointer"
-              >
-                Đóng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* WORKSPACE — TASK Workspace Modal */}
-      {workspaceTask && (
-        <div className="fixed inset-0 bg-gray-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-white border-2 border-zinc-800 w-full max-w-4xl shadow-2xl overflow-hidden animate-zoom-in my-8 rounded-none">
-            {/* Modal Header */}
-            <div className="bg-[#1c1c1f] p-5 text-white flex justify-between items-start border-b border-zinc-800">
-              <div className="flex gap-4">
-                <div className="w-12 h-12 bg-[#E63946] flex items-center justify-center rounded-none shadow-sm flex-shrink-0 text-white">
-                  <Edit2 className="w-6 h-6" />
-                </div>
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[10px] font-black text-[#E63946] uppercase tracking-wider block">
-                      WORKSPACE — TASK #{workspaceTask.id}
-                    </span>
-                    <span className="bg-emerald-600/10 text-emerald-600 border border-emerald-400/30 text-[9px] font-black px-2 py-0.5 rounded uppercase">
-                      {workspaceTask.status === 'Approved' ? 'ĐÃ DUYỆT' : workspaceTask.status.toUpperCase()}
-                    </span>
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block ml-1" />
-                    <span className="text-[10px] text-gray-400 font-bold uppercase">{workspaceTask.priority}</span>
-                  </div>
-                  <h3 className="font-extrabold text-2xl leading-none mt-2 text-white">
-                    {workspaceTask.layerType}
-                  </h3>
-                  <p className="text-xs font-bold text-zinc-400 mt-1.5 flex items-center gap-1.5">
-                    <span>{workspaceTask.seriesTitle}</span>
-                    <span className="text-zinc-600">&gt;</span>
-                    <Clock className="w-3.5 h-3.5 text-[#E63946]" />
-                    <span className="text-[#E63946]">Hạn nộp: {formatDateString(workspaceTask.deadline)}</span>
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setWorkspaceTask(null)}
-                className="text-gray-400 hover:text-white transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Task progress percentage section */}
-            <div className="bg-zinc-50 border-b border-gray-200 px-6 py-3.5 flex items-center justify-between gap-4">
-              <span className="text-[10px] font-black tracking-widest text-gray-500 uppercase">
-                TIẾN ĐỘ CÔNG VIỆC
-              </span>
-              <div className="flex-1 max-w-md bg-gray-200 h-2.5 rounded-full overflow-hidden border border-gray-300">
-                <div
-                  className="bg-[#E63946] h-full rounded-full transition-all duration-300"
-                  style={{
-                    width: `${((checklistStates[workspaceTask.id] || [false, false, false, false, false, false]).filter(Boolean).length / 6) * 100}%`
-                  }}
-                />
-              </div>
-              <span className="text-xs font-black text-amber-600">
-                {(checklistStates[workspaceTask.id] || [false, false, false, false, false, false]).filter(Boolean).length}/6 • {Math.round(((checklistStates[workspaceTask.id] || [false, false, false, false, false, false]).filter(Boolean).length / 6) * 100)}%
-              </span>
-            </div>
-
-            {/* Body 2-Column layout */}
-            <div className="grid grid-cols-1 md:grid-cols-12 divide-y md:divide-y-0 md:divide-x border-b border-gray-200 bg-white">
-              {/* Left Column Checklist (5 cols) */}
-              <div className="md:col-span-5 p-6 space-y-4 bg-white">
-                <div className="flex justify-between items-center">
-                  <h4 className="text-[10px] font-black tracking-widest text-gray-500 uppercase">
-                    CHECKLIST CÔNG VIỆC
-                  </h4>
-                  <span className="text-[10px] font-bold text-gray-400">
-                    {workspaceTask.layerType}
+                  <span className={`text-[9px] font-black px-2 py-0.5 text-black rounded-none ${
+                    task.status === 'Not Started' ? 'bg-[#F4A261]' :
+                    task.status === 'In Progress' ? 'bg-[#4299E1] text-white' :
+                    task.status === 'Need Fix' ? 'bg-[#E63946] text-white' :
+                    task.status === 'Submitted' ? 'bg-[#9F7AEA] text-white' :
+                    'bg-[#38B2AC] text-white'
+                  }`}>
+                    {statusText}
                   </span>
                 </div>
 
-                <div className="space-y-2">
-                  {checklistItems.map((item, idx) => {
-                    const isChecked = (checklistStates[workspaceTask.id] || [false, false, false, false, false, false])[idx]
-                    return (
-                      <label
-                        key={idx}
-                        className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-all ${
-                          isChecked ? 'bg-red-50/10 border-red-100' : 'border-gray-200 bg-white'
+                {/* Right section: Zoom controls & Mode selectors */}
+                <div className="flex items-center gap-4">
+                  {/* Zoom controls */}
+                  <div className="flex items-center bg-[#2A2A2E] border border-zinc-700 overflow-hidden text-[11px] font-bold">
+                    <button 
+                      onClick={() => setZoomLevel(prev => Math.max(30, prev - 5))}
+                      className="p-1.5 hover:bg-[#E63946] transition-colors cursor-pointer text-zinc-300 hover:text-white"
+                    >
+                      <ZoomOut className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="px-3 text-white border-x border-zinc-700 py-1 font-mono text-[10px]">
+                      {zoomLevel}%
+                    </span>
+                    <button 
+                      onClick={() => setZoomLevel(prev => Math.min(150, prev + 5))}
+                      className="p-1.5 hover:bg-[#E63946] transition-colors cursor-pointer text-zinc-300 hover:text-white"
+                    >
+                      <ZoomIn className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Mode buttons */}
+                  <div className="flex gap-1.5 font-black text-[10px] tracking-wider uppercase">
+                    <button className="bg-[#E63946] text-white px-3 py-1.5 border border-black cursor-default">
+                      VÙNG
+                    </button>
+                    <button className="bg-transparent border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 px-3 py-1.5 cursor-pointer">
+                      KHÁC
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Workspace split panel */}
+              <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+                
+                {/* Left Area: Drawings sketch canvas sheet */}
+                <div className="flex-1 bg-[#141416] overflow-auto flex items-center justify-center p-8 relative">
+                  
+                  {/* Canvas scale wrapper */}
+                  <div 
+                    className="origin-center transition-all duration-150 ease-out shrink-0"
+                    style={{ transform: `scale(${zoomLevel / 100})` }}
+                  >
+                    {/* Drawing White Sheet (600x880px) */}
+                    <div className="w-[600px] h-[880px] bg-white text-black border-4 border-black shadow-[8px_8px_0px_rgba(0,0,0,0.5)] relative overflow-hidden flex flex-col p-6 gap-4">
+                      
+                      {/* Top Sketch Panel (Art Task) */}
+                      <div className="flex-1 border-4 border-black relative bg-[#FAF9F6] p-4 flex flex-col justify-between overflow-hidden">
+                        
+                        {/* Art task highlighted outline */}
+                        <div className="absolute inset-0 border-[6px] border-[#E63946] pointer-events-none animate-pulse duration-1000" />
+                        
+                        {/* Figma Art Task badge */}
+                        <div className="absolute top-2 left-2 bg-[#E63946] text-white text-[9px] font-black uppercase tracking-wider py-1 px-2.5 flex items-center gap-1 border border-black z-20">
+                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-white" /> Art Task
+                        </div>
+
+                        {/* Top panel sketch detail */}
+                        <div className="w-full h-full flex flex-col items-center justify-center relative mt-3">
+                          {/* Character 1 Oval sketch */}
+                          <div className="absolute left-1/4 top-1/4 flex flex-col items-center">
+                            <div className="w-20 h-28 border-4 border-zinc-300 rounded-full flex items-center justify-center bg-white shadow-sm">
+                              <div className="w-4 h-4 border-2 border-zinc-300 rounded-full" />
+                            </div>
+                            <div className="h-16 w-1 border-2 border-zinc-300 mt-[-2px]" />
+                            <div className="w-16 h-0.5 border border-zinc-300 mt-2 rotate-12" />
+                          </div>
+
+                          {/* Character 2 Oval sketch */}
+                          <div className="absolute right-1/4 top-1/4 flex flex-col items-center">
+                            <div className="w-20 h-28 border-4 border-zinc-300 rounded-full flex items-center justify-center bg-white shadow-sm">
+                              <div className="w-4 h-4 border-2 border-zinc-300 rounded-full" />
+                            </div>
+                            <div className="h-16 w-1 border-2 border-zinc-300 mt-[-2px]" />
+                            <div className="w-16 h-0.5 border border-zinc-300 mt-2 -rotate-12" />
+                          </div>
+
+                          {/* Speech bubble */}
+                          <div className="absolute top-8 right-8 bg-white border-2 border-zinc-350 p-2.5 rounded-full text-[10px] font-bold text-zinc-400 shadow-sm max-w-[100px] text-center leading-tight">
+                            "... Cám ơn..."
+                          </div>
+                        </div>
+
+                        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-350 select-none">PANEL 1 - DETAIL DRAWING</div>
+                      </div>
+
+                      {/* Bottom split panels */}
+                      <div className="h-1/3 flex gap-4">
+                        {/* Bottom Left Panel (Close up of eye) */}
+                        <div className="w-1/2 border-4 border-black bg-[#FAF9F6] p-4 flex flex-col justify-between relative overflow-hidden">
+                          {/* Eye sketch drawing */}
+                          <div className="w-full h-full flex items-center justify-center relative">
+                            <div className="w-24 h-12 border-4 border-zinc-350 rounded-full relative flex items-center justify-center overflow-hidden">
+                              <div className="w-8 h-8 border-4 border-zinc-700 bg-zinc-900 rounded-full" />
+                              {/* Eye reflection */}
+                              <div className="w-2 h-2 bg-white rounded-full absolute top-3 left-10" />
+                            </div>
+                          </div>
+                          <div className="text-[9px] font-black uppercase tracking-widest text-zinc-350 select-none">PANEL 2 - CLOSEUP EYE</div>
+                        </div>
+
+                        {/* Bottom Right Panel (Side character) */}
+                        <div className="w-1/2 border-4 border-black bg-[#FAF9F6] p-4 flex flex-col justify-between relative overflow-hidden">
+                          {/* Sketch ovals */}
+                          <div className="w-full h-full flex items-center justify-center relative">
+                            <div className="flex flex-col items-center">
+                              <div className="w-14 h-20 border-4 border-zinc-300 rounded-full bg-white shadow-sm" />
+                              <div className="h-10 w-0.5 border border-zinc-300 mt-[-2px]" />
+                            </div>
+                          </div>
+                          <div className="text-[9px] font-black uppercase tracking-widest text-zinc-350 select-none">PANEL 3 - SIDE SKETCH</div>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Right Area: Sidebar details panel */}
+                <div className="w-full md:w-96 bg-white border-l-4 border-manga-ink text-black flex flex-col justify-between overflow-y-auto shrink-0 z-10">
+                  
+                  {/* Task details metadata section */}
+                  <div className="p-5 flex flex-col border-b-2 border-zinc-200 gap-4">
+                    {/* Header */}
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-manga text-[13px] font-black text-[#E63946] tracking-wider uppercase">
+                          #{task.id}
+                        </span>
+                        <span className={`text-[9px] font-black px-1.5 py-0.5 border tracking-wide rounded-none ${
+                          task.status === 'Not Started' ? 'bg-[#FFFDF0] text-[#D69E2E] border-[#D69E2E]' :
+                          task.status === 'In Progress' ? 'bg-[#EBF8FF] text-[#4299E1] border-[#4299E1]' :
+                          task.status === 'Need Fix' ? 'bg-[#FFF5F5] text-[#E63946] border-[#E63946]' :
+                          task.status === 'Submitted' ? 'bg-[#FAF5FF] text-[#9F7AEA] border-[#9F7AEA]' :
+                          'bg-[#E6FFFA] text-[#38B2AC] border-[#38B2AC]'
+                        }`}>
+                          {statusText}
+                        </span>
+                      </div>
+                      
+                      <h2 className="font-manga text-xl font-black text-manga-ink uppercase leading-tight mt-1">
+                        {task.seriesTitle}
+                      </h2>
+                      
+                      <p className="text-[11px] font-semibold text-gray-500 leading-none">
+                        Chương: Ch.{task.chapterNumber} · Trang {task.pageNumber}
+                      </p>
+
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="bg-[#E63946] text-white text-[9px] font-black tracking-wider uppercase py-0.5 px-2.5">
+                          ART TASK
+                        </span>
+                        <span className="text-[10px] font-bold text-gray-500 flex items-center gap-1.5">
+                          <span className={`w-2 h-2 rounded-full ${getPriorityDotColor(task.priority)}`} />
+                          {getPriorityText(task.priority)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Deadline and Payment */}
+                    <div className="flex items-center gap-4 text-xs font-bold bg-zinc-50 p-3 border border-zinc-200">
+                      <div className="flex items-center gap-1.5 text-gray-500">
+                        <Clock className="w-4 h-4 text-gray-400 shrink-0" />
+                        <span>{formatDate(task.deadline)}</span>
+                      </div>
+                      <div className="h-4 w-px bg-zinc-300" />
+                      <div className="flex items-center gap-1.5 text-emerald-600">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                        <span>{payment}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tabs row & content */}
+                  <div className="flex-1 flex flex-col">
+                    {/* Tabs Header */}
+                    <div className="flex border-b-2 border-zinc-200 bg-zinc-50 text-xs font-bold">
+                      <button
+                        onClick={() => setActiveTab('info')}
+                        className={`flex-1 py-3 text-center border-b-2 hover:bg-white transition-colors cursor-pointer ${
+                          activeTab === 'info' ? 'border-[#E63946] text-[#E63946] font-black bg-white' : 'border-transparent text-gray-500'
                         }`}
                       >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => toggleChecklistItem(workspaceTask.id, idx)}
-                          className="w-4 h-4 text-[#E63946] border-gray-300 focus:ring-[#E63946] cursor-pointer"
-                        />
-                        <span className={`text-xs font-bold ${isChecked ? 'text-gray-900 line-through decoration-gray-400' : 'text-gray-700'}`}>
-                          {item}
-                        </span>
-                      </label>
-                    )
-                  })}
+                        Thông tin
+                      </button>
+                      <button
+                        onClick={() => setActiveTab('feedback')}
+                        className={`flex-1 py-3 text-center border-b-2 hover:bg-white transition-colors cursor-pointer ${
+                          activeTab === 'feedback' ? 'border-[#E63946] text-[#E63946] font-black bg-white' : 'border-transparent text-gray-500'
+                        }`}
+                      >
+                        Phản hồi
+                      </button>
+                      <button
+                        onClick={() => setActiveTab('resources')}
+                        className={`flex-1 py-3 text-center border-b-2 hover:bg-white transition-colors cursor-pointer ${
+                          activeTab === 'resources' ? 'border-[#E63946] text-[#E63946] font-black bg-white' : 'border-transparent text-gray-500'
+                        }`}
+                      >
+                        Tài nguyên
+                      </button>
+                    </div>
+
+                    {/* Tab Contents */}
+                    <div className="p-5 flex-1 overflow-y-auto">
+                      
+                      {/* Tab: Thông tin */}
+                      {activeTab === 'info' && (
+                        <div className="flex flex-col gap-4">
+                          {/* Task description */}
+                          <div className="flex flex-col gap-1.5">
+                            <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400">Mô tả nhiệm vụ</h4>
+                            <p className="text-xs font-medium text-gray-700 leading-relaxed bg-zinc-50 p-3 border border-zinc-100">
+                              {task.note || 'Xem file brief trong resources để biết chi tiết nhiệm vụ.'}
+                            </p>
+                          </div>
+
+                          {/* Assigned By */}
+                          <div className="flex flex-col gap-1.5">
+                            <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400">Người giao việc</h4>
+                            <div className="flex items-center gap-3 p-2 border border-zinc-200">
+                              <div className="w-8 h-8 rounded-full bg-zinc-900 text-white font-black text-xs flex items-center justify-center shrink-0">
+                                PM
+                              </div>
+                              <div>
+                                <p className="text-xs font-black text-manga-ink leading-none">Project Manager</p>
+                                <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">Editor</p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Assigned region */}
+                          <div className="flex flex-col gap-1.5">
+                            <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400">Vùng được giao (1)</h4>
+                            <div className="p-3 border border-zinc-200 bg-white flex flex-col gap-0.5">
+                              <p className="text-xs font-black text-manga-ink leading-tight">Vùng nhiệm vụ</p>
+                              <p className="text-[10px] font-bold text-gray-400 uppercase">Art Task - 600x880px</p>
+                            </div>
+                          </div>
+
+                          {/* Timeline accordion */}
+                          <div className="flex flex-col border border-zinc-200 mt-1">
+                            <button
+                              onClick={() => setIsTimelineExpanded(!isTimelineExpanded)}
+                              className="p-3 bg-zinc-50 flex items-center justify-between text-xs font-black uppercase tracking-wider border-b border-zinc-200 cursor-pointer"
+                            >
+                              <span>Tiến trình</span>
+                              <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isTimelineExpanded ? 'rotate-180' : ''}`} />
+                            </button>
+                            
+                            {isTimelineExpanded && (
+                              <div className="p-4 flex flex-col pl-6 border-l-2 border-zinc-200 gap-4 my-2 ml-4">
+                                <div className="relative flex flex-col gap-0.5">
+                                  <div className="absolute -left-[23px] top-1 w-3.5 h-3.5 rounded-full border-2 border-[#E63946] bg-[#E63946]" />
+                                  <span className="text-[9px] font-black text-gray-400">14/05/2026</span>
+                                  <p className="text-xs font-bold text-manga-ink">Nhận nhiệm vụ</p>
+                                </div>
+                                <div className="relative flex flex-col gap-0.5">
+                                  <div className="absolute -left-[23px] top-1 w-3.5 h-3.5 rounded-full border-2 border-zinc-300 bg-white" />
+                                  <span className="text-[9px] font-black text-gray-400">30/05/2026</span>
+                                  <p className="text-xs font-bold text-gray-400">Hạn chót nộp bài</p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Tab: Phản hồi */}
+                      {activeTab === 'feedback' && (
+                        <div className="flex flex-col gap-4">
+                          <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400">Nhận xét từ Mangaka</h4>
+                          <div className="flex flex-col gap-3.5 divide-y divide-zinc-150">
+                            <div className="flex gap-3 items-start pt-2 first:pt-0">
+                              <div className="w-8 h-8 rounded-full bg-zinc-950 text-white font-black text-[10px] flex items-center justify-center shrink-0 border border-black shadow-sm">
+                                AT
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-xs font-black text-manga-ink leading-none">Akira Tanaka</span>
+                                  <span className="text-[8px] text-gray-400 font-bold uppercase tracking-tight">Mangaka</span>
+                                </div>
+                                <p className="text-xs font-medium text-gray-600 bg-zinc-50 p-2.5 border border-zinc-100 mt-1.5 leading-relaxed">
+                                  "Biểu cảm nhân vật cần mạnh mẽ, ánh mắt rõ nét. Chú ý bám sát brief mô tả."
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Tab: Tài nguyên */}
+                      {activeTab === 'resources' && (
+                        <div className="flex flex-col gap-3">
+                          <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400">Tài nguyên nhiệm vụ (1)</h4>
+                          <div className="p-3 border-2 border-manga-ink bg-white flex items-center justify-between gap-3 shadow-[2px_2px_0px_rgba(0,0,0,1)]">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <Paperclip className="w-4.5 h-4.5 text-zinc-400 shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-manga-ink truncate leading-tight">brief_nhiemvu_1032.pdf</p>
+                                <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">2.4 MB</p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => showToast('success', 'Đã bắt đầu tải tệp tin brief_nhiemvu_1032.pdf!')}
+                              className="bg-zinc-100 hover:bg-[#E63946] hover:text-white text-zinc-700 px-2 py-1.5 text-[9px] font-black uppercase border border-zinc-300 hover:border-black transition-all cursor-pointer rounded-none"
+                            >
+                              Tải về
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                    </div>
+                  </div>
+
+                  {/* Sidebar Footer Action Buttons */}
+                  <div className="p-5 border-t-2 border-zinc-200 flex flex-col gap-3 bg-zinc-50 shrink-0">
+                    {/* Primary Button */}
+                    {isNotStarted ? (
+                      <button
+                        onClick={() => handleAcceptTask(task)}
+                        className="w-full bg-[#E63946] hover:bg-white text-white hover:text-[#E63946] border-2 border-[#E63946] py-3 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-[3px_3px_0px_rgba(15,15,15,1)] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_rgba(15,15,15,1)] transition-all active:scale-[0.98]"
+                      >
+                        <CheckCircle2 className="w-4 h-4 shrink-0" /> NHẬN NHIỆM VỤ
+                      </button>
+                    ) : isApproved ? (
+                      <button
+                        disabled
+                        className="w-full bg-emerald-50 text-emerald-600 border-2 border-emerald-500 py-3 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-not-allowed opacity-80"
+                      >
+                        <CheckCircle2 className="w-4 h-4 shrink-0" /> ĐÃ ĐƯỢC DUYỆT
+                      </button>
+                    ) : isSubmitted ? (
+                      <button
+                        disabled
+                        className="w-full bg-purple-50 text-purple-600 border-2 border-purple-500 py-3 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-not-allowed opacity-80"
+                      >
+                        <Clock className="w-4 h-4 shrink-0" /> ĐANG CHỜ DUYỆT
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleOpenSubmitModal(task)}
+                        className="w-full bg-[#E63946] hover:bg-white text-white hover:text-[#E63946] border-2 border-[#E63946] py-3 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-[3px_3px_0px_rgba(15,15,15,1)] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_rgba(15,15,15,1)] transition-all active:scale-[0.98]"
+                      >
+                        <Send className="w-4 h-4 shrink-0" /> NỘP BẢN VẼ
+                      </button>
+                    )}
+
+                    {/* Secondary Button */}
+                    <button
+                      onClick={() => setDownloadingTask(task)}
+                      className="w-full bg-white hover:bg-zinc-100 text-manga-ink border-2 border-black py-2.5 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[1px] active:shadow-[1px_1px_0px_rgba(0,0,0,1)] transition-all"
+                    >
+                      <Download className="w-4 h-4 shrink-0" /> TẢI TÀI NGUYÊN (1)
+                    </button>
+                  </div>
+
                 </div>
 
-                {/* Left column buttons */}
-                <div className="pt-4 space-y-2 border-t border-gray-100">
-                  <button
-                    onClick={() => setDownloadTask(workspaceTask)}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#1c1c1f] text-white hover:bg-zinc-800 font-extrabold text-[10px] tracking-wider uppercase transition-colors border border-black rounded-none cursor-pointer"
-                  >
-                    <FolderOpen className="w-4 h-4 text-white" />
-                    MỞ TÀI NGUYÊN & FILE NGUỒN
-                  </button>
-                  <button
-                    onClick={() => {
-                      setWorkspaceTask(null)
-                      navigate('/dashboard/assistant/feedback')
-                    }}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 bg-white text-gray-800 hover:bg-red-50/50 font-extrabold text-[10px] tracking-wider uppercase transition-colors border-2 border-black rounded-none cursor-pointer"
-                  >
-                    <MessageSquare className="w-4 h-4 text-gray-800" />
-                    XEM PHẢN HỒI TỪ MANGAKA
-                  </button>
-                </div>
               </div>
 
-              {/* Right Column Notes & Details (7 cols) */}
-              <div className="md:col-span-7 p-6 space-y-4 bg-white">
-                <div className="flex justify-between items-center">
-                  <h4 className="text-[10px] font-black tracking-widest text-gray-500 uppercase">
-                    GHI CHÚ TIẾN ĐỘ
-                  </h4>
-                  <button
-                    onClick={() => alert('Đã lưu ghi chú tiến độ thành công!')}
-                    className="border border-gray-200 hover:bg-gray-50 text-gray-600 rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 transition-all cursor-pointer"
-                  >
-                    <Check className="w-3.5 h-3.5 text-emerald-600" />
-                    Lưu ghi chú
-                  </button>
-                </div>
-
-                {/* Notes guide section - read-only */}
-                <div className="p-3 bg-zinc-50 border border-gray-200 text-gray-500 rounded text-xs select-none">
-                  <span className="font-extrabold text-[10px] text-gray-400 uppercase tracking-wide block mb-1">Ví dụ ghi chú:</span>
-                  <p className="leading-relaxed text-[11px] font-semibold">
-                    — Đã hoàn thành lineart trang 1-4, đang xử lý trang 5
-                    <br />— Biểu cảm panel 3 cần chỉnh lại theo ref Akira gửi
-                    <br />— Dự kiến hoàn thành trước 01/06/2026
-                  </p>
-                </div>
-
-                {/* Notes Editor text area - for writing only */}
-                <textarea
-                  value={progressNotes[workspaceTask.id] || ''}
-                  onChange={(e) => setProgressNotes(prev => ({ ...prev, [workspaceTask.id]: e.target.value }))}
-                  placeholder="Nhập ghi chú tiến độ công việc thực tế của bạn tại đây..."
-                  rows={5}
-                  className="w-full p-4 border border-gray-200 focus:outline-none focus:border-[#E63946] text-xs font-sans text-gray-700 leading-relaxed bg-white rounded-none"
-                />
-
-                {/* Project details card */}
-                <div className="bg-gray-50 p-4 border border-gray-200 rounded-xl grid grid-cols-3 gap-4 text-center">
-                  <div>
-                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">Manga</span>
-                    <span className="text-xs font-extrabold text-gray-900 mt-1 block truncate">
-                      {workspaceTask.seriesTitle}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">Loại nhiệm vụ</span>
-                    <span className="text-xs font-extrabold text-gray-900 mt-1 block truncate">
-                      {workspaceTask.layerType}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">Ngày giao</span>
-                    <span className="text-xs font-extrabold text-gray-900 mt-1 block">
-                      15/04/2026
-                    </span>
-                  </div>
-                </div>
-              </div>
             </div>
+          );
+        })()
+      )}
 
-            {/* Footer */}
-            <div className="bg-gray-50 p-4 border-t border-gray-200 flex justify-between items-center">
-              <span className="text-xs font-bold text-gray-400 flex items-center gap-1.5">
-                <span className="w-2 h-2 bg-amber-500 rounded-full" />
-                Còn {6 - ((checklistStates[workspaceTask.id] || [false, false, false, false, false, false]).filter(Boolean).length)} hạng mục chưa xong
-              </span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setWorkspaceTask(null)}
-                  className="bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 font-extrabold text-xs px-5 py-2 uppercase transition-all rounded-none cursor-pointer"
+      {/* Workspace Detail Modal popup for EDIT (SỬA) Action */}
+      {selectedTaskForModal && (() => {
+        const task = selectedTaskForModal;
+        const currentChecklist = checklistStates[task.id] || [false, false, false, false, false, false];
+        const checkedCount = currentChecklist.filter(Boolean).length;
+        const progressPercent = Math.round((checkedCount / 6) * 100);
+        const statusConfig = getStatusConfigForModal(task.status);
+        const priorityColor = getPriorityDotColor(task.priority);
+        const remainingText = getRemainingDaysText(task);
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in text-black">
+            <div className="bg-white border-4 border-manga-ink w-full max-w-4xl shadow-[6px_6px_0px_rgba(0,0,0,1)] overflow-hidden flex flex-col max-h-[90vh]">
+              
+              {/* Modal Header */}
+              <div className="bg-[#1C1C1F] text-white border-b-4 border-manga-ink p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {/* PenTool square icon with pink border */}
+                  <div className="w-10 h-10 border-2 border-[#E63946] bg-[#2A2A2E] flex items-center justify-center shrink-0">
+                    <PenTool className="w-5 h-5 text-[#E63946]" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] font-black text-[#E63946] tracking-wider uppercase">
+                        WORKSPACE — TASK #{task.id}
+                      </span>
+                      <span className={`text-[8px] font-black px-1.5 py-0.5 border ${statusConfig.text} ${statusConfig.bg} ${statusConfig.border} tracking-wide`}>
+                        {statusConfig.label}
+                      </span>
+                      <span className="text-[10px] font-bold text-zinc-400 flex items-center gap-1">
+                        <span className={`w-2 h-2 rounded-full ${priorityColor}`} />
+                        {getPriorityText(task.priority)}
+                      </span>
+                    </div>
+                    <h2 className="font-manga text-xl font-black tracking-wide leading-tight mt-1">
+                      {task.layerType}
+                    </h2>
+                    <p className="text-[11px] font-bold text-zinc-400 flex items-center gap-1.5 mt-0.5">
+                      <span>{task.seriesTitle}</span>
+                      <span className="text-zinc-600">•</span>
+                      <span className="text-red-400 flex items-center gap-1">
+                        <Clock className="w-3 h-3" /> Deadline: {formatDate(task.deadline)} ({remainingText})
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setSelectedTaskForModal(null)}
+                  className="text-zinc-400 hover:text-white border-2 border-transparent hover:border-zinc-700 p-1 transition-all cursor-pointer bg-transparent border-none"
                 >
-                  Đóng
+                  <X className="w-6 h-6" />
                 </button>
-                <span className="bg-emerald-50 text-emerald-600 border border-emerald-300 rounded font-black text-xs px-4 py-2 uppercase flex items-center gap-1.5 tracking-wider">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  {workspaceTask.status === 'Approved' ? 'Đã được duyệt' : 'Đang thực hiện'}
-                </span>
               </div>
+
+              {/* Modal Progress Section */}
+              <div className="bg-zinc-50 border-b-2 border-manga-ink px-6 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                  <span className="font-manga text-xs font-black text-zinc-800 tracking-wider uppercase">TIẾN ĐỘ CÔNG VIỆC</span>
+                </div>
+                <div className="flex items-center gap-4 w-full sm:w-auto flex-1 max-w-md">
+                  {/* Progress bar container */}
+                  <div className="w-full h-3 bg-zinc-200 border-2 border-black rounded-none overflow-hidden relative">
+                    <div 
+                      className="h-full bg-[#E63946] transition-all duration-300"
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
+                  <span className="font-manga text-xs font-black text-zinc-800 shrink-0">
+                    {checkedCount}/6 • {progressPercent}%
+                  </span>
+                </div>
+              </div>
+
+              {/* Modal Body - 2 Columns */}
+              <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 overflow-y-auto">
+                
+                {/* Column Left: Checklist */}
+                <div className="flex flex-col gap-4">
+                  <div>
+                    <h3 className="font-manga text-xs font-black text-zinc-800 uppercase tracking-wider mb-1">
+                      CHECKLIST CÔNG VIỆC
+                    </h3>
+                    <p className="text-[10px] font-bold text-zinc-400 uppercase">{task.layerType}</p>
+                  </div>
+
+                  {/* Checklist items list */}
+                  <div className="flex flex-col gap-2.5">
+                    {CHECKLIST_ITEMS.map((label, idx) => {
+                      const isChecked = currentChecklist[idx];
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => handleToggleChecklist(task.id, idx)}
+                          className="w-full text-left flex items-start gap-3 p-2.5 border-2 border-zinc-200 hover:border-black bg-white hover:bg-zinc-50/50 transition-colors cursor-pointer group"
+                        >
+                          {/* Checkbox square */}
+                          <div className={`w-5 h-5 border-2 flex items-center justify-center shrink-0 transition-colors ${
+                            isChecked ? 'bg-[#E63946] border-[#E63946]' : 'bg-white border-zinc-300 group-hover:border-black'
+                          }`}>
+                            {isChecked && (
+                              <Check className="w-3.5 h-3.5 text-white stroke-[3px]" />
+                            )}
+                          </div>
+                          <span className={`text-xs font-bold leading-tight select-none ${
+                            isChecked ? 'text-zinc-400 line-through' : 'text-zinc-850'
+                          }`}>
+                            {label}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Action buttons under checklist */}
+                  <div className="flex flex-col sm:flex-row gap-3 mt-2">
+                    <button
+                      onClick={() => {
+                        setSelectedTaskForModal(null)
+                        setDownloadingTask(task)
+                      }}
+                      className="flex-1 bg-black hover:bg-zinc-800 text-white border-2 border-black py-2.5 px-3 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[1px] active:shadow-[1px_1px_0px_rgba(0,0,0,1)] transition-all"
+                    >
+                      <FileDown className="w-4 h-4 shrink-0" /> MỞ TÀI NGUYÊN & FILE NGUỒN
+                    </button>
+                    <button
+                      onClick={() => handleViewFeedbackPage(task.id)}
+                      className="flex-1 bg-white hover:bg-red-50/10 text-[#E63946] border-2 border-[#E63946] py-2.5 px-3 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_rgba(230,57,70,0.2)] hover:shadow-[2px_2px_0px_rgba(230,57,70,0.4)] transition-all"
+                    >
+                      <MessageSquare className="w-4 h-4 shrink-0" /> XEM PHẢN HỒI TỪ MANGAKA
+                    </button>
+                  </div>
+                </div>
+
+                {/* Column Right: Progress Notes */}
+                <div className="flex flex-col gap-4">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h3 className="font-manga text-xs font-black text-zinc-800 uppercase tracking-wider mb-1">
+                        GHI CHÚ TIẾN ĐỘ
+                      </h3>
+                      <p className="text-[10px] font-bold text-zinc-400 uppercase">TIẾN TRÌNH LÀM VIỆC</p>
+                    </div>
+                    <button
+                      onClick={() => handleSaveNotes(task.id)}
+                      className="bg-white hover:bg-zinc-50 border-2 border-black py-1.5 px-2.5 text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_rgba(0,0,0,1)] transition-all cursor-pointer"
+                    >
+                      <Save className="w-3.5 h-3.5 inline mr-1 shadow-none border-none" /> LƯU GHI CHÚ
+                    </button>
+                  </div>
+
+                  {/* Textarea */}
+                  <div className="relative flex-1 flex flex-col">
+                    <textarea
+                      value={editingNote}
+                      onChange={(e) => setEditingNote(e.target.value)}
+                      placeholder={`Ghi lại tiến độ và ghi chú trong khi làm Task #${task.id}...\n\nVí dụ:\n— Đã hoàn thành lineart trang 1-4, đang xử lý trang 5\n— Biểu cảm panel 3 cần chỉnh lại theo ref Akira gửi\n— Dự kiến hoàn thành trước ${formatDate(task.deadline)}`}
+                      className="w-full flex-1 min-h-[220px] p-3 text-xs font-semibold text-gray-700 bg-zinc-50/50 border-2 border-zinc-300 focus:border-black focus:bg-white focus:outline-none resize-none transition-all placeholder:text-gray-400 font-sans"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="bg-zinc-50 border-t-4 border-manga-ink p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <span className="text-xs font-bold text-gray-500">
+                  {checkedCount === 6 ? (
+                    <span className="text-emerald-600 flex items-center gap-1.5 font-black uppercase tracking-wide">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" /> Hoàn thành tất cả checklist!
+                    </span>
+                  ) : (
+                    `Còn ${6 - checkedCount} hạng mục chưa xong`
+                  )}
+                </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setSelectedTaskForModal(null)}
+                    className="bg-white hover:bg-zinc-100 text-manga-ink border-2 border-black py-2.5 px-5 text-xs font-black uppercase tracking-wider cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[1px] active:shadow-[1px_1px_0px_rgba(0,0,0,1)] transition-all"
+                  >
+                    ĐÓNG
+                  </button>
+                  
+                  {/* Conditional Action Button */}
+                  {task.status === 'Approved' ? (
+                    <button
+                      disabled
+                      className="bg-emerald-50 text-emerald-600 border-2 border-emerald-500 py-2.5 px-5 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-not-allowed opacity-80"
+                    >
+                      <CheckCircle2 className="w-4 h-4 shrink-0" /> ĐÃ ĐƯỢC DUYỆT
+                    </button>
+                  ) : task.status === 'Submitted' ? (
+                    <button
+                      disabled
+                      className="bg-purple-50 text-purple-600 border-2 border-purple-500 py-2.5 px-5 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-not-allowed opacity-80"
+                    >
+                      <Clock className="w-4 h-4 shrink-0" /> ĐANG CHỜ DUYỆT
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleModalSubmitAction(task)}
+                      className="bg-[#E63946] hover:bg-white text-white hover:text-[#E63946] border-2 border-[#E63946] py-2.5 px-5 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[1px] active:shadow-[1px_1px_0px_rgba(0,0,0,1)] transition-all"
+                    >
+                      <Send className="w-4 h-4 shrink-0" /> NỘP BÀI SỬA ĐỔI
+                    </button>
+                  )}
+                </div>
+              </div>
+
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
+
+      {submittingTask && (() => {
+        const task = submittingTask;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in text-black">
+            <div className="bg-white border-4 border-manga-ink w-full max-w-xl shadow-[6px_6px_0px_rgba(0,0,0,1)] overflow-hidden flex flex-col">
+              
+              {/* Modal Header */}
+              <div className="bg-[#2D2D30] text-white border-b-4 border-manga-ink p-4 flex items-center justify-between">
+                <div>
+                  <h2 className="text-[14px] font-black text-[#E63946] uppercase tracking-wider">
+                    NỘP KẾT QUẢ NHIỆM VỤ
+                  </h2>
+                  <p className="text-xs font-bold text-white mt-0.5">
+                    Task #{task.id} - {task.layerType}
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setSubmittingTask(null)}
+                  className="text-zinc-400 hover:text-white transition-colors bg-transparent border-none cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="p-6 flex flex-col gap-4">
+                
+                {/* Task Info Card */}
+                <div className="border border-zinc-200 p-4 bg-white flex justify-between items-center">
+                  <div>
+                    <h3 className="font-manga text-[14px] font-black text-zinc-800 leading-tight">
+                      {task.seriesTitle}
+                    </h3>
+                    <p className="text-[11px] font-bold text-zinc-400 mt-1 uppercase">
+                      {task.layerType}
+                    </p>
+                  </div>
+                  <div className="text-[11px] font-bold text-red-500 flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5" /> Deadline: {formatDate(task.deadline)}
+                  </div>
+                </div>
+
+                {/* Edit Notes Field */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-black text-zinc-800 uppercase tracking-wider flex items-center gap-0.5">
+                    GHI CHÚ CHỈNH SỬA <span className="text-[#E63946]">*</span>
+                  </label>
+                  <textarea
+                    value={submitNotes}
+                    onChange={(e) => setSubmitNotes(e.target.value)}
+                    placeholder="Mô tả những gì bạn đã thực hiện trong bản nộp này..."
+                    className="w-full min-h-[90px] p-3 text-xs font-semibold text-gray-700 bg-white border border-zinc-300 focus:border-black focus:outline-none resize-none transition-all placeholder:text-gray-400 font-sans"
+                    required
+                  />
+                </div>
+
+                {/* Version Field */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-black text-zinc-800 uppercase tracking-wider flex items-center gap-0.5">
+                    PHIÊN BẢN <span className="text-[#E63946]">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={submitVersion}
+                    onChange={(e) => setSubmitVersion(e.target.value)}
+                    className="w-full p-2.5 text-xs font-bold text-gray-700 bg-white border border-zinc-300 focus:border-black focus:outline-none transition-all font-sans"
+                    required
+                  />
+                </div>
+
+                {/* File Attachment Upload Box */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-black text-zinc-800 uppercase tracking-wider flex items-center gap-0.5">
+                    FILE ĐÍNH KÈM <span className="text-[#E63946]">*</span>
+                  </label>
+                  
+                  {attachedFile ? (
+                    <div className="border-2 border-dashed border-[#E63946] bg-red-50/10 p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Paperclip className="w-5 h-5 text-[#E63946] shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-zinc-850 truncate">{attachedFile.name}</p>
+                          <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">{attachedFile.size}</p>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => setAttachedFile(null)}
+                        className="text-gray-400 hover:text-[#E63946] bg-transparent border-none cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div 
+                      onClick={() => setAttachedFile({ name: `${task.seriesTitle.toLowerCase().replace(/\s+/g, '_')}_ch${task.chapterNumber}_page${task.pageNumber}_draft.psd`, size: '24.8 MB' })}
+                      className="border-2 border-dashed border-zinc-300 hover:border-black p-6 flex flex-col items-center justify-center gap-2 cursor-pointer bg-zinc-50/50 hover:bg-zinc-50 transition-all"
+                    >
+                      <Paperclip className="w-6 h-6 text-zinc-400" />
+                      <p className="text-xs font-bold text-zinc-800">
+                        Kéo thả hoặc click để chọn file
+                      </p>
+                      <p className="text-[10px] font-bold text-zinc-400">
+                        .psd, .ai, .png, .jpg, .zip
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+
+              {/* Modal Footer */}
+              <div className="bg-zinc-50 border-t-2 border-zinc-200 p-4 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSubmittingTask(null)}
+                  className="bg-white hover:bg-zinc-100 text-manga-ink border-2 border-black py-2.5 px-6 text-xs font-black uppercase tracking-wider cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[1px] active:shadow-[1px_1px_0px_rgba(0,0,0,1)] transition-all"
+                >
+                  HỦY
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!submitNotes.trim()) {
+                      showToast('error', 'Vui lòng nhập ghi chú chỉnh sửa!')
+                      return
+                    }
+                    if (!attachedFile) {
+                      showToast('error', 'Vui lòng đính kèm file kết quả!')
+                      return
+                    }
+                    handleSubmitResult(task.id)
+                  }}
+                  className="bg-[#E63946] hover:bg-white text-white hover:text-[#E63946] border-2 border-[#E63946] py-2.5 px-6 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[1px] active:shadow-[1px_1px_0px_rgba(0,0,0,1)] transition-all"
+                >
+                  <Upload className="w-4 h-4" /> NỘP KẾT QUẢ
+                </button>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
+
+      {downloadingTask && (() => {
+        const task = downloadingTask;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in text-black">
+            <div className="bg-white border-4 border-manga-ink w-full max-w-xl shadow-[6px_6px_0px_rgba(0,0,0,1)] overflow-hidden flex flex-col">
+              
+              {/* Modal Header */}
+              <div className="bg-[#2D2D30] text-white border-b-4 border-manga-ink p-4 flex items-center justify-between">
+                <div>
+                  <h2 className="text-[14px] font-black text-[#E63946] uppercase tracking-wider">
+                    TÀI NGUYÊN & FILE NGUỒN
+                  </h2>
+                  <p className="text-xs font-bold text-white mt-0.5">
+                    Task #{task.id} — {task.layerType}
+                  </p>
+                  <p className="text-[10px] font-medium text-zinc-400 mt-0.5">
+                    {task.seriesTitle} - Deadline: {formatDate(task.deadline)}
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setDownloadingTask(null)}
+                  className="text-zinc-400 hover:text-white transition-colors bg-transparent border-none cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Sub-header statistics row */}
+              <div className="bg-zinc-50 border-b-2 border-zinc-200 px-6 py-3 flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2 font-bold text-zinc-600">
+                  <span>📁 3 file đính kèm</span>
+                  <span className="text-zinc-300">|</span>
+                  <span className="text-zinc-400 font-medium">Tổng ~81 MB</span>
+                </div>
+                <button
+                  onClick={() => {
+                    showToast('success', 'Bắt đầu tải xuống toàn bộ tài nguyên (81 MB)!')
+                    setDownloadingTask(null)
+                  }}
+                  className="bg-[#E63946] hover:bg-white text-white hover:text-[#E63946] border border-[#E63946] px-3.5 py-1.5 text-[10px] font-black uppercase flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" /> TẢI TẤT CẢ
+                </button>
+              </div>
+
+              {/* Modal Content / Files list */}
+              <div className="p-6 flex flex-col gap-5 overflow-y-auto max-h-[50vh]">
+                
+                {/* Section: TÀI LIỆU THAM KHẢO */}
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between text-[10px] font-black text-zinc-550 tracking-wider">
+                    <span>— TÀI LIỆU THAM KHẢO</span>
+                    <span className="text-zinc-400 font-medium">2 file</span>
+                  </div>
+
+                  {/* File 1 */}
+                  <div className="border border-zinc-200 p-3 bg-white flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {/* Purple box zip icon */}
+                      <div className="w-10 h-10 bg-purple-50 flex items-center justify-center shrink-0 border border-purple-100">
+                        <span className="text-xl">📦</span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-black text-zinc-800 truncate leading-tight">SW_cover_ref_vol1-2.zip</p>
+                        <p className="text-[10px] text-zinc-450 mt-1 font-medium leading-tight truncate">File gốc bìa Vol.1 và Vol.2 để giữ nhất quán</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="bg-purple-100 text-purple-700 text-[9px] font-black py-0.5 px-1.5">ZIP</span>
+                      <span className="text-[10px] text-gray-400 font-bold">67 MB</span>
+                      <button 
+                        onClick={() => showToast('success', 'Bắt đầu tải SW_cover_ref_vol1-2.zip!')}
+                        className="bg-white hover:bg-zinc-50 border border-zinc-300 py-1.5 px-2.5 text-[9px] font-black uppercase flex items-center gap-1 cursor-pointer"
+                      >
+                        <Download className="w-3 h-3" /> TẢI XUỐNG
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* File 2 */}
+                  <div className="border border-zinc-200 p-3 bg-white flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {/* Red PDF icon */}
+                      <div className="w-10 h-10 bg-red-55/10 flex items-center justify-center shrink-0 border border-red-100">
+                        <span className="text-xl text-red-500">📄</span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-black text-zinc-800 truncate leading-tight">SW_characters_pose_ref.pdf</p>
+                        <p className="text-[10px] text-zinc-450 mt-1 font-medium leading-tight truncate">Tư thế nhân vật đề xuất cho bìa Vol.3</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="bg-red-100 text-red-700 text-[9px] font-black py-0.5 px-1.5">PDF</span>
+                      <span className="text-[10px] text-gray-400 font-bold">9.1 MB</span>
+                      <button 
+                        onClick={() => showToast('success', 'Bắt đầu tải SW_characters_pose_ref.pdf!')}
+                        className="bg-white hover:bg-zinc-50 border border-zinc-300 py-1.5 px-2.5 text-[9px] font-black uppercase flex items-center gap-1 cursor-pointer"
+                      >
+                        <Download className="w-3 h-3" /> TẢI XUỐNG
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section: SCRIPT / KỊCH BẢN */}
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between text-[10px] font-black text-zinc-550 tracking-wider">
+                    <span>— SCRIPT / KỊCH BẢN</span>
+                    <span className="text-zinc-400 font-medium">1 file</span>
+                  </div>
+
+                  {/* File 3 */}
+                  <div className="border border-zinc-200 p-3 bg-white flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {/* Red PDF icon */}
+                      <div className="w-10 h-10 bg-red-55/10 flex items-center justify-center shrink-0 border border-red-100">
+                        <span className="text-xl text-red-500">📄</span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-black text-zinc-800 truncate leading-tight">SW_Vol3_cover_brief.pdf</p>
+                        <p className="text-[10px] text-zinc-450 mt-1 font-medium leading-tight truncate">Brief thiết kế bìa Volume 3 từ Mangaka</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="bg-red-100 text-red-700 text-[9px] font-black py-0.5 px-1.5">PDF</span>
+                      <span className="text-[10px] text-gray-400 font-bold">4.5 MB</span>
+                      <button 
+                        onClick={() => showToast('success', 'Bắt đầu tải SW_Vol3_cover_brief.pdf!')}
+                        className="bg-white hover:bg-zinc-50 border border-zinc-300 py-1.5 px-2.5 text-[9px] font-black uppercase flex items-center gap-1 cursor-pointer"
+                      >
+                        <Download className="w-3 h-3" /> TẢI XUỐNG
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Modal Footer */}
+              <div className="bg-zinc-50 border-t-2 border-zinc-200 p-4 flex items-center justify-between gap-3">
+                <span className="text-[10px] font-bold text-gray-400">
+                  File được gắn kèm bởi Mangaka / Editor • Giao ngày 08/05/2026
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setDownloadingTask(null)}
+                  className="bg-white hover:bg-zinc-100 text-manga-ink border-2 border-black py-2.5 px-6 text-xs font-black uppercase tracking-wider cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[1px] active:shadow-[1px_1px_0px_rgba(0,0,0,1)] transition-all"
+                >
+                  ĐÓNG
+                </button>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
     </div>
   )
 }

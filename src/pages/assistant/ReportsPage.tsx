@@ -1,364 +1,257 @@
-import React, { useState } from 'react'
-import { useNavigate } from 'react-router'
-import {
-  Calendar,
-  TrendingUp,
-  FileDown,
-  ChevronDown,
-  CheckCircle2
-} from 'lucide-react'
-import { useToast } from '@/contexts/ToastContext'
-
-interface MonthlyReport {
-  month: string
-  date: string
-  pages: number
-  tasks: number
-  approved: number
-  pending: number
-  income: number
-  rate: number
-  isCurrent?: boolean
-}
-
-const mockMonthlyReports: MonthlyReport[] = [
-  {
-    month: 'Tháng 5, 2026',
-    date: '18/05/2026',
-    pages: 68,
-    tasks: 65,
-    approved: 62,
-    pending: 6,
-    income: 3060,
-    rate: 45,
-    isCurrent: true
-  },
-  {
-    month: 'Tháng 4, 2026',
-    date: '30/04/2026',
-    pages: 61,
-    tasks: 61,
-    approved: 58,
-    pending: 3,
-    income: 2745,
-    rate: 45
-  },
-  {
-    month: 'Tháng 3, 2026',
-    date: '31/03/2026',
-    pages: 55,
-    tasks: 55,
-    approved: 53,
-    pending: 2,
-    income: 2475,
-    rate: 45
-  },
-  {
-    month: 'Tháng 2, 2026',
-    date: '28/02/2026',
-    pages: 48,
-    tasks: 48,
-    approved: 47,
-    pending: 1,
-    income: 2160,
-    rate: 45
-  },
-  {
-    month: 'Tháng 1, 2026',
-    date: '31/01/2026',
-    pages: 42,
-    tasks: 42,
-    approved: 42,
-    pending: 0,
-    income: 1890,
-    rate: 45
-  }
-]
+import React from 'react'
+import { Calendar, Download, FileText, BarChart2, CheckCircle } from 'lucide-react'
 
 export default function ReportsPage() {
-  const navigate = useNavigate()
-  const { showToast } = useToast()
-  const [selectedMonth, setSelectedMonth] = useState('Tháng 5, 2026')
-  const [selectedWeek, setSelectedWeek] = useState('Tuần 3')
+  // Using static data to perfectly match the requested design structure while removing income
 
-  const handleDownloadPDF = (report: MonthlyReport) => {
-    showToast(`Đang khởi tạo tải xuống báo cáo hiệu suất dạng PDF cho "${report.month}"...`)
-  }
-
-  // Weekly data for bar chart (mockup values)
-  const weeklyData = [
-    { day: 'T2', value: 8 },
-    { day: 'T3', value: 17 },
-    { day: 'T4', value: 10 },
-    { day: 'T5', value: 15 },
-    { day: 'T6', value: 6 },
-    { day: 'T7', value: 5 },
-    { day: 'CN', value: 12 }
+  const reports = [
+    { month: 'Tháng 5, 2026', desc: 'Đang cập nhật...', date: '15/05/2026', pages: 68, tasks: 68, approved: 62, pending: 6 },
+    { month: 'Tháng 4, 2026', desc: 'Tải xuống PDF', date: '30/04/2026', pages: 61, tasks: 61, approved: 58, pending: 3 },
+    { month: 'Tháng 3, 2026', desc: 'Tải xuống PDF', date: '31/03/2026', pages: 55, tasks: 55, approved: 53, pending: 2 },
+    { month: 'Tháng 2, 2026', desc: 'Tải xuống PDF', date: '28/02/2026', pages: 48, tasks: 48, approved: 47, pending: 1 },
+    { month: 'Tháng 1, 2026', desc: 'Tải xuống PDF', date: '31/01/2026', pages: 42, tasks: 42, approved: 42, pending: 0 },
   ]
 
-  // Formatted currencies helper
-  const formatCurrency = (val: number) => {
-    return `$${val.toLocaleString('en-US').replace(',', '.')}`
-  }
+  const totalPages = reports.reduce((acc, r) => acc + r.pages, 0)
+  const totalTasks = reports.reduce((acc, r) => acc + r.tasks, 0)
+  const totalApproved = reports.reduce((acc, r) => acc + r.approved, 0)
+  const totalPending = reports.reduce((acc, r) => acc + r.pending, 0)
+
+  // Chart data for visual representation
+  const weeklyPages = [14, 9, 19, 11, 16, 7, 5]
+  const maxWeeklyPages = Math.max(...weeklyPages)
+
+  const monthlyTasks = [42, 48, 55, 61, 68]
+  const maxMonthlyTasks = Math.max(...monthlyTasks)
 
   return (
-    <div className="max-w-7xl mx-auto pb-16 font-sans text-gray-900">
-      
-      {/* Back Button */}
-      <button
-        onClick={() => navigate(-1)}
-        className="flex items-center gap-1 text-xs font-extrabold text-[#E63946] hover:text-black transition-colors uppercase mb-3 bg-transparent border-0 p-0 cursor-pointer"
-      >
-        &larr; Quay lại
-      </button>
-
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 border-b border-gray-200 pb-5 gap-4">
+    <div className="max-w-[1200px] mx-auto pb-12 font-sans">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 uppercase">
+          <h1 className="font-manga text-[32px] font-bold uppercase text-manga-ink leading-tight">
             BÁO CÁO HIỆU SUẤT
           </h1>
           <p className="text-sm font-medium text-gray-500 mt-1">
-            Thống kê trang đã duyệt và thu nhập theo từng tháng
+            Thống kê trang đã duyệt và nhiệm vụ theo từng tháng
           </p>
         </div>
-
-        {/* Month Dropdown selector */}
         <div className="relative">
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="appearance-none pl-10 pr-10 py-2 border-2 border-black font-extrabold text-xs bg-white text-gray-700 rounded-none cursor-pointer focus:outline-none"
-          >
-            <option value="Tháng 5, 2026">Tháng 5, 2026</option>
-            <option value="Tháng 4, 2026">Tháng 4, 2026</option>
-            <option value="Tháng 3, 2026">Tháng 3, 2026</option>
-          </select>
-          <Calendar className="w-4 h-4 text-gray-700 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <ChevronDown className="w-4 h-4 text-gray-700 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <button className="flex items-center gap-2 bg-white border-2 border-manga-ink px-4 py-2 font-bold text-sm shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] transition-all">
+            <Calendar className="w-4 h-4" /> Tháng 5, 2026 <span className="ml-2 text-[10px]">▼</span>
+          </button>
         </div>
       </div>
 
-      {/* Grid of 2 Stat Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        
-        {/* Card 1: Tổng trang đã duyệt (5 tháng) */}
-        <div className="bg-white border border-gray-200 p-5 rounded-xl shadow-xs">
-          <span className="text-[10px] font-black tracking-wider text-gray-400 uppercase flex items-center gap-1.5 mb-2">
-            <CheckCircle2 className="w-4 h-4 text-rose-500" />
-            TỔNG TRANG ĐÃ DUYỆT (5 THÁNG)
-          </span>
-          <span className="text-4xl font-extrabold text-[#E63946] block mt-1">
-            274
-          </span>
-          <p className="text-[10px] font-bold text-gray-400 mt-3">
-            Tất cả thời gian • 5 tháng gần nhất
-          </p>
-        </div>
-
-        {/* Card 2: Trang duyệt tháng 5 */}
-        <div className="bg-white border border-gray-200 p-5 rounded-xl shadow-xs">
-          <span className="text-[10px] font-black tracking-wider text-gray-400 uppercase flex items-center gap-1.5 mb-2">
-            <TrendingUp className="w-4 h-4 text-blue-500" />
-            TRANG DUYỆT — THÁNG 5, 2026
-          </span>
-          <span className="text-4xl font-extrabold text-blue-600 block mt-1">
-            68
-          </span>
-          <p className="text-[10px] font-bold text-emerald-600 mt-3">
-            +11% so với tháng trước
-          </p>
-        </div>
-
-      </div>
-
-
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 gap-8 mb-8">
-        
-        {/* Weekly Bar Chart (Full Width) */}
-        <div className="bg-white border-2 border-black rounded-none p-6 shadow-sm">
-          <div className="flex justify-between items-center pb-4 border-b border-gray-100 mb-6">
-            <div>
-              <h2 className="text-sm font-extrabold tracking-wider text-gray-900 uppercase">
-                TRANG DUYỆT HÀNG TUẦN
-              </h2>
-              <span className="text-[11px] font-bold text-gray-400 block mt-0.5">Tháng 5, 2026 - Tuần 3 (15 - 21/05)</span>
-            </div>
-            
-            {/* Week Dropdown */}
-            <div className="relative">
-              <select
-                value={selectedWeek}
-                onChange={(e) => setSelectedWeek(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-[11px] font-extrabold border border-gray-200 rounded bg-white text-gray-600 cursor-pointer focus:outline-none"
-              >
-                <option value="Tuần 1">Tuần 1</option>
-                <option value="Tuần 2">Tuần 2</option>
-                <option value="Tuần 3">Tuần 3</option>
-                <option value="Tuần 4">Tuần 4</option>
-              </select>
-              <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
+      {/* Stats Cards Row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white border-2 border-manga-ink p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex flex-col justify-between">
+          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">
+            <FileText className="w-3 h-3 text-[#E63946]" /> TỔNG TRANG ĐÃ DUYỆT (5 THÁNG)
           </div>
+          <div>
+            <div className="font-manga text-[40px] leading-none font-bold text-[#E63946]">{totalPages}</div>
+            <div className="text-[10px] font-semibold text-gray-400 mt-1 uppercase">68 trang / 5 tháng gần nhất</div>
+          </div>
+        </div>
 
-          {/* Bar Chart Container using Flexbox column structures */}
-          <div className="relative h-64 flex flex-col justify-between pt-4">
-            
-            {/* Chart Grid Lines & Y-Axis Labels */}
-            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-8 pt-4">
-              {[20, 15, 10, 5, 0].map((labelVal) => (
-                <div key={labelVal} className="flex items-center gap-4 w-full">
-                  <span className="text-[10px] font-bold text-gray-400 w-4 text-right">{labelVal}</span>
-                  <div className="flex-1 border-t border-dashed border-gray-100" />
-                </div>
-              ))}
+        <div className="bg-white border-2 border-manga-ink p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex flex-col justify-between">
+          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">
+            <CheckCircle className="w-3 h-3 text-[#48BB78]" /> TỔNG NHIỆM VỤ HOÀN THÀNH
+          </div>
+          <div>
+            <div className="font-manga text-[40px] leading-none font-bold text-[#48BB78]">{totalApproved}</div>
+            <div className="text-[10px] font-semibold text-gray-400 mt-1 uppercase">Trên tổng số {totalTasks} nhiệm vụ</div>
+          </div>
+        </div>
+
+        <div className="bg-white border-2 border-manga-ink p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex flex-col justify-between">
+          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">
+            <BarChart2 className="w-3 h-3 text-[#4299E1]" /> TRANG DUYỆT - THÁNG 5, 2026
+          </div>
+          <div>
+            <div className="font-manga text-[40px] leading-none font-bold text-[#4299E1]">68</div>
+            <div className="text-[10px] font-semibold text-gray-400 mt-1 uppercase">+7 trang so với tháng trước</div>
+          </div>
+        </div>
+
+        <div className="bg-white border-2 border-manga-ink p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex flex-col justify-between">
+          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">
+            <CheckCircle className="w-3 h-3 text-[#F6AD55]" /> NHIỆM VỤ - THÁNG 5, 2026
+          </div>
+          <div>
+            <div className="font-manga text-[40px] leading-none font-bold text-[#F6AD55]">62</div>
+            <div className="text-[10px] font-semibold text-gray-400 mt-1 uppercase">HOÀN THÀNH / 68 TỔNG SỐ</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Info Bar */}
+      <div className="bg-[#1A1A1A] text-white px-6 py-4 border-2 border-manga-ink shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <span className="text-[#E63946] text-lg font-bold">⚡</span>
+          <span className="font-bold text-sm tracking-wider uppercase">HIỆU SUẤT HIỆN TẠI</span>
+        </div>
+        <div className="flex items-center gap-4 text-xs font-bold uppercase tracking-wider">
+          <div className="flex flex-col text-right">
+            <span className="text-gray-400 text-[10px]">Tháng 5, 2026</span>
+            <span className="text-white">68 TRANG (62 NHIỆM VỤ)</span>
+          </div>
+          <div className="w-px h-8 bg-gray-700"></div>
+          <div className="flex flex-col text-right">
+            <span className="text-gray-400 text-[10px]">Tháng trước</span>
+            <span className="text-gray-300">61 TRANG (58 NHIỆM VỤ)</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Charts */}
+      <div className="grid md:grid-cols-2 gap-6 mb-8">
+        {/* Weekly Pages Chart */}
+        <div className="bg-white border-2 border-manga-ink p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="font-bold text-sm uppercase tracking-wider text-manga-ink">TRANG DUYỆT HÀNG TUẦN</h2>
+              <p className="text-[10px] text-gray-400 uppercase font-bold mt-1">Tháng 5, 2026 - Tuần 2 (08/05 - 15/05)</p>
             </div>
+            <button className="border border-gray-300 px-3 py-1 text-xs font-bold text-gray-600">Tuần 2 ▾</button>
+          </div>
+          
+          <div className="relative h-[200px] flex items-end justify-between gap-2 border-l border-b border-gray-200 pb-2 pl-2">
+            {/* Y-axis labels */}
+            <div className="absolute -left-6 bottom-0 top-0 flex flex-col justify-between text-[10px] text-gray-400 font-bold py-2">
+              <span>20-</span>
+              <span>15-</span>
+              <span>10-</span>
+              <span>5-</span>
+              <span>0-</span>
+            </div>
+            
+            {/* Grid lines */}
+            <div className="absolute left-0 right-0 bottom-[25%] h-px border-t border-dashed border-gray-200"></div>
+            <div className="absolute left-0 right-0 bottom-[50%] h-px border-t border-dashed border-gray-200"></div>
+            <div className="absolute left-0 right-0 bottom-[75%] h-px border-t border-dashed border-gray-200"></div>
+            <div className="absolute left-0 right-0 top-0 h-px border-t border-dashed border-gray-200"></div>
 
             {/* Bars */}
-            <div className="relative z-10 flex-1 flex items-end justify-around pl-8 pr-4 pb-8 h-full max-w-4xl mx-auto w-full">
-              {weeklyData.map((bar, idx) => {
-                // Height calculate percent (Max height 20 pages)
-                const heightPct = (bar.value / 20) * 100
-                return (
-                  <div key={idx} className="flex flex-col items-center group w-12">
-                    {/* Tooltip value */}
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-900 text-white text-[9px] font-bold py-1 px-1.5 rounded -mt-6 absolute translate-y-[-10px] pointer-events-none">
-                      {bar.value} trang
-                    </span>
-                    
-                    {/* Bar track wrapper to resolve percentage height bug */}
-                    <div className="h-[160px] w-8 flex items-end bg-transparent mb-2">
-                      <div
-                        className="w-full bg-[#E63946] hover:bg-red-600 transition-all duration-300 rounded-t-sm cursor-pointer shadow-xs animate-bar-grow"
-                        style={{ height: `${heightPct}%` }}
-                      />
-                    </div>
-                    
-                    {/* Weekday label */}
-                    <span className="text-[11px] font-black text-gray-400 uppercase">
-                      {bar.day}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
+            {weeklyPages.map((val, i) => (
+              <div key={i} className="relative flex flex-col items-center flex-1 group z-10">
+                <div 
+                  className="w-full max-w-[40px] bg-[#E63946] border border-[#B02A35] transition-all group-hover:opacity-80"
+                  style={{ height: `${(val / 20) * 100}%` }}
+                ></div>
+                <div className="absolute -bottom-6 text-[10px] font-bold text-gray-400">
+                  {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][i]}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
+        {/* Monthly Tasks Chart */}
+        <div className="bg-white border-2 border-manga-ink p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="font-bold text-sm uppercase tracking-wider text-manga-ink">XU HƯỚNG NHIỆM VỤ</h2>
+              <p className="text-[10px] text-gray-400 uppercase font-bold mt-1">5 tháng gần nhất (2026)</p>
+            </div>
+          </div>
+          
+          <div className="relative h-[200px] flex items-end justify-between gap-2 border-l border-b border-gray-200 pb-2 pl-2">
+            {/* Y-axis labels */}
+            <div className="absolute -left-6 bottom-0 top-0 flex flex-col justify-between text-[10px] text-gray-400 font-bold py-2">
+              <span>80-</span>
+              <span>60-</span>
+              <span>40-</span>
+              <span>20-</span>
+              <span>0-</span>
+            </div>
+            
+            {/* Grid lines */}
+            <div className="absolute left-0 right-0 bottom-[25%] h-px border-t border-dashed border-gray-200"></div>
+            <div className="absolute left-0 right-0 bottom-[50%] h-px border-t border-dashed border-gray-200"></div>
+            <div className="absolute left-0 right-0 bottom-[75%] h-px border-t border-dashed border-gray-200"></div>
+            <div className="absolute left-0 right-0 top-0 h-px border-t border-dashed border-gray-200"></div>
+
+            {/* Bars */}
+            {monthlyTasks.map((val, i) => (
+              <div key={i} className="relative flex flex-col items-center flex-1 group z-10">
+                <div 
+                  className="w-full max-w-[40px] bg-[#48BB78] border border-[#38A169] transition-all group-hover:opacity-80"
+                  style={{ height: `${(val / 80) * 100}%` }}
+                ></div>
+                <div className="absolute -bottom-6 text-[10px] font-bold text-gray-400">
+                  {['Th1', 'Th2', 'Th3', 'Th4', 'Th5'][i]}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* PDF Monthly Reports Table */}
-      <h3 className="text-xs font-black tracking-widest text-gray-400 uppercase mb-4">
-        BÁO CÁO HÀNG THÁNG (PDF)
-      </h3>
-      
-      <div className="bg-white border-2 border-black rounded-none shadow-sm overflow-hidden mb-6">
+      {/* Table */}
+      <div className="bg-white border-2 border-manga-ink shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+        <div className="bg-[#1A1A1A] text-white px-6 py-4 flex items-center justify-between">
+          <h2 className="font-bold text-xs uppercase tracking-wider">BÁO CÁO HÀNG THÁNG (PDF)</h2>
+          <span className="text-[10px] font-bold text-gray-400 uppercase">5 báo cáo - Chỉ hiển thị hiệu suất</span>
+        </div>
+        
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-black text-white text-[10px] font-black uppercase tracking-wider border-b-2 border-black">
-                <th className="py-4 px-6 text-white">BÁO CÁO</th>
-                <th className="py-4 px-6 text-white">NGÀY CÔNG BỐ</th>
-                <th className="py-4 px-6 text-white">TRANG DUYỆT</th>
-                <th className="py-4 px-6 text-white text-center">NHIỆM VỤ</th>
-                <th className="py-4 px-6 text-white text-center">ĐÃ DUYỆT</th>
-                <th className="py-4 px-6 text-white text-center">CHỜ DUYỆT</th>
-                <th className="py-4 px-6 text-white text-center">TẢI XUỐNG</th>
+              <tr className="border-b-2 border-manga-ink text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                <th className="py-4 px-6">BÁO CÁO</th>
+                <th className="py-4 px-6 text-center">NGÀY</th>
+                <th className="py-4 px-6 text-center">TRANG DUYỆT</th>
+                <th className="py-4 px-6 text-center">NHIỆM VỤ</th>
+                <th className="py-4 px-6 text-center">ĐÃ DUYỆT</th>
+                <th className="py-4 px-6 text-center">CHỜ DUYỆT</th>
+                <th className="py-4 px-6 text-right">TẢI XUỐNG</th>
               </tr>
             </thead>
-            
-            <tbody className="divide-y divide-gray-100 text-sm font-semibold text-gray-700 bg-white">
-              {mockMonthlyReports.map((report, idx) => (
-                <tr key={idx} className="hover:bg-gray-50/50 transition-colors">
-                  
-                  {/* Monthly report card link */}
-                  <td className="py-4 px-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded bg-red-50 flex items-center justify-center flex-shrink-0 text-[#E63946] border border-red-100">
-                        <FileDown className="w-4 h-4" />
-                      </div>
+            <tbody className="divide-y border-manga-ink">
+              {reports.map((report, idx) => (
+                <tr key={idx} className={`hover:bg-gray-50 transition-colors ${idx === 0 ? 'bg-[#FFF5F5]' : ''}`}>
+                  <td className="py-5 px-6">
+                    <div className="flex items-start gap-3">
+                      <FileText className={`w-5 h-5 ${idx === 0 ? 'text-[#E63946]' : 'text-gray-400'}`} />
                       <div>
-                        <h4 className="text-xs font-extrabold text-gray-900 leading-tight">
-                          {report.month}
-                        </h4>
-                        <span className={`text-[9px] font-bold uppercase mt-0.5 block ${report.isCurrent ? 'text-[#E63946] animate-pulse' : 'text-gray-400'}`}>
-                          {report.isCurrent ? 'Đang xem' : 'Tải xuống PDF'}
-                        </span>
+                        <div className="font-bold text-sm text-manga-ink">{report.month}</div>
+                        <div className={`text-[10px] font-bold mt-1 uppercase ${idx === 0 ? 'text-[#E63946]' : 'text-gray-400'}`}>
+                          {report.desc}
+                        </div>
                       </div>
                     </div>
                   </td>
-
-                  {/* Publish date */}
-                  <td className="py-4 px-6 text-gray-500 text-xs font-bold">
-                    {report.date}
-                  </td>
-
-                  {/* Total pages approved */}
-                  <td className="py-4 px-6 text-[#E63946] font-black text-xs">
-                    {report.pages} trang
-                  </td>
-
-                  {/* Total Tasks count */}
-                  <td className="py-4 px-6 text-center text-gray-900">
-                    {report.tasks}
-                  </td>
-
-                  {/* Approved tasks */}
-                  <td className="py-4 px-6 text-center text-emerald-600 font-extrabold">
-                    {report.approved}
-                  </td>
-
-                  {/* Pending tasks */}
-                  <td className="py-4 px-6 text-center text-amber-500 font-extrabold">
-                    {report.pending}
-                  </td>
-
-                  {/* PDF Download Action Button */}
-                  <td className="py-4 px-6 text-center">
-                    <button
-                      onClick={() => handleDownloadPDF(report)}
-                      className="bg-[#E63946] text-white font-extrabold text-[9px] px-3 py-1.5 rounded uppercase tracking-wider flex items-center gap-1.5 mx-auto hover:bg-red-600 transition-colors border border-[#E63946]"
-                    >
-                      <FileDown className="w-3.5 h-3.5" />
-                      PDF
+                  <td className="py-5 px-6 text-center text-xs font-semibold text-gray-500">{report.date}</td>
+                  <td className="py-5 px-6 text-center font-bold text-[#E63946] text-sm">{report.pages} trang</td>
+                  <td className="py-5 px-6 text-center font-bold text-manga-ink text-sm">{report.tasks}</td>
+                  <td className="py-5 px-6 text-center font-bold text-[#48BB78] text-sm">{report.approved}</td>
+                  <td className="py-5 px-6 text-center font-bold text-[#F6AD55] text-sm">{report.pending}</td>
+                  <td className="py-5 px-6 text-right">
+                    <button className="bg-[#E63946] hover:bg-[#B02A35] transition-colors text-white px-4 py-2 border-2 border-[#1A1A1A] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center gap-2 text-[10px] font-bold ml-auto active:translate-y-[2px] active:shadow-none">
+                      <Download className="w-3 h-3" /> PDF
                     </button>
                   </td>
-
                 </tr>
               ))}
             </tbody>
-            
-            {/* Total / Summary black footer row */}
             <tfoot>
-              <tr className="bg-[#1c1c1f] text-white text-xs font-extrabold border-t-2 border-black">
-                <td className="py-4 px-6 text-white uppercase tracking-wider">
+              <tr className="bg-[#1A1A1A] text-white">
+                <td colSpan={2} className="py-4 px-6 font-bold text-xs uppercase tracking-wider">
                   TỔNG CỘNG (5 THÁNG)
                 </td>
-                <td className="py-4 px-6 text-zinc-400">
-                  —
-                </td>
-                <td className="py-4 px-6 text-[#E63946] font-black">
-                  274 trang
-                </td>
-                <td className="py-4 px-6 text-center text-white font-black">
-                  276
-                </td>
-                <td className="py-4 px-6 text-center text-emerald-500 font-black">
-                  262
-                </td>
-                <td className="py-4 px-6 text-center text-amber-500 font-black">
-                  12
-                </td>
-                <td className="py-4 px-6">
-                  {/* Empty cell spacer */}
-                </td>
+                <td className="py-4 px-6 text-center font-bold text-[#E63946] text-sm">{totalPages} trang</td>
+                <td className="py-4 px-6 text-center font-bold text-sm">{totalTasks}</td>
+                <td className="py-4 px-6 text-center font-bold text-[#48BB78] text-sm">{totalApproved}</td>
+                <td className="py-4 px-6 text-center font-bold text-[#F6AD55] text-sm">{totalPending}</td>
+                <td className="py-4 px-6"></td>
               </tr>
             </tfoot>
           </table>
         </div>
       </div>
-
     </div>
   )
 }
+

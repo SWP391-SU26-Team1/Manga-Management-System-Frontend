@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="vite-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#41D1FF" />
+      <stop offset="100%" stop-color="#BD34FE" />
+    </linearGradient>
+    <linearGradient id="lightning-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFEA79" />
+      <stop offset="100%" stop-color="#FFAD1F" />
+    </linearGradient>
+  </defs>
+  <!-- V-shaped triangle pointing down -->
+  <polygon points="15,20 85,20 50,85" fill="url(#vite-gradient)" />
+  <!-- Yellow lightning bolt on top -->
+  <polygon points="58,10 38,45 50,45 42,85 70,38 54,38" fill="url(#lightning-gradient)" />
+</svg>

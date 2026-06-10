@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { Mail, Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react'
 import { validateEmail, validatePassword } from '@/utils/validators'
-import { MOCK_USERS } from '@/data/mockUsers'
+import authService from '@/services/auth.service'
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -22,6 +22,7 @@ export default function LoginPage() {
   })
 
   const [loginError, setLoginError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
   const getInputClass = (field: 'email' | 'password', extraPaddingRight = 'pr-4') => {
     const isTouched = touched[field]
@@ -68,7 +69,7 @@ export default function LoginPage() {
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoginError(null)
 
@@ -89,26 +90,33 @@ export default function LoginPage() {
       return
     }
 
-    const user = MOCK_USERS.find(
-      (u) => u.email.toLowerCase() === email.trim().toLowerCase() && u.password === password
-    )
+    setLoading(true)
+    try {
+      const data = await authService.login({ email, password })
+      
+      const storedUserData = {
+        ...data.user,
+        token: data.token
+      }
+      
+      localStorage.setItem('mangaflow_user', JSON.stringify(storedUserData))
 
-    if (user) {
-      localStorage.setItem('mangaflow_user', JSON.stringify(user))
-
-      if (user.role === 'MANGAKA') {
+      if (storedUserData.role === 'MANGAKA') {
         navigate('/dashboard/mangaka')
-      } else if (user.role === 'ASSISTANT') {
+      } else if (storedUserData.role === 'ASSISTANT') {
         navigate('/dashboard/assistant')
-      } else if (user.role === 'EDITOR') {
+      } else if (storedUserData.role === 'EDITOR') {
         navigate('/dashboard/tantou-editor')
-      } else if (user.role === 'BOARD') {
+      } else if (storedUserData.role === 'BOARD') {
         navigate('/dashboard/editorial-board')
       } else {
         navigate('/')
       }
-    } else {
-      setLoginError('Email hoặc mật khẩu không chính xác.')
+    } catch (err: any) {
+      console.error('Login error:', err)
+      const errorMsg = err.response?.data?.message || 'Email hoặc mật khẩu không chính xác.'
+      setLoginError(errorMsg)
+      setLoading(false)
     }
   }
 
@@ -223,10 +231,10 @@ export default function LoginPage() {
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={!isFormValid}
+                disabled={!isFormValid || loading}
                 className="w-full mt-4 bg-manga-red text-white font-bold uppercase tracking-widest py-3 px-8 manga-border manga-shadow-sm hover:translate-y-1 hover:manga-shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:manga-shadow-sm flex items-center justify-center gap-2"
               >
-                Đăng nhập <span>→</span>
+                {loading ? 'Đang đăng nhập...' : 'Đăng nhập'} <span>→</span>
               </button>
             </form>
 

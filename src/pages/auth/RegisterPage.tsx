@@ -1,12 +1,17 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { PenTool, PencilRuler, FileSignature, Sparkles, Eye, EyeOff, ArrowLeft } from 'lucide-react'
 import { validateUsername, validateEmail, validatePassword, validateConfirmPassword } from '@/utils/validators'
-import { MOCK_USERS } from '@/data/mockUsers'
+import authService from '@/services/auth.service'
 
 export default function RegisterPage() {
   const navigate = useNavigate()
   const [role, setRole] = useState<'mangaka' | 'assistant' | 'editor'>('mangaka')
+  const [registerError, setRegisterError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [showSuccess, setShowSuccess] = useState(false)
+  const [registeredUser, setRegisteredUser] = useState<any>(null)
+  const [countdown, setCountdown] = useState(3)
 
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
@@ -14,6 +19,29 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  useEffect(() => {
+    let timer: any
+    if (showSuccess && countdown > 0) {
+      timer = setTimeout(() => setCountdown(prev => prev - 1), 1000)
+    } else if (showSuccess && countdown === 0 && registeredUser) {
+      handleImmediateRedirect()
+    }
+    return () => clearTimeout(timer)
+  }, [showSuccess, countdown, registeredUser])
+
+  const handleImmediateRedirect = () => {
+    if (!registeredUser) return
+    const dashboardPath =
+      registeredUser.role === 'MANGAKA'
+        ? '/dashboard/mangaka'
+        : registeredUser.role === 'ASSISTANT'
+        ? '/dashboard/assistant'
+        : registeredUser.role === 'EDITOR'
+        ? '/dashboard/tantou-editor'
+        : '/'
+    navigate(dashboardPath)
+  }
 
   const [errors, setErrors] = useState({
     username: '',
@@ -93,8 +121,9 @@ export default function RegisterPage() {
     !errors.username && !errors.email && !errors.password && !errors.confirmPassword &&
     !validateUsername(username) && !validateEmail(email) && !validatePassword(password) && !validateConfirmPassword(password, confirmPassword)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setRegisterError(null)
 
     const uErr = validateUsername(username) || ''
     const eErr = validateEmail(email) || ''
@@ -119,28 +148,29 @@ export default function RegisterPage() {
       return
     }
 
-    // Add user to MOCK_USERS simulation
-    const userRole = role.toUpperCase() as any
-    const exists = MOCK_USERS.some(u => u.email.toLowerCase() === email.trim().toLowerCase())
-    if (exists) {
-      setErrors(prev => ({ ...prev, email: 'Email đã tồn tại trên hệ thống.' }))
-      return
+    setLoading(true)
+    try {
+      const data = await authService.register({
+        username: username.trim(),
+        email: email.trim().toLowerCase(),
+        password,
+        role
+      })
+      
+      const storedUserData = {
+        ...data.user,
+        token: data.token
+      }
+      
+      localStorage.setItem('mangaflow_user', JSON.stringify(storedUserData))
+      setRegisteredUser(storedUserData)
+      setShowSuccess(true)
+    } catch (err: any) {
+      console.error('Registration error:', err)
+      const errorMsg = err.response?.data?.message || 'Đăng ký thất bại. Vui lòng thử lại.'
+      setRegisterError(errorMsg)
+      setLoading(false)
     }
-
-    MOCK_USERS.push({
-      id: `usr_${role}_${Date.now()}`,
-      username: username,
-      email: email,
-      password: password,
-      role: userRole,
-      fullName: username,
-      avatarUrl: `https://i.pravatar.cc/150?u=${username}`,
-      bio: `Mô tả về ${username}.`,
-      stats: { projectsCompleted: 0, activeProjects: 0 }
-    })
-
-    alert('Đăng ký thành công!')
-    navigate('/login')
   }
 
   return (
@@ -188,11 +218,51 @@ export default function RegisterPage() {
 
         {/* Right Block - Form */}
         <div className="w-full md:w-7/12 bg-white p-10 md:p-14 relative z-10">
-          <form onSubmit={handleSubmit} className="flex flex-col h-full justify-center">
+          {showSuccess ? (
+            <div className="flex flex-col items-center justify-center h-full text-center py-6 space-y-6">
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center text-green-500 animate-bounce">
+                <Sparkles className="w-10 h-10" />
+              </div>
+              
+              <h2 className="font-manga text-3xl font-bold uppercase text-manga-ink tracking-wide">
+                Đăng ký thành công!
+              </h2>
+              
+              <p className="text-gray-600 text-sm max-w-md leading-relaxed">
+                Chào mừng <span className="font-bold text-manga-ink">{registeredUser?.fullName}</span>! Tài khoản của bạn đã được khởi tạo và đăng nhập thành công vào hệ thống <strong>MangaFlow</strong>.
+              </p>
 
-            <h2 className="font-manga text-2xl font-bold uppercase mb-6 tracking-wide">
-              Bạn là ai?
-            </h2>
+              <div className="w-full max-w-sm p-4 bg-gray-50 border-2 border-dashed border-gray-200 text-left space-y-2">
+                <div className="text-xs text-gray-500 uppercase tracking-widest font-bold">Thông tin tài khoản:</div>
+                <div className="text-sm font-bold text-manga-ink">Email: <span className="font-normal text-gray-600">{registeredUser?.email}</span></div>
+                <div className="text-sm font-bold text-manga-ink">Vai trò: <span className="font-normal text-manga-red uppercase">{registeredUser?.role}</span></div>
+              </div>
+
+              <div className="space-y-4 w-full max-w-xs pt-4">
+                <button
+                  type="button"
+                  onClick={handleImmediateRedirect}
+                  className="w-full bg-manga-ink text-white font-bold uppercase tracking-widest py-4 px-6 manga-border manga-shadow-sm hover:bg-gray-950 hover:translate-y-1 hover:manga-shadow-none transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  Bắt đầu làm việc ngay <span>→</span>
+                </button>
+                <p className="text-xs text-gray-400">
+                  Tự động chuyển hướng sau <span className="font-bold text-manga-red text-sm">{countdown}</span> giây...
+                </p>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="flex flex-col h-full justify-center">
+
+              {registerError && (
+                <div className="bg-manga-red/10 border-l-4 border-manga-red p-3 text-sm text-manga-red font-bold mb-6">
+                  {registerError}
+                </div>
+              )}
+
+              <h2 className="font-manga text-2xl font-bold uppercase mb-6 tracking-wide">
+                Bạn là ai?
+              </h2>
 
             {/* Roles Selection */}
             <div className="grid grid-cols-3 gap-3 md:gap-4 mb-10">
@@ -337,10 +407,10 @@ export default function RegisterPage() {
             <div className="mt-10">
               <button
                 type="submit"
-                disabled={!isFormValid}
+                disabled={!isFormValid || loading}
                 className="w-full bg-manga-red text-white font-bold uppercase tracking-widest py-4 px-8 manga-border manga-shadow-sm hover:translate-y-1 hover:manga-shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:manga-shadow-sm"
               >
-                Bắt đầu sáng tạo
+                {loading ? 'Đang xử lý...' : 'Bắt đầu sáng tạo'}
               </button>
             </div>
 
@@ -355,7 +425,8 @@ export default function RegisterPage() {
               </Link>
             </div>
           </form>
-        </div>
+        )}
+      </div>
       </div>
     </div>
   )

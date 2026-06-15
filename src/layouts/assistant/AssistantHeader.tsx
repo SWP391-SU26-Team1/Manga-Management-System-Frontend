@@ -203,7 +203,7 @@ export function Header() {
                 {dropdownNotifications.map((notif) => {
                   const Icon = notif.type === 'URGENT' ? AlertTriangle : notif.type === 'APPROVED' ? CheckCircle2 : MessageSquare
                   const iconColor = notif.type === 'URGENT' ? 'text-[#E63946]' : notif.type === 'APPROVED' ? 'text-emerald-500' : 'text-blue-500'
-                  
+
                   return (
                     <div
                       key={notif.id}
@@ -223,7 +223,7 @@ export function Header() {
                           {notif.message}
                         </p>
                       </div>
-                      
+
                       {/* Unread indicator red dot */}
                       {notif.unread && unreadCount > 0 && (
                         <span className="w-1.5 h-1.5 rounded-full bg-[#E63946] mt-2 flex-shrink-0" />
@@ -260,7 +260,7 @@ export function Header() {
 
         {/* User avatar circular box with dropdown wrapper */}
         <div className="relative" ref={profileRef}>
-          <button 
+          <button
             onClick={() => { setShowProfile(!showProfile); setShowNotifications(false); }}
             className="w-10 h-10 rounded-full overflow-hidden border-2 border-manga-ink hover:border-[#E63946] transition-all bg-zinc-900 flex items-center justify-center text-white font-bold cursor-pointer relative shadow-sm hover:scale-105 active:scale-95"
           >
@@ -277,23 +277,23 @@ export function Header() {
 
           {showProfile && (
             <div className="absolute top-12 right-0 w-52 bg-white border-[3px] border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] flex flex-col z-50">
-              <Link 
-                to="/dashboard/assistant/profile" 
+              <Link
+                to="/dashboard/assistant/profile"
                 onClick={() => setShowProfile(false)}
                 className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 hover:bg-zinc-50 transition-colors"
               >
                 <User className="w-4 h-4 text-black" />
                 <span className="text-sm font-bold text-black">Hồ sơ cá nhân</span>
               </Link>
-              <Link 
-                to="/dashboard/assistant/settings" 
+              <Link
+                to="/dashboard/assistant/settings"
                 onClick={() => setShowProfile(false)}
                 className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 hover:bg-zinc-50 transition-colors"
               >
                 <Settings className="w-4 h-4 text-black" />
                 <span className="text-sm font-bold text-black">Cài đặt</span>
               </Link>
-              <button 
+              <button
                 onClick={() => {
                   setShowProfile(false);
                   handleLogout();

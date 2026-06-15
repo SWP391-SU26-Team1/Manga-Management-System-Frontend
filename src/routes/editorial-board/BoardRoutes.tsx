@@ -2,33 +2,61 @@ import React from 'react'
 import { Routes, Route } from 'react-router'
 import BoardLayout from '@/layouts/editorial-board/BoardLayout'
 
-// Pages
+// Member Editor Pages
 import BoardDashboardPage from '@/pages/editorial-board/member-editor/BoardDashboardPage'
 import { ReadDraftPage, ScorePage, VotePage } from '@/pages/editorial-board/member-editor/ReviewPages'
 import { DisputesListPage, DisputeDetailsPage } from '@/pages/editorial-board/member-editor/DisputesPage'
 import SeriesApprovalPage from '@/pages/editorial-board/member-editor/SeriesApprovalPage'
 import SeriesReviewDetailPage from '@/pages/editorial-board/member-editor/SeriesReviewDetailPage'
-import RecoveryPage from '@/pages/editorial-board/chief-editor/RecoveryPage'
 import ProfilePage from '@/pages/editorial-board/member-editor/ProfilePage'
 import SettingsPage from '@/pages/editorial-board/member-editor/SettingsPage'
 
+// Chief Editor Pages
+import ChiefDashboardPage from '@/pages/editorial-board/chief-editor/ChiefDashboardPage'
+import { ChiefReadDraftPage, ChiefScorePage } from '@/pages/editorial-board/chief-editor/ChiefReviewPages'
+import VoteSummaryPage from '@/pages/editorial-board/chief-editor/VoteSummaryPage'
+import SendNotificationPage from '@/pages/editorial-board/chief-editor/SendNotificationPage'
+import SeriesDecisionPage from '@/pages/editorial-board/chief-editor/SeriesDecisionPage'
+import { ChiefDisputesListPage, ChiefDisputeDetailsPage } from '@/pages/editorial-board/chief-editor/ChiefDisputesPage'
+import RecoveryPage from '@/pages/editorial-board/chief-editor/RecoveryPage'
+
 export default function BoardRoutes() {
+  const storedUser = localStorage.getItem('mangaflow_user')
+  const user = storedUser ? JSON.parse(storedUser) : null
+  const isChief = user?.isChief || user?.email === 'chiefeditor@mangaflow.com'
+
   return (
     <Routes>
       <Route element={<BoardLayout />}>
         {/* Main board dashboards */}
-        <Route index element={<BoardDashboardPage />} />
-        <Route path="recovery" element={<RecoveryPage />} />
-        <Route path="disputes" element={<DisputesListPage />} />
-        <Route path="disputes/:caseId" element={<DisputeDetailsPage />} />
+        <Route index element={isChief ? <ChiefDashboardPage /> : <BoardDashboardPage />} />
         
-        {/* Series review and voting flow */}
+        {/* Recovery: handles locking internally in RecoveryPage.tsx */}
+        <Route path="recovery" element={<RecoveryPage />} />
+        
+        {/* Disputes listing and details: dynamic checks or separate components */}
+        <Route path="disputes" element={isChief ? <ChiefDisputesListPage /> : <DisputesListPage />} />
+        <Route path="disputes/:caseId" element={isChief ? <ChiefDisputeDetailsPage /> : <DisputeDetailsPage />} />
+        
+        {/* Series review and voting flow (member-specific or global) */}
         <Route path="series-approval" element={<SeriesApprovalPage />} />
         <Route path="series-approval/:seriesId" element={<SeriesReviewDetailPage />} />
 
-        {/* Chapter review multi-step flow */}
-        <Route path="review/:chapterId/draft" element={<ReadDraftPage />} />
-        <Route path="review/:chapterId/score" element={<ScorePage />} />
+        {/* Series strategic evaluation pending (Chief Only) */}
+        <Route path="series-decision/:seriesId" element={<SeriesDecisionPage />} />
+
+        {/* Chapter review multi-step flow (Chief vs Member Editor routing) */}
+        <Route path="review/:chapterId/draft" element={isChief ? <ChiefReadDraftPage /> : <ReadDraftPage />} />
+        <Route path="review/:chapterId/score" element={isChief ? <ChiefScorePage /> : <ScorePage />} />
+        
+        {/* Screen 3 for Chief (analysis) and Screen 4 (decision) */}
+        <Route path="review/:chapterId/analysis" element={isChief ? <VoteSummaryPage /> : <VotePage />} />
+        <Route path="review/:chapterId/decision" element={isChief ? <SendNotificationPage /> : <VotePage />} />
+        
+        {/* Direct route for general decision dispatch */}
+        <Route path="send-notification" element={<SendNotificationPage />} />
+
+        {/* Member vote submission */}
         <Route path="review/:chapterId/vote" element={<VotePage />} />
 
         {/* Global info pages */}

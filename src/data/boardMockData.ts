@@ -410,6 +410,35 @@ class BoardStore {
     }
   }
 
+  updateChapterStatus(chapterId: string, status: string, percent?: number): void {
+    const list = this.getQueueChapters();
+    const item = list.find(c => c.id === chapterId);
+    if (item) {
+      item.progressLabel = status;
+      if (percent !== undefined) item.progressPercent = percent;
+      this.setStored('board_queue_chapters', list);
+    }
+  }
+
+  updateSeriesStatus(seriesId: string, status: 'APPROVED' | 'REJECTED' | 'MONTHLY' | 'HIATUS'): void {
+    const list = this.getReviewedSeries();
+    const item = list.find(s => s.id === seriesId);
+    if (item) {
+      if (!item.vote) {
+        item.vote = {
+          decision: status === 'APPROVED' ? 'APPROVE' : 'REJECT',
+          note: `Trưởng ban phán quyết: ${status}`,
+          submittedAt: new Date().toISOString()
+        };
+      } else {
+        item.vote.decision = status === 'APPROVED' ? 'APPROVE' : 'REJECT';
+        item.vote.note = `Trưởng ban phán quyết: ${status}`;
+        item.vote.submittedAt = new Date().toISOString();
+      }
+      this.setStored('board_reviewed_series', list);
+    }
+  }
+
   resetStore(): void {
     if (!this.isClient) return;
     localStorage.removeItem('board_queue_chapters');

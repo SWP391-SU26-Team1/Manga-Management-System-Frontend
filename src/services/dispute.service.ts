@@ -47,6 +47,16 @@ export const disputeService = {
       reason
     })
     return response.data
+  },
+
+  // POST /api/disputes/:caseId/verdict - Submits Chief Editor final verdict on a dispute
+  saveVerdict: async (caseId: string, verdict: 'AUTHOR' | 'EDITOR' | 'COMPROMISE', compromise: string, nextActions: string): Promise<any> => {
+    const response = await api.post(`/api/disputes/${caseId}/verdict`, {
+      verdict,
+      compromise,
+      nextActions
+    })
+    return response.data
   }
 }
 

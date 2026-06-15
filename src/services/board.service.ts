@@ -136,6 +136,36 @@ export const boardService = {
   saveSeriesVote: async (vote: BackendSeriesVotePayload): Promise<BackendSeriesVotePayload> => {
     const response = await api.post<BackendSeriesVotePayload>('/api/board/series-votes', vote)
     return response.data
+  },
+
+  // POST /api/board/chapters/:chapterId/decision - Chief final decision on Chapter
+  saveChapterDecision: async (chapterId: string, status: string, percent: number): Promise<any> => {
+    const response = await api.post(`/api/board/chapters/${chapterId}/decision`, { status, percent })
+    return response.data
+  },
+
+  // POST /api/board/series/:seriesId/decision - Chief final decision on Series
+  saveSeriesDecision: async (seriesId: string, status: string, note?: string): Promise<any> => {
+    const response = await api.post(`/api/board/series/${seriesId}/decision`, { status, note })
+    return response.data
+  },
+
+  // POST /api/board/sessions - Initiates a new council discussion session
+  createBoardSession: async (sessionData: { sessionName: string; seriesIds: string[]; memberIds: string[]; deadline: string }): Promise<any> => {
+    const response = await api.post('/api/board/sessions', sessionData)
+    return response.data
+  },
+
+  // GET /api/board/recovery - Fetches active recovery plans
+  getRecoveryPlans: async (): Promise<any[]> => {
+    const response = await api.get<any[]>('/api/board/recovery')
+    return response.data
+  },
+
+  // POST /api/board/recovery/:planId/evaluate - Evaluates recovery plans
+  evaluateRecoveryPlan: async (planId: string, action: string, note?: string): Promise<any> => {
+    const response = await api.post(`/api/board/recovery/${planId}/evaluate`, { action, note })
+    return response.data
   }
 }
 

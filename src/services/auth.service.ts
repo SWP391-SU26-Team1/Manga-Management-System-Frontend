@@ -30,7 +30,8 @@ interface BackendUser {
   email: string
   role: string
   name?: string
-  avatarUrl?: string
+  avatar_url?: string   // snake_case — actual backend field
+  avatarUrl?: string    // camelCase fallback
   bio?: string
   stats?: any
 }
@@ -50,10 +51,12 @@ const mapBackendUser = (user: BackendUser) => ({
   email: user.email,
   role: user.role.toUpperCase(), // e.g. "mangaka" -> "MANGAKA"
   fullName: user.name || user.username,
-  avatarUrl: user.avatarUrl || `https://i.pravatar.cc/150?u=${user.username}`,
-  bio: user.bio || `Mô tả về ${user.username}.`,
+  // Ưu tiên avatar_url (snake_case từ backend), fallback camelCase, sau đó pravatar
+  avatarUrl: user.avatar_url || user.avatarUrl || `https://i.pravatar.cc/150?u=${user.username}`,
+  bio: user.bio || '',
   stats: user.stats || { projectsCompleted: 0, activeProjects: 0 }
 })
+
 
 export const authService = {
   login: async (payload: LoginPayload): Promise<AuthResponse> => {

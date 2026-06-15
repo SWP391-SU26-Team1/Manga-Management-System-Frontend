@@ -8,11 +8,8 @@ import {
   Award,
   Vote,
   Settings,
-  LogOut,
-  Plus,
-  X
+  LogOut
 } from 'lucide-react'
-import { boardService } from '@/services/board.service'
 
 // Main panel menu items
 const mainMenuItems = [
@@ -116,42 +113,7 @@ export default function BoardSidebar() {
     return location.pathname.startsWith(path)
   }
 
-  // Modal State
-  const [showSessionModal, setShowSessionModal] = useState(false)
-  const [sessionName, setSessionName] = useState('')
-  const [selectedSeries, setSelectedSeries] = useState('Void Walker')
-  const [selectedMembers, setSelectedMembers] = useState<string[]>(['Minh K.', 'Lan Phương'])
-  const [deadlineDate, setDeadlineDate] = useState('2026-06-20')
-  const [modalSuccess, setModalSuccess] = useState(false)
 
-  const handleCreateSession = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!sessionName.trim()) return
-    try {
-      await boardService.createBoardSession({
-        sessionName: sessionName.trim(),
-        seriesIds: [selectedSeries === 'Void Walker' ? 'void-walker' : selectedSeries],
-        memberIds: selectedMembers,
-        deadline: new Date(deadlineDate).toISOString()
-      })
-    } catch (err) {
-      console.warn('API error creating board session, falling back to local storage:', err)
-    }
-    setModalSuccess(true)
-    setTimeout(() => {
-      setModalSuccess(false)
-      setShowSessionModal(false)
-      setSessionName('')
-    }, 1500)
-  }
-
-  const toggleMember = (member: string) => {
-    if (selectedMembers.includes(member)) {
-      setSelectedMembers(selectedMembers.filter(m => m !== member))
-    } else {
-      setSelectedMembers([...selectedMembers, member])
-    }
-  }
 
   return (
     <>
@@ -194,28 +156,6 @@ export default function BoardSidebar() {
 
         {/* Footer Section */}
         <div className="p-3 border-t-2 border-manga-ink bg-white space-y-2">
-          {/* Review Flow Button block: NEW BOARD SESSION */}
-          {isReviewMode && (
-            isChief ? (
-              <button
-                onClick={() => setShowSessionModal(true)}
-                className="flex items-center justify-center gap-2 w-full py-2.5 bg-manga-red text-white border-2 border-black font-manga font-bold uppercase text-sm tracking-wider shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:bg-red-700 hover:translate-y-[1px] hover:shadow-[1px_1px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer mb-2 select-none"
-              >
-                <Plus className="w-4 h-4" />
-                <span>NEW BOARD SESSION</span>
-              </button>
-            ) : (
-              <button
-                disabled
-                className="flex items-center justify-center gap-2 w-full py-2.5 bg-gray-200 border-2 border-dashed border-gray-400 text-gray-500 font-manga font-bold uppercase text-sm tracking-wider cursor-not-allowed mb-2 select-none"
-                title="Chỉ dành cho Trưởng ban Biên tập (Chief Editor)"
-              >
-                <Plus className="w-4 h-4" />
-                <span>NEW BOARD SESSION</span>
-              </button>
-            )
-          )}
-
           {/* Settings link */}
           <Link
             to="/dashboard/editorial-board/settings"
@@ -262,104 +202,6 @@ export default function BoardSidebar() {
         </div>
       </aside>
 
-      {/* New Board Session Modal Overlay */}
-      {showSessionModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 font-sans">
-          <div className="w-full max-w-md bg-white border-4 border-manga-ink p-6 shadow-[8px_8px_0px_rgba(0,0,0,1)] text-manga-ink relative">
-            <button
-              onClick={() => setShowSessionModal(false)}
-              className="absolute top-4 right-4 p-1 hover:text-manga-red cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="bg-manga-ink text-white p-3 font-manga font-bold text-sm tracking-wide uppercase border-b-2 border-black -mx-6 -mt-6 mb-6">
-              Tạo phiên họp hội đồng mới
-            </div>
-
-            {modalSuccess ? (
-              <div className="py-8 text-center space-y-3">
-                <div className="w-12 h-12 rounded-full border-4 border-emerald-500 flex items-center justify-center text-emerald-500 font-bold text-xl mx-auto animate-bounce">
-                  ✓
-                </div>
-                <h4 className="font-manga text-lg font-bold uppercase text-emerald-600">ĐÃ TẠO PHIÊN HỌP THÀNH CÔNG!</h4>
-                <p className="text-xs font-bold text-gray-500">Hội đồng biên tập sẽ nhận được thông báo ngay lập tức.</p>
-              </div>
-            ) : (
-              <form onSubmit={handleCreateSession} className="space-y-4">
-                {/* Session Name */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-black uppercase">Tên phiên họp / Nội dung</label>
-                  <input
-                    type="text"
-                    required
-                    value={sessionName}
-                    onChange={e => setSessionName(e.target.value)}
-                    placeholder="Ví dụ: Thẩm định kịch bản Void Walker Ch. 95"
-                    className="w-full border-2 border-manga-ink px-3 py-2 text-xs font-bold outline-none focus:border-manga-red bg-zinc-50"
-                  />
-                </div>
-
-                {/* Series Select */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-black uppercase">Chọn tác phẩm (Series)</label>
-                  <select
-                    value={selectedSeries}
-                    onChange={e => setSelectedSeries(e.target.value)}
-                    className="w-full border-2 border-manga-ink px-3 py-2 text-xs font-bold outline-none focus:border-manga-red bg-zinc-50"
-                  >
-                    <option value="Void Walker">Void Walker</option>
-                    <option value="Cyber Ronin">Cyber Ronin</option>
-                    <option value="Crimson Petal">Crimson Petal</option>
-                    <option value="Shadow Protocol">Shadow Protocol</option>
-                  </select>
-                </div>
-
-                {/* Members Multi-select */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-black uppercase">Thành viên tham dự</label>
-                  <div className="grid grid-cols-2 gap-2 bg-zinc-50 border-2 border-manga-ink p-3">
-                    {['Minh K.', 'Lan Phương', 'Tuấn A.', 'Bình Minh'].map(member => {
-                      const checked = selectedMembers.includes(member)
-                      return (
-                        <label key={member} className="flex items-center gap-2 text-xs font-bold cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleMember(member)}
-                            className="w-3.5 h-3.5 border-2 border-manga-ink"
-                          />
-                          <span>{member}</span>
-                        </label>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                {/* Deadline */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-black uppercase">Hạn chót thẩm định (Deadline)</label>
-                  <input
-                    type="date"
-                    required
-                    value={deadlineDate}
-                    onChange={e => setDeadlineDate(e.target.value)}
-                    className="w-full border-2 border-manga-ink px-3 py-2 text-xs font-bold outline-none focus:border-manga-red bg-zinc-50"
-                  />
-                </div>
-
-                {/* Submit button */}
-                <button
-                  type="submit"
-                  className="w-full py-3 bg-manga-red text-white border-2 border-black font-manga font-bold text-xs uppercase tracking-widest shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:bg-red-700 hover:translate-y-[1px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer"
-                >
-                  TẠO PHIÊN HỌP HỘI ĐỒNG
-                </button>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
     </>
   )
 }

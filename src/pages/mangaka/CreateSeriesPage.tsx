@@ -1,21 +1,8 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router'
-import { ArrowLeft, AlertTriangle, Send, Save, User, BookOpen, Tag, Calendar, FileText, Info } from 'lucide-react'
-import { mangakaStore } from '@/data/mangakaMockData'
-
-const MOCK_EDITORS = [
-  { id: 'ed-001', name: 'Nakamura Hiroshi' },
-  { id: 'ed-002', name: 'Suzuki Yuki' },
-  { id: 'ed-003', name: 'Tanaka Rei' },
-  { id: 'ed-004', name: 'Watanabe Jun' },
-]
-
-const GENRE_OPTIONS = [
-  'Action', 'Adventure', 'Comedy', 'Drama', 'Fantasy',
-  'Horror', 'Mystery', 'Romance', 'Sci-Fi', 'Shonen',
-  'Shojo', 'Seinen', 'Josei', 'Slice of Life', 'Sports',
-  'Supernatural', 'Thriller',
-]
+import { useNavigate, Link } from 'react-router'
+import { ArrowLeft, AlertTriangle, Send, Save, BookOpen, Tag, Calendar, FileText, Info, CheckCircle, X, Upload, Trash2, CalendarDays } from 'lucide-react'
+import { seriesService, getErrorMessage } from '@/services/series.service'
+import { uploadService } from '@/services/upload.service'
 
 export default function CreateSeriesPage() {
   const navigate = useNavigate()
@@ -23,89 +10,144 @@ export default function CreateSeriesPage() {
   // Form fields
   const [title, setTitle] = useState('')
   const [selectedGenres, setSelectedGenres] = useState<string[]>([])
+  const [genreInput, setGenreInput] = useState('')
   const [description, setDescription] = useState('')
   const [coverUrl, setCoverUrl] = useState('')
   const [publishSchedule, setPublishSchedule] = useState('Weekly')
   const [proposedStartDate, setProposedStartDate] = useState('')
-  const [tantouEditorId, setTantouEditorId] = useState('')
   const [editorNote, setEditorNote] = useState('')
 
   // UI state
-  const [errors, setErrors] = useState<{ title?: string; genres?: string; description?: string; tantouEditorId?: string }>({})
+  const [errors, setErrors] = useState<{ title?: string; genres?: string; description?: string }>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [activeStep, setActiveStep] = useState(1)
+  const [successMsg, setSuccessMsg] = useState('')
+  const [apiError, setApiError] = useState('')
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
 
-  const toggleGenre = (genre: string) => {
-    setSelectedGenres(prev =>
-      prev.includes(genre) ? prev.filter(g => g !== genre) : [...prev, genre]
-    )
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError('Kích thước ảnh không được vượt quá 5MB')
+      return
+    }
+
+    setIsUploading(true)
+    setUploadError('')
+    try {
+      const res = await uploadService.uploadSingle(file, 'series_covers')
+      setCoverUrl(res.secure_url)
+    } catch (err) {
+      setUploadError(getErrorMessage(err))
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const handleRemoveGenre = (genreToRemove: string) => {
+    setSelectedGenres(prev => prev.filter(g => g !== genreToRemove))
+  }
+
+  const handleGenreKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      const val = genreInput.trim()
+      if (val) {
+        if (!selectedGenres.includes(val)) {
+          setSelectedGenres(prev => [...prev, val])
+        }
+        setGenreInput('')
+      }
+    }
+  }
+
+  const addCustomGenre = () => {
+    const val = genreInput.trim()
+    if (val) {
+      if (!selectedGenres.includes(val)) {
+        setSelectedGenres(prev => [...prev, val])
+      }
+      setGenreInput('')
+    }
+  }
+
+  const getFinalGenreString = () => {
+    const finalGenres = [...selectedGenres]
+    const trimmed = genreInput.trim()
+    if (trimmed && !finalGenres.includes(trimmed)) {
+      finalGenres.push(trimmed)
+    }
+    return finalGenres.join(', ')
   }
 
   const validateForm = () => {
     const tempErrors: typeof errors = {}
     if (!title.trim()) tempErrors.title = 'Tên tác phẩm không được để trống'
-    if (selectedGenres.length === 0) tempErrors.genres = 'Chọn ít nhất một thể loại'
     if (!description.trim() || description.trim().length < 20)
       tempErrors.description = 'Mô tả phải tối thiểu 20 ký tự'
     setErrors(tempErrors)
     return Object.keys(tempErrors).length === 0
   }
 
-  const validateForSubmit = () => {
-    const tempErrors: typeof errors = {}
-    if (!title.trim()) tempErrors.title = 'Tên tác phẩm không được để trống'
-    if (selectedGenres.length === 0) tempErrors.genres = 'Chọn ít nhất một thể loại'
-    if (!description.trim() || description.trim().length < 20)
-      tempErrors.description = 'Mô tả phải tối thiểu 20 ký tự'
-    if (!tantouEditorId) tempErrors.tantouEditorId = 'Vui lòng chọn Tantou Editor phụ trách'
-    setErrors(tempErrors)
-    return Object.keys(tempErrors).length === 0
-  }
-
-  // Save as Draft
-  const handleSaveDraft = (e: React.FormEvent) => {
+  // Save as Draft → POST /api/mangaka/series
+  const handleSaveDraft = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!validateForm()) return
 
-    mangakaStore.addSeries({
-      title: title.trim(),
-      description: description.trim(),
-      tags: selectedGenres,
-      coverUrl: coverUrl.trim() || null,
-      status: 'Draft',
-      nextDeadline: proposedStartDate || 'Chưa thiết lập',
-    })
-
-    alert('Đã lưu bản nháp thành công!')
-    navigate('/dashboard/mangaka/series')
+    setIsSubmitting(true)
+    setApiError('')
+    try {
+      await seriesService.create({
+        title: title.trim(),
+        description: description.trim(),
+        genre: getFinalGenreString(),
+        cover_image: coverUrl.trim() || null,
+      })
+      setSuccessMsg('✅ Đã lưu bản nháp thành công!')
+      setTimeout(() => navigate('/dashboard/mangaka/series'), 1500)
+    } catch (err) {
+      setApiError(getErrorMessage(err))
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  // Submit to Editorial Board for review
+  // Submit to Board → POST tạo series rồi PATCH submit-review
   const handleSubmitToBoard = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!validateForSubmit()) return
+    if (!validateForm()) return
 
     setIsSubmitting(true)
-    await new Promise(res => setTimeout(res, 1200))
+    setApiError('')
+    try {
+      // Bước 1: Tạo series
+      const newSeries = await seriesService.create({
+        title: title.trim(),
+        description: description.trim(),
+        genre: getFinalGenreString(),
+        cover_image: coverUrl.trim() || null,
+      })
 
-    mangakaStore.addSeries({
-      title: title.trim(),
-      description: description.trim(),
-      tags: selectedGenres,
-      coverUrl: coverUrl.trim() || null,
-      status: 'Waiting Review',
-      nextDeadline: proposedStartDate || 'Chưa thiết lập',
-    })
+      // Bước 2: Nộp lên Board
+      await seriesService.submitReview(newSeries._id)
 
-    setIsSubmitting(false)
-    alert('Hồ sơ đã được nộp lên Hội đồng biên tập! Trạng thái: Đang xét duyệt (Under Review). Bạn sẽ nhận thông báo khi có kết quả.')
-    navigate('/dashboard/mangaka/series')
+      setSuccessMsg('✅ Hồ sơ đã được nộp lên Hội đồng biên tập! Trạng thái: Đang xét duyệt.')
+      setTimeout(() => navigate('/dashboard/mangaka/series'), 2000)
+    } catch (err) {
+      setApiError(getErrorMessage(err))
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const steps = [
     { num: 1, label: 'Thông tin cơ bản' },
     { num: 2, label: 'Nội dung & Lịch phát hành' },
-    { num: 3, label: 'Phân công & Gửi duyệt' },
+    { num: 3, label: 'Xem lại & Gửi' },
   ]
 
   return (
@@ -151,6 +193,22 @@ export default function CreateSeriesPage() {
         ))}
       </div>
 
+      {/* Success Message */}
+      {successMsg && (
+        <div className="bg-green-50 border-2 border-green-500 p-4 mb-6 flex items-center gap-3">
+          <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
+          <p className="font-bold text-green-700 text-sm">{successMsg}</p>
+        </div>
+      )}
+
+      {/* API Error */}
+      {apiError && (
+        <div className="bg-red-50 border-2 border-manga-red p-4 mb-6 flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-manga-red shrink-0" />
+          <p className="font-bold text-manga-red text-sm">{apiError}</p>
+        </div>
+      )}
+
       {/* Alert Info */}
       <div className="bg-blue-50 border-2 border-blue-400 p-4 flex gap-3 mb-6">
         <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
@@ -161,7 +219,6 @@ export default function CreateSeriesPage() {
           <p className="text-xs font-bold text-blue-800 leading-relaxed">
             Series mới được <strong>Lưu nháp</strong> (Draft) trước, sau đó bạn có thể <strong>Nộp lên Hội đồng</strong> để xét duyệt.
             Sau khi nộp, trạng thái chuyển sang <strong className="text-orange-600">Đang xét duyệt (Under Review)</strong>.
-            Hội đồng sẽ bỏ phiếu thông qua và Tantou Editor được phân công sẽ liên hệ với bạn.
           </p>
         </div>
       </div>
@@ -199,55 +256,122 @@ export default function CreateSeriesPage() {
               <div className="space-y-2">
                 <label className="block text-xs font-black uppercase tracking-wider text-manga-ink flex items-center gap-1.5">
                   <Tag className="w-3.5 h-3.5" />
-                  THỂ LOẠI <span className="text-manga-red">*</span>
+                  THỂ LOẠI
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  {GENRE_OPTIONS.map(genre => (
-                    <button
-                      key={genre}
-                      type="button"
-                      onClick={() => toggleGenre(genre)}
-                      className={`px-3 py-1.5 border-2 text-xs font-black uppercase transition-all ${
-                        selectedGenres.includes(genre)
-                          ? 'bg-manga-red text-white border-manga-red'
-                          : 'bg-white text-manga-ink border-manga-ink hover:bg-red-50 hover:border-manga-red'
-                      }`}
-                    >
-                      {genre}
-                    </button>
-                  ))}
+                
+                {/* Tag Input */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={genreInput}
+                    onChange={e => setGenreInput(e.target.value)}
+                    onKeyDown={handleGenreKeyDown}
+                    placeholder="Nhập thể loại tự do (ví dụ: Isekai, Harem) rồi nhấn Enter..."
+                    className="flex-1 px-4 py-3 border-2 border-manga-ink focus:outline-none focus:border-manga-red font-bold text-sm bg-transparent transition-colors"
+                  />
+                  <button
+                    type="button"
+                    onClick={addCustomGenre}
+                    className="px-4 py-3 bg-manga-ink text-white font-manga font-bold text-sm uppercase border-2 border-manga-ink hover:bg-gray-800 transition-colors"
+                  >
+                    Thêm
+                  </button>
                 </div>
+
+                {/* Selected Tags list */}
                 {selectedGenres.length > 0 && (
-                  <p className="text-[10px] font-bold text-gray-500 uppercase">
-                    Đã chọn: {selectedGenres.join(', ')}
-                  </p>
+                  <div className="flex flex-wrap gap-2 py-1">
+                    {selectedGenres.map(genre => (
+                      <span
+                        key={genre}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-manga-red text-white text-xs font-black uppercase border-2 border-manga-red"
+                      >
+                        {genre}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveGenre(genre)}
+                          className="hover:text-gray-200 focus:outline-none ml-1"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
                 )}
+
+
                 {errors.genres && <p className="text-xs font-bold text-manga-red">{errors.genres}</p>}
               </div>
 
-              {/* Cover URL */}
+              {/* Cover Image Upload */}
               <div className="space-y-2">
                 <label className="block text-xs font-black uppercase tracking-wider text-manga-ink">
-                  ẢNH BÌA MOCKUP (IMAGE URL - TÙY CHỌN)
+                  ẢNH BÌA MOCKUP (ẢNH TẢI LÊN - TÙY CHỌN)
                 </label>
-                <input
-                  type="text"
-                  value={coverUrl}
-                  onChange={e => setCoverUrl(e.target.value)}
-                  placeholder="https://images.unsplash.com/photo-..."
-                  className="w-full px-4 py-3 border-2 border-manga-ink focus:outline-none focus:border-manga-red font-bold text-sm bg-transparent"
-                />
-                {coverUrl && (
-                  <div className="w-24 h-32 border-2 border-manga-ink overflow-hidden mt-2">
-                    <img src={coverUrl} alt="preview" className="w-full h-full object-cover" onError={e => (e.currentTarget.style.display = 'none')} />
+                
+                {coverUrl ? (
+                  <div className="relative w-40 h-52 border-4 border-manga-ink manga-shadow overflow-hidden group bg-gray-100 mt-2">
+                    <img src={coverUrl} alt="Cover Preview" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setCoverUrl('')}
+                      className="absolute top-2 right-2 p-1.5 bg-manga-red text-white border-2 border-manga-ink hover:bg-red-700 transition-colors shadow"
+                      title="Xóa ảnh"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative mt-2">
+                    <label className={`flex flex-col items-center justify-center w-full h-40 border-4 border-dashed border-manga-ink bg-gray-50/50 hover:bg-red-50/20 transition-all cursor-pointer ${
+                      isUploading ? 'opacity-70 pointer-events-none' : ''
+                    }`}>
+                      {isUploading ? (
+                        <div className="flex flex-col items-center gap-2">
+                          <span className="w-7 h-7 border-4 border-manga-ink border-t-manga-red rounded-full animate-spin" />
+                          <span className="text-xs font-bold text-gray-500 uppercase">Đang tải ảnh lên...</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center gap-1.5 p-4 text-center">
+                          <Upload className="w-7 h-7 text-manga-ink animate-bounce" />
+                          <span className="text-xs font-black uppercase text-manga-ink">Click để chọn file ảnh bìa</span>
+                          <span className="text-[9px] font-bold text-gray-400 uppercase">Hỗ trợ JPG, PNG, WEBP tối đa 5MB</span>
+                        </div>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleCoverUpload}
+                        className="hidden"
+                        disabled={isUploading}
+                      />
+                    </label>
                   </div>
                 )}
+                {uploadError && <p className="text-xs font-bold text-manga-red mt-1">{uploadError}</p>}
               </div>
 
               <div className="flex justify-end pt-2">
                 <button
                   type="button"
-                  onClick={() => { if (validateForm()) setActiveStep(2) }}
+                  onClick={() => {
+                    const tempErrors: typeof errors = {}
+                    if (!title.trim()) {
+                      tempErrors.title = 'Tên tác phẩm không được để trống'
+                      setErrors(tempErrors)
+                    } else {
+                      // Tự động thêm thể loại đang gõ dở nếu quên bấm "Thêm"
+                      const trimmedGenre = genreInput.trim()
+                      if (trimmedGenre) {
+                        if (!selectedGenres.includes(trimmedGenre)) {
+                          setSelectedGenres(prev => [...prev, trimmedGenre])
+                        }
+                        setGenreInput('')
+                      }
+                      setErrors({})
+                      setActiveStep(2)
+                    }
+                  }}
                   className="px-8 py-3 bg-manga-ink text-white font-manga font-bold text-sm uppercase border-2 border-manga-ink hover:bg-gray-800 transition-colors"
                 >
                   Tiếp theo →
@@ -345,7 +469,16 @@ export default function CreateSeriesPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { if (validateForm()) setActiveStep(3) }}
+                  onClick={() => {
+                    const tempErrors: typeof errors = {}
+                    if (!description.trim() || description.trim().length < 20) {
+                      tempErrors.description = 'Mô tả phải tối thiểu 20 ký tự'
+                      setErrors(tempErrors)
+                    } else {
+                      setErrors({})
+                      setActiveStep(3)
+                    }
+                  }}
                   className="px-8 py-3 bg-manga-ink text-white font-manga font-bold text-sm uppercase border-2 border-manga-ink hover:bg-gray-800 transition-colors"
                 >
                   Tiếp theo →
@@ -354,13 +487,13 @@ export default function CreateSeriesPage() {
             </div>
           )}
 
-          {/* ─── STEP 3: Phân công & Gửi duyệt ─── */}
+          {/* ─── STEP 3: Xem lại & Gửi ─── */}
           {activeStep === 3 && (
             <div className="p-6 md:p-8 space-y-6">
               <div className="border-b-2 border-dashed border-gray-200 pb-4 mb-2">
                 <h2 className="font-manga text-xl font-bold uppercase flex items-center gap-2">
-                  <User className="w-5 h-5 text-manga-red" />
-                  Phân công & Gửi duyệt
+                  <CheckCircle className="w-5 h-5 text-manga-red" />
+                  Xem lại & Gửi
                 </h2>
               </div>
 
@@ -374,7 +507,9 @@ export default function CreateSeriesPage() {
                   </div>
                   <div>
                     <span className="text-[10px] font-bold text-gray-400 uppercase block">Thể loại</span>
-                    <span className="font-bold text-manga-ink">{selectedGenres.length > 0 ? selectedGenres.join(', ') : '—'}</span>
+                    <span className="font-bold text-manga-ink">
+                      {getFinalGenreString() || '—'}
+                    </span>
                   </div>
                   <div>
                     <span className="text-[10px] font-bold text-gray-400 uppercase block">Lịch phát hành</span>
@@ -384,58 +519,11 @@ export default function CreateSeriesPage() {
                     <span className="text-[10px] font-bold text-gray-400 uppercase block">Bắt đầu dự kiến</span>
                     <span className="font-bold text-manga-ink">{proposedStartDate || 'Chưa xác định'}</span>
                   </div>
+                  <div className="col-span-2">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase block">Mô tả</span>
+                    <span className="font-bold text-manga-ink text-sm whitespace-pre-wrap break-words block">{description || '—'}</span>
+                  </div>
                 </div>
-              </div>
-
-              {/* Tantou Editor Selection */}
-              <div className="space-y-2">
-                <label className="block text-xs font-black uppercase tracking-wider text-manga-ink flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5" />
-                  TANTOU EDITOR PHỤ TRÁCH <span className="text-manga-red">*</span>
-                </label>
-                <p className="text-[10px] text-gray-500 font-bold uppercase">
-                  Chọn biên tập viên sẽ phụ trách series này. Editor sẽ nhận thông báo và liên hệ sau khi Board xét duyệt.
-                </p>
-                <div className="grid grid-cols-1 gap-2 mt-2">
-                  {MOCK_EDITORS.map(editor => (
-                    <label
-                      key={editor.id}
-                      className={`flex items-center gap-3 px-4 py-3 border-2 cursor-pointer transition-all ${
-                        tantouEditorId === editor.id
-                          ? 'border-manga-red bg-red-50 text-manga-red'
-                          : 'border-manga-ink bg-white hover:bg-gray-50'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="tantouEditor"
-                        value={editor.id}
-                        checked={tantouEditorId === editor.id}
-                        onChange={() => setTantouEditorId(editor.id)}
-                        className="sr-only"
-                      />
-                      <div className={`w-4 h-4 border-2 rounded-full flex-shrink-0 flex items-center justify-center ${
-                        tantouEditorId === editor.id ? 'border-manga-red' : 'border-manga-ink'
-                      }`}>
-                        {tantouEditorId === editor.id && (
-                          <div className="w-2 h-2 rounded-full bg-manga-red" />
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-manga-ink text-white flex items-center justify-center font-manga font-bold text-sm">
-                          {editor.name.charAt(0)}
-                        </div>
-                        <span className="font-bold text-sm">{editor.name}</span>
-                        <span className="text-[10px] font-bold text-gray-400 uppercase">Tantou Editor</span>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-                {errors.tantouEditorId && (
-                  <p className="text-xs font-bold text-manga-red flex items-center gap-1">
-                    <AlertTriangle className="w-3 h-3" /> {errors.tantouEditorId}
-                  </p>
-                )}
               </div>
 
               {/* Warning */}
@@ -446,7 +534,6 @@ export default function CreateSeriesPage() {
                   <p className="text-xs font-bold text-orange-800 leading-relaxed">
                     Sau khi nộp, trạng thái series sẽ chuyển sang <strong>Đang xét duyệt</strong>.
                     Hội đồng biên tập sẽ xem xét và bỏ phiếu thông qua.
-                    Bạn không thể chỉnh sửa hồ sơ trong thời gian đang xét duyệt.
                   </p>
                 </div>
               </div>
@@ -466,9 +553,14 @@ export default function CreateSeriesPage() {
                   <button
                     type="button"
                     onClick={handleSaveDraft}
-                    className="flex items-center justify-center gap-2 px-6 py-3 border-2 border-manga-ink bg-white text-manga-ink font-manga font-bold text-sm uppercase hover:bg-gray-50 transition-colors"
+                    disabled={isSubmitting}
+                    className="flex items-center justify-center gap-2 px-6 py-3 border-2 border-manga-ink bg-white text-manga-ink font-manga font-bold text-sm uppercase hover:bg-gray-50 transition-colors disabled:opacity-60"
                   >
-                    <Save className="w-4 h-4" />
+                    {isSubmitting ? (
+                      <span className="inline-block w-4 h-4 border-2 border-manga-ink border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Save className="w-4 h-4" />
+                    )}
                     Lưu nháp
                   </button>
 
@@ -497,6 +589,18 @@ export default function CreateSeriesPage() {
           )}
         </form>
       </div>
+      {/* Footer */}
+      <footer className="mt-16 pt-8 border-t-2 border-manga-ink flex flex-col md:flex-row items-center justify-between gap-4 text-sm font-bold text-gray-500">
+        <div className="font-manga text-2xl text-manga-red">MangaFlow</div>
+        <div>© 2026 MangaFlow System. Gangan Press Co. Ltd. All rights reserved.</div>
+        <div className="flex items-center gap-6">
+          <Link to="/dashboard/mangaka" className="hover:text-manga-red transition-colors flex items-center gap-1">
+            <CalendarDays className="w-4 h-4" /> Lịch trình
+          </Link>
+          <a href="#" className="hover:text-manga-red transition-colors">Quy tắc xuất bản</a>
+          <a href="#" className="hover:text-manga-red transition-colors">Hỗ trợ Mangaka</a>
+        </div>
+      </footer>
     </div>
   )
 }

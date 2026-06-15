@@ -60,12 +60,12 @@ export function SeriesCard({ series, chapterCount, onCreateChapter }: SeriesCard
           </div>
 
           {/* Details */}
-          <div className="flex-1 flex flex-col justify-between">
+          <div className="flex-1 min-w-0 flex flex-col justify-between">
             <div>
-              <h3 className="font-manga text-2xl font-bold uppercase text-manga-ink leading-tight mb-2">
+              <h3 className="font-manga text-2xl font-bold uppercase text-manga-ink leading-tight mb-2 break-all">
                 {series.title}
               </h3>
-              <p className="text-xs text-gray-600 line-clamp-2 mb-3">
+              <p className="text-xs text-gray-600 line-clamp-2 mb-3 break-all">
                 {series.description || "Chưa có mô tả chi tiết cho tác phẩm này."}
               </p>
             </div>

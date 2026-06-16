@@ -166,6 +166,30 @@ export const boardService = {
   evaluateRecoveryPlan: async (planId: string, action: string, note?: string): Promise<any> => {
     const response = await api.post(`/api/board/recovery/${planId}/evaluate`, { action, note })
     return response.data
+  },
+
+  // GET /api/board/votes/summary/:chapterId - Fetches vote summary for a chapter
+  getVoteSummary: async (chapterId: string): Promise<any> => {
+    const response = await api.get<any>(`/api/board/votes/summary/${chapterId}`)
+    return response.data
+  },
+
+  // POST /api/notifications - Sends a new official decision notification
+  sendNotification: async (notificationData: {
+    templateType: string
+    projectName: string
+    recipients: string[]
+    effectiveDate: string
+    extraNote?: string
+  }): Promise<any> => {
+    const response = await api.post('/api/notifications', notificationData)
+    return response.data
+  },
+
+  // POST /api/comments/:commentId/pin - Pins a comment in chapter discussion
+  pinComment: async (chapterId: string, commentId: string, isPinned: boolean): Promise<any> => {
+    const response = await api.post(`/api/comments/${commentId}/pin`, { chapter_id: chapterId, isPinned })
+    return response.data
   }
 }
 

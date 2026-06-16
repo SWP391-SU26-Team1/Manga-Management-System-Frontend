@@ -59,13 +59,20 @@ export function ChiefReadDraftPage() {
   const handleSendComment = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newComment.trim() || !chapterId) return
+    const commentText = newComment.trim()
+    try {
+      await boardService.addComment(chapterId, commentText)
+    } catch (err) {
+      console.warn('API error sending comment, using fallback:', err)
+    }
     const added: BoardComment = {
       id: `comment_${Date.now()}`,
       author: 'TRẦN K. (CHIEF EDITOR)',
       role: 'Chief Editor',
       isChief: true,
+      isPinned: false,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      content: newComment
+      content: commentText
     }
     const updated = [...comments, added]
     setComments(updated)
@@ -80,8 +87,33 @@ export function ChiefReadDraftPage() {
     localStorage.setItem(`board_comments_${chapterId}`, JSON.stringify(updated))
   }
 
-  const handlePinComment = (commentId: string) => {
-    alert('Bình luận đã được ghim lên đầu cuộc thảo luận của hội đồng!')
+  const handlePinComment = async (commentId: string) => {
+    const targetComment = comments.find(c => c.id === commentId)
+    const nextPinnedState = targetComment ? !targetComment.isPinned : true
+    
+    // Toggle locally
+    const updated = comments.map(c => {
+      if (c.id === commentId) {
+        return { ...c, isPinned: nextPinnedState }
+      }
+      return c
+    })
+    
+    // Sort pinned to the top
+    const sorted = [...updated].sort((a, b) => {
+      const aPinned = a.isPinned ? 1 : 0
+      const bPinned = b.isPinned ? 1 : 0
+      return bPinned - aPinned
+    })
+    
+    setComments(sorted)
+    localStorage.setItem(`board_comments_${chapterId}`, JSON.stringify(sorted))
+    
+    try {
+      await boardService.pinComment(chapterId || '', commentId, nextPinnedState)
+    } catch (err) {
+      console.warn('API error pinning comment:', err)
+    }
   }
 
   const chapterTitleDisplay = chapterId === 'cyber-ronin' 
@@ -193,13 +225,13 @@ export function ChiefReadDraftPage() {
                   <div 
                     key={comment.id}
                     className={`p-3 border-2 border-manga-ink shadow-[2px_2px_0px_rgba(0,0,0,1)] flex flex-col justify-between ${
-                      commentIsChief ? 'bg-[#fff5f5] border-manga-red' : 'bg-zinc-50'
+                      comment.isPinned ? 'border-yellow-500 bg-[#fffbeb]' : commentIsChief ? 'bg-[#fff5f5] border-manga-red' : 'bg-zinc-50'
                     }`}
                   >
                     <div>
                       <div className="flex justify-between items-baseline mb-1">
                         <span className={`text-[10px] font-black uppercase tracking-wider ${commentIsChief ? 'text-manga-red' : 'text-gray-800'}`}>
-                          {commentIsChief ? '★ TRƯỞNG BAN BIÊN TẬP' : comment.author}
+                          {comment.isPinned && '📌 [GHIM] '}{commentIsChief ? '★ TRƯỞNG BAN BIÊN TẬP' : comment.author}
                         </span>
                         <span className="text-[8px] text-gray-400 font-bold uppercase">{comment.time}</span>
                       </div>
@@ -213,7 +245,7 @@ export function ChiefReadDraftPage() {
                         onClick={() => handlePinComment(comment.id)}
                         className="text-[9px] font-black text-gray-400 hover:text-manga-ink uppercase bg-transparent border-0 cursor-pointer"
                       >
-                        📌 Pin
+                        {comment.isPinned ? '📌 Bỏ Ghim' : '📌 Ghim'}
                       </button>
                       <button 
                         onClick={() => handleDeleteComment(comment.id)}
@@ -298,10 +330,23 @@ export function ChiefScorePage() {
     setGrade(prev => ({ ...prev, [metric]: val }))
   }
 
-  const handleSaveScore = () => {
+  const handleSaveScore = async () => {
     if (grade.drawing === 0 || grade.pacing === 0 || grade.layout === 0 || grade.dialogue === 0 || grade.finish === 0) {
       addNotification('RATING FAILED', 'Vui lòng hoàn thành điểm số cho tất cả tiêu chí.', 'RATING', 'rating_failed')
       return
+    }
+    try {
+      await boardService.saveGrade({
+        chapter_id: grade.chapterId,
+        drawing: grade.drawing,
+        pacing: grade.pacing,
+        layout: grade.layout,
+        dialogue: grade.dialogue,
+        finish: grade.finish,
+        note: grade.note
+      })
+    } catch (err) {
+      console.warn('API error saving grade, using fallback:', err)
     }
     boardStore.saveGrade(grade)
     addNotification('RATING SUCCESSFUL', `Đã lưu điểm số thẩm định của Trưởng ban cho tác phẩm: ${chapterTitleDisplay}`, 'RATING', 'rating_success')

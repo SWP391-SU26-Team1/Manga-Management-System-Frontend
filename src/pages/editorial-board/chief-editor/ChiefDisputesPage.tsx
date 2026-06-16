@@ -113,6 +113,92 @@ export function ChiefDisputeDetailsPage() {
   const [showPdfModal, setShowPdfModal] = useState(false)
   const [showLightbox, setShowLightbox] = useState(false)
 
+  const handleDownloadPdf = () => {
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) {
+      alert('Không thể mở cửa sổ in. Vui lòng tắt chặn pop-up.')
+      return
+    }
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>CASE_REPORT_#${caseItem?.id || 'Dispute'}</title>
+          <style>
+            body { font-family: Georgia, serif; padding: 40px; color: #333; line-height: 1.6; }
+            h2 { font-family: Arial, sans-serif; text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 30px; letter-spacing: 2px; }
+            .meta { display: flex; justify-content: space-between; margin-bottom: 30px; border-bottom: 1px solid #ddd; padding-bottom: 20px; font-family: Arial, sans-serif; font-size: 11px; font-weight: bold; }
+            .section { margin-bottom: 25px; }
+            .section-title { font-family: Arial, sans-serif; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 10px; text-transform: uppercase; color: #111; }
+            .verdict-box { border: 2px solid #000; padding: 20px; background-color: #fcfcfc; font-family: Arial, sans-serif; }
+            .verdict-title { font-weight: bold; color: #E63946; margin-bottom: 10px; text-transform: uppercase; }
+            .signatures { display: flex; justify-content: space-between; margin-top: 50px; font-family: Arial, sans-serif; font-size: 10px; font-weight: bold; }
+            .signature-block { text-align: center; width: 200px; }
+            .sign-line { border-bottom: 1px dashed #ccc; height: 50px; margin-bottom: 10px; }
+            @media print {
+              body { padding: 20px; }
+            }
+          </style>
+        </head>
+        <body>
+          <h2>MANGAFLOW EDITORIAL BOARD</h2>
+          <p style="text-align: center; font-size: 9px; font-family: Arial, sans-serif; font-weight: bold; color: #666; margin-top: -20px; text-transform: uppercase;">
+            OFFICIAL DISPUTE CASE REPORT — CONFIDENTIAL
+          </p>
+          
+          <div class="meta" style="display: flex; justify-content: space-between;">
+            <div>
+              <p style="color: #888; margin: 2px 0;">MÃ VỤ VIỆC: <strong>CASE #${caseItem?.id || 'N/A'}</strong></p>
+              <p style="color: #888; margin: 2px 0;">DỰ ÁN SERIALIZATION: <strong>${caseItem?.projectTitle || 'N/A'}</strong></p>
+            </div>
+            <div>
+              <p style="color: #888; margin: 2px 0;">NGƯỜI QUYẾT ĐỊNH: <strong>Trần K. (Trưởng ban Biên tập)</strong></p>
+              <p style="color: #888; margin: 2px 0;">NGÀY BAN HÀNH PHÁN QUYẾT: <strong>${new Date().toLocaleDateString('vi-VN')}</strong></p>
+            </div>
+          </div>
+          
+          <div class="section">
+            <div class="section-title">1. LẬP TRƯỜNG CỦA TÁC GIẢ (${caseItem?.authorName || 'N/A'})</div>
+            <p style="font-style: italic;">"${caseItem?.authorOpinion || ''}"</p>
+          </div>
+          
+          <div class="section">
+            <div class="section-title">2. LẬP TRƯỜNG CỦA BIÊN TẬP VIÊN (${caseItem?.editorName || 'N/A'})</div>
+            <p style="font-style: italic;">"${caseItem?.editorOpinion || ''}"</p>
+          </div>
+          
+          <div class="section verdict-box">
+            <div class="verdict-title">3. PHÁN QUYẾT TỪ TRƯỞNG BAN BIÊN TẬP</div>
+            <p style="font-weight: bold; margin-bottom: 5px;">HÌNH THỨC: ${verdict === 'AUTHOR' ? 'Ủng hộ Mangaka' : verdict === 'EDITOR' ? 'Ủng hộ Biên tập viên' : 'Thỏa hiệp bắt buộc'}</p>
+            <p style="font-style: italic; margin-bottom: 15px;">"${compromiseText || 'Chưa nhập chi tiết giải pháp phán quyết.'}"</p>
+            <p style="font-size: 11px; color: #555;"><strong>Hành động tiếp theo:</strong> ${nextActions || 'Không có.'}</p>
+          </div>
+          
+          <div class="signatures">
+            <div class="signature-block">
+              <p style="color: #888;">TRƯỞNG BAN BIÊN TẬP</p>
+              <div class="sign-line"></div>
+              <p>Trần K.</p>
+            </div>
+            <div class="signature-block">
+              <p style="color: #888;">ĐẠI DIỆN HỘI ĐỒNG THẨM ĐỊNH</p>
+              <div class="sign-line"></div>
+              <p>Minamoto Shizuka</p>
+            </div>
+          </div>
+          
+          <script>
+            window.onload = function() {
+              window.print();
+              window.close();
+            }
+          </script>
+        </body>
+      </html>
+    `)
+    printWindow.document.close()
+    setShowPdfModal(false)
+  }
+
   const [comments, setComments] = useState<any[]>([
     { id: 1, author: 'MINH K. (ART DIRECTOR)', text: 'Nên cho tác giả thêm 1 chương để triển khai tâm lý nhân vật.', time: '10 phút trước', isChief: false },
     { id: 2, author: 'LAN PHƯƠNG (EDITOR)', text: 'Đồng ý, nhịp truyện nếu thay đổi đột ngột quá sẽ phản tác dụng.', time: '30 phút trước', isChief: false },
@@ -369,7 +455,7 @@ export function ChiefDisputeDetailsPage() {
                 QUAY LẠI
               </button>
               <button 
-                onClick={() => { alert('Tải tệp tin CASE_REPORT_MF-8492.pdf thành công!'); setShowPdfModal(false); }}
+                onClick={handleDownloadPdf}
                 className="px-5 py-2.5 bg-manga-ink text-white border-2 border-manga-ink font-bold text-xs uppercase flex items-center gap-1.5 shadow-[3px_3px_0px_rgba(0,0,0,1)] hover:bg-manga-red transition-all cursor-pointer"
               >
                 <Download className="w-4 h-4" />

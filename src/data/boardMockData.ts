@@ -33,6 +33,7 @@ export interface BoardComment {
   author: string;
   role: string;
   isChief?: boolean;
+  isPinned?: boolean;
   time: string;
   content: string;
 }
@@ -348,6 +349,42 @@ class BoardStore {
   }
 
   // --- Chapter Voting ---
+  getVoteSummary(chapterId: string) {
+    const totalVotes = 12;
+    const approveVotes = 8;
+    const reviseVotes = 3;
+    const rejectVotes = 1;
+    const quorumReached = true;
+    
+    const initialVotes = [
+      { name: 'Minh K.', role: 'Art Director', vote: 'APPROVE', quote: 'Nét vẽ rất tốt, tỉ lệ giải phẫu chuẩn xác và các bối cảnh cơ khí chi tiết.' },
+      { name: 'Lan Phương', role: 'Editor', vote: 'REVISE', quote: 'Cần xem lại thoại ở trang 12 và bong bóng SFX hơi che nét vẽ.' },
+      { name: 'Tuấn A.', role: 'Senior Editor', vote: 'REJECT', quote: 'Cốt truyện đi chệch hướng so với outline ban đầu đã duyệt ở chương 60.' },
+      { name: 'Bình Minh', role: 'Producer', vote: 'APPROVE', quote: 'Tiến độ tốt, giữ nguyên tiến độ xuất bản để kịp ra mắt tập truyện.' },
+      { name: 'Quốc Bảo', role: 'Editorial staff', vote: 'APPROVE', quote: 'Ý đồ phân cảnh xuất sắc, nhịp truyện nhanh cuốn hút.' },
+      { name: 'Mỹ Linh', role: 'Marketing Manager', vote: 'APPROVE', quote: 'Tạo hình nhân vật rất ăn khách, phù hợp chiến dịch truyền thông.' },
+      { name: 'Hoàng Long', role: 'Lead Editor', vote: 'REVISE', quote: 'Cần biên tập lại các khung thoại độc thoại nội tâm hơi dài.' },
+    ];
+    
+    const restVotes = [
+      { name: 'Thu Thảo', role: 'Editor', vote: 'APPROVE', quote: 'Shading xuất sắc, tạo chiều sâu cho khung cảnh đêm thành phố.' },
+      { name: 'Duy Mạnh', role: 'Art Consultant', vote: 'APPROVE', quote: 'Lineart sạch sẽ, các trang màu lột tả được chất cyberpunk.' },
+      { name: 'Ánh Tuyết', role: 'Editor', vote: 'APPROVE', quote: 'Mạch truyện hợp lý, dẫn dắt tự nhiên.' },
+      { name: 'Kim Chi', role: 'Content Reviewer', vote: 'REVISE', quote: 'Một số lỗi chính tả nhỏ cần sửa ở trang 8.' },
+      { name: 'Thanh Hải', role: 'Creative Director', vote: 'APPROVE', quote: 'Storyboard vững chắc, không khí u tối đúng tinh thần bộ truyện.' }
+    ];
+    
+    return {
+      chapter_id: chapterId,
+      totalVotes,
+      approveVotes,
+      reviseVotes,
+      rejectVotes,
+      quorumReached,
+      voters: [...initialVotes, ...restVotes]
+    };
+  }
+
   getVote(chapterId: string): ChapterVote {
     const defaultVote: ChapterVote = {
       chapterId,

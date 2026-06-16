@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation, Link } from 'react-router'
 import { ArrowLeft, Check, Send, FileText, Calendar, User, Plus } from 'lucide-react'
+import { boardService } from '@/services/board.service'
 
 export default function SendNotificationPage() {
   const { chapterId } = useParams<{ chapterId: string }>()
@@ -40,7 +41,18 @@ export default function SendNotificationPage() {
     alert('Đã lưu bản nháp thông báo thành công!')
   }
 
-  const handleSendNotification = () => {
+  const handleSendNotification = async () => {
+    try {
+      await boardService.sendNotification({
+        templateType: template,
+        projectName,
+        recipients,
+        effectiveDate,
+        extraNote
+      })
+    } catch (err) {
+      console.warn('API error sending notification, using fallback:', err)
+    }
     setShowSuccessToast(true)
     setTimeout(() => {
       setShowSuccessToast(false)

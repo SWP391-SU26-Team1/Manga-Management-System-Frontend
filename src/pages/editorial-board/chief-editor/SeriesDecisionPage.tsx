@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router'
 import { ArrowLeft, CheckCircle, AlertCircle, Trash2, Send } from 'lucide-react'
 import { boardStore } from '@/data/boardMockData'
@@ -12,6 +12,27 @@ export default function SeriesDecisionPage() {
   const [certify, setCertify] = useState(false)
   const [decision, setDecision] = useState<'CONTINUE_WEEKLY' | 'MOVE_TO_MONTHLY' | 'ON_HIATUS' | 'CANCEL_SERIES'>('CONTINUE_WEEKLY')
   const [showConfirm, setShowConfirm] = useState(false)
+
+  // Dynamic series detail state
+  const [seriesData, setSeriesData] = useState<any>(null)
+
+  useEffect(() => {
+    const fetchSeries = async () => {
+      if (!seriesId) return
+      try {
+        const data = await boardService.getSeriesById(seriesId)
+        if (data) {
+          setSeriesData(data)
+        } else {
+          setSeriesData(boardStore.getReviewedSeriesById(seriesId))
+        }
+      } catch (err) {
+        console.warn('API error fetching series data:', err)
+        setSeriesData(boardStore.getReviewedSeriesById(seriesId))
+      }
+    }
+    fetchSeries()
+  }, [seriesId])
 
   // Discussion State
   const [comments, setComments] = useState<any[]>([
@@ -78,7 +99,7 @@ export default function SeriesDecisionPage() {
     navigate('/dashboard/editorial-board/send-notification', {
       state: {
         templateType: decision === 'CANCEL_SERIES' ? 'CANCELLATION' : 'SCHEDULE_CHANGE',
-        projectName: 'Void Walker (Series)',
+        projectName: `${seriesData?.title || 'Void Walker'} (Series)`,
         resolution: `Quyết định chính thức của Trưởng ban: ${
           decision === 'CONTINUE_WEEKLY' ? 'Tiếp tục phát hành Hàng Tuần' : 
           decision === 'MOVE_TO_MONTHLY' ? 'Chuyển sang tạp chí Hàng Tháng (Monthly)' : 
@@ -101,7 +122,7 @@ export default function SeriesDecisionPage() {
             </div>
 
             <p className="text-xs font-bold leading-relaxed text-gray-700 mb-6">
-              Bạn đang đưa ra quyết định chiến lược cho tác phẩm <strong>VOID WALKER</strong> là:{' '}
+              Bạn đang đưa ra quyết định chiến lược cho tác phẩm <strong>{seriesData?.title || 'VOID WALKER'}</strong> là:{' '}
               <strong className="text-manga-red uppercase text-sm">
                 {decision === 'CONTINUE_WEEKLY' && 'TIẾP TỤC TUẦN (CONTINUE WEEKLY)'}
                 {decision === 'MOVE_TO_MONTHLY' && 'CHUYỂN SANG THÁNG (MOVE TO MONTHLY)'}
@@ -148,11 +169,11 @@ export default function SeriesDecisionPage() {
               CRITICAL EVALUATION
             </span>
             <span className="bg-manga-ink text-white font-bold text-[9px] px-2 py-0.5 border-2 border-manga-ink uppercase">
-              SERIES: VOID WALKER
+              SERIES: {seriesData?.title || 'VOID WALKER'}
             </span>
           </div>
           <h1 className="font-manga text-3xl md:text-4xl font-bold uppercase">
-            DECISION PENDING: VOID WALKER
+            DECISION PENDING: {seriesData?.title || 'VOID WALKER'}
           </h1>
           <p className="text-xs font-bold text-gray-500 uppercase mt-1">
             Mục tiêu đánh giá: Tương lai phát hành do phản ứng độc giả sụt giảm trong Arc 'Cursed Realm'.

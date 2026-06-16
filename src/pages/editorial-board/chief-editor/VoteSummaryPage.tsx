@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router'
 import { ArrowLeft, CheckCircle, AlertCircle, HelpCircle } from 'lucide-react'
 import { boardStore } from '@/data/boardMockData'
@@ -7,11 +7,6 @@ import { boardService } from '@/services/board.service'
 export default function VoteSummaryPage() {
   const { chapterId } = useParams<{ chapterId: string }>()
   const navigate = useNavigate()
-
-  // State for expand all votes
-  const [expandAll, setExpandAll] = useState(false)
-  const [showConfirm, setShowConfirm] = useState(false)
-  const [decisionType, setDecisionType] = useState<'APPROVAL' | 'REVISION' | 'CANCELLATION'>('APPROVAL')
 
   const chapterTitleDisplay = chapterId === 'cyber-ronin' 
     ? 'CYBER RONIN: ZERO' 
@@ -23,27 +18,67 @@ export default function VoteSummaryPage() {
 
   const chapterNumberDisplay = chapterId === 'cyber-ronin' ? 65 : chapterId === 'pitch-black' ? 12 : chapterId === 'whispers-of-mana' ? 45 : 1
 
-  // Mock voters data
-  const initialVotes = [
-    { name: 'Minh K.', role: 'Art Director', vote: 'APPROVE', quote: 'Nét vẽ rất tốt, tỉ lệ giải phẫu chuẩn xác và các bối cảnh cơ khí chi tiết.' },
-    { name: 'Lan Phương', role: 'Editor', vote: 'REVISE', quote: 'Cần xem lại thoại ở trang 12 và bong bóng SFX hơi che nét vẽ.' },
-    { name: 'Tuấn A.', role: 'Senior Editor', vote: 'REJECT', quote: 'Cốt truyện đi chệch hướng so với outline ban đầu đã duyệt ở chương 60.' },
-    { name: 'Bình Minh', role: 'Producer', vote: 'APPROVE', quote: 'Tiến độ tốt, giữ nguyên tiến độ xuất bản để kịp ra mắt tập truyện.' },
-    { name: 'Quốc Bảo', role: 'Editorial staff', vote: 'APPROVE', quote: 'Ý đồ phân cảnh xuất sắc, nhịp truyện nhanh cuốn hút.' },
-    { name: 'Mỹ Linh', role: 'Marketing Manager', vote: 'APPROVE', quote: 'Tạo hình nhân vật rất ăn khách, phù hợp chiến dịch truyền thông.' },
-    { name: 'Hoàng Long', role: 'Lead Editor', vote: 'REVISE', quote: 'Cần biên tập lại các khung thoại độc thoại nội tâm hơi dài.' },
-  ]
+  // State for expand all votes
+  const [expandAll, setExpandAll] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [decisionType, setDecisionType] = useState<'APPROVAL' | 'REVISION' | 'CANCELLATION'>('APPROVAL')
 
-  const restVotes = [
-    { name: 'Thu Thảo', role: 'Editor', vote: 'APPROVE', quote: 'Shading xuất sắc, tạo chiều sâu cho khung cảnh đêm thành phố.' },
-    { name: 'Duy Mạnh', role: 'Art Consultant', vote: 'APPROVE', quote: 'Lineart sạch sẽ, các trang màu lột tả được chất cyberpunk.' },
-    { name: 'Ánh Tuyết', role: 'Editor', vote: 'APPROVE', quote: 'Mạch truyện hợp lý, dẫn dắt tự nhiên.' },
-    { name: 'Kim Chi', role: 'Content Reviewer', vote: 'REVISE', quote: 'Một số lỗi chính tả nhỏ cần sửa ở trang 8.' },
-    { name: 'Thanh Hải', role: 'Creative Director', vote: 'APPROVE', quote: 'Storyboard vững chắc, không khí u tối đúng tinh thần bộ truyện.' }
-  ]
+  // Dynamic voters and stats states
+  const [votes, setVotes] = useState<any[]>([])
+  const [stats, setStats] = useState({
+    totalVotes: 0,
+    approveCount: 0,
+    reviseCount: 0,
+    rejectCount: 0,
+    approvePercent: 0,
+    revisePercent: 0,
+    rejectPercent: 0,
+    quorumReached: false
+  })
 
-  const allVotes = [...initialVotes, ...restVotes]
-  const displayedVotes = expandAll ? allVotes : initialVotes
+  useEffect(() => {
+    const fetchSummary = async () => {
+      if (!chapterId) return
+      try {
+        const data = await boardService.getVoteSummary(chapterId)
+        if (data && data.voters) {
+          updateState(data)
+        } else {
+          updateState(boardStore.getVoteSummary(chapterId))
+        }
+      } catch (err) {
+        console.warn('API error fetching vote summary, using fallback:', err)
+        updateState(boardStore.getVoteSummary(chapterId))
+      }
+    }
+
+    const updateState = (data: any) => {
+      setVotes(data.voters || [])
+      const total = data.totalVotes || data.voters?.length || 0
+      const approve = data.approveVotes || data.voters?.filter((v: any) => v.vote === 'APPROVE').length || 0
+      const revise = data.reviseVotes || data.voters?.filter((v: any) => v.vote === 'REVISE').length || 0
+      const reject = data.rejectVotes || data.voters?.filter((v: any) => v.vote === 'REJECT').length || 0
+      
+      const appPct = total > 0 ? Math.round((approve / total) * 100) : 0
+      const revPct = total > 0 ? Math.round((revise / total) * 100) : 0
+      const rejPct = total > 0 ? Math.round((reject / total) * 100) : 0
+
+      setStats({
+        totalVotes: total,
+        approveCount: approve,
+        reviseCount: revise,
+        rejectCount: reject,
+        approvePercent: appPct,
+        revisePercent: revPct,
+        rejectPercent: rejPct,
+        quorumReached: data.quorumReached || total >= 6
+      })
+    }
+
+    fetchSummary()
+  }, [chapterId])
+
+  const displayedVotes = expandAll ? votes : votes.slice(0, 7)
 
   const handleDecisionClick = (type: 'APPROVAL' | 'REVISION' | 'CANCELLATION') => {
     setDecisionType(type)
@@ -134,7 +169,7 @@ export default function VoteSummaryPage() {
         </span>
       </div>
 
-      <h1 className="font-manga text-3xl md:text-4xl font-bold uppercase leading-none mb-2">
+      <h1 className="font-manga text-3xl md:text-4xl font-bold uppercase leading-none mb-2 mt-4">
         TỔNG HỢP KẾT QUẢ BIỂU QUYẾT
       </h1>
       <p className="text-xs font-bold text-gray-500 uppercase mb-8">
@@ -159,15 +194,15 @@ export default function VoteSummaryPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div className="border-2 border-manga-ink p-3 bg-zinc-50 shadow-sm text-center">
                 <span className="block text-[10px] text-gray-400 font-bold uppercase">Tổng số phiếu</span>
-                <strong className="font-manga text-3xl text-manga-ink">12 / 12</strong>
+                <strong className="font-manga text-3xl text-manga-ink">{stats.totalVotes} / {stats.totalVotes}</strong>
               </div>
               <div className="border-2 border-manga-ink p-3 bg-[#fff5f5] shadow-sm text-center">
                 <span className="block text-[10px] text-gray-400 font-bold uppercase">Tỉ lệ nhất trí</span>
-                <strong className="font-manga text-3xl text-manga-red">66%</strong>
+                <strong className="font-manga text-3xl text-manga-red">{stats.approvePercent}%</strong>
               </div>
               <div className="border-2 border-manga-ink p-3 bg-zinc-50 shadow-sm text-center">
                 <span className="block text-[10px] text-gray-400 font-bold uppercase">Quorum tối thiểu</span>
-                <strong className="font-manga text-3xl text-emerald-600">ĐẠT</strong>
+                <strong className="font-manga text-3xl text-emerald-600">{stats.quorumReached ? 'ĐẠT' : 'CHƯA ĐẠT'}</strong>
               </div>
             </div>
 
@@ -179,10 +214,10 @@ export default function VoteSummaryPage() {
               <div className="space-y-1">
                 <div className="flex justify-between text-xs font-bold">
                   <span className="text-emerald-600">✔ PHÊ DUYỆT XUẤT BẢN</span>
-                  <span>8 phiếu (66%)</span>
+                  <span>{stats.approveCount} phiếu ({stats.approvePercent}%)</span>
                 </div>
                 <div className="w-full h-4 bg-gray-100 border-2 border-manga-ink rounded-none overflow-hidden relative">
-                  <div className="h-full bg-manga-red border-r-2 border-manga-ink" style={{ width: '66.6%' }} />
+                  <div className="h-full bg-manga-red border-r-2 border-manga-ink" style={{ width: `${stats.approvePercent}%` }} />
                 </div>
               </div>
 
@@ -190,10 +225,10 @@ export default function VoteSummaryPage() {
               <div className="space-y-1">
                 <div className="flex justify-between text-xs font-bold">
                   <span className="text-[#a16207]">📅 CẦN CHỈNH SỬA</span>
-                  <span>3 phiếu (25%)</span>
+                  <span>{stats.reviseCount} phiếu ({stats.revisePercent}%)</span>
                 </div>
                 <div className="w-full h-4 bg-gray-100 border-2 border-manga-ink rounded-none overflow-hidden relative">
-                  <div className="h-full bg-yellow-400 border-r-2 border-manga-ink" style={{ width: '25%' }} />
+                  <div className="h-full bg-yellow-400 border-r-2 border-manga-ink" style={{ width: `${stats.revisePercent}%` }} />
                 </div>
               </div>
 
@@ -201,10 +236,10 @@ export default function VoteSummaryPage() {
               <div className="space-y-1">
                 <div className="flex justify-between text-xs font-bold">
                   <span className="text-zinc-500">✖ HỦY BỎ BẢN THẢO</span>
-                  <span>1 phiếu (8%)</span>
+                  <span>{stats.rejectCount} phiếu ({stats.rejectPercent}%)</span>
                 </div>
                 <div className="w-full h-4 bg-gray-100 border-2 border-manga-ink rounded-none overflow-hidden relative">
-                  <div className="h-full bg-zinc-900 border-r-2 border-manga-ink" style={{ width: '8.33%' }} />
+                  <div className="h-full bg-zinc-900 border-r-2 border-manga-ink" style={{ width: `${stats.rejectPercent}%` }} />
                 </div>
               </div>
             </div>
@@ -278,7 +313,7 @@ export default function VoteSummaryPage() {
             onClick={() => setExpandAll(!expandAll)}
             className="w-full mt-4 py-2 bg-zinc-100 hover:bg-zinc-200 border-2 border-manga-ink text-manga-ink font-manga font-bold text-xs uppercase transition-colors"
           >
-            {expandAll ? 'ẨN BỚT PHIẾU BẦU' : `XEM TẤT CẢ ${allVotes.length} PHIẾU`}
+            {expandAll ? 'ẨN BỚT PHIẾU BẦU' : `XEM TẤT CẢ ${votes.length} PHIẾU`}
           </button>
         </div>
       </div>

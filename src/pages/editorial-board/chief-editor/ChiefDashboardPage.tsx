@@ -72,7 +72,12 @@ export default function ChiefDashboardPage() {
     loadData()
   }, [])
 
-  const handleToggleTask = (taskId: string) => {
+  const handleToggleTask = async (taskId: string) => {
+    try {
+      await boardService.toggleTask(taskId)
+    } catch (err) {
+      console.warn('API error toggling task, using fallback:', err)
+    }
     boardStore.toggleTask(taskId)
     setTasks(boardStore.getTodayTasks())
   }
@@ -232,6 +237,16 @@ export default function ChiefDashboardPage() {
                   Chương 104 bị trì hoãn xuất bản. Đang đóng băng lịch.
                 </p>
               </div>
+
+              <Link to="/dashboard/editorial-board/disputes/MF-8492" className="border-2 border-manga-ink bg-white p-3 shadow-[2px_2px_0px_rgba(0,0,0,1)] block hover:bg-red-50 transition-colors">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-manga text-xs font-black uppercase text-manga-ink">BÓNG ĐÊM VÔ TẬN</span>
+                  <span className="bg-amber-500 text-white text-[8px] font-black border-2 border-manga-ink px-1.5 py-0.5 uppercase tracking-tighter">TRANH CHẤP</span>
+                </div>
+                <p className="text-[10px] text-gray-600 font-bold leading-normal">
+                  Mâu thuẫn kịch bản chương 45 giữa Mangaka & BTV. Cần phán quyết tối hậu.
+                </p>
+              </Link>
             </div>
 
             <Link

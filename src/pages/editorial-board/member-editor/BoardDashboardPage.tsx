@@ -282,7 +282,7 @@ export default function BoardDashboardPage() {
           {/* Checklist Task Widget */}
           <div className="bg-white border-4 border-manga-ink p-5 shadow-[6px_6px_0px_rgba(15,15,15,1)]">
             <h3 className="font-manga text-xl font-black uppercase border-b-4 border-manga-ink pb-2 mb-4">
-              GIAO THỨC HÔM NAY
+              VIỆC CẦN LÀM HÔM NAY
             </h3>
             
             <div className="space-y-3">

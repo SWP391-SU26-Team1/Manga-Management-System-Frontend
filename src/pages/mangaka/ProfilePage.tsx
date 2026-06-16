@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { Link } from 'react-router'
-import { User, Mail, Award, BookOpen, Star, Users, Briefcase, Edit3, Save, X, Camera, Loader2, CalendarDays } from 'lucide-react'
+import { User, Mail, Award, BookOpen, Star, Users, Briefcase, Edit3, Save, X, Camera, Loader2 } from 'lucide-react'
 import { userService, UserProfileAPI } from '@/services/user.service'
 import { seriesService } from '@/services/series.service'
 import { uploadService } from '@/services/upload.service'
@@ -444,9 +444,7 @@ export default function ProfilePage() {
         <div className="font-manga text-2xl text-manga-red">MangaFlow</div>
         <div>© 2026 MangaFlow System. Gangan Press Co. Ltd. All rights reserved.</div>
         <div className="flex items-center gap-6">
-          <Link to="/dashboard/mangaka" className="hover:text-manga-red transition-colors flex items-center gap-1">
-            <CalendarDays className="w-4 h-4" /> Lịch trình
-          </Link>
+          
           <a href="#" className="hover:text-manga-red transition-colors">Quy tắc xuất bản</a>
           <a href="#" className="hover:text-manga-red transition-colors">Hỗ trợ Mangaka</a>
         </div>

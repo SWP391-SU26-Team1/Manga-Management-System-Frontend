@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router'
-import { CheckCircle, AlertCircle, MessageSquare, CalendarDays } from 'lucide-react'
+import { CheckCircle, AlertCircle, MessageSquare } from 'lucide-react'
 import { EditorFeedback } from '@/data/mangakaMockData'
 import { FeedbackCard } from '@/components/mangaka/FeedbackCard'
 import { feedbackService } from '@/services/feedback.service'
@@ -272,9 +272,7 @@ export default function FeedbackPage() {
         <div className="font-manga text-2xl text-manga-red">MangaFlow</div>
         <div>© 2026 MangaFlow System. Gangan Press Co. Ltd. All rights reserved.</div>
         <div className="flex items-center gap-6">
-          <Link to="/dashboard/mangaka" className="hover:text-manga-red transition-colors flex items-center gap-1">
-            <CalendarDays className="w-4 h-4" /> Lịch trình
-          </Link>
+          
           <a href="#" className="hover:text-manga-red transition-colors">Quy tắc xuất bản</a>
           <a href="#" className="hover:text-manga-red transition-colors">Hỗ trợ Mangaka</a>
         </div>

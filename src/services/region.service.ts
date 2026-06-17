@@ -28,18 +28,37 @@ export const regionService = {
     return res.data.data ?? []
   },
 
-  /** POST /api/mangaka/series/:seriesId/chapters/:chapterId/pages/:pageId/regions */
+  /** POST /api/page-regions */
   create: async (
     seriesId: string,
     chapterId: string,
     pageId: string,
     payload: { region_type?: string; coordinates: any; label?: string }
   ): Promise<RegionAPI> => {
-    const res = await api.post<{ success: boolean; data: RegionAPI }>(
-      `/api/mangaka/series/${seriesId}/chapters/${chapterId}/pages/${pageId}/regions`,
-      payload
+    const flatPayload = {
+      page_id: pageId,
+      x: Math.round(payload.coordinates?.x ?? 0),
+      y: Math.round(payload.coordinates?.y ?? 0),
+      width: Math.max(1, Math.round(payload.coordinates?.w ?? payload.coordinates?.width ?? 0)),
+      height: Math.max(1, Math.round(payload.coordinates?.h ?? payload.coordinates?.height ?? 0)),
+    }
+    const res = await api.post<{ success: boolean; data: any }>(
+      '/api/page-regions',
+      flatPayload
     )
-    return res.data.data
+    const reg = res.data.data
+    return {
+      region_id: reg.region_id,
+      page_id: reg.page_id,
+      coordinates: {
+        x: reg.x,
+        y: reg.y,
+        w: reg.width,
+        h: reg.height
+      },
+      created_at: reg.created_at,
+      updated_at: reg.updated_at
+    }
   },
 
   /** DELETE /api/mangaka/series/:seriesId/chapters/:chapterId/pages/:pageId/regions/:regionId */

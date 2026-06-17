@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams, Link } from 'react-router'
-import { AlertTriangle, Info, X, ClipboardList, ZoomIn, ZoomOut, Maximize, Trash2, CheckCircle } from 'lucide-react'
-import { TaskTable } from '@/components/mangaka/TaskTable'
+import { AlertTriangle, Info, X, ClipboardList, ZoomIn, ZoomOut, Maximize, CheckCircle, RefreshCw } from 'lucide-react'
+import { TaskTable, DisplayTask } from '@/components/mangaka/TaskTable'
 import { seriesService, SeriesAPI } from '@/services/series.service'
 import { chapterService, ChapterAPI } from '@/services/chapter.service'
 import { pageService, PageAPI } from '@/services/page.service'
 import { taskService, TaskAPI, LAYER_TYPE_MAP, TaskType } from '@/services/task.service'
 import { regionService } from '@/services/region.service'
+import { uploadService } from '@/services/upload.service'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -48,6 +49,8 @@ function AssignTaskContent() {
   const [note, setNote] = useState('')
   const [formError, setFormError] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
+  const [taskSuccessMsg, setTaskSuccessMsg] = useState('')
+  const [taskWarningMsg, setTaskWarningMsg] = useState('')
 
   // Image state
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -67,6 +70,95 @@ function AssignTaskContent() {
   const [isLoadingPages, setIsLoadingPages] = useState(false)
   const [isLoadingTasks, setIsLoadingTasks] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isUploadingPages, setIsUploadingPages] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+  const [isReplacingImage, setIsReplacingImage] = useState(false)
+
+  const handleUploadPages = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    if (!selectedSeriesId || !selectedChapterId) {
+      setUploadError('Vui lòng chọn series và chapter trước!')
+      return
+    }
+
+    setIsUploadingPages(true)
+    setUploadError('')
+    try {
+      const filesArray = Array.from(files)
+      // Upload each file to Cloudinary in parallel
+      const uploadPromises = filesArray.map(file => uploadService.uploadSingle(file, 'pages'))
+      const uploadResults = await Promise.all(uploadPromises)
+
+      // Format payload for bulk creation (omit page_number to let backend calculate automatically)
+      const bulkPayload = uploadResults.map((res) => ({
+        image_url: res.secure_url
+      }))
+
+      // Create page entries in Database
+      const createdPages = await pageService.bulkCreate(selectedSeriesId, selectedChapterId, bulkPayload)
+      
+      // Update local pages state
+      setPages(createdPages)
+      
+      // Auto select the first created page
+      if (createdPages.length > 0) {
+        setSelectedPageId(createdPages[0]._id)
+      }
+      
+      setSuccessMsg('Đã tải lên các trang phác thảo thô thành công!')
+    } catch (err: any) {
+      console.error(err)
+      setUploadError(err.response?.data?.message || err.message || 'Lỗi khi tải trang lên, vui lòng thử lại.')
+    } finally {
+      setIsUploadingPages(false)
+    }
+  }
+
+  const handleBeforeUpload = (e: React.MouseEvent<HTMLLabelElement>) => {
+    if (isUploadingPages) {
+      e.preventDefault()
+      return
+    }
+    if (tasks.length === 0) {
+      e.preventDefault()
+      setTaskWarningMsg('Bạn phải điền đầy đủ thông tin giao task và hoàn tất giao task cho trang hiện tại trước khi tải trang tiếp theo!')
+      setTimeout(() => {
+        setTaskWarningMsg('')
+      }, 5000)
+    }
+  }
+
+  const handleReplacePageImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    if (!selectedSeriesId || !selectedChapterId || !selectedPageId) {
+      alert('Vui lòng chọn trang cần thay thế ảnh!')
+      return
+    }
+
+    const file = files[0]
+    setIsReplacingImage(true)
+    try {
+      const res = await uploadService.uploadSingle(file, 'pages')
+      const updatedPage = await pageService.update(
+        selectedSeriesId,
+        selectedChapterId,
+        selectedPageId,
+        { image_url: res.secure_url }
+      )
+      
+      // Cập nhật state list pages cục bộ
+      setPages(prevPages => prevPages.map(p => p._id === selectedPageId ? updatedPage : p))
+      setPreviewUrl(res.secure_url)
+      alert('Đã thay thế ảnh của trang thành công!')
+    } catch (err: any) {
+      console.error(err)
+      alert(err.response?.data?.message || err.message || 'Lỗi khi thay thế ảnh, vui lòng thử lại.')
+    } finally {
+      setIsReplacingImage(false)
+    }
+  }
 
   // ── Load series on mount ───────────────────────────────────────────────────
   useEffect(() => {
@@ -190,10 +282,10 @@ function AssignTaskContent() {
         // Map backend regions to local annotations state
         const mappedAnns: AreaMarkup[] = regs.map((r: any) => ({
           id: r.region_id,
-          x: r.coordinates?.x ?? 0,
-          y: r.coordinates?.y ?? 0,
-          w: r.coordinates?.w ?? r.coordinates?.width ?? 0,
-          h: r.coordinates?.h ?? r.coordinates?.height ?? 0,
+          x: r.coordinates?.x ?? r.x ?? 0,
+          y: r.coordinates?.y ?? r.y ?? 0,
+          w: r.coordinates?.w ?? r.coordinates?.width ?? r.width ?? 0,
+          h: r.coordinates?.h ?? r.coordinates?.height ?? r.height ?? 0,
           label: r.label || 'Vùng',
           saved: true
         }))
@@ -262,7 +354,10 @@ function AssignTaskContent() {
         region_id: dbRegionId
       })
 
-      setSuccessMsg('✅ Đã giao nhiệm vụ thành công!')
+      setTaskSuccessMsg('Đã giao nhiệm vụ thành công!')
+      setTimeout(() => {
+        setTaskSuccessMsg('')
+      }, 4000)
       setNote('')
       setAssignedTo('')
       setActiveAnnotationId(null)
@@ -276,10 +371,10 @@ function AssignTaskContent() {
 
       const mappedAnns: AreaMarkup[] = regs.map((r: any) => ({
         id: r.region_id,
-        x: r.coordinates?.x ?? 0,
-        y: r.coordinates?.y ?? 0,
-        w: r.coordinates?.w ?? r.coordinates?.width ?? 0,
-        h: r.coordinates?.h ?? r.coordinates?.height ?? 0,
+        x: r.coordinates?.x ?? r.x ?? 0,
+        y: r.coordinates?.y ?? r.y ?? 0,
+        w: r.coordinates?.w ?? r.coordinates?.width ?? r.width ?? 0,
+        h: r.coordinates?.h ?? r.coordinates?.height ?? r.height ?? 0,
         label: r.label || 'Vùng',
         saved: true
       }))
@@ -312,10 +407,10 @@ function AssignTaskContent() {
       const regs = await regionService.getByPage(selectedSeriesId, selectedChapterId, selectedPageId)
       const mappedAnns: AreaMarkup[] = regs.map((r: any) => ({
         id: r.region_id,
-        x: r.coordinates?.x ?? 0,
-        y: r.coordinates?.y ?? 0,
-        w: r.coordinates?.w ?? r.coordinates?.width ?? 0,
-        h: r.coordinates?.h ?? r.coordinates?.height ?? 0,
+        x: r.coordinates?.x ?? r.x ?? 0,
+        y: r.coordinates?.y ?? r.y ?? 0,
+        w: r.coordinates?.w ?? r.coordinates?.width ?? r.width ?? 0,
+        h: r.coordinates?.h ?? r.coordinates?.height ?? r.height ?? 0,
         label: r.label || 'Vùng',
         saved: true
       }))
@@ -368,14 +463,15 @@ function AssignTaskContent() {
   }
 
   // Map TaskAPI to display format for TaskTable (resolves assistant names)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const displayTasks: any[] = tasks.map(t => ({
+  const displayTasks: DisplayTask[] = tasks.map(t => ({
     id: t._id,
     chapterId: t.chapter_id,
     pageId: t.page_id,
+    chapterNumber: activeChapter?.chapter_number || 'N/A',
+    pageNumber: activePage?.page_number || 'N/A',
     assignedTo: t.assigned_to_name || t.assigned_to,
     layerType: t.task_type,
-    deadline: t.deadline ?? '',
+    deadline: t.deadline ? new Date(t.deadline).toLocaleDateString('vi-VN') : '',
     priority: t.priority,
     note: t.description,
     status: t.status,
@@ -442,26 +538,94 @@ function AssignTaskContent() {
           {isLoadingPages ? (
             <span className="text-xs font-bold text-gray-400">Đang tải...</span>
           ) : (
-            <select
-              value={selectedPageId}
-              onChange={e => setSelectedPageId(e.target.value)}
-              disabled={pages.length === 0}
-              className="border-2 border-manga-ink px-2.5 py-1.5 font-bold text-xs bg-white uppercase focus:outline-none disabled:opacity-50"
-            >
-              {pages.length === 0 && <option value="">-- Chưa có trang --</option>}
-              {pages.map(p => (
-                <option key={p._id} value={p._id}>Trang {p.page_number}</option>
-              ))}
-            </select>
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedPageId}
+                onChange={e => setSelectedPageId(e.target.value)}
+                disabled={pages.length === 0}
+                className="border-2 border-manga-ink px-2.5 py-1.5 font-bold text-xs bg-white uppercase focus:outline-none disabled:opacity-50"
+              >
+                {pages.length === 0 && <option value="">-- Chưa có trang --</option>}
+                {pages.map(p => (
+                  <option key={p._id} value={p._id}>Trang {p.page_number}</option>
+                ))}
+              </select>
+
+              {pages.length > 0 && (
+                <label 
+                  onClick={handleBeforeUpload}
+                  className="bg-manga-red hover:bg-red-700 text-white font-bold text-xs uppercase px-3 py-1.5 border-2 border-manga-ink cursor-pointer hover:translate-y-0.5 transition-all flex items-center gap-1.5"
+                >
+                  {isUploadingPages ? (
+                    <>
+                      <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
+                      <span>Đang tải...</span>
+                    </>
+                  ) : (
+                    <span>+ Tải Thêm Trang</span>
+                  )}
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    className="hidden"
+                    disabled={isUploadingPages}
+                    onChange={handleUploadPages}
+                  />
+                </label>
+              )}
+            </div>
           )}
+
         </div>
       </div>
 
-      {/* No pages warning */}
+      {/* No pages warning & upload zone */}
       {!isLoadingChapters && !isLoadingPages && chapters.length > 0 && pages.length === 0 && (
-        <div className="bg-yellow-50 border-2 border-yellow-400 p-4 mb-6 flex items-center gap-2 text-yellow-800 font-bold text-sm">
-          <Info className="w-4 h-4 shrink-0" />
-          Chapter này chưa có trang nào. Trang sẽ được tạo tự động bởi hệ thống sau khi bạn tải bản thảo lên.
+        <div className="border-4 border-dashed border-manga-ink p-8 mb-6 bg-white text-center flex flex-col items-center justify-center gap-4 manga-shadow-sm">
+          <div className="bg-yellow-50 border border-yellow-400 p-3 flex items-center gap-2 text-yellow-800 font-bold text-xs uppercase">
+            <Info className="w-4 h-4 shrink-0 text-manga-red" />
+            Chapter này hiện chưa có trang nào trong cơ sở dữ liệu!
+          </div>
+          
+          <div className="max-w-md">
+            <h3 className="font-manga text-xl font-bold uppercase text-manga-ink mb-1">
+              Tải lên các trang phác thảo thô
+            </h3>
+            <p className="text-xs text-gray-500 font-bold mb-4">
+              Tải lên các tệp hình ảnh phác thảo (Name/Draft) của từng trang để tiến hành chia khung và giao việc cho trợ lý.
+            </p>
+            
+            {uploadError && (
+              <div className="bg-red-50 border-2 border-[#E63946] p-2.5 text-xs font-bold text-[#E63946] mb-4">
+                {uploadError}
+              </div>
+            )}
+            {successMsg && (
+              <div className="bg-green-50 border-2 border-green-500 p-2.5 text-xs font-bold text-green-700 mb-4">
+                {successMsg}
+              </div>
+            )}
+            
+            <label className="inline-block bg-manga-red hover:bg-red-700 text-white font-manga font-bold text-xs uppercase px-6 py-3 border-2 border-manga-ink manga-shadow-sm hover:translate-y-0.5 transition-all cursor-pointer">
+              {isUploadingPages ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Đang tải lên...
+                </span>
+              ) : (
+                'Chọn nhiều ảnh để tải lên'
+              )}
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                className="hidden"
+                disabled={isUploadingPages}
+                onChange={handleUploadPages}
+              />
+            </label>
+          </div>
         </div>
       )}
 
@@ -480,27 +644,42 @@ function AssignTaskContent() {
           <div className="border-4 border-manga-ink manga-shadow relative bg-[#f7f7f7] flex items-center justify-center p-6 w-full" style={{ minHeight: 650 }}>
             {previewUrl ? (
               <div className="relative w-full h-full flex flex-col items-center justify-center">
-                <div className="absolute top-0 right-0 flex gap-2 z-10 bg-white/80 backdrop-blur p-1 border-2 border-manga-ink">
+                <div className="absolute top-0 right-0 flex gap-2 z-10 bg-white/80 backdrop-blur p-1 border-2 border-manga-ink flex-wrap items-center">
                   <button onClick={() => setZoom(z => Math.min(z + 0.25, 3))} type="button" className="p-1.5 hover:bg-gray-200 border-r border-manga-ink/20" title="Phóng to"><ZoomIn className="w-4 h-4" /></button>
                   <button onClick={() => setZoom(z => Math.max(z - 0.25, 0.5))} type="button" className="p-1.5 hover:bg-gray-200 border-r border-manga-ink/20" title="Thu nhỏ"><ZoomOut className="w-4 h-4" /></button>
                   <button onClick={() => setZoom(1)} type="button" className="p-1.5 hover:bg-gray-200 border-r border-manga-ink/20" title="Mặc định"><Maximize className="w-4 h-4" /></button>
-                  <button onClick={() => setAnnotations([])} type="button" className="p-1.5 hover:bg-red-100 text-red-600 flex items-center gap-1 text-xs font-bold uppercase" title="Xóa tất cả vùng vẽ lỗi"><Trash2 className="w-3.5 h-3.5" /> Xóa tất cả</button>
+                  <label className="p-1.5 hover:bg-gray-100 text-manga-ink flex items-center gap-1 text-xs font-bold uppercase cursor-pointer disabled:opacity-50" title="Thay thế ảnh cho trang này">
+                    <RefreshCw className={`w-3.5 h-3.5 ${isReplacingImage ? 'animate-spin' : ''}`} />
+                    {isReplacingImage ? 'Đang thay...' : 'Thay Thế Ảnh'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={isReplacingImage}
+                      onChange={handleReplacePageImage}
+                    />
+                  </label>
                 </div>
 
                 <div className="w-full flex-1 flex items-center justify-center mt-10 overflow-hidden">
                   <div
                     ref={imageContainerRef}
-                    className="relative inline-block max-w-full"
+                    className="relative inline-block border-2 border-manga-ink bg-white shadow-sm"
                     onMouseDown={handleMouseDown}
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
                     onMouseLeave={handleMouseUp}
-                    style={{ cursor: 'crosshair' }}
+                    style={{
+                      cursor: 'crosshair',
+                      aspectRatio: '1200/1700',
+                      height: '600px',
+                      maxWidth: '100%'
+                    }}
                   >
                     <img
                       src={previewUrl}
                       alt="Bản thảo Preview"
-                      className="max-w-full max-h-[600px] object-contain shadow-sm pointer-events-none select-none transition-transform"
+                      className="w-full h-full object-fill pointer-events-none select-none transition-transform"
                       style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}
                       draggable={false}
                     />
@@ -570,11 +749,7 @@ function AssignTaskContent() {
                   <AlertTriangle className="w-4 h-4 flex-shrink-0" /> {formError}
                 </div>
               )}
-              {successMsg && (
-                <div className="bg-green-50 border border-green-500 p-2.5 text-xs text-green-700 uppercase flex items-center gap-1.5">
-                  <CheckCircle className="w-4 h-4 flex-shrink-0" /> {successMsg}
-                </div>
-              )}
+
 
               {/* Context summary */}
               <div className="border border-manga-ink p-3 bg-gray-50 text-xs">
@@ -699,6 +874,46 @@ function AssignTaskContent() {
           <a href="#" className="hover:text-manga-red transition-colors">Hỗ trợ Mangaka</a>
         </div>
       </footer>
+
+      {/* Floating Toast Notification */}
+      {taskSuccessMsg && (
+        <div className="fixed bottom-6 right-6 z-[9999] animate-bounce duration-300">
+          <div className="border-4 border-manga-ink manga-shadow-sm p-4 flex items-center gap-3 bg-white text-emerald-800 min-w-[320px]">
+            <CheckCircle className="w-6 h-6 text-emerald-500 shrink-0" />
+            <div className="flex-1">
+              <p className="font-manga text-sm font-black uppercase tracking-wider text-manga-ink">Thành Công!</p>
+              <p className="text-xs font-bold text-gray-700 mt-0.5">{taskSuccessMsg}</p>
+            </div>
+            <button 
+              type="button" 
+              onClick={() => setTaskSuccessMsg('')} 
+              className="ml-2 hover:bg-zinc-100 p-1 text-gray-400 hover:text-manga-ink border-none bg-transparent cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Warning Toast Notification */}
+      {taskWarningMsg && (
+        <div className="fixed bottom-6 right-6 z-[9999] animate-bounce duration-300">
+          <div className="border-4 border-manga-ink manga-shadow-sm p-4 flex items-center gap-3 bg-white text-manga-red min-w-[320px]">
+            <AlertTriangle className="w-6 h-6 text-manga-red shrink-0" />
+            <div className="flex-1">
+              <p className="font-manga text-sm font-black uppercase tracking-wider text-manga-ink">Cảnh Báo!</p>
+              <p className="text-xs font-bold text-gray-700 mt-0.5">{taskWarningMsg}</p>
+            </div>
+            <button 
+              type="button" 
+              onClick={() => setTaskWarningMsg('')} 
+              className="ml-2 hover:bg-zinc-100 p-1 text-gray-400 hover:text-manga-ink border-none bg-transparent cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

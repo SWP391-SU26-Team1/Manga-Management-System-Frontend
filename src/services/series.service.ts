@@ -89,6 +89,45 @@ export const seriesService = {
     )
     return res.data.data ?? []
   },
+
+  /** POST /api/mangaka/series/:seriesId/members — thêm thành viên vào dự án */
+  addMember: async (
+    seriesId: string,
+    payload: { user_id: string; role_in_series: string }
+  ): Promise<any> => {
+    const res = await api.post<{ success: boolean; data: any }>(
+      `/api/mangaka/series/${seriesId}/members`,
+      payload
+    )
+    return res.data.data
+  },
+
+  /** DELETE /api/mangaka/series/:seriesId/members/:seriesMemberId — xóa thành viên khỏi dự án */
+  removeMember: async (seriesId: string, seriesMemberId: string): Promise<void> => {
+    await api.delete(
+      `/api/mangaka/series/${seriesId}/members/${seriesMemberId}`
+    )
+  },
+
+  /** GET /api/mangaka/series/:seriesId/members + map all of them */
+  getAllMembersOfMySeries: async (): Promise<any[]> => {
+    const list = await seriesService.getAll()
+    const memberPromises = list.map(async (s) => {
+      try {
+        const mems = await seriesService.getMembers(s._id)
+        return mems.map((m: any) => ({
+          ...m,
+          seriesId: s._id,
+          seriesTitle: s.title,
+        }))
+      } catch (err) {
+        console.error(`Lỗi khi lấy thành viên của series ${s.title}:`, err)
+        return []
+      }
+    })
+    const results = await Promise.all(memberPromises)
+    return results.flat()
+  },
 }
 
 export default seriesService

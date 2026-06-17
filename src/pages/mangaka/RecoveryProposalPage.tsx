@@ -1,29 +1,38 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { FileWarning, Send, BarChart2, MessageSquare, AlertTriangle, ArrowLeft } from 'lucide-react'
-import { mangakaStore, Series, RecoveryProposal } from '@/data/mangakaMockData'
+import { mangakaStore, RecoveryProposal } from '@/data/mangakaMockData'
+import { seriesService, SeriesAPI } from '@/services/series.service'
 
 export default function RecoveryProposalPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const defaultSeriesId = searchParams.get('seriesId') || ''
   
-  const [series, setSeries] = useState<Series[]>([])
+  const [series, setSeries] = useState<SeriesAPI[]>([])
   const [selectedSeriesId, setSelectedSeriesId] = useState(defaultSeriesId)
   const [proposalText, setProposalText] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [proposals, setProposals] = useState<RecoveryProposal[]>([])
 
   useEffect(() => {
-    setSeries(mangakaStore.getSeries())
-    setProposals(mangakaStore.getRecoveryProposals())
-    
-    if (!defaultSeriesId && mangakaStore.getSeries().length > 0) {
-      setSelectedSeriesId(mangakaStore.getSeries()[0].id)
+    const fetchSeriesAndProposals = async () => {
+      try {
+        const slist = await seriesService.getAll()
+        setSeries(slist)
+        setProposals(mangakaStore.getRecoveryProposals())
+        
+        if (!defaultSeriesId && slist.length > 0) {
+          setSelectedSeriesId(slist[0]._id)
+        }
+      } catch (err) {
+        console.error('Lỗi khi tải series cho đề xuất:', err)
+      }
     }
+    fetchSeriesAndProposals()
   }, [defaultSeriesId])
 
-  const selectedSeries = series.find(s => s.id === selectedSeriesId)
+  const selectedSeries = series.find(s => s._id === selectedSeriesId)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -75,7 +84,7 @@ export default function RecoveryProposalPage() {
                   className="w-full border-2 border-manga-ink p-3 bg-white font-bold text-lg focus:ring-2 focus:ring-manga-red"
                 >
                   {series.map(s => (
-                    <option key={s.id} value={s.id}>{s.title}</option>
+                    <option key={s._id} value={s._id}>{s.title}</option>
                   ))}
                 </select>
               </div>

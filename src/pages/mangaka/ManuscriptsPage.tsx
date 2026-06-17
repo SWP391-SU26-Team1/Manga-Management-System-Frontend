@@ -188,7 +188,7 @@ export default function ManuscriptsPage() {
         if (userStr) {
           try {
             const parsed = JSON.parse(userStr)
-            mangakaId = parsed.user?.id || ''
+            mangakaId = parsed.user?.id || parsed.id || ''
           } catch {
             // ignore
           }

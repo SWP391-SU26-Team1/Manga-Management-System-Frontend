@@ -1,33 +1,96 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router'
 import { Layers, Image as ImageIcon, ClipboardList, Eye, Settings, FileCheck } from 'lucide-react'
-import { mangakaStore, MangaPage, Chapter, Series } from '@/data/mangakaMockData'
+import { seriesService } from '@/services/series.service'
+import { chapterService } from '@/services/chapter.service'
+import { pageService } from '@/services/page.service'
+import { taskService } from '@/services/task.service'
+
+interface DerivedPage {
+  id: string
+  pageNumber: number
+  thumbnailUrl: string
+  panelFrameStatus: string
+  lineArtStatus: string
+  speechBalloonStatus: string
+  backgroundStatus: string
+  assetStatus: string
+  overallStatus: string
+}
 
 export default function PageViewerPage() {
   const { pageId } = useParams()
   const navigate = useNavigate()
 
-  const [page, setPage] = useState<MangaPage | null>(null)
-  const [chapter, setChapter] = useState<Chapter | null>(null)
-  const [series, setSeries] = useState<Series | null>(null)
+  const [page, setPage] = useState<DerivedPage | null>(null)
+  const [chapter, setChapter] = useState<any | null>(null)
+  const [series, setSeries] = useState<any | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (pageId) {
-      const p = mangakaStore.getPages().find(p => p.id === pageId)
-      if (p) {
-        setPage(p)
-        const c = mangakaStore.getChapters().find(c => c.id === p.chapterId)
-        if (c) {
-          setChapter(c)
-          const s = mangakaStore.getSeries().find(s => s.id === c.seriesId)
-          if (s) setSeries(s)
+    if (!pageId) return
+
+    const fetchPageData = async () => {
+      try {
+        setLoading(true)
+        // 1. Fetch page detail
+        const pageData = await pageService.getPageById(pageId)
+        
+        // 2. Fetch chapter details
+        const chapterData = await chapterService.getById(pageData.chapter_id)
+        setChapter(chapterData)
+
+        // 3. Fetch series details
+        const seriesData = await seriesService.getById(chapterData.series_id)
+        setSeries(seriesData)
+
+        // 4. Fetch tasks of page
+        const tasks = await taskService.getByPage(seriesData._id, chapterData._id, pageId)
+
+        const getLayerStatus = (type: string) => {
+          const t = tasks.find(x => x.task_type === type)
+          if (!t) return 'Not Started'
+          if (t.status === 'in_progress') return 'Doing'
+          if (t.status === 'submitted') return 'Submitted'
+          if (t.status === 'needs_revision') return 'Need Fix'
+          if (t.status === 'approved') return 'Approved'
+          return 'Not Started'
         }
+
+        const mapOverallStatus = (status: string) => {
+          if (status === 'approved' || status === 'published') return 'Approved'
+          if (status === 'in_review') return 'Submitted'
+          if (status === 'draft') return 'Doing'
+          return 'Not Started'
+        }
+
+        setPage({
+          id: pageId,
+          pageNumber: pageData.page_number,
+          thumbnailUrl: pageData.image_url || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200&auto=format&fit=crop',
+          panelFrameStatus: getLayerStatus('cleaning'), // Panel Frame mapped to cleaning
+          lineArtStatus: getLayerStatus('inking'), // Line Art mapped to inking
+          backgroundStatus: getLayerStatus('background'),
+          speechBalloonStatus: getLayerStatus('lettering'),
+          assetStatus: getLayerStatus('coloring'),
+          overallStatus: mapOverallStatus(pageData.status)
+        })
+      } catch (err) {
+        console.error('Lỗi khi tải chi tiết trang:', err)
+      } finally {
+        setLoading(false)
       }
     }
+
+    fetchPageData()
   }, [pageId])
 
+  if (loading) {
+    return <div className="p-8 h-screen flex items-center justify-center font-bold text-manga-ink">Đang tải chi tiết trang bản thảo...</div>
+  }
+
   if (!page || !chapter || !series) {
-    return <div className="p-8 text-center font-bold text-red-500">Đang tải hoặc Không tìm thấy trang!</div>
+    return <div className="p-8 text-center font-bold text-red-500">Không tìm thấy trang bản thảo hoặc có lỗi xảy ra!</div>
   }
 
   const layers = [
@@ -54,19 +117,19 @@ export default function PageViewerPage() {
         <div className="flex items-center gap-4">
           <div>
             <h1 className="font-manga text-2xl font-bold uppercase text-manga-red tracking-wide flex items-center gap-2">
-              {series.title} - Ch.{chapter.chapterNumber} - Page {page.pageNumber}
+              {series.title} - Ch.{chapter.chapter_number} - Page {page.pageNumber}
             </h1>
           </div>
         </div>
         <div className="flex gap-2">
           <button 
-            onClick={() => navigate(`/dashboard/mangaka/assign-task?pageId=${page.id}`)}
+            onClick={() => navigate(`/dashboard/mangaka/assign-task?seriesId=${series._id}&chapterId=${chapter._id}&pageId=${page.id}`)}
             className="flex items-center gap-2 bg-white px-4 py-2 border-2 border-manga-ink font-bold hover:bg-gray-100 text-sm uppercase"
           >
             <ClipboardList className="w-4 h-4" /> Giao Task
           </button>
           <button 
-            onClick={() => navigate(`/dashboard/mangaka/submission?pageId=${page.id}`)}
+            onClick={() => navigate(`/dashboard/mangaka/submission?seriesId=${series._id}&chapterId=${chapter._id}&pageId=${page.id}`)}
             className="flex items-center gap-2 bg-manga-ink text-white px-4 py-2 border-2 border-manga-ink font-bold hover:bg-gray-800 text-sm uppercase"
           >
             <FileCheck className="w-4 h-4" /> Nộp / Duyệt bài

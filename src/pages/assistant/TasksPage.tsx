@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router'
 import { 
   Search, 
@@ -26,13 +26,57 @@ import {
   ChevronUp,
   User,
   Paperclip,
-  Upload
+  Upload,
+  Loader2
 } from 'lucide-react'
-import { assistantStore, AssistantTask } from '@/data/assistantMockData'
+import { AssistantTask } from '@/data/assistantMockData'
+import assistantService, { PageTask } from '@/services/assistant.service'
+import uploadService from '@/services/upload.service'
+import TaskDetailModal from '@/components/assistant/TaskDetailModal'
+
+const getTaskTypeName = (type: string) => {
+  const maps: Record<string, string> = {
+    inking: 'Character Lineart',
+    coloring: 'Coloring',
+    lettering: 'Lettering',
+    cleaning: 'Cleaning',
+    sfx: 'SFX Design',
+    background: 'Background'
+  }
+  return maps[type] || type.toUpperCase()
+}
+
+const mapBackendTaskToAssistantTask = (task: PageTask): AssistantTask => {
+  let mappedStatus: AssistantTask['status'] = 'Not Started'
+  if (task.status === 'in_progress') mappedStatus = 'In Progress'
+  else if (task.status === 'submitted') mappedStatus = 'Submitted'
+  else if (task.status === 'needs_revision') mappedStatus = 'Need Fix'
+  else if (task.status === 'completed') mappedStatus = 'Approved'
+  else if (task.status === 'assigned') mappedStatus = 'Not Started'
+
+  return {
+    id: task.task_id,
+    seriesTitle: task.page?.chapter?.series?.title || 'Unknown Series',
+    chapterNumber: task.page?.chapter?.title ? parseInt(task.page.chapter.title.replace(/\D/g, '')) || 1 : 1,
+    pageNumber: task.page?.page_number || 1,
+    layerType: getTaskTypeName(task.task_type),
+    assignedBy: task.users?.name || task.users?.username || 'Mangaka/Editor',
+    deadline: task.deadline ? task.deadline.split('T')[0] : '',
+    status: mappedStatus,
+    priority: task.priority || 'Medium',
+    note: task.description || '',
+    referenceUrl: task.page?.image_url || undefined,
+  }
+}
 
 export default function TasksPage() {
   const navigate = useNavigate()
   const [tasks, setTasks] = useState<AssistantTask[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isUploadingFile, setIsUploadingFile] = useState(false)
+  const [uploadedFileUrl, setUploadedFileUrl] = useState('')
+  const [error, setError] = useState<string | null>(null)
   
   // Modal State for EDIT (SỬA) action
   const [selectedTaskForModal, setSelectedTaskForModal] = useState<AssistantTask | null>(null)
@@ -85,17 +129,29 @@ export default function TasksPage() {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'In Progress' | 'Not Started' | 'Submitted' | 'Need Fix' | 'Approved'>('ALL')
   const [sortByDeadline, setSortByDeadline] = useState(true)
 
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   useEffect(() => {
     loadTasksData()
   }, [])
 
-  const loadTasksData = () => {
+  const loadTasksData = async () => {
+    setIsLoading(true)
+    setError(null)
     try {
-      const fetchedTasks = assistantStore.getTasks();
-      setTasks(Array.isArray(fetchedTasks) ? fetchedTasks : []);
-    } catch (e) {
-      console.error("Error fetching tasks:", e);
-      setTasks([]);
+      const res = await assistantService.listMyTasks()
+      if (res && res.success) {
+        const mapped = res.data.map(mapBackendTaskToAssistantTask)
+        setTasks(mapped)
+      } else {
+        setTasks([])
+      }
+    } catch (err: any) {
+      console.error("Error fetching tasks:", err);
+      setError("Không thể kết nối danh sách nhiệm vụ từ backend API.")
+      setTasks([])
+    } finally {
+      setIsLoading(false)
     }
   }
   
@@ -266,11 +322,45 @@ export default function TasksPage() {
   }
 
   // Handle final submission in the modal
-  const handleSubmitResult = (taskId: string) => {
-    assistantStore.updateTaskStatus(taskId, 'Submitted')
-    loadTasksData()
-    setSubmittingTask(null)
-    showToast('success', `Nộp kết quả thành công cho Task #${taskId}!`)
+  const handleSubmitResult = async (taskId: string) => {
+    if (!uploadedFileUrl) {
+      showToast('error', 'Vui lòng đính kèm file kết quả!')
+      return
+    }
+    setIsSubmitting(true)
+    try {
+      await assistantService.createSubmission(taskId, {
+        file_url: uploadedFileUrl,
+        submission_notes: submitNotes
+      })
+      loadTasksData()
+      setSubmittingTask(null)
+      showToast('success', `Nộp kết quả thành công cho Task #${taskId}!`)
+    } catch (err: any) {
+      console.error(err)
+      showToast('error', `Lỗi: ${err?.message || 'Không thể nộp kết quả'}`)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Handle uploading files for submission
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setIsUploadingFile(true)
+    try {
+      const res = await uploadService.uploadSingle(file, 'submissions')
+      setUploadedFileUrl(res.secure_url)
+      setAttachedFile({ name: file.name, size: `${(file.size / (1024 * 1024)).toFixed(1)} MB` })
+      showToast('success', 'Đã tải file lên Cloudinary thành công!')
+    } catch (err: any) {
+      console.error(err)
+      showToast('error', 'Không thể tải file lên Cloudinary.')
+    } finally {
+      setIsUploadingFile(false)
+    }
   }
 
   // Submit revision / open submit modal from edit modal
@@ -280,10 +370,15 @@ export default function TasksPage() {
   }
 
   // Accept task handler for the drawing workspace
-  const handleAcceptTask = (task: AssistantTask) => {
-    assistantStore.updateTaskStatus(task.id, 'In Progress')
-    loadTasksData() // refresh tasks in table and view
-    showToast('success', `Đã nhận thành công Nhiệm vụ #${task.id}! Bắt đầu vẽ nào.`)
+  const handleAcceptTask = async (task: AssistantTask) => {
+    try {
+      await assistantService.startTask(task.id)
+      loadTasksData() // refresh tasks in table and view
+      showToast('success', `Đã nhận thành công Nhiệm vụ #${task.id}! Bắt đầu vẽ nào.`)
+    } catch (err: any) {
+      console.error(err)
+      showToast('error', `Lỗi: ${err?.message || 'Không thể nhận nhiệm vụ'}`)
+    }
   }
 
   // Get status color config for modal
@@ -1023,216 +1118,13 @@ export default function TasksPage() {
       )}
 
       {/* Workspace Detail Modal popup for EDIT (SỬA) Action */}
-      {selectedTaskForModal && (() => {
-        const task = selectedTaskForModal;
-        const currentChecklist = checklistStates[task.id] || [false, false, false, false, false, false];
-        const checkedCount = currentChecklist.filter(Boolean).length;
-        const progressPercent = Math.round((checkedCount / 6) * 100);
-        const statusConfig = getStatusConfigForModal(task.status);
-        const priorityColor = getPriorityDotColor(task.priority);
-        const remainingText = getRemainingDaysText(task);
-
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in text-black">
-            <div className="bg-white border-4 border-manga-ink w-full max-w-4xl shadow-[6px_6px_0px_rgba(0,0,0,1)] overflow-hidden flex flex-col max-h-[90vh]">
-              
-              {/* Modal Header */}
-              <div className="bg-[#1C1C1F] text-white border-b-4 border-manga-ink p-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {/* PenTool square icon with pink border */}
-                  <div className="w-10 h-10 border-2 border-[#E63946] bg-[#2A2A2E] flex items-center justify-center shrink-0">
-                    <PenTool className="w-5 h-5 text-[#E63946]" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[10px] font-black text-[#E63946] tracking-wider uppercase">
-                        WORKSPACE — TASK #{task.id}
-                      </span>
-                      <span className={`text-[8px] font-black px-1.5 py-0.5 border ${statusConfig.text} ${statusConfig.bg} ${statusConfig.border} tracking-wide`}>
-                        {statusConfig.label}
-                      </span>
-                      <span className="text-[10px] font-bold text-zinc-400 flex items-center gap-1">
-                        <span className={`w-2 h-2 rounded-full ${priorityColor}`} />
-                        {getPriorityText(task.priority)}
-                      </span>
-                    </div>
-                    <h2 className="font-manga text-xl font-black tracking-wide leading-tight mt-1">
-                      {task.layerType}
-                    </h2>
-                    <p className="text-[11px] font-bold text-zinc-400 flex items-center gap-1.5 mt-0.5">
-                      <span>{task.seriesTitle}</span>
-                      <span className="text-zinc-600">•</span>
-                      <span className="text-red-400 flex items-center gap-1">
-                        <Clock className="w-3 h-3" /> Deadline: {formatDate(task.deadline)} ({remainingText})
-                      </span>
-                    </p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setSelectedTaskForModal(null)}
-                  className="text-zinc-400 hover:text-white border-2 border-transparent hover:border-zinc-700 p-1 transition-all cursor-pointer bg-transparent border-none"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-
-              {/* Modal Progress Section */}
-              <div className="bg-zinc-50 border-b-2 border-manga-ink px-6 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
-                <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
-                  <span className="font-manga text-xs font-black text-zinc-800 tracking-wider uppercase">TIẾN ĐỘ CÔNG VIỆC</span>
-                </div>
-                <div className="flex items-center gap-4 w-full sm:w-auto flex-1 max-w-md">
-                  {/* Progress bar container */}
-                  <div className="w-full h-3 bg-zinc-200 border-2 border-black rounded-none overflow-hidden relative">
-                    <div 
-                      className="h-full bg-[#E63946] transition-all duration-300"
-                      style={{ width: `${progressPercent}%` }}
-                    />
-                  </div>
-                  <span className="font-manga text-xs font-black text-zinc-800 shrink-0">
-                    {checkedCount}/6 • {progressPercent}%
-                  </span>
-                </div>
-              </div>
-
-              {/* Modal Body - 2 Columns */}
-              <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 overflow-y-auto">
-                
-                {/* Column Left: Checklist */}
-                <div className="flex flex-col gap-4">
-                  <div>
-                    <h3 className="font-manga text-xs font-black text-zinc-800 uppercase tracking-wider mb-1">
-                      CHECKLIST CÔNG VIỆC
-                    </h3>
-                    <p className="text-[10px] font-bold text-zinc-400 uppercase">{task.layerType}</p>
-                  </div>
-
-                  {/* Checklist items list */}
-                  <div className="flex flex-col gap-2.5">
-                    {CHECKLIST_ITEMS.map((label, idx) => {
-                      const isChecked = currentChecklist[idx];
-                      return (
-                        <button
-                          key={idx}
-                          onClick={() => handleToggleChecklist(task.id, idx)}
-                          className="w-full text-left flex items-start gap-3 p-2.5 border-2 border-zinc-200 hover:border-black bg-white hover:bg-zinc-50/50 transition-colors cursor-pointer group"
-                        >
-                          {/* Checkbox square */}
-                          <div className={`w-5 h-5 border-2 flex items-center justify-center shrink-0 transition-colors ${
-                            isChecked ? 'bg-[#E63946] border-[#E63946]' : 'bg-white border-zinc-300 group-hover:border-black'
-                          }`}>
-                            {isChecked && (
-                              <Check className="w-3.5 h-3.5 text-white stroke-[3px]" />
-                            )}
-                          </div>
-                          <span className={`text-xs font-bold leading-tight select-none ${
-                            isChecked ? 'text-zinc-400 line-through' : 'text-zinc-850'
-                          }`}>
-                            {label}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Action buttons under checklist */}
-                  <div className="flex flex-col sm:flex-row gap-3 mt-2">
-                    <button
-                      onClick={() => {
-                        setSelectedTaskForModal(null)
-                        setDownloadingTask(task)
-                      }}
-                      className="flex-1 bg-black hover:bg-zinc-800 text-white border-2 border-black py-2.5 px-3 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[1px] active:shadow-[1px_1px_0px_rgba(0,0,0,1)] transition-all"
-                    >
-                      <FileDown className="w-4 h-4 shrink-0" /> MỞ TÀI NGUYÊN & FILE NGUỒN
-                    </button>
-                    <button
-                      onClick={() => handleViewFeedbackPage(task.id)}
-                      className="flex-1 bg-white hover:bg-red-50/10 text-[#E63946] border-2 border-[#E63946] py-2.5 px-3 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_rgba(230,57,70,0.2)] hover:shadow-[2px_2px_0px_rgba(230,57,70,0.4)] transition-all"
-                    >
-                      <MessageSquare className="w-4 h-4 shrink-0" /> XEM PHẢN HỒI TỪ MANGAKA
-                    </button>
-                  </div>
-                </div>
-
-                {/* Column Right: Progress Notes */}
-                <div className="flex flex-col gap-4">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h3 className="font-manga text-xs font-black text-zinc-800 uppercase tracking-wider mb-1">
-                        GHI CHÚ TIẾN ĐỘ
-                      </h3>
-                      <p className="text-[10px] font-bold text-zinc-400 uppercase">TIẾN TRÌNH LÀM VIỆC</p>
-                    </div>
-                    <button
-                      onClick={() => handleSaveNotes(task.id)}
-                      className="bg-white hover:bg-zinc-50 border-2 border-black py-1.5 px-2.5 text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_rgba(0,0,0,1)] transition-all cursor-pointer"
-                    >
-                      <Save className="w-3.5 h-3.5 inline mr-1 shadow-none border-none" /> LƯU GHI CHÚ
-                    </button>
-                  </div>
-
-                  {/* Textarea */}
-                  <div className="relative flex-1 flex flex-col">
-                    <textarea
-                      value={editingNote}
-                      onChange={(e) => setEditingNote(e.target.value)}
-                      placeholder={`Ghi lại tiến độ và ghi chú trong khi làm Task #${task.id}...\n\nVí dụ:\n— Đã hoàn thành lineart trang 1-4, đang xử lý trang 5\n— Biểu cảm panel 3 cần chỉnh lại theo ref Akira gửi\n— Dự kiến hoàn thành trước ${formatDate(task.deadline)}`}
-                      className="w-full flex-1 min-h-[220px] p-3 text-xs font-semibold text-gray-700 bg-zinc-50/50 border-2 border-zinc-300 focus:border-black focus:bg-white focus:outline-none resize-none transition-all placeholder:text-gray-400 font-sans"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Modal Footer */}
-              <div className="bg-zinc-50 border-t-4 border-manga-ink p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <span className="text-xs font-bold text-gray-500">
-                  {checkedCount === 6 ? (
-                    <span className="text-emerald-600 flex items-center gap-1.5 font-black uppercase tracking-wide">
-                      <CheckCircle2 className="w-4 h-4 shrink-0" /> Hoàn thành tất cả checklist!
-                    </span>
-                  ) : (
-                    `Còn ${6 - checkedCount} hạng mục chưa xong`
-                  )}
-                </span>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setSelectedTaskForModal(null)}
-                    className="bg-white hover:bg-zinc-100 text-manga-ink border-2 border-black py-2.5 px-5 text-xs font-black uppercase tracking-wider cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[1px] active:shadow-[1px_1px_0px_rgba(0,0,0,1)] transition-all"
-                  >
-                    ĐÓNG
-                  </button>
-                  
-                  {/* Conditional Action Button */}
-                  {task.status === 'Approved' ? (
-                    <button
-                      disabled
-                      className="bg-emerald-50 text-emerald-600 border-2 border-emerald-500 py-2.5 px-5 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-not-allowed opacity-80"
-                    >
-                      <CheckCircle2 className="w-4 h-4 shrink-0" /> ĐÃ ĐƯỢC DUYỆT
-                    </button>
-                  ) : task.status === 'Submitted' ? (
-                    <button
-                      disabled
-                      className="bg-purple-50 text-purple-600 border-2 border-purple-500 py-2.5 px-5 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-not-allowed opacity-80"
-                    >
-                      <Clock className="w-4 h-4 shrink-0" /> ĐANG CHỜ DUYỆT
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleModalSubmitAction(task)}
-                      className="bg-[#E63946] hover:bg-white text-white hover:text-[#E63946] border-2 border-[#E63946] py-2.5 px-5 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[1px] active:shadow-[1px_1px_0px_rgba(0,0,0,1)] transition-all"
-                    >
-                      <Send className="w-4 h-4 shrink-0" /> NỘP BÀI SỬA ĐỔI
-                    </button>
-                  )}
-                </div>
-              </div>
-
-            </div>
-          </div>
-        );
-      })()}
+      {selectedTaskForModal && (
+        <TaskDetailModal
+          taskId={selectedTaskForModal.id}
+          onClose={() => setSelectedTaskForModal(null)}
+          onStatusChanged={loadTasksData}
+        />
+      )}
 
       {submittingTask && (() => {
         const task = submittingTask;
@@ -1310,7 +1202,12 @@ export default function TasksPage() {
                     FILE ĐÍNH KÈM <span className="text-[#E63946]">*</span>
                   </label>
                   
-                  {attachedFile ? (
+                  {isUploadingFile ? (
+                    <div className="border-2 border-dashed border-[#E63946] bg-red-50/10 p-6 flex flex-col items-center justify-center gap-2">
+                      <Loader2 className="w-6 h-6 animate-spin text-[#E63946]" />
+                      <p className="text-xs font-bold text-[#E63946]">Đang tải tệp lên Cloudinary...</p>
+                    </div>
+                  ) : attachedFile ? (
                     <div className="border-2 border-dashed border-[#E63946] bg-red-50/10 p-4 flex items-center justify-between">
                       <div className="flex items-center gap-2 min-w-0">
                         <Paperclip className="w-5 h-5 text-[#E63946] shrink-0" />
@@ -1320,7 +1217,7 @@ export default function TasksPage() {
                         </div>
                       </div>
                       <button 
-                        onClick={() => setAttachedFile(null)}
+                        onClick={() => { setAttachedFile(null); setUploadedFileUrl(''); }}
                         className="text-gray-400 hover:text-[#E63946] bg-transparent border-none cursor-pointer"
                       >
                         <X className="w-4 h-4" />
@@ -1328,7 +1225,7 @@ export default function TasksPage() {
                     </div>
                   ) : (
                     <div 
-                      onClick={() => setAttachedFile({ name: `${task.seriesTitle.toLowerCase().replace(/\s+/g, '_')}_ch${task.chapterNumber}_page${task.pageNumber}_draft.psd`, size: '24.8 MB' })}
+                      onClick={() => fileInputRef.current?.click()}
                       className="border-2 border-dashed border-zinc-300 hover:border-black p-6 flex flex-col items-center justify-center gap-2 cursor-pointer bg-zinc-50/50 hover:bg-zinc-50 transition-all"
                     >
                       <Paperclip className="w-6 h-6 text-zinc-400" />
@@ -1338,6 +1235,13 @@ export default function TasksPage() {
                       <p className="text-[10px] font-bold text-zinc-400">
                         .psd, .ai, .png, .jpg, .zip
                       </p>
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleImageUpload}
+                        accept=".psd,.ai,.png,.jpg,.jpeg,.zip"
+                        className="hidden"
+                      />
                     </div>
                   )}
                 </div>
@@ -1355,6 +1259,7 @@ export default function TasksPage() {
                 </button>
                 <button
                   type="button"
+                  disabled={isSubmitting || isUploadingFile}
                   onClick={() => {
                     if (!submitNotes.trim()) {
                       showToast('error', 'Vui lòng nhập ghi chú chỉnh sửa!')
@@ -1366,9 +1271,19 @@ export default function TasksPage() {
                     }
                     handleSubmitResult(task.id)
                   }}
-                  className="bg-[#E63946] hover:bg-white text-white hover:text-[#E63946] border-2 border-[#E63946] py-2.5 px-6 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[1px] active:shadow-[1px_1px_0px_rgba(0,0,0,1)] transition-all"
+                  className="bg-[#E63946] hover:bg-white text-white hover:text-[#E63946] border-2 border-[#E63946] py-2.5 px-6 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[1px] active:shadow-[1px_1px_0px_rgba(0,0,0,1)] transition-all disabled:opacity-60"
                 >
-                  <Upload className="w-4 h-4" /> NỘP KẾT QUẢ
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      <span>ĐANG NỘP...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      <span>NỘP KẾT QUẢ</span>
+                    </>
+                  )}
                 </button>
               </div>
 

@@ -1,41 +1,105 @@
 import React, { useState, useEffect } from 'react'
 import { Bell, Check, Trash2, Filter } from 'lucide-react'
-import { mangakaStore, Notification } from '@/data/mangakaMockData'
-import { useNavigate } from 'react-router'
+import { Notification } from '@/data/mangakaMockData'
+import { useNavigate, Link } from 'react-router'
+import { rankingService } from '@/services/ranking.service'
 
 export default function NotificationsPage() {
   const navigate = useNavigate()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [filter, setFilter] = useState<"All" | "Unread" | "Assistant" | "Editor" | "Board" | "Ranking">("All")
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const mapType = (backendType: string): "Assistant" | "Editor" | "Board" | "Ranking" | "System" => {
+    const t = (backendType || '').toLowerCase();
+    if (t.includes('task') || t.includes('submission')) return 'Assistant';
+    if (t.includes('editor') || t.includes('feedback')) return 'Editor';
+    if (t.includes('review') || t.includes('vote') || t.includes('board') || t.includes('chapter_approved')) return 'Board';
+    if (t.includes('ranking')) return 'Ranking';
+    return 'System';
+  };
+
+  const mapLink = (backendType: string): string => {
+    const t = (backendType || '').toLowerCase();
+    if (t.includes('task') || t.includes('submission')) return '/dashboard/mangaka/submission';
+    if (t.includes('feedback') || t.includes('editor')) return '/dashboard/mangaka/feedback';
+    if (t.includes('ranking')) return '/dashboard/mangaka/ranking';
+    return '';
+  };
+
+  const loadNotifications = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const data = await rankingService.getNotifications()
+      const mapped: Notification[] = data.map(n => ({
+        id: n.notification_id,
+        type: mapType(n.type),
+        title: n.title,
+        message: n.content || '',
+        createdAt: n.created_at,
+        isRead: n.is_read,
+        link: mapLink(n.type) || undefined,
+      }))
+      setNotifications(mapped)
+    } catch (err: any) {
+      console.error(err)
+      setError('Không thể tải danh sách thông báo.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    setNotifications(mangakaStore.getNotifications())
+    loadNotifications()
   }, [])
 
-  const handleMarkAllRead = () => {
-    mangakaStore.markAllNotificationsRead()
-    setNotifications(mangakaStore.getNotifications())
+  const handleMarkAllRead = async () => {
+    try {
+      await rankingService.markAllRead()
+      await loadNotifications()
+    } catch (err) {
+      console.error(err)
+      alert('Không thể đánh dấu đã đọc tất cả thông báo.')
+    }
   }
 
-  const handleMarkRead = (id: string, e: React.MouseEvent) => {
+  const handleMarkRead = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    mangakaStore.markNotificationRead(id)
-    setNotifications(mangakaStore.getNotifications())
+    try {
+      await rankingService.markAsRead(id)
+      await loadNotifications()
+    } catch (err) {
+      console.error(err)
+      alert('Không thể đánh dấu thông báo đã đọc.')
+    }
   }
 
-  const handleDelete = (id: string, e: React.MouseEvent) => {
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    const updated = notifications.filter(n => n.id !== id)
-    // mangakaStore does not have a delete method, but for mock purposes we just update local state
-    setNotifications(updated)
+    if (!confirm('Bạn có chắc chắn muốn xóa thông báo này?')) return
+    try {
+      await rankingService.deleteNotification(id)
+      await loadNotifications()
+    } catch (err) {
+      console.error(err)
+      alert('Không thể xóa thông báo.')
+    }
   }
 
-  const handleNotifClick = (notif: Notification) => {
-    mangakaStore.markNotificationRead(notif.id)
+  const handleNotifClick = async (notif: Notification) => {
+    if (!notif.isRead) {
+      try {
+        await rankingService.markAsRead(notif.id)
+      } catch (err) {
+        console.error(err)
+      }
+    }
     if (notif.link) {
       navigate(notif.link)
     } else {
-      setNotifications(mangakaStore.getNotifications())
+      await loadNotifications()
     }
   }
 
@@ -99,7 +163,15 @@ export default function NotificationsPage() {
         {/* Notifications List */}
         <div className="flex-1 flex flex-col">
           <div className="divide-y-2 divide-gray-100">
-            {filteredNotifs.length > 0 ? filteredNotifs.map(n => (
+            {loading ? (
+              <div className="p-12 text-center text-gray-400 font-bold uppercase text-sm">
+                Đang tải dữ liệu thông báo...
+              </div>
+            ) : error ? (
+              <div className="p-12 text-center text-manga-red font-bold text-sm">
+                Có lỗi xảy ra: {error}
+              </div>
+            ) : filteredNotifs.length > 0 ? filteredNotifs.map(n => (
               <div 
                 key={n.id}
                 onClick={() => handleNotifClick(n)}
@@ -160,6 +232,16 @@ export default function NotificationsPage() {
           </div>
         </div>
       </div>
+      {/* Footer */}
+      <footer className="mt-16 pt-8 border-t-2 border-manga-ink flex flex-col md:flex-row items-center justify-between gap-4 text-sm font-bold text-gray-500">
+        <div className="font-manga text-2xl text-manga-red">MangaFlow</div>
+        <div>© 2026 MangaFlow System. Gangan Press Co. Ltd. All rights reserved.</div>
+        <div className="flex items-center gap-6">
+          
+          <a href="#" className="hover:text-manga-red transition-colors">Quy tắc xuất bản</a>
+          <a href="#" className="hover:text-manga-red transition-colors">Hỗ trợ Mangaka</a>
+        </div>
+      </footer>
     </div>
   )
 }

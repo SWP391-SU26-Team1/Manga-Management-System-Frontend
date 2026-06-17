@@ -1,17 +1,59 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router'
 import { CheckSquare, Clock, CheckCircle, AlertCircle, FileText, ChevronRight, X } from 'lucide-react'
-import { mangakaStore, BoardReview } from '@/data/mangakaMockData'
+import { BoardReview } from '@/data/mangakaMockData'
+import { seriesService } from '@/services/series.service'
+import { manuscriptService } from '@/services/manuscript.service'
+import api from '@/services/api'
 
 export default function BoardReviewPage() {
   const [reviews, setReviews] = useState<BoardReview[]>([])
   const [selectedReview, setSelectedReview] = useState<BoardReview | null>(null)
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false)
   const [revisionNote, setRevisionNote] = useState('')
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    setReviews(mangakaStore.getBoardReviews())
+    fetchReviews()
   }, [])
+
+  const fetchReviews = async () => {
+    try {
+      setLoading(true)
+      const slist = await seriesService.getAll()
+      
+      const mPromises = slist.map(async (s) => {
+        try {
+          const msList = await manuscriptService.getBySeriesId(s._id)
+          return msList.map((m: any) => {
+            let status: 'Waiting' | 'Approved' | 'Need Fix' = 'Waiting'
+            if (m.status === 'submitted' || m.status === 'pending_review') status = 'Waiting'
+            else if (m.status === 'approved' || m.status === 'published') status = 'Approved'
+            else if (m.status === 'rejected') status = 'Need Fix'
+
+            return {
+              id: m._id,
+              seriesId: s.title,
+              chapterId: m.chapter ? `Ch.${m.chapter.chapter_number} - ${m.chapter.title}` : (m.title || 'Bản thảo'),
+              submittedAt: m.created_at,
+              status,
+              feedback: m.content || m.description || 'Chưa có nhận xét từ Hội đồng',
+              seriesIdRaw: s._id
+            } as any
+          })
+        } catch {
+          return []
+        }
+      })
+
+      const results = await Promise.all(mPromises)
+      setReviews(results.flat())
+    } catch (err) {
+      console.error('Lỗi khi tải danh sách review:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const stats = [
     { label: "Đã trình", value: reviews.length, icon: FileText, color: "text-blue-600" },
@@ -20,13 +62,26 @@ export default function BoardReviewPage() {
     { label: "Cần sửa", value: reviews.filter(r => r.status === 'Need Fix').length, icon: AlertCircle, color: "text-red-600" }
   ]
 
-  const handleSubmitRevision = () => {
+  const handleSubmitRevision = async () => {
     if (!selectedReview) return;
-    // Mock submit revision
-    alert(`Đã nộp bản sửa đổi cho: ${selectedReview.seriesId}`);
-    setIsSubmitModalOpen(false);
-    setSelectedReview(null);
-    setRevisionNote('');
+    try {
+      setLoading(true)
+      // 1. Update manuscript description first
+      await api.patch(`/api/manuscripts/${selectedReview.id}`, { description: revisionNote })
+      // 2. Submit the manuscript
+      await manuscriptService.submit(selectedReview.id)
+      
+      alert(`Đã nộp bản sửa đổi cho bản thảo thành công!`);
+      setIsSubmitModalOpen(false);
+      setSelectedReview(null);
+      setRevisionNote('');
+      await fetchReviews()
+    } catch (err: any) {
+      console.error(err)
+      alert('Không thể nộp bản sửa đổi. Lỗi: ' + (err.response?.data?.message || err.message))
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -57,35 +112,41 @@ export default function BoardReviewPage() {
           <h2 className="font-manga font-bold text-xl uppercase">Danh sách trình duyệt</h2>
         </div>
         <div className="divide-y-2 divide-gray-100">
-          {reviews.map(review => (
-            <div key={review.id} className="p-6 flex items-center justify-between hover:bg-red-50/30 transition-colors">
-              <div className="flex items-center gap-6">
-                <div className="w-16 h-20 bg-gray-200 border-2 border-manga-ink"></div>
-                <div>
-                  <h3 className="font-bold text-lg">{review.seriesId} - {review.chapterId}</h3>
-                  <p className="text-sm text-gray-500 font-bold">Ngày nộp: {new Date(review.submittedAt).toLocaleDateString()}</p>
+          {loading ? (
+            <div className="p-8 text-center text-gray-500 font-bold">Đang tải dữ liệu trình duyệt từ Hội đồng...</div>
+          ) : (
+            <>
+              {reviews.map(review => (
+                <div key={review.id} className="p-6 flex items-center justify-between hover:bg-red-50/30 transition-colors">
+                  <div className="flex items-center gap-6">
+                    <div className="w-16 h-20 bg-gray-200 border-2 border-manga-ink flex items-center justify-center font-bold text-xs uppercase text-gray-400">Ảnh</div>
+                    <div>
+                      <h3 className="font-bold text-lg">{review.seriesId} - {review.chapterId}</h3>
+                      <p className="text-sm text-gray-500 font-bold">Ngày nộp: {new Date(review.submittedAt).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-6">
+                    <span className={`px-4 py-1.5 border-2 border-manga-ink font-bold text-sm uppercase ${
+                      review.status === 'Approved' ? 'bg-green-100 text-green-700' :
+                      review.status === 'Waiting' ? 'bg-orange-100 text-orange-700' :
+                      'bg-red-100 text-red-700'
+                    }`}>
+                      {review.status}
+                    </span>
+                    <button 
+                      onClick={() => setSelectedReview(review)}
+                      className="p-2 border-2 border-manga-ink hover:bg-manga-ink hover:text-white transition-colors"
+                      title="Xem chi tiết"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-6">
-                <span className={`px-4 py-1.5 border-2 border-manga-ink font-bold text-sm uppercase ${
-                  review.status === 'Approved' ? 'bg-green-100 text-green-700' :
-                  review.status === 'Waiting' ? 'bg-orange-100 text-orange-700' :
-                  'bg-red-100 text-red-700'
-                }`}>
-                  {review.status}
-                </span>
-                <button 
-                  onClick={() => setSelectedReview(review)}
-                  className="p-2 border-2 border-manga-ink hover:bg-manga-ink hover:text-white transition-colors"
-                  title="Xem chi tiết"
-                >
-                  <ChevronRight className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          ))}
-          {reviews.length === 0 && (
-            <div className="p-8 text-center text-gray-500 font-bold">Chưa có bản thảo nào được trình lên Hội đồng.</div>
+              ))}
+              {reviews.length === 0 && (
+                <div className="p-8 text-center text-gray-500 font-bold">Chưa có bản thảo nào được trình lên Hội đồng.</div>
+              )}
+            </>
           )}
         </div>
       </div>

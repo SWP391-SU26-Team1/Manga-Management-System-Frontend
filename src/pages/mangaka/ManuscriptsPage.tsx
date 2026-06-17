@@ -1,106 +1,301 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router'
 import { FileText, Clock, AlertTriangle, CheckCircle, Eye, Upload, Send } from 'lucide-react'
-import { mangakaStore, Chapter } from '@/data/mangakaMockData'
+import { seriesService, SeriesAPI } from '@/services/series.service'
+import { chapterService } from '@/services/chapter.service'
+import { pageService } from '@/services/page.service'
+import { uploadService } from '@/services/upload.service'
+import { manuscriptService, ManuscriptAPI } from '@/services/manuscript.service'
 
-const getStatusDisplay = (status: string) => {
-  switch (status) {
-    case 'Draft':
+const getChapterDisplayStatus = (ch: any, m?: any) => {
+  if (m) {
+    switch (m.status) {
+      case 'draft':
+        return 'ĐANG SOẠN'
+      case 'needs_revision':
+      case 'rejected':
+        return 'CẦN CHỈNH SỬA'
+      case 'submitted':
+      case 'in_review':
+        return 'CHỜ BOARD DUYỆT'
+      case 'approved':
+      case 'published':
+      case 'archived':
+      case 'hidden':
+        return 'ĐÃ DUYỆT'
+      default:
+        return m.status.toUpperCase()
+    }
+  }
+
+  // No manuscript
+  switch (ch.status) {
+    case 'draft':
+      return 'ĐANG SOẠN'
+    case 'pending_review':
+      return 'CHỜ BOARD DUYỆT'
+    case 'approved':
+    case 'published':
+      return 'ĐÃ DUYỆT'
+    case 'rejected':
+      return 'CẦN CHỈNH SỬA'
+    default:
+      return 'ĐANG VẼ LỚP'
+  }
+}
+
+const getStatusDisplay = (displayStatus: string) => {
+  switch (displayStatus) {
+    case 'ĐANG SOẠN':
       return { label: 'ĐANG SOẠN', classes: 'bg-white text-black border-2 border-black' }
-    case 'Sketching':
-    case 'Need Fix':
+    case 'CẦN CHỈNH SỬA':
       return { label: 'CẦN CHỈNH SỬA', classes: 'bg-[#E63946] text-white border-2 border-[#E63946]' }
-    case 'Drawing':
+    case 'ĐANG VẼ LỚP':
       return { label: 'ĐANG VẼ LỚP', classes: 'bg-black text-white border-2 border-black' }
-    case 'Waiting Review':
-      return { label: 'CHỜ DUYỆT', classes: 'bg-yellow-400 text-black border-2 border-black' }
-    case 'Completed':
-    case 'Approved':
+    case 'CHỜ BOARD DUYỆT':
+      return { label: 'CHỜ BOARD DUYỆT', classes: 'bg-yellow-400 text-black border-2 border-black' }
+    case 'ĐÃ DUYỆT':
       return { label: 'ĐÃ DUYỆT', classes: 'bg-white text-black border-2 border-black' }
     default:
-      return { label: status.toUpperCase(), classes: 'bg-white text-black border-2 border-black' }
+      return { label: displayStatus, classes: 'bg-white text-black border-2 border-black' }
   }
 }
 
 export default function ManuscriptsPage() {
-  const [chapters, setChapters] = useState<Chapter[]>([])
-  const [seriesList, setSeriesList] = useState<any[]>([])
+  const [chapters, setChapters] = useState<any[]>([])
+  const [manuscripts, setManuscripts] = useState<ManuscriptAPI[]>([])
+  const [chapterPagesMap, setChapterPagesMap] = useState<{ [key: string]: number }>({})
+  const [seriesList, setSeriesList] = useState<SeriesAPI[]>([])
+  
   const [activeTab, setActiveTab] = useState('TẤT CẢ')
   const [showSubmitModal, setShowSubmitModal] = useState(false)
   const [selectedSeriesId, setSelectedSeriesId] = useState('')
+  const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null)
+  
   const [newChapterTitle, setNewChapterTitle] = useState('')
   const [newChapterNum, setNewChapterNum] = useState('')
   const [newChapterPages, setNewChapterPages] = useState('20')
+  const [file, setFile] = useState<File | null>(null)
 
-  // Load data from store
-  useEffect(() => {
-    setChapters(mangakaStore.getChapters())
-    const sl = mangakaStore.getSeries()
-    setSeriesList(sl)
-    if (sl.length > 0) {
-      setSelectedSeriesId(sl[0].id)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
+
+  // Load data from services
+  const loadData = async () => {
+    setIsLoading(true)
+    setErrorMsg('')
+    try {
+      const sl = await seriesService.getAll()
+      setSeriesList(sl)
+      if (sl.length > 0 && !selectedSeriesId) {
+        setSelectedSeriesId(sl[0]._id)
+      }
+
+      // Fetch chapters and manuscripts for all series in parallel
+      const chsPromises = sl.map(s => chapterService.getBySeriesId(s._id).catch(() => []))
+      const msPromises = sl.map(s => manuscriptService.getBySeriesId(s._id).catch(() => []))
+
+      const chsResults = await Promise.all(chsPromises)
+      const msResults = await Promise.all(msPromises)
+
+      const allChs = chsResults.flat()
+      const allMs = msResults.flat()
+
+      setChapters(allChs)
+      setManuscripts(allMs)
+
+      // Fetch page counts for all chapters in parallel
+      const pageCountsMap: { [key: string]: number } = {}
+      await Promise.all(
+        allChs.map(async (ch) => {
+          try {
+            const pages = await pageService.getByChapterId(ch._id)
+            pageCountsMap[ch._id] = pages.length
+          } catch {
+            pageCountsMap[ch._id] = 0
+          }
+        })
+      )
+      setChapterPagesMap(pageCountsMap)
+    } catch (err) {
+      console.error(err)
+      setErrorMsg('Không thể tải dữ liệu bản thảo.')
+    } finally {
+      setIsLoading(false)
     }
-  }, [])
-
-  const handleUpdateStatus = (chapterId: string, newStatus: Chapter['status']) => {
-    mangakaStore.updateChapterStatus(chapterId, newStatus)
-    setChapters(mangakaStore.getChapters())
   }
 
-  const handleCreateSubmission = (e: React.FormEvent) => {
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const handleUpdateStatus = async (seriesId: string, manuscriptId: string) => {
+    try {
+      await manuscriptService.revise(seriesId, manuscriptId)
+      alert('Đã chuyển bản thảo về trạng thái nháp thành công!')
+      await loadData()
+    } catch (err) {
+      console.error(err)
+      alert('Không thể thực hiện chỉnh sửa trạng thái.')
+    }
+  }
+
+  const handleCreateSubmission = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newChapterTitle || !newChapterNum) {
-      alert('Vui lòng điền đầy đủ thông tin!')
+    setErrorMsg('')
+
+    if (!selectedSeriesId) {
+      setErrorMsg('Vui lòng chọn Series!')
       return
     }
 
-    const num = parseInt(newChapterNum, 10)
-    const pages = parseInt(newChapterPages, 10)
-
-    if (isNaN(num) || isNaN(pages)) {
-      alert('Vui lòng nhập số hợp lệ!')
+    if (!selectedChapterId && (!newChapterTitle.trim() || !newChapterNum)) {
+      setErrorMsg('Vui lòng điền đầy đủ thông tin chapter!')
       return
     }
 
-    mangakaStore.addChapter({
-      seriesId: selectedSeriesId,
-      chapterNumber: num,
-      title: newChapterTitle,
-      deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      totalPages: pages,
-      status: 'Drawing' // Start at drawing layer stage
-    })
+    setIsSubmitting(true)
 
-    alert('Nộp bản thảo mới thành công!')
-    setChapters(mangakaStore.getChapters())
-    setShowSubmitModal(false)
-    setNewChapterTitle('')
-    setNewChapterNum('')
+    try {
+      let chapterId = selectedChapterId
+      let chapterTitle = newChapterTitle
+      let chapterNumberStr = newChapterNum
+
+      // 1. Nếu chưa có chapter, ta tạo chapter mới trước
+      if (!chapterId) {
+        const num = parseInt(chapterNumberStr, 10)
+        if (isNaN(num)) {
+          throw new Error('Số chapter không hợp lệ!')
+        }
+        const newCh = await chapterService.create(selectedSeriesId, {
+          title: chapterTitle.trim(),
+          chapter_number: num
+        })
+        chapterId = newCh._id
+        chapterTitle = newCh.title
+        chapterNumberStr = String(newCh.chapter_number)
+      }
+
+      // 2. Nếu người dùng chọn file tải lên, tiến hành tạo và submit manuscript
+      if (file) {
+        // a. Upload file lên Cloudinary
+        const uploadRes = await uploadService.uploadSingle(file, 'manuscripts')
+
+        // b. Lấy mangaka_id từ localStorage
+        const userStr = localStorage.getItem('mangaflow_user')
+        let mangakaId = ''
+        if (userStr) {
+          try {
+            const parsed = JSON.parse(userStr)
+            mangakaId = parsed.user?.id || parsed.id || ''
+          } catch {
+            // ignore
+          }
+        }
+
+        if (!mangakaId) {
+          throw new Error('Không tìm thấy thông tin tài khoản đăng nhập!')
+        }
+
+        // c. Tạo manuscript
+        const manuscript = await manuscriptService.create({
+          mangaka_id: mangakaId,
+          series_id: selectedSeriesId,
+          chapter_id: chapterId,
+          title: `Bản thảo Chương ${chapterNumberStr}: ${chapterTitle}`,
+          file_url: uploadRes.secure_url
+        })
+
+        // d. Thêm file liên kết để backend/editor có thể đọc
+        await manuscriptService.addFile({
+          manuscript_id: manuscript._id,
+          file_url: uploadRes.secure_url,
+          file_name: file.name,
+          file_type: file.name.split('.').pop() || 'psd'
+        })
+
+        // e. Submit manuscript lên Board
+        await manuscriptService.submit(manuscript._id)
+      }
+
+      alert('Đã thực hiện thành công!')
+      setShowSubmitModal(false)
+      setNewChapterTitle('')
+      setNewChapterNum('')
+      setFile(null)
+      setSelectedChapterId(null)
+      
+      // Reload page data
+      await loadData()
+    } catch (err: any) {
+      console.error(err)
+      setErrorMsg(err.response?.data?.message || err.message || 'Có lỗi xảy ra, vui lòng thử lại.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   // Map series title to chapters
-  const enrichedChapters = chapters.map(ch => ({
-    ...ch,
-    seriesTitle: seriesList.find(s => s.id === ch.seriesId)?.title || 'Không rõ',
-  }))
+  const enrichedChapters = chapters.map(ch => {
+    // Find matching manuscripts for this chapter, sort by created_at descending to get the latest one
+    const matchingManuscripts = manuscripts.filter(m => m.chapter_id === ch._id)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    const latestManuscript = matchingManuscripts[0]
+
+    // Count pages for this chapter
+    const pageCount = chapterPagesMap[ch._id] || 0
+
+    // Determine deadline (use chapter's publish_date, or format created_at + 7 days)
+    const deadlineDate = ch.publish_date 
+      ? new Date(ch.publish_date)
+      : new Date(new Date(ch.created_at || Date.now()).getTime() + 7 * 24 * 60 * 60 * 1000)
+    const deadlineStr = deadlineDate.toISOString().split('T')[0]
+
+    // Determine display status and classes
+    const displayStatus = getChapterDisplayStatus(ch, latestManuscript)
+    const statusDisplay = getStatusDisplay(displayStatus)
+
+    return {
+      id: ch._id,
+      seriesId: ch.series_id,
+      seriesTitle: seriesList.find(s => s._id === ch.series_id)?.title || 'Không rõ',
+      chapterNumber: ch.chapter_number,
+      title: ch.title || 'Không có tiêu đề',
+      deadline: deadlineStr,
+      totalPages: pageCount,
+      status: ch.status, // Database chapter status
+      displayStatus: displayStatus,
+      statusDisplay: statusDisplay,
+      latestManuscript: latestManuscript
+    }
+  })
 
   // Filter based on active tab
   const filteredChapters = enrichedChapters.filter(ch => {
     if (activeTab === 'TẤT CẢ') return true
-    if (activeTab === 'CHỜ BOARD DUYỆT') return ch.status === 'Waiting Review'
-    const display = getStatusDisplay(ch.status).label
-    return display === activeTab
+    return ch.displayStatus === activeTab
   })
 
   // Calculate stats
   const totalChapters = enrichedChapters.length
-  const drawingCount = enrichedChapters.filter(ch => getStatusDisplay(ch.status).label === 'ĐANG VẼ LỚP').length
-  const needFixCount = enrichedChapters.filter(ch => getStatusDisplay(ch.status).label === 'CẦN CHỈNH SỬA').length
-  const completedCount = enrichedChapters.filter(ch => getStatusDisplay(ch.status).label === 'ĐÃ DUYỆT').length
+  const drawingCount = enrichedChapters.filter(ch => ch.displayStatus === 'ĐANG VẼ LỚP').length
+  const needFixCount = enrichedChapters.filter(ch => ch.displayStatus === 'CẦN CHỈNH SỬA').length
+  const completedCount = enrichedChapters.filter(ch => ch.displayStatus === 'ĐÃ DUYỆT').length
+
+  if (isLoading) {
+    return (
+      <div className="p-12 text-center">
+        <div className="w-10 h-10 border-4 border-black border-t-[#E63946] rounded-full animate-spin mx-auto mb-4" />
+        <p className="font-bold text-gray-500 uppercase text-xs">Đang tải dữ liệu bản thảo...</p>
+      </div>
+    )
+  }
 
   return (
-    <div className="p-2 max-w-7xl mx-auto flex gap-8">
-      {/* Main Content */}
+    <div className="p-2 max-w-7xl mx-auto flex flex-col">
+      <div className="flex gap-8">
+        {/* Main Content */}
       <div className="flex-1">
         {/* Header */}
         <div className="flex justify-between items-start mb-6">
@@ -115,7 +310,16 @@ export default function ManuscriptsPage() {
             </p>
           </div>
           <button
-            onClick={() => setShowSubmitModal(true)}
+            onClick={() => {
+              setSelectedChapterId(null)
+              setNewChapterTitle('')
+              setNewChapterNum('')
+              setFile(null)
+              if (seriesList.length > 0) {
+                setSelectedSeriesId(seriesList[0]._id)
+              }
+              setShowSubmitModal(true)
+            }}
             className="bg-[#E63946] text-white border-2 border-black font-bold uppercase py-2.5 px-5 shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none transition-all flex items-center gap-2 text-xs"
           >
             + TẠO CHAPTER MỚI
@@ -180,8 +384,8 @@ export default function ManuscriptsPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredChapters.map((ch, idx) => {
-                const statusDisplay = getStatusDisplay(ch.status)
+              {filteredChapters.map((ch) => {
+                const statusDisplay = ch.statusDisplay
                 const isNeedFix = statusDisplay.label === 'CẦN CHỈNH SỬA'
 
                 return (
@@ -206,7 +410,7 @@ export default function ManuscriptsPage() {
                     <td className="p-4 align-middle">
                       <div className="flex flex-row flex-wrap gap-4 items-center">
                         <Link
-                          to={`/dashboard/mangaka/chapters`}
+                          to={`/dashboard/mangaka/series/${ch.seriesId}`}
                           className="flex items-center gap-1.5 text-[10px] font-black text-black uppercase hover:underline whitespace-nowrap"
                         >
                           <Eye className="w-3.5 h-3.5 flex-shrink-0" />
@@ -215,8 +419,10 @@ export default function ManuscriptsPage() {
                         <button
                           onClick={() => {
                             setSelectedSeriesId(ch.seriesId)
+                            setSelectedChapterId(ch.id)
                             setNewChapterNum(String(ch.chapterNumber))
                             setNewChapterTitle(ch.title)
+                            setFile(null)
                             setShowSubmitModal(true)
                           }}
                           className="flex items-center gap-1.5 text-[10px] font-black text-black uppercase hover:underline text-left whitespace-nowrap"
@@ -224,9 +430,9 @@ export default function ManuscriptsPage() {
                           <Upload className="w-3.5 h-3.5 flex-shrink-0" />
                           NỘP BẢN THẢO MỚI
                         </button>
-                        {isNeedFix && (
+                        {isNeedFix && ch.latestManuscript && (
                           <button
-                            onClick={() => handleUpdateStatus(ch.id, 'Drawing')}
+                            onClick={() => handleUpdateStatus(ch.seriesId, ch.latestManuscript._id)}
                             className="flex items-center gap-1.5 text-[10px] font-bold text-[#E63946] hover:underline text-left whitespace-nowrap"
                           >
                             <Send className="w-3.5 h-3.5 flex-shrink-0" />
@@ -307,21 +513,28 @@ export default function ManuscriptsPage() {
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center backdrop-blur-[2px]">
           <form
             onSubmit={handleCreateSubmission}
-            className="bg-white border-4 border-black p-6 w-full max-w-md shadow-[8px_8px_0px_rgba(0,0,0,1)] relative"
+            className="bg-white border-4 border-black p-6 w-full max-w-md shadow-[8px_8px_0px_rgba(0,0,0,1)] relative animate-in fade-in duration-200"
           >
-            <h2 className="text-lg font-black font-manga uppercase mb-4 border-b-2 border-black pb-2 select-none">
-              TẠO CHAPTER MỚI
+            <h2 className="text-lg font-black uppercase mb-4 border-b-2 border-black pb-2 select-none">
+              {selectedChapterId ? 'NỘP BẢN THẢO MỚI' : 'TẠO CHAPTER MỚI'}
             </h2>
+
+            {errorMsg && (
+              <div className="bg-red-50 border-2 border-[#E63946] p-3 text-xs font-bold text-[#E63946] mb-4">
+                {errorMsg}
+              </div>
+            )}
 
             <div className="mb-4">
               <label className="block text-[11px] font-black uppercase mb-1">Chọn Series</label>
               <select
                 value={selectedSeriesId}
                 onChange={e => setSelectedSeriesId(e.target.value)}
-                className="w-full border-2 border-black p-2 text-xs font-bold focus:outline-none bg-white rounded-none"
+                disabled={!!selectedChapterId}
+                className="w-full border-2 border-black p-2 text-xs font-bold focus:outline-none bg-white rounded-none disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
                 {seriesList.map(s => (
-                  <option key={s.id} value={s.id}>{s.title}</option>
+                  <option key={s._id} value={s._id}>{s.title}</option>
                 ))}
               </select>
             </div>
@@ -333,13 +546,14 @@ export default function ManuscriptsPage() {
                   type="number"
                   value={newChapterNum}
                   onChange={e => setNewChapterNum(e.target.value)}
-                  className="w-full border-2 border-black p-2 text-xs font-bold focus:outline-none rounded-none"
+                  disabled={!!selectedChapterId}
+                  className="w-full border-2 border-black p-2 text-xs font-bold focus:outline-none rounded-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                   placeholder="VD: 46"
                   required
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-black uppercase mb-1">Số Trang</label>
+                <label className="block text-[11px] font-black uppercase mb-1">Số Trang dự kiến</label>
                 <input
                   type="number"
                   value={newChapterPages}
@@ -357,18 +571,34 @@ export default function ManuscriptsPage() {
                 type="text"
                 value={newChapterTitle}
                 onChange={e => setNewChapterTitle(e.target.value)}
-                className="w-full border-2 border-black p-2 text-xs font-bold focus:outline-none rounded-none"
+                disabled={!!selectedChapterId}
+                className="w-full border-2 border-black p-2 text-xs font-bold focus:outline-none rounded-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                 placeholder="VD: Hắc phong hành"
                 required
               />
             </div>
 
             <div className="mb-5">
-              <label className="block text-[11px] font-black uppercase mb-1">File đính kèm (PSD/ZIP)</label>
-              <div className="border-2 border-dashed border-gray-400 p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:border-black bg-gray-50 transition-all rounded-none">
-                <Upload className="w-7 h-7 mb-2 text-gray-500" />
-                <p className="text-[10px] font-black text-gray-500 uppercase">Kéo thả file hoặc click để tải lên</p>
-              </div>
+              <label className="block text-[11px] font-black uppercase mb-1">
+                File đính kèm (PSD/ZIP) {!selectedChapterId && '(Tùy chọn)'}
+              </label>
+              <label className="border-2 border-dashed border-gray-400 p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:border-black bg-gray-50 transition-all rounded-none block">
+                <Upload className="w-7 h-7 mb-2 text-gray-500 mx-auto" />
+                <p className="text-[10px] font-black text-gray-500 uppercase">
+                  {file ? file.name : 'Kéo thả file hoặc click để tải lên'}
+                </p>
+                <input
+                  type="file"
+                  accept=".psd,.zip,.rar,.pdf"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files.length > 0) {
+                      setFile(e.target.files[0])
+                    }
+                  }}
+                  required={!!selectedChapterId}
+                />
+              </label>
             </div>
 
             <div className="flex gap-3 justify-end">
@@ -378,21 +608,46 @@ export default function ManuscriptsPage() {
                   setShowSubmitModal(false)
                   setNewChapterTitle('')
                   setNewChapterNum('')
+                  setFile(null)
+                  setSelectedChapterId(null)
                 }}
-                className="px-4 py-2 border-2 border-black text-[10px] font-black uppercase hover:bg-gray-100 rounded-none transition-all"
+                disabled={isSubmitting}
+                className="px-4 py-2 border-2 border-black text-[10px] font-black uppercase hover:bg-gray-100 rounded-none transition-all disabled:opacity-50"
               >
                 HỦY BỎ
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-[#E63946] text-white border-2 border-black text-[10px] font-black uppercase hover:bg-red-700 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all rounded-none"
+                disabled={isSubmitting}
+                className="px-4 py-2 bg-[#E63946] text-white border-2 border-black text-[10px] font-black uppercase hover:bg-red-700 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all rounded-none disabled:opacity-50 flex items-center gap-2"
               >
-                TẠO CHAPTER
+                {isSubmitting ? (
+                  <>
+                    <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ĐANG XỬ LÝ...
+                  </>
+                ) : selectedChapterId ? (
+                  'NỘP BẢN THẢO'
+                ) : (
+                  'TẠO CHAPTER'
+                )}
               </button>
             </div>
           </form>
         </div>
       )}
+      </div>
+
+      {/* Footer */}
+      <footer className="mt-16 pt-8 border-t-2 border-manga-ink flex flex-col md:flex-row items-center justify-between gap-4 text-sm font-bold text-gray-500">
+        <div className="font-manga text-2xl text-manga-red">MangaFlow</div>
+        <div>© 2026 MangaFlow System. Gangan Press Co. Ltd. All rights reserved.</div>
+        <div className="flex items-center gap-6">
+          
+          <a href="#" className="hover:text-manga-red transition-colors">Quy tắc xuất bản</a>
+          <a href="#" className="hover:text-manga-red transition-colors">Hỗ trợ Mangaka</a>
+        </div>
+      </footer>
     </div>
   )
 }

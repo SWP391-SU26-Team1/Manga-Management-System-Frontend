@@ -1,11 +1,66 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link, useNavigate, useLocation } from 'react-router'
 import { Bell, MessageSquare, Send, User, Settings, LogOut } from 'lucide-react'
 import { mangakaStore, Notification, EditorFeedback } from '@/data/mangakaMockData'
 
 export function Header() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [showNotif, setShowNotif] = useState(false);
+
+  // Determine breadcrumb based on current path
+  const getBreadcrumb = () => {
+    const path = location.pathname
+    let sectionName = 'Trang Chủ'
+
+    if (path === '/dashboard/mangaka') {
+      sectionName = 'Trang Chủ'
+    } else if (path === '/dashboard/mangaka/series') {
+      sectionName = 'Series của tôi'
+    } else if (path === '/dashboard/mangaka/create-series') {
+      sectionName = 'Tạo bản thảo'
+    } else if (path === '/dashboard/mangaka/submission') {
+      sectionName = 'Duyệt kết quả'
+    } else if (path === '/dashboard/mangaka/assign-task') {
+      sectionName = 'Giao việc trợ lý'
+    } else if (path === '/dashboard/mangaka/assistants') {
+      sectionName = 'Trợ lý của tôi'
+    } else if (path === '/dashboard/mangaka/ranking') {
+      sectionName = 'Xếp hạng & Cảnh báo'
+    } else if (path === '/dashboard/mangaka/feedback') {
+      sectionName = 'Nhận xét từ Editor'
+    } else if (path === '/dashboard/mangaka/board-review') {
+      sectionName = 'Hội đồng duyệt'
+    } else if (path === '/dashboard/mangaka/risk-alerts') {
+      sectionName = 'Cảnh báo rủi ro'
+    } else if (path === '/dashboard/mangaka/recovery-proposal') {
+      sectionName = 'Kế hoạch phục hồi'
+    } else if (path === '/dashboard/mangaka/notifications') {
+      sectionName = 'Thông báo'
+    } else if (path === '/dashboard/mangaka/manuscripts') {
+      sectionName = 'Quản lý Chapter'
+    } else if (path === '/dashboard/mangaka/profile') {
+      sectionName = 'Hồ sơ cá nhân'
+    } else if (path === '/dashboard/mangaka/settings') {
+      sectionName = 'Cài đặt'
+    } else if (path.startsWith('/dashboard/mangaka/page-viewer/')) {
+      sectionName = 'Xem bản vẽ'
+    } else if (path.includes('/create-chapter')) {
+      sectionName = 'Tạo Chapter mới'
+    } else if (path.startsWith('/dashboard/mangaka/series/')) {
+      sectionName = 'Chi tiết Series'
+    }
+
+    return (
+      <div className="flex items-center gap-2 text-sm font-sans font-semibold text-gray-500">
+        <Link to="/dashboard/mangaka" className="uppercase text-xs font-bold tracking-wider text-gray-400 hover:text-manga-red transition-colors">
+          MANGAFLOW
+        </Link>
+        <span className="text-gray-300">/</span>
+        <span className="text-gray-900 font-bold">{sectionName}</span>
+      </div>
+    )
+  }
   const [showFeedback, setShowFeedback] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
 
@@ -70,28 +125,10 @@ export function Header() {
 
   return (
     <header className="h-16 bg-white border-b-4 border-manga-ink flex items-center justify-between px-8 sticky top-0 z-30">
-      {/* Left Navigation */}
-      <nav className="flex items-center gap-8">
-        <Link to="/dashboard/mangaka">
-          <span className="font-manga text-2xl font-bold uppercase text-manga-red tracking-wide">
-            MANGAFLOW
-          </span>
-        </Link>
-        <div className="flex items-center gap-6 text-sm font-manga font-bold uppercase tracking-wide">
-          <Link
-            to="/dashboard/mangaka/schedule"
-            className="text-manga-ink hover:text-manga-red transition-colors"
-          >
-            Lịch trình
-          </Link>
-          <Link to="/dashboard/mangaka/assets" className="text-manga-ink hover:text-manga-red transition-colors">
-            Kho tư liệu
-          </Link>
-          <Link to="/dashboard/mangaka/library" className="text-manga-ink hover:text-manga-red transition-colors">
-            Thư viện
-          </Link>
-        </div>
-      </nav>
+      {/* Left Navigation / Breadcrumb */}
+      <div className="flex items-center">
+        {getBreadcrumb()}
+      </div>
 
       {/* Right Actions */}
       <div className="flex items-center gap-4">
@@ -179,6 +216,9 @@ export function Header() {
         <Link to="/dashboard/mangaka/submission" className="bg-manga-red text-white font-manga font-bold text-sm uppercase px-5 py-2 border-2 border-manga-ink manga-shadow-sm hover:translate-y-0.5 hover:shadow-none transition-all whitespace-nowrap ml-2">
           NỘP BẢN THẢO
         </Link>
+
+        {/* Vertical divider */}
+        <div className="h-6 w-px bg-gray-200 ml-2" />
 
         {/* Profile Dropdown */}
         <div className="relative" ref={profileRef}>

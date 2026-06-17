@@ -2,79 +2,67 @@ import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { Plus, BookOpen, Clock, AlertTriangle, FileText, CheckCircle, Tag } from 'lucide-react'
 import { SeriesCard } from '@/components/mangaka/SeriesCard'
-import { mangakaStore, Series } from '@/data/mangakaMockData'
+import { seriesService, SeriesAPI, getErrorMessage } from '@/services/series.service'
+import { chapterService } from '@/services/chapter.service'
 
 const filters = [
   { label: 'Tất cả', value: 'all' },
-  { label: 'Bản nháp', value: 'Draft' },
-  { label: 'Đang vẽ', value: 'In Production' },
-  { label: 'Chờ duyệt', value: 'Waiting Review' },
-  { label: 'Đã xuất bản', value: 'Published' },
+  { label: 'Bản nháp', value: 'draft' },
+  { label: 'Đang vẽ', value: 'in_production' },
+  { label: 'Chờ duyệt', value: 'under_review' },
+  { label: 'Đã xuất bản', value: 'published' },
 ]
 
 export default function SeriesPage() {
   const [activeFilter, setActiveFilter] = useState('all')
-  const [seriesList, setSeriesList] = useState<Series[]>([])
+  const [seriesList, setSeriesList] = useState<SeriesAPI[]>([])
+  const [chapterCounts, setChapterCounts] = useState<Record<string, number>>({})
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState('')
   const [counts, setCounts] = useState({
-    total: 0,
-    active: 0,
-    waiting: 0,
-    published: 0,
-    submissions: 0,
-    feedbacks: 0,
+    total: 0, active: 0, waiting: 0, published: 0,
   })
 
   useEffect(() => {
-    const list = mangakaStore.getSeries()
-    setSeriesList(list)
+    const fetchData = async () => {
+      setIsLoading(true)
+      setError('')
+      try {
+        const list = await seriesService.getAll()
+        setSeriesList(list)
+        setCounts({
+          total: list.length,
+          active: list.filter(s => s.status === 'in_production').length,
+          waiting: list.filter(s => s.status === 'under_review').length,
+          published: list.filter(s => s.status === 'published').length,
+        })
 
-    const subs = mangakaStore.getSubmissions().filter((s) => s.status === 'Pending').length
-    const fbs = mangakaStore.getEditorFeedbacks().filter((f) => f.status === 'Open').length
-
-    setCounts({
-      total: list.length,
-      active: list.filter((s) => s.status === 'In Production').length,
-      waiting: list.filter((s) => s.status === 'Waiting Review').length,
-      published: list.filter((s) => s.status === 'Published').length,
-      submissions: subs,
-      feedbacks: fbs,
-    })
-  }, [])
-
-  const handleCreateChapter = (seriesId: string) => {
-    const title = prompt('Nhập tiêu đề cho Chapter mới:')
-    if (!title) return
-    const numStr = prompt('Nhập số thứ tự Chapter (ví dụ: 46):')
-    if (!numStr) return
-    const num = parseInt(numStr)
-    if (isNaN(num)) {
-      alert('Số thứ tự Chapter không hợp lệ!')
-      return
+        // Load chapter counts for each series
+        const counts: Record<string, number> = {}
+        await Promise.all(
+          list.map(async (s) => {
+            try {
+              const chapters = await chapterService.getBySeriesId(s._id)
+              counts[s._id] = chapters.length
+            } catch {
+              counts[s._id] = 0
+            }
+          })
+        )
+        setChapterCounts(counts)
+      } catch (err) {
+        setError(getErrorMessage(err))
+      } finally {
+        setIsLoading(false)
+      }
     }
-    const deadline = prompt(
-      'Nhập hạn chót nộp bản thảo (YYYY-MM-DD):',
-      new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString().split('T')[0]
-    )
-    if (!deadline) return
-
-    mangakaStore.addChapter({
-      seriesId,
-      chapterNumber: num,
-      title,
-      deadline,
-      totalPages: 20,
-      status: 'Draft',
-    })
-
-    alert(`Đã tạo thành công Chương ${num}: ${title}!`)
-    const list = mangakaStore.getSeries()
-    setSeriesList(list)
-  }
+    fetchData()
+  }, [])
 
   const filtered =
     activeFilter === 'all'
       ? seriesList
-      : seriesList.filter((s) => s.status === activeFilter)
+      : seriesList.filter(s => s.status === activeFilter)
 
   return (
     <div className="max-w-6xl mx-auto pb-16 relative">
@@ -99,14 +87,12 @@ export default function SeriesPage() {
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
         {[
           { label: 'Tổng tác phẩm', value: counts.total, icon: BookOpen },
           { label: 'Đang sáng tác', value: counts.active, icon: CheckCircle },
-          { label: 'Chờ phê duyệt', value: counts.waiting, icon: Clock },
+          { label: 'Chờ phê duyệt', value: counts.waiting, icon: Clock, red: counts.waiting > 0 },
           { label: 'Đã xuất bản', value: counts.published, icon: FileText },
-          { label: 'Bản vẽ chờ duyệt', value: counts.submissions, icon: AlertTriangle, red: counts.submissions > 0 },
-          { label: 'Editor Góp ý', value: counts.feedbacks, icon: Tag, red: counts.feedbacks > 0 },
         ].map((stat) => {
           const Icon = stat.icon
           return (
@@ -145,8 +131,21 @@ export default function SeriesPage() {
         ))}
       </div>
 
-      {/* Series Cards Grid */}
-      {filtered.length === 0 ? (
+      {/* Error */}
+      {error && (
+        <div className="bg-red-50 border-2 border-manga-red p-4 mb-6 flex items-center gap-2 text-manga-red font-bold text-sm">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          {error}
+        </div>
+      )}
+
+      {/* Loading */}
+      {isLoading ? (
+        <div className="bg-white border-4 border-manga-ink p-12 text-center manga-shadow-sm">
+          <div className="w-10 h-10 border-4 border-manga-ink border-t-manga-red rounded-full animate-spin mx-auto mb-4" />
+          <p className="font-bold text-gray-500 uppercase text-sm">Đang tải danh sách series...</p>
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="bg-white border-4 border-manga-ink p-12 text-center manga-shadow-sm">
           <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-3" />
           <h3 className="font-manga text-2xl font-bold uppercase text-gray-500 mb-1">Không tìm thấy series nào</h3>
@@ -156,27 +155,36 @@ export default function SeriesPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {filtered.map((s) => {
-            const chs = mangakaStore.getChapters(s.id)
-            return (
-              <SeriesCard
-                key={s.id}
-                series={s}
-                chapterCount={chs.length}
-                onCreateChapter={handleCreateChapter}
-              />
-            )
-          })}
+          {filtered.map((s) => (
+            <SeriesCard
+              key={s._id}
+              series={{
+                id: s._id,
+                title: s.title,
+                description: s.description,
+                tags: s.genre ? s.genre.split(', ') : [],
+                coverUrl: s.cover_image ?? null,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                status: s.status as any,
+                nextDeadline: s.updated_at ?? s.created_at,
+                createdAt: s.created_at,
+              }}
+              chapterCount={chapterCounts[s._id] ?? 0}
+              onCreateChapter={() => {}}
+            />
+
+          ))}
         </div>
       )}
 
       {/* Footer */}
-      <footer className="mt-16 bg-manga-ink text-white py-6 px-8 flex flex-col md:flex-row items-center justify-between gap-4 text-sm font-bold">
+      <footer className="mt-16 pt-8 border-t-2 border-manga-ink flex flex-col md:flex-row items-center justify-between gap-4 text-sm font-bold text-gray-500">
         <div className="font-manga text-2xl text-manga-red">MangaFlow</div>
-        <div className="text-gray-400">© 2026 MangaFlow System. Gangan Press Co. Ltd.</div>
-        <div className="flex items-center gap-6 text-gray-400">
-          <button onClick={() => alert('Mở trang Quy tắc xuất bản')} className="hover:text-white transition-colors uppercase">Quy tắc xuất bản</button>
-          <button onClick={() => alert('Mở trang Hỗ trợ Mangaka')} className="hover:text-white transition-colors uppercase">Hỗ trợ Mangaka</button>
+        <div>© 2026 MangaFlow System. Gangan Press Co. Ltd. All rights reserved.</div>
+        <div className="flex items-center gap-6">
+          
+          <a href="#" className="hover:text-manga-red transition-colors">Quy tắc xuất bản</a>
+          <a href="#" className="hover:text-manga-red transition-colors">Hỗ trợ Mangaka</a>
         </div>
       </footer>
     </div>

@@ -17,6 +17,7 @@ import SettingsPage from '@/pages/assistant/SettingsPage'
 export default function AssistantRoutes() {
   return (
     <Routes>
+      {/* All routes wrapped in the shared sidebar + header layout */}
       <Route element={<AssistantLayout />}>
         <Route index element={<AssistantDashboardPage />} />
         <Route path="tasks" element={<TasksPage />} />

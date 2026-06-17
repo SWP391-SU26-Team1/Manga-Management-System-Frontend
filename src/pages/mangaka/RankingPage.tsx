@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from 'react'
+import { Link } from 'react-router'
 import { AlertCircle, TrendingUp, Bell, AlertTriangle, Info, ChevronDown, ChevronUp } from 'lucide-react'
 import { RankingPanel } from '@/components/mangaka/RankingPanel'
-import { mangakaStore, RankingStat, RiskAlert } from '@/data/mangakaMockData'
+import { RankingStat, RiskAlert } from '@/data/mangakaMockData'
+import { rankingService } from '@/services/ranking.service'
+import { seriesService } from '@/services/series.service'
+import { chapterService } from '@/services/chapter.service'
 
 const RISK_LEVEL_CONFIG = {
   High: {
@@ -39,21 +43,158 @@ export default function RankingPage() {
   const [activeTab, setActiveTab] = useState<'ranking' | 'alerts'>('ranking')
   const [expandedAlertId, setExpandedAlertId] = useState<string | null>(null)
   const [readAlerts, setReadAlerts] = useState<Set<string>>(new Set())
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchRankingData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      // 1. Fetch Mangaka's series
+      const mySeries = await seriesService.getAll()
+      if (mySeries.length === 0) {
+        setStats([])
+        setAlerts([])
+        setLoading(false)
+        return
+      }
+
+      // 2. Fetch Top rankings from system (to get rank positions)
+      const topRankings = await rankingService.getTopSeries(100)
+
+      // 3. For each series, fetch trend, chapters, risk in parallel
+      const statsPromises = mySeries.map(async (series) => {
+        try {
+          const trendData = await rankingService.getSeriesTrend(series._id)
+          const chapters = await chapterService.getBySeriesId(series._id)
+          const riskData = await rankingService.checkSeriesRisk(series._id)
+
+          // Find ranking from top rankings
+          const matchedRanking = topRankings.find(r => r.series_id === series._id)
+
+          const latestTrend = trendData?.trend && trendData.trend.length > 0
+            ? trendData.trend[trendData.trend.length - 1]
+            : null
+
+          const rankWeekly = matchedRanking
+            ? matchedRanking.rank_position
+            : (latestTrend ? latestTrend.rank : 99)
+
+          const rating = matchedRanking
+            ? matchedRanking.score
+            : (latestTrend ? latestTrend.score : 0)
+
+          const rankChange = latestTrend ? latestTrend.change : 0
+
+          // Format numbers
+          const formatNum = (val: number) => {
+            if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M'
+            if (val >= 1000) return (val / 1000).toFixed(1) + 'K'
+            return val.toString()
+          }
+
+          const viewCount = series.view_count || 0
+          const views = formatNum(viewCount)
+          const likes = formatNum(Math.floor(viewCount * 0.08))
+          const comments = formatNum(Math.floor(viewCount * 0.02))
+          const followers = formatNum(Math.floor(viewCount * 0.12))
+
+          let hotChapter = 'N/A'
+          if (chapters.length > 0) {
+            const maxChNum = Math.max(...chapters.map(c => c.chapter_number))
+            hotChapter = `CH.${maxChNum}`
+          }
+
+          const statItem: RankingStat = {
+            id: matchedRanking?.series_ranking_id || `rank_${series._id}`,
+            seriesId: series._id,
+            seriesTitle: series.title,
+            rankWeekly,
+            views,
+            likes,
+            comments,
+            followers,
+            rating,
+            rankChange,
+            hotChapter,
+          }
+
+          return { statItem, riskData }
+        } catch (e) {
+          console.error(`Error loading stats for series ${series.title}:`, e)
+          return null
+        }
+      })
+
+      const statsResults = await Promise.all(statsPromises)
+      const validStats = statsResults.map(r => r?.statItem).filter((item): item is RankingStat => !!item)
+      setStats(validStats)
+
+      // 4. Fetch notifications and build alerts list
+      const notifications = await rankingService.getNotifications()
+      const warningNotifications = notifications.filter(n => n.type === 'ranking_warning')
+
+      const notificationAlerts: RiskAlert[] = warningNotifications.map(n => {
+        const matched = mySeries.find(s => n.content.includes(s.title) || n.title.includes(s.title))
+        return {
+          id: n.notification_id,
+          seriesId: matched ? matched._id : '',
+          level: (n.content.toLowerCase().includes('high') || n.title.toLowerCase().includes('nguy cơ') || n.content.toLowerCase().includes('rủi ro')) ? 'High' : 'Medium',
+          message: n.content,
+          createdAt: n.created_at,
+          isRead: n.is_read,
+        }
+      })
+
+      // Build dynamic alerts based on checkSeriesRisk
+      const dynamicRiskAlerts: RiskAlert[] = []
+      statsResults.forEach((r, idx) => {
+        if (r && r.riskData && r.riskData.at_risk) {
+          const series = mySeries[idx]
+          const level = r.riskData.low_score ? 'High' : 'Medium'
+          dynamicRiskAlerts.push({
+            id: `dynamic_${series._id}`,
+            seriesId: series._id,
+            level,
+            message: `Tác phẩm "${series.title}" đang gặp rủi ro ${level === 'High' ? 'cao' : 'trung bình'}. ${r.riskData.declining ? 'Xếp hạng đang giảm liên tiếp.' : ''} ${r.riskData.low_score ? 'Điểm tương tác thấp (< 5).' : ''}`,
+            createdAt: new Date().toISOString(),
+            isRead: false,
+          })
+        }
+      })
+
+      const mergedAlerts = [...notificationAlerts, ...dynamicRiskAlerts]
+      setAlerts(mergedAlerts)
+
+      // Auto switch to alerts tab if there are unread high-risk alerts
+      if (mergedAlerts.some(al => al.level === 'High' && !al.isRead)) {
+        setActiveTab('alerts')
+      }
+
+    } catch (err: any) {
+      console.error("Error loading ranking data:", err)
+      setError("Không thể tải dữ liệu xếp hạng và cảnh báo.")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    setStats(mangakaStore.getRankingStats())
-    const a = mangakaStore.getRiskAlerts()
-    setAlerts(a)
-    // auto-switch to alerts tab if there are unread high-risk alerts
-    if (a.some(al => al.level === 'High' && !al.isRead)) {
-      setActiveTab('alerts')
-    }
+    fetchRankingData()
   }, [])
 
   const unreadCount = alerts.filter(a => !a.isRead && !readAlerts.has(a.id)).length
   const highRiskCount = alerts.filter(a => a.level === 'High').length
 
-  const markRead = (id: string) => {
+  const markRead = async (id: string) => {
+    if (!id.startsWith('dynamic_')) {
+      try {
+        await rankingService.markAsRead(id)
+      } catch (err) {
+        console.error("Lỗi khi đánh dấu thông báo đã đọc:", err)
+      }
+    }
     setReadAlerts(prev => new Set([...prev, id]))
   }
 
@@ -144,11 +285,19 @@ export default function RankingPage() {
             </div>
           )}
 
-          {stats.length > 0 ? (
+          {loading ? (
+            <div className="bg-white border-4 border-manga-ink p-12 text-center font-bold text-gray-400">
+              Đang tải dữ liệu xếp hạng...
+            </div>
+          ) : error ? (
+            <div className="bg-white border-4 border-manga-red text-manga-red p-12 text-center font-bold">
+              Có lỗi xảy ra: {error}
+            </div>
+          ) : stats.length > 0 ? (
             <RankingPanel stats={stats} />
           ) : (
             <div className="bg-white border-4 border-manga-ink p-12 text-center font-bold text-gray-400">
-              Đang tải dữ liệu xếp hạng...
+              Bạn chưa có tác phẩm nào hoặc chưa có dữ liệu xếp hạng.
             </div>
           )}
 
@@ -192,7 +341,15 @@ export default function RankingPage() {
             ))}
           </div>
 
-          {alerts.length > 0 ? (
+          {loading ? (
+            <div className="bg-white border-4 border-manga-ink p-12 text-center font-bold text-gray-400">
+              Đang tải dữ liệu cảnh báo...
+            </div>
+          ) : error ? (
+            <div className="bg-white border-4 border-manga-red text-manga-red p-12 text-center font-bold">
+              Có lỗi xảy ra: {error}
+            </div>
+          ) : alerts.length > 0 ? (
             <div className="space-y-3">
               {alerts.map(alert => {
                 const config = RISK_LEVEL_CONFIG[alert.level as keyof typeof RISK_LEVEL_CONFIG] || RISK_LEVEL_CONFIG.Low
@@ -269,6 +426,16 @@ export default function RankingPage() {
           )}
         </div>
       )}
+      {/* Footer */}
+      <footer className="mt-16 pt-8 border-t-2 border-manga-ink flex flex-col md:flex-row items-center justify-between gap-4 text-sm font-bold text-gray-500">
+        <div className="font-manga text-2xl text-manga-red">MangaFlow</div>
+        <div>© 2026 MangaFlow System. Gangan Press Co. Ltd. All rights reserved.</div>
+        <div className="flex items-center gap-6">
+          
+          <a href="#" className="hover:text-manga-red transition-colors">Quy tắc xuất bản</a>
+          <a href="#" className="hover:text-manga-red transition-colors">Hỗ trợ Mangaka</a>
+        </div>
+      </footer>
     </div>
   )
 }

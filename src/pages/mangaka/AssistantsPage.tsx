@@ -1,47 +1,152 @@
 import React, { useState, useEffect } from 'react'
-import { Plus, Eye, ClipboardList, BarChart2, CheckCircle, Flame, Hourglass, Moon, X, UserPlus, FileCheck } from 'lucide-react'
-import { mangakaStore, Assistant, LayerTask } from '@/data/mangakaMockData'
+import { Plus, Eye, ClipboardList, BarChart2, CheckCircle, Flame, Hourglass, Moon, X, UserPlus, FileCheck, Trash2 } from 'lucide-react'
+import { Assistant, LayerTask } from '@/data/mangakaMockData'
 import { Link } from 'react-router'
+import { seriesService, SeriesAPI } from '@/services/series.service'
+import { taskService } from '@/services/task.service'
+
+const TASK_TYPE_MAP: Record<string, string> = {
+  inking: 'Line Art',
+  background: 'Background',
+  coloring: 'Screentone',
+  lettering: 'Speech Balloon',
+  cleaning: 'Cleaning',
+  sfx: 'Effects / SFX'
+}
 
 export default function AssistantsPage() {
   const [assistants, setAssistants] = useState<Assistant[]>([])
   const [tasks, setTasks] = useState<LayerTask[]>([])
   const [submissionsCount, setSubmissionsCount] = useState(0)
+  const [seriesList, setSeriesList] = useState<SeriesAPI[]>([])
+  const [loading, setLoading] = useState(true)
 
   // Modals state
   const [showAddModal, setShowAddModal] = useState(false)
   const [showStatsModal, setShowStatsModal] = useState<Assistant | null>(null)
 
   // Form state
-  const [newName, setNewName] = useState('')
+  const [newAssistantUserId, setNewAssistantUserId] = useState('')
+  const [selectedSeriesId, setSelectedSeriesId] = useState('')
   const [newRole, setNewRole] = useState('Line Art')
 
   useEffect(() => {
     refreshData()
   }, [])
 
-  const refreshData = () => {
-    setAssistants(mangakaStore.getAssistants())
-    setTasks(mangakaStore.getTasks())
-    setSubmissionsCount(mangakaStore.getSubmissions().filter(s => s.status === 'Pending').length)
+  const refreshData = async () => {
+    try {
+      setLoading(true)
+      // 1. Load series list
+      const slist = await seriesService.getAll()
+      setSeriesList(slist)
+      if (slist.length > 0) {
+        setSelectedSeriesId(slist[0]._id)
+      }
+
+      // 2. Load consolidated members
+      const allMembers = await seriesService.getAllMembersOfMySeries()
+      // Filter members to only assistant role
+      const assistantMembers = allMembers.filter((m: any) => m.users?.role === 'assistant')
+
+      // 3. Load all tasks
+      const allTasks = await taskService.getAllTasks()
+
+      // Map backend tasks to LayerTask format for table
+      const mappedTasks: LayerTask[] = allTasks.map((t: any) => ({
+        id: t.task_id,
+        chapterId: t.chapter_id || '',
+        pageId: t.page_id || '',
+        layerType: (TASK_TYPE_MAP[t.task_type] || t.task_type) as any,
+        assignedTo: t.assistant?.name || t.assistant?.username || 'Chưa giao',
+        deadline: t.deadline ? new Date(t.deadline).toLocaleDateString('vi-VN') : 'N/A',
+        status: t.status === 'in_progress' ? 'Doing' : t.status === 'submitted' ? 'Submitted' : t.status === 'needs_revision' ? 'Need Fix' : t.status === 'approved' ? 'Approved' : 'Not Started',
+        note: t.content || '',
+        priority: t.priority || 'Medium',
+      }))
+      setTasks(mappedTasks)
+
+      // Calculate workload statistics for each assistant member
+      const assistantsList: Assistant[] = assistantMembers.map((m: any) => {
+        const userId = m.user_id
+        const assistantTasks = allTasks.filter((t: any) => t.assistant_id === userId)
+        const activeTasks = assistantTasks.filter((t: any) => t.status !== 'approved' && t.status !== 'completed' && t.status !== 'cancelled')
+        const pendingTasks = assistantTasks.filter((t: any) => t.status === 'submitted')
+
+        let status: 'Đang làm' | 'Chờ duyệt' | 'Nghỉ ngơi' = 'Nghỉ ngơi'
+        if (pendingTasks.length > 0) status = 'Chờ duyệt'
+        else if (activeTasks.length > 0) status = 'Đang làm'
+
+        return {
+          id: m.series_member_id, // we save series_member_id here for deletion
+          name: m.users?.name || m.users?.username || 'Trợ lý',
+          role: m.role_in_series || 'Assistant',
+          avatarUrl: m.users?.avatar_url || `https://i.pravatar.cc/150?u=${userId}`,
+          currentTasksCount: activeTasks.length,
+          pendingSubmissionsCount: pendingTasks.length,
+          status,
+          seriesId: m.seriesId,
+          seriesTitle: m.seriesTitle,
+          userId: userId // save actual user UUID
+        } as any
+      })
+
+      setAssistants(assistantsList)
+      setSubmissionsCount(allTasks.filter((t: any) => t.status === 'submitted').length)
+    } catch (err) {
+      console.error('Lỗi khi tải dữ liệu trợ lý:', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleAddAssistant = (e: React.FormEvent) => {
+  const handleAddAssistant = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newName.trim()) return
-    mangakaStore.addAssistant({
-      name: newName.trim(),
-      role: newRole,
-      avatarUrl: `https://i.pravatar.cc/150?u=${Date.now()}`
-    })
-    setNewName('')
-    setShowAddModal(false)
-    refreshData()
+    if (!newAssistantUserId.trim() || !selectedSeriesId) return
+    try {
+      setLoading(true)
+      await seriesService.addMember(selectedSeriesId, {
+        user_id: newAssistantUserId.trim(),
+        role_in_series: newRole
+      })
+      setNewAssistantUserId('')
+      setShowAddModal(false)
+      await refreshData()
+      alert('Đã thêm trợ lý vào dự án thành công!')
+    } catch (err: any) {
+      console.error(err)
+      alert('Không thể thêm trợ lý. Lỗi: ' + (err.response?.data?.message || err.message))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleRemoveAssistant = async (seriesId: string, seriesMemberId: string, name: string) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa trợ lý ${name} khỏi series này?`)) return
+    try {
+      setLoading(true)
+      await seriesService.removeMember(seriesId, seriesMemberId)
+      await refreshData()
+      alert('Đã xóa trợ lý khỏi dự án!')
+    } catch (err: any) {
+      console.error(err)
+      alert('Không thể xóa trợ lý. Lỗi: ' + (err.response?.data?.message || err.message))
+    } finally {
+      setLoading(false)
+    }
   }
 
   const totalTasks = tasks.length
   const activeTasksCount = tasks.filter(t => t.status === 'Doing').length
-  const overdueTasksCount = tasks.filter(t => new Date(t.deadline) < new Date() && t.status !== 'Approved').length
+  const overdueTasksCount = tasks.filter(t => {
+    // parse deadline format DD/MM/YYYY
+    const parts = t.deadline.split('/')
+    if (parts.length === 3) {
+      const deadlineDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]))
+      return deadlineDate < new Date() && t.status !== 'Approved'
+    }
+    return false
+  }).length
 
   const summaryStats = [
     { label: 'Tổng trợ lý', value: assistants.length.toString() },
@@ -82,13 +187,19 @@ export default function AssistantsPage() {
         ))}
       </div>
 
+      {loading && (
+        <div className="bg-white border-4 border-manga-ink p-12 text-center font-bold text-gray-400 mb-8">
+          Đang tải dữ liệu đội ngũ trợ lý...
+        </div>
+      )}
+
       {/* Assistant Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-        {assistants.map((a) => {
+        {!loading && assistants.map((a: any) => {
           const workload = Math.min(100, (a.currentTasksCount * 20) + (a.pendingSubmissionsCount * 10))
           return (
           <div key={a.id} className={`bg-white border-2 border-manga-ink manga-shadow flex flex-col ${a.status === 'Nghỉ ngơi' ? 'opacity-70' : ''}`}>
-            <div className="bg-manga-ink text-white p-4 flex items-center gap-4">
+            <div className="bg-manga-ink text-white p-4 flex items-center gap-4 relative">
               <div className="w-14 h-14 border-2 border-white overflow-hidden flex-shrink-0 bg-gray-300 flex items-center justify-center">
                 {a.avatarUrl
                   ? <img src={a.avatarUrl} alt={a.name} className="w-full h-full object-cover grayscale" />
@@ -96,9 +207,17 @@ export default function AssistantsPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <h3 className="font-manga text-xl font-bold">{a.name}</h3>
+                  <h3 className="font-manga text-xl font-bold truncate pr-6">{a.name}</h3>
                   {statusIcon[a.status]}
                 </div>
+                <p className="text-[10px] font-bold text-manga-red truncate mt-0.5 uppercase">Series: {a.seriesTitle}</p>
+                <button 
+                  onClick={() => handleRemoveAssistant(a.seriesId, a.id, a.name)}
+                  className="absolute top-4 right-4 text-gray-400 hover:text-manga-red transition-colors"
+                  title="Xóa trợ lý khỏi dự án"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
                 <p className="text-xs font-bold text-gray-300 uppercase tracking-widest">{a.role}</p>
                 <span className={`inline-block mt-1 text-[9px] font-bold uppercase px-2 py-0.5 border ${a.status === 'Đang làm' ? 'bg-manga-red border-red-400 text-white' : a.status === 'Chờ duyệt' ? 'bg-white text-manga-ink border-white' : 'bg-gray-600 text-gray-300 border-gray-500'}`}>
                   {a.status}
@@ -209,12 +328,26 @@ export default function AssistantsPage() {
             </div>
             <form onSubmit={handleAddAssistant} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Tên Trợ Lý</label>
+                <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Chọn Series</label>
+                <select 
+                  value={selectedSeriesId} 
+                  onChange={e => setSelectedSeriesId(e.target.value)}
+                  className="w-full border-2 border-manga-ink p-2 font-bold focus:ring-2 focus:ring-manga-red bg-white"
+                  required
+                >
+                  {seriesList.map(s => (
+                    <option key={s._id} value={s._id}>{s.title}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase text-gray-500 mb-1">User ID Trợ Lý (UUID)</label>
                 <input 
                   type="text" 
-                  value={newName} 
-                  onChange={e => setNewName(e.target.value)}
+                  value={newAssistantUserId} 
+                  onChange={e => setNewAssistantUserId(e.target.value)}
                   className="w-full border-2 border-manga-ink p-2 font-bold focus:ring-2 focus:ring-manga-red"
+                  placeholder="Dán UUID của trợ lý..."
                   required
                 />
               </div>

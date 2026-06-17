@@ -178,7 +178,7 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen bg-[#fcfcfc] relative flex items-center justify-center p-4 md:p-8 font-sans overflow-hidden">
       <button
-        onClick={() => navigate(-1)}
+        onClick={() => navigate('/')}
         className="absolute top-6 left-6 md:top-10 md:left-10 z-50 p-2 bg-white text-manga-ink manga-border manga-shadow-sm hover:translate-y-1 hover:manga-shadow-none transition-all flex items-center justify-center"
         aria-label="Quay lại"
       >

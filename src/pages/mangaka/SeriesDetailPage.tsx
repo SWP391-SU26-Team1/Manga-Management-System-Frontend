@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router'
 import {
   BookOpen, Clock, Layers, PlusSquare,
-  FileCheck, ClipboardList, CheckCircle, AlertCircle, BarChart2, AlertTriangle
+  FileCheck, ClipboardList, CheckCircle, AlertCircle, BarChart2, AlertTriangle, Users, UserPlus
 } from 'lucide-react'
 import { seriesService, SeriesAPI, getErrorMessage } from '@/services/series.service'
 import { chapterService, ChapterAPI } from '@/services/chapter.service'
 
-const TABS = ['Danh sách Chapter', 'Trạng thái Board Review']
+const TABS = ['Danh sách Chapter', 'Trạng thái Board Review', 'Thành viên Series']
 
 export default function SeriesDetailPage() {
   const { seriesId } = useParams()
@@ -18,18 +18,28 @@ export default function SeriesDetailPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
 
+  // Member Management States
+  const [members, setMembers] = useState<any[]>([])
+  const [newMemberUserId, setNewMemberUserId] = useState('')
+  const [newMemberRole, setNewMemberRole] = useState('assistant')
+  const [memberError, setMemberError] = useState('')
+  const [memberSuccess, setMemberSuccess] = useState('')
+  const [isAddingMember, setIsAddingMember] = useState(false)
+
   useEffect(() => {
     if (!seriesId) return
     const fetchData = async () => {
       setIsLoading(true)
       setError('')
       try {
-        const [s, chs] = await Promise.all([
+        const [s, chs, mems] = await Promise.all([
           seriesService.getById(seriesId),
           chapterService.getBySeriesId(seriesId),
+          seriesService.getMembers(seriesId),
         ])
         setSeries(s)
         setChapters([...chs].sort((a, b) => b.chapter_number - a.chapter_number))
+        setMembers(mems)
       } catch (err) {
         setError(getErrorMessage(err))
       } finally {
@@ -38,6 +48,41 @@ export default function SeriesDetailPage() {
     }
     fetchData()
   }, [seriesId])
+
+  const handleAddMember = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setMemberError('')
+    setMemberSuccess('')
+    if (!newMemberUserId.trim()) return
+
+    setIsAddingMember(true)
+    try {
+      await seriesService.addMember(seriesId!, {
+        user_id: newMemberUserId.trim(),
+        role_in_series: newMemberRole,
+      })
+      setMemberSuccess('Thêm thành viên vào dự án thành công!')
+      setNewMemberUserId('')
+      const mems = await seriesService.getMembers(seriesId!)
+      setMembers(mems)
+    } catch (err) {
+      setMemberError(getErrorMessage(err))
+    } finally {
+      setIsAddingMember(false)
+    }
+  }
+
+  const handleRemoveMember = async (seriesMemberId: string) => {
+    if (!window.confirm('Bạn có chắc muốn xóa thành viên này khỏi Series?')) return
+    try {
+      await seriesService.removeMember(seriesId!, seriesMemberId)
+      alert('Đã xóa thành viên thành công!')
+      const mems = await seriesService.getMembers(seriesId!)
+      setMembers(mems)
+    } catch (err) {
+      alert(getErrorMessage(err))
+    }
+  }
 
   const getSeriesStatusColor = (status: string) => {
     switch (status) {
@@ -195,7 +240,7 @@ export default function SeriesDetailPage() {
                     : 'bg-white text-manga-ink border-manga-ink hover:bg-gray-50'
                 }`}
               >
-                {idx === 0 ? <Layers className="w-4 h-4" /> : <BarChart2 className="w-4 h-4" />}
+                {idx === 0 ? <Layers className="w-4 h-4" /> : idx === 1 ? <BarChart2 className="w-4 h-4" /> : <Users className="w-4 h-4" />}
                 {tab}
               </button>
             ))}
@@ -269,6 +314,134 @@ export default function SeriesDetailPage() {
                   <p className="text-xs text-gray-400 font-bold mt-1 uppercase">
                     Trạng thái xét duyệt sẽ xuất hiện ở đây sau khi bạn nộp hồ sơ lên Hội đồng.
                   </p>
+                </div>
+              </div>
+            )}
+
+            {/* ── TAB 2: Series Members ── */}
+            {activeTab === 2 && (
+              <div className="p-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  {/* Left: Add Member Form */}
+                  <div className="lg:col-span-1 border-2 border-manga-ink p-5 bg-gray-50">
+                    <h3 className="font-manga text-xl font-bold uppercase mb-4 flex items-center gap-2">
+                      <UserPlus className="w-5 h-5 text-manga-red" />
+                      Thêm thành viên
+                    </h3>
+
+                    <form onSubmit={handleAddMember} className="space-y-4 font-bold text-sm text-manga-ink">
+                      {memberError && (
+                        <div className="bg-red-50 border border-manga-red p-2.5 text-xs text-manga-red uppercase flex items-center gap-1.5">
+                          <AlertTriangle className="w-4 h-4 flex-shrink-0" /> {memberError}
+                        </div>
+                      )}
+                      {memberSuccess && (
+                        <div className="bg-green-50 border border-green-500 p-2.5 text-xs text-green-700 uppercase flex items-center gap-1.5">
+                          <CheckCircle className="w-4 h-4 flex-shrink-0" /> {memberSuccess}
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="block text-xs uppercase tracking-widest mb-1.5">User ID Trợ lý (UUID) *</label>
+                        <input
+                          type="text"
+                          required
+                          value={newMemberUserId}
+                          onChange={e => setNewMemberUserId(e.target.value)}
+                          placeholder="Nhập UUID từ Supabase..."
+                          className="w-full border-2 border-manga-ink px-3 py-2 text-sm focus:outline-none focus:border-manga-red bg-white"
+                        />
+                        <p className="text-[10px] text-gray-400 mt-1">Copy mã UUID (User ID) của tài khoản trợ lý</p>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs uppercase tracking-widest mb-1.5">Vai trò trong dự án *</label>
+                        <select
+                          value={newMemberRole}
+                          onChange={e => setNewMemberRole(e.target.value)}
+                          className="w-full border-2 border-manga-ink px-3 py-2 text-sm focus:outline-none focus:border-manga-red bg-white"
+                        >
+                          <option value="assistant">Assistant (Trợ lý vẽ)</option>
+                          <option value="mangaka">Mangaka (Đồng tác giả)</option>
+                        </select>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isAddingMember}
+                        className="w-full bg-manga-red hover:bg-red-700 text-white font-manga font-bold text-xs uppercase py-3 border-2 border-manga-ink manga-shadow-sm hover:translate-y-0.5 hover:shadow-none transition-all disabled:opacity-50"
+                      >
+                        {isAddingMember ? 'Đang xử lý...' : 'Thêm thành viên'}
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Right: Members List */}
+                  <div className="lg:col-span-2">
+                    <h3 className="font-manga text-xl font-bold uppercase mb-4 flex items-center gap-2">
+                      <Users className="w-5 h-5 text-manga-red" />
+                      Danh sách trợ lý tham gia ({members.length})
+                    </h3>
+
+                    <div className="border-2 border-manga-ink overflow-hidden">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-manga-ink text-white font-bold text-[11px] uppercase tracking-wider">
+                            <th className="p-3 border-r border-manga-ink/20">Thành viên</th>
+                            <th className="p-3 border-r border-manga-ink/20">Vai trò chính</th>
+                            <th className="p-3 border-r border-manga-ink/20">Vai trò Series</th>
+                            <th className="p-3 text-center">Hành động</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y-2 divide-gray-100">
+                          {members.map((m) => (
+                            <tr key={m.series_member_id} className="font-semibold text-xs text-manga-ink hover:bg-red-50/20 transition-colors">
+                              <td className="p-4 border-r border-gray-100 align-middle">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden shrink-0 border border-manga-ink/20">
+                                    {m.users?.avatar_url ? (
+                                      <img src={m.users.avatar_url} alt={m.users.username} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center font-bold text-gray-500 bg-gray-100 uppercase">{m.users?.username?.[0] ?? '?'}</div>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <div className="font-bold text-sm">{m.users?.name || m.users?.username || 'Chưa đặt tên'}</div>
+                                    <div className="text-[10px] text-gray-400 font-bold">{m.users?.email || 'Không có email'}</div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="p-4 border-r border-gray-100 align-middle text-gray-500 uppercase font-bold text-[10px]">
+                                {m.users?.role || 'N/A'}
+                              </td>
+                              <td className="p-4 border-r border-gray-100 align-middle">
+                                <span className="px-2 py-0.5 border border-manga-ink bg-gray-50 font-bold uppercase text-[10px]">
+                                  {m.role_in_series}
+                                </span>
+                              </td>
+                              <td className="p-4 align-middle text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveMember(m.series_member_id)}
+                                  className="text-manga-red hover:underline font-bold text-xs uppercase"
+                                >
+                                  Xóa khỏi Series
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+
+                          {members.length === 0 && (
+                            <tr>
+                              <td colSpan={4} className="p-8 text-center text-gray-400 font-bold uppercase text-xs">
+                                Chưa có trợ lý nào được thêm vào dự án này.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

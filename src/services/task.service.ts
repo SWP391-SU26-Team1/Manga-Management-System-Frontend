@@ -69,7 +69,7 @@ export const taskService = {
     pageId: string
   ): Promise<TaskAPI[]> => {
     const res = await api.get<{ success: boolean; data: any[] }>(
-      `/api/mangaka/series/${seriesId}/chapters/${chapterId}/pages/${pageId}/tasks`
+      `/api/pages/${pageId}/tasks`
     )
     return (res.data.data ?? []).map(mapTask)
   },

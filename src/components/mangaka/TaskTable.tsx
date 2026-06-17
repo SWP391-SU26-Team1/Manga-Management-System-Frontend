@@ -1,30 +1,63 @@
-
 import React from "react";
 import { Eye, Edit2, Trash2, ClipboardList, X, BellRing, ExternalLink } from "lucide-react";
-import { LayerTask } from "@/data/mangakaMockData";
 import { Link } from "react-router";
 
+export interface DisplayTask {
+  id: string;
+  chapterId: string;
+  pageId: string;
+  chapterNumber?: number | string;
+  pageNumber?: number | string;
+  layerType: string;
+  assignedTo: string;
+  deadline: string;
+  status: string;
+  note: string;
+  priority: "Low" | "Medium" | "High" | "Urgent";
+  regions?: any[];
+}
+
 interface TaskTableProps {
-  tasks: LayerTask[];
+  tasks: DisplayTask[];
   onDeleteTask?: (taskId: string) => void;
-  onEditTask?: (task: LayerTask) => void;
+  onEditTask?: (task: DisplayTask) => void;
 }
 
 export function TaskTable({ tasks, onDeleteTask, onEditTask }: TaskTableProps) {
-  const [selectedTask, setSelectedTask] = React.useState<LayerTask | null>(null);
+  const [selectedTask, setSelectedTask] = React.useState<DisplayTask | null>(null);
 
-  const getStatusBadge = (status: LayerTask["status"]) => {
-    switch (status) {
-      case "Approved":
+  const getStatusBadge = (status: string) => {
+    const s = (status || "").toLowerCase();
+    switch (s) {
+      case "approved":
+      case "completed":
         return <span className="bg-manga-red text-white border-manga-ink border px-2 py-0.5 text-xs font-bold uppercase">Approved</span>;
-      case "Submitted":
+      case "submitted":
         return <span className="bg-blue-100 text-blue-800 border-blue-300 border px-2 py-0.5 text-xs font-bold uppercase">Submitted</span>;
-      case "Doing":
+      case "doing":
+      case "in_progress":
+      case "assigned":
         return <span className="bg-yellow-100 text-yellow-800 border-yellow-300 border px-2 py-0.5 text-xs font-bold uppercase">Doing</span>;
-      case "Need Fix":
+      case "need fix":
+      case "rejected":
         return <span className="bg-red-100 text-red-800 border-red-300 border px-2 py-0.5 text-xs font-bold uppercase">Need Fix</span>;
+      case "cancelled":
+        return <span className="bg-gray-400 text-white border-gray-500 border px-2 py-0.5 text-xs font-bold uppercase">Cancelled</span>;
       default:
         return <span className="bg-gray-100 text-gray-500 border-gray-300 border px-2 py-0.5 text-xs font-bold uppercase">Not Started</span>;
+    }
+  };
+
+  const getLayerTypeDisplay = (type: string) => {
+    const t = type || "";
+    switch (t) {
+      case "inking": return "Line Art";
+      case "background": return "Background";
+      case "lettering": return "Speech Balloon";
+      case "coloring": return "Screentone";
+      case "sfx": return "Effects / SFX";
+      case "cleaning": return "Cleaning";
+      default: return t;
     }
   };
 
@@ -79,13 +112,15 @@ export function TaskTable({ tasks, onDeleteTask, onEditTask }: TaskTableProps) {
               {/* Chapter and Page */}
               <td className="p-4 border-r-2 border-manga-ink">
                 <span className="bg-gray-100 text-manga-ink border border-manga-ink px-2 py-0.5 text-xs">
-                  Page {task.pageId.split("_")[2] || "1"} (CH.{task.chapterId.split("_")[1] || "44"})
+                  Page {task.pageNumber ?? "N/A"} (CH.{task.chapterNumber ?? "N/A"})
                 </span>
               </td>
 
               {/* Layer type */}
               <td className="p-4 border-r-2 border-manga-ink">
-                <span className="text-xs uppercase text-gray-500 font-bold">{task.layerType}</span>
+                <span className="text-xs uppercase text-gray-500 font-bold">
+                  {getLayerTypeDisplay(task.layerType)}
+                </span>
               </td>
 
               {/* Deadline */}
@@ -159,7 +194,7 @@ export function TaskTable({ tasks, onDeleteTask, onEditTask }: TaskTableProps) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs font-bold text-gray-500 uppercase">Lớp bản thảo</p>
-                  <p className="font-bold">{selectedTask.layerType}</p>
+                  <p className="font-bold">{getLayerTypeDisplay(selectedTask.layerType)}</p>
                 </div>
                 <div>
                   <p className="text-xs font-bold text-gray-500 uppercase">Hạn chót</p>

@@ -52,6 +52,14 @@ export const chapterService = {
     )
     return mapChapter(res.data.data)
   },
+
+  /** GET /api/chapters/:chapterId - Lấy chapter theo ID */
+  getById: async (chapterId: string): Promise<ChapterAPI> => {
+    const res = await api.get<{ success: boolean; data: any }>(
+      `/api/chapters/${chapterId}`
+    )
+    return mapChapter(res.data.data)
+  },
 }
 
 export default chapterService

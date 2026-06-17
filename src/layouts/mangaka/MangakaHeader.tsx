@@ -18,7 +18,7 @@ export function Header() {
     } else if (path === '/dashboard/mangaka/series') {
       sectionName = 'Series của tôi'
     } else if (path === '/dashboard/mangaka/create-series') {
-      sectionName = 'Tạo series mới'
+      sectionName = 'Tạo bản thảo'
     } else if (path === '/dashboard/mangaka/submission') {
       sectionName = 'Duyệt kết quả'
     } else if (path === '/dashboard/mangaka/assign-task') {

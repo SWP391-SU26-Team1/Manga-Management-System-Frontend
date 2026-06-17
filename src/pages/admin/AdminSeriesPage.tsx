@@ -17,35 +17,35 @@ export default function AdminSeriesPage() {
   return (
     <div className="space-y-8">
       <AdminPageHeader
-        title="Danh Sach Series"
-        description="Quan ly va kiem duyet kho luu tru truyen tranh he thong"
-        action={<AdminButton icon={Plus}>Them Series Moi</AdminButton>}
+        title="Danh sách series"
+        description="Quản lý và kiểm duyệt kho lưu trữ truyện tranh hệ thống."
+        action={<AdminButton icon={Plus}>Thêm series mới</AdminButton>}
       />
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-        <AdminStatCard label="Tong Series" value="1,248" helper="Verified archive entries" trend="+12%" icon={Layers3} accent="green" />
-        <AdminStatCard label="Cho Duyet" value="24" helper="Urgent moderation queue" trend="Urgent" icon={XCircle} />
-        <AdminStatCard label="Da Xuat Ban" value="1,180" helper="Approved public catalog" icon={CheckCircle2} accent="green" />
-        <AdminStatCard label="Da Khoa" value="44" helper="Restricted titles" icon={ShieldOff} accent="red" />
+        <AdminStatCard label="Tổng series" value="1,248" helper="Mục lưu trữ đã xác thực" trend="+12%" icon={Layers3} accent="green" />
+        <AdminStatCard label="Chờ duyệt" value="24" helper="Hàng chờ kiểm duyệt khẩn cấp" trend="Khẩn cấp" icon={XCircle} />
+        <AdminStatCard label="Đã xuất bản" value="1,180" helper="Danh mục công khai đã duyệt" icon={CheckCircle2} accent="green" />
+        <AdminStatCard label="Đã khóa" value="44" helper="Series bị hạn chế" icon={ShieldOff} accent="red" />
       </div>
 
       <AdminTableFrame>
         <div className="flex flex-col gap-4 border-b-2 border-manga-ink p-6 lg:flex-row lg:items-center lg:justify-between">
-          <AdminFilters tabs={['Tat Ca (1248)', 'Cho Duyet (24)', 'Da Duyet (1180)', 'Bi Khoa (44)']} />
+          <AdminFilters tabs={['Tất cả (1248)', 'Chờ duyệt (24)', 'Đã duyệt (1180)', 'Bị khóa (44)']} />
           <button className="border-2 border-manga-ink bg-white px-5 py-3 text-sm font-black shadow-[3px_3px_0_rgba(0,0,0,1)]">
-            Sap xep theo: Moi nhat
+            Sắp xếp theo: Mới nhất
           </button>
         </div>
         <table className="w-full border-collapse text-left">
           <thead>
             <tr className="bg-gray-100 text-xs font-black uppercase">
-              <th className="border-b-2 border-r-2 border-manga-ink px-8 py-5">Bia</th>
-              <th className="border-b-2 border-r-2 border-manga-ink px-7 py-5">Ten Series</th>
-              <th className="border-b-2 border-r-2 border-manga-ink px-7 py-5">The Loai</th>
-              <th className="border-b-2 border-r-2 border-manga-ink px-7 py-5 text-center">So Chuong</th>
-              <th className="border-b-2 border-r-2 border-manga-ink px-7 py-5 text-center">Thanh Vien</th>
-              <th className="border-b-2 border-r-2 border-manga-ink px-7 py-5 text-center">Trang Thai</th>
-              <th className="border-b-2 border-manga-ink px-7 py-5 text-right">Thao Tac</th>
+              <th className="border-b-2 border-r-2 border-manga-ink px-8 py-5">Bìa</th>
+              <th className="border-b-2 border-r-2 border-manga-ink px-7 py-5">Tên series</th>
+              <th className="border-b-2 border-r-2 border-manga-ink px-7 py-5">Thể loại</th>
+              <th className="border-b-2 border-r-2 border-manga-ink px-7 py-5 text-center">Số chương</th>
+              <th className="border-b-2 border-r-2 border-manga-ink px-7 py-5 text-center">Thành viên</th>
+              <th className="border-b-2 border-r-2 border-manga-ink px-7 py-5 text-center">Trạng thái</th>
+              <th className="border-b-2 border-manga-ink px-7 py-5 text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -73,7 +73,7 @@ export default function AdminSeriesPage() {
                 <td className="px-7 py-5">
                   <div className="flex justify-end gap-3">
                     <button className="flex h-11 w-11 items-center justify-center border-2 border-manga-ink bg-[#282828] text-white shadow-[3px_3px_0_rgba(0,0,0,1)]"><Eye className="h-5 w-5" /></button>
-                    {series.status === 'pending_review' && <button className="border-2 border-manga-ink bg-manga-red px-4 text-xs font-black uppercase text-white shadow-[3px_3px_0_rgba(0,0,0,1)]">Duyet</button>}
+                    {series.status === 'pending_review' && <button className="border-2 border-manga-ink bg-manga-red px-4 text-xs font-black uppercase text-white shadow-[3px_3px_0_rgba(0,0,0,1)]">Duyệt</button>}
                     <button className="flex h-11 w-11 items-center justify-center border-2 border-manga-ink bg-white"><Edit3 className="h-5 w-5" /></button>
                   </div>
                 </td>
@@ -82,7 +82,7 @@ export default function AdminSeriesPage() {
           </tbody>
         </table>
         <div className="flex flex-col gap-4 border-t-2 border-manga-ink px-8 py-6 md:flex-row md:items-center md:justify-between">
-          <p className="text-sm font-black">Hien thi 1 - 4 cua 1,248 series</p>
+          <p className="text-sm font-black">Hiển thị 1 - 4 trong tổng số 1,248 series</p>
           <AdminPagination />
         </div>
       </AdminTableFrame>

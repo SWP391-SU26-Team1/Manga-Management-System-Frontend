@@ -31,26 +31,27 @@ export type ChapterRanking = {
 }
 
 export const adminRankingsService = {
-  listPeriods: () => adminList<RankingPeriod>('/api/admin/ranking-periods'),
-  getPeriod: (periodId: string) => adminGet<RankingPeriod>(`/api/admin/ranking-periods/${periodId}`),
-  createPeriod: (body: Omit<RankingPeriod, 'period_id'>) => adminPost<RankingPeriod>('/api/admin/ranking-periods', body),
+  getStats: () => adminGet('/api/dashboard/rankings'),
+  listPeriods: (params?: { page?: number; limit?: number }) => adminList<RankingPeriod>('/api/ranking-periods', params),
+  getPeriod: (periodId: string) => adminGet<RankingPeriod>(`/api/ranking-periods/${periodId}`),
+  createPeriod: (body: Omit<RankingPeriod, 'period_id'>) => adminPost<RankingPeriod>('/api/ranking-periods', body),
   updatePeriod: (periodId: string, body: Partial<RankingPeriod>) =>
-    adminPatch<RankingPeriod>(`/api/admin/ranking-periods/${periodId}`, body),
+    adminPatch<RankingPeriod>(`/api/ranking-periods/${periodId}`, body),
   updatePeriodStatus: (periodId: string, status: RankingPeriodStatus) =>
-    adminPatch<RankingPeriod>(`/api/admin/ranking-periods/${periodId}/status`, { status }),
-  deletePeriod: (periodId: string) => adminDelete(`/api/admin/ranking-periods/${periodId}`),
+    adminPatch<RankingPeriod>(`/api/ranking-periods/${periodId}/status`, { status }),
+  deletePeriod: (periodId: string) => adminDelete(`/api/ranking-periods/${periodId}`),
 
-  listSeriesRankings: () => adminList<SeriesRanking>('/api/admin/series-rankings'),
+  listSeriesRankings: (params?: { page?: number; limit?: number }) => adminList<SeriesRanking>('/api/series-rankings', params),
   createSeriesRanking: (body: Omit<SeriesRanking, 'series_ranking_id'>) =>
-    adminPost<SeriesRanking>('/api/admin/series-rankings', body),
+    adminPost<SeriesRanking>('/api/series-rankings', body),
   updateSeriesRanking: (rankingId: string, body: Partial<SeriesRanking>) =>
-    adminPatch<SeriesRanking>(`/api/admin/series-rankings/${rankingId}`, body),
-  deleteSeriesRanking: (rankingId: string) => adminDelete(`/api/admin/series-rankings/${rankingId}`),
+    adminPatch<SeriesRanking>(`/api/series-rankings/${rankingId}`, body),
+  deleteSeriesRanking: (rankingId: string) => adminDelete(`/api/series-rankings/${rankingId}`),
 
-  listChapterRankings: () => adminList<ChapterRanking>('/api/admin/chapter-rankings'),
+  listChapterRankings: (params?: { page?: number; limit?: number }) => adminList<ChapterRanking>('/api/chapter-rankings', params),
   createChapterRanking: (body: Omit<ChapterRanking, 'chapter_ranking_id'>) =>
-    adminPost<ChapterRanking>('/api/admin/chapter-rankings', body),
+    adminPost<ChapterRanking>('/api/chapter-rankings', body),
   updateChapterRanking: (rankingId: string, body: Partial<ChapterRanking>) =>
-    adminPatch<ChapterRanking>(`/api/admin/chapter-rankings/${rankingId}`, body),
-  deleteChapterRanking: (rankingId: string) => adminDelete(`/api/admin/chapter-rankings/${rankingId}`),
+    adminPatch<ChapterRanking>(`/api/chapter-rankings/${rankingId}`, body),
+  deleteChapterRanking: (rankingId: string) => adminDelete(`/api/chapter-rankings/${rankingId}`),
 }

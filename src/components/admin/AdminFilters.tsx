@@ -3,9 +3,10 @@ import React from 'react'
 interface AdminFiltersProps {
   tabs: string[]
   activeTab?: string
+  onTabChange?: (tab: string) => void
 }
 
-export function AdminFilters({ tabs, activeTab }: AdminFiltersProps) {
+export function AdminFilters({ tabs, activeTab, onTabChange }: AdminFiltersProps) {
   const selectedTab = activeTab || tabs[0]
 
   return (
@@ -13,6 +14,8 @@ export function AdminFilters({ tabs, activeTab }: AdminFiltersProps) {
       {tabs.map((tab) => (
         <button
           key={tab}
+          type="button"
+          onClick={() => onTabChange?.(tab)}
           className={`border-2 border-manga-ink px-5 py-3 text-xs font-black uppercase ${tab === selectedTab ? 'bg-manga-red text-white shadow-[3px_3px_0px_rgba(0,0,0,1)]' : 'bg-white text-manga-ink'}`}
         >
           {tab}

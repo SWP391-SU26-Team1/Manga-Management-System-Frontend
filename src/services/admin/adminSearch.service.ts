@@ -8,5 +8,5 @@ export type AdminSearchResult = {
 }
 
 export const adminSearchService = {
-  search: (keyword: string) => adminGet<AdminSearchResult>('/api/admin/search', { keyword }),
+  search: (keyword: string) => adminGet<AdminSearchResult>('/api/search', { keyword }),
 }

@@ -3,24 +3,22 @@ import {
   Bell,
   BookOpen,
   ClipboardList,
-  FileText,
   Layers3,
   LayoutDashboard,
   MessageSquareText,
-  Settings,
   Users,
   Vote,
 } from 'lucide-react'
 
 export const adminNav = [
   {
-    label: 'Dashboard',
+    label: 'Tổng quan',
     path: '/dashboard/admin',
     icon: LayoutDashboard,
     exact: true,
   },
   {
-    label: 'Users',
+    label: 'Người dùng',
     path: '/dashboard/admin/users',
     icon: Users,
   },
@@ -30,43 +28,33 @@ export const adminNav = [
     icon: Layers3,
   },
   {
-    label: 'Chapters',
+    label: 'Chương',
     path: '/dashboard/admin/chapters',
     icon: BookOpen,
   },
   {
-    label: 'Pages',
-    path: '/dashboard/admin/pages',
-    icon: FileText,
-  },
-  {
-    label: 'Tasks',
+    label: 'Công việc',
     path: '/dashboard/admin/tasks',
     icon: ClipboardList,
   },
   {
-    label: 'Review Sessions',
+    label: 'Phiên đánh giá',
     path: '/dashboard/admin/review-sessions',
     icon: MessageSquareText,
   },
   {
-    label: 'Votes',
+    label: 'Bình chọn',
     path: '/dashboard/admin/votes',
     icon: Vote,
   },
   {
-    label: 'Rankings',
+    label: 'Xếp hạng',
     path: '/dashboard/admin/rankings',
     icon: BarChart3,
   },
   {
-    label: 'Notifications',
+    label: 'Thông báo',
     path: '/dashboard/admin/notifications',
     icon: Bell,
-  },
-  {
-    label: 'Settings',
-    path: '/dashboard/admin/settings',
-    icon: Settings,
   },
 ]

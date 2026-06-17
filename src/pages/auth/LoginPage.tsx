@@ -109,6 +109,8 @@ export default function LoginPage() {
         navigate('/dashboard/tantou-editor')
       } else if (storedUserData.role === 'BOARD') {
         navigate('/dashboard/editorial-board')
+      } else if (storedUserData.role === 'ADMIN') {
+        navigate('/dashboard/admin')
       } else {
         navigate('/')
       }

@@ -35,6 +35,8 @@ export function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
             navigate('/dashboard/tantou-editor')
           } else if (user.role === 'BOARD') {
             navigate('/dashboard/editorial-board')
+          } else if (user.role === 'ADMIN') {
+            navigate('/dashboard/admin')
           } else {
             navigate('/')
           }

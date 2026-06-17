@@ -93,7 +93,9 @@ export type User = {
 }
 
 export type Series = {
+  id?: string
   series_id: string
+  seriesId?: string
   title: string
   description?: string | null
   cover_image_url?: string | null
@@ -105,8 +107,11 @@ export type Series = {
 }
 
 export type Chapter = {
+  id?: string
   chapter_id: string
+  chapterId?: string
   series_id: string
+  seriesId?: string
   chapter_number: number
   title?: string | null
   thumbnail_image_url?: string | null
@@ -155,19 +160,35 @@ export type PageTask = {
 }
 
 export type ReviewSession = {
+  id?: string
   session_id: string
+  sessionId?: string
   series_id: string
+  seriesId?: string
   chapter_id?: string | null
+  chapterId?: string | null
   created_by_user_id?: string | null
+  createdByUserId?: string | null
+  title?: string | null
   name?: string | null
   description?: string | null
+  deadline?: string | null
   started_at?: string | null
+  startedAt?: string | null
   ended_at?: string | null
+  endedAt?: string | null
   created_at: string
+  createdAt?: string
+  updated_at?: string | null
+  updatedAt?: string | null
   status: ReviewSessionStatus
+  series?: Pick<Series, 'series_id' | 'title'> | null
+  chapter?: Pick<Chapter, 'chapter_id' | 'chapter_number' | 'title'> | null
+  created_by?: Pick<User, 'user_id' | 'username' | 'name'> | null
 }
 
 export type Vote = {
+  id?: string
   vote_id: string
   voter_id: string
   session_id?: string | null
@@ -176,6 +197,15 @@ export type Vote = {
   note?: string | null
   created_at: string
   status: VoteStatus
+  users?: Pick<User, 'user_id' | 'username' | 'email'> | null
+}
+
+export type ReviewSessionProcessResult = {
+  session_id: string
+  total_votes: number
+  avg_score: number
+  decision_count: Record<string, number>
+  dominant_decision: string
 }
 
 export type Notification = {

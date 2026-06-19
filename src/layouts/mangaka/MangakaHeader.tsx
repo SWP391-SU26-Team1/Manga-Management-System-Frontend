@@ -2,6 +2,168 @@ import React, { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router'
 import { Bell, MessageSquare, Send, User, Settings, LogOut } from 'lucide-react'
 import { mangakaStore, Notification, EditorFeedback } from '@/data/mangakaMockData'
+import { rankingService } from '@/services/ranking.service'
+
+const mapType = (backendType: string): "Assistant" | "Editor" | "Board" | "Ranking" | "System" => {
+  const t = (backendType || '').toLowerCase();
+  if (t.includes('task') || t.includes('submission')) return 'Assistant';
+  if (t.includes('editor') || t.includes('feedback')) return 'Editor';
+  if (t.includes('review') || t.includes('vote') || t.includes('board') || t.includes('chapter_approved')) return 'Board';
+  if (t.includes('ranking')) return 'Ranking';
+  return 'System';
+};
+
+const mapLink = (backendType: string): string => {
+  const t = (backendType || '').toLowerCase();
+  if (t.includes('task') || t.includes('submission')) return '/dashboard/mangaka/submission';
+  if (t.includes('feedback') || t.includes('editor')) return '/dashboard/mangaka/feedback';
+  if (t.includes('ranking')) return '/dashboard/mangaka/ranking';
+  return '';
+};
+
+const translateNotification = (title: string, content: string, type: string) => {
+  const t = (type || '').toLowerCase();
+  const lowerTitle = (title || '').toLowerCase();
+  const lowerContent = (content || '').toLowerCase();
+
+  let viTitle = title;
+  let viContent = content;
+
+  if (t === 'task_assigned' || lowerTitle.includes('new task assigned') || lowerTitle.includes('giao việc')) {
+    viTitle = 'Nhiệm vụ mới được giao';
+    viContent = content || 'Bạn đã giao một nhiệm vụ mới cho trợ lý.';
+  } else if (lowerTitle.includes('task reassigned')) {
+    viTitle = 'Nhiệm vụ được giao lại';
+  } else if (lowerTitle.includes('task transferred')) {
+    viTitle = 'Nhiệm vụ được chuyển giao';
+  } else if (
+    t === 'task_submitted' || 
+    t === 'submission_created' || 
+    lowerTitle.includes('task submitted') || 
+    lowerTitle.includes('page submission') || 
+    lowerTitle.includes('nộp bài') || 
+    lowerTitle.includes('nộp bản vẽ')
+  ) {
+    viTitle = 'Yêu cầu duyệt bản vẽ mới';
+    viContent = content || 'Trợ lý đã nộp bản vẽ mới để chờ duyệt.';
+  } else if (t === 'task_updated' || lowerTitle.includes('task updated')) {
+    viTitle = 'Nhiệm vụ được cập nhật';
+    viContent = content || 'Một nhiệm vụ đã được cập nhật trạng thái.';
+  } else if (t === 'task_overdue' || lowerTitle.includes('task overdue') || lowerTitle.includes('quá hạn')) {
+    viTitle = 'CẢNH BÁO QUÁ HẠN!';
+    viContent = content || 'Nhiệm vụ của trợ lý đã quá hạn chót nộp bài.';
+  } else if (t === 'feedback_created' || lowerTitle.includes('feedback created') || lowerTitle.includes('nhận xét')) {
+    viTitle = 'Phản hồi mới từ Editor';
+    viContent = content || 'Editor đã gửi nhận xét mới cho bản thảo của bạn.';
+  } else if (t === 'user_mentioned' || lowerTitle.includes('user mentioned') || lowerTitle.includes('nhắc đến')) {
+    viTitle = 'Bạn được nhắc đến';
+    viContent = content || 'Có người nhắc đến bạn trong một thảo luận.';
+  } else if (t === 'chapter_published' || lowerTitle.includes('chapter published') || lowerTitle.includes('xuất bản')) {
+    viTitle = 'Chapter đã được xuất bản';
+    viContent = content || 'Chapter của bạn đã được duyệt và xuất bản thành công.';
+  } else if (
+    t === 'manuscript_submitted' || 
+    lowerTitle.includes('manuscript submitted') || 
+    lowerTitle.includes('nộp bản thảo')
+  ) {
+    viTitle = 'Bản thảo đã được nộp';
+    viContent = content || 'Bản thảo chương truyện đã được nộp lên ban biên tập.';
+  } else if (t === 'decision_result' || lowerTitle.includes('decision result') || lowerTitle.includes('quyết định') || lowerTitle.includes('series approved') || lowerTitle.includes('series rejected')) {
+    viTitle = 'Kết quả duyệt bản thảo';
+    viContent = content || 'Ban biên tập đã đưa ra quyết định duyệt cho bản thảo của bạn.';
+  } else if (
+    t === 'ranking_warning' || 
+    lowerTitle.includes('ranking risk') || 
+    lowerTitle.includes('ranking warning') || 
+    lowerTitle.includes('cảnh báo xếp hạng')
+  ) {
+    viTitle = 'Cảnh báo xếp hạng series';
+    viContent = content || 'Series của bạn đang có biến động thứ hạng thấp hoặc có rủi ro.';
+  } else if (lowerTitle.includes('submission approved')) {
+    viTitle = 'Bản vẽ đã được phê duyệt';
+  } else if (lowerTitle.includes('submission rejected')) {
+    viTitle = 'Bản vẽ bị từ chối';
+  } else if (lowerTitle.includes('revision requested')) {
+    viTitle = 'Yêu cầu chỉnh sửa bản vẽ';
+  }
+
+  // Map content
+  if (lowerContent.includes('submitted page version')) {
+    const match = content.match(/assistant submitted page version\s+(.+?)\s+for review/i);
+    if (match) {
+      viContent = `Trợ lý đã nộp bản vẽ trang (Phiên bản v${match[1]}) để chờ bạn duyệt.`;
+    } else {
+      viContent = `Trợ lý đã nộp bản vẽ trang mới để chờ bạn duyệt.`;
+    }
+  } else if (lowerContent.includes('submitted a submission for task')) {
+    const match = content.match(/assistant\s+(.+?)\s+submitted a submission for task\s+(\d+)/i);
+    if (match) {
+      viContent = `Trợ lý ${match[1]} đã nộp bản vẽ cho Nhiệm vụ #${match[2]}.`;
+    }
+  } else if (lowerContent.includes('assigned task')) {
+    const match = content.match(/assigned task\s+(\d+)\s+to assistant\s+(.+)/i);
+    if (match) {
+      viContent = `Đã giao Nhiệm vụ #${match[1]} thành công cho Trợ lý ${match[2]}.`;
+    }
+  } else if (lowerContent.includes('is at risk in ranking') || lowerContent.includes('is at risk due to declining ranking')) {
+    const match = content.match(/series\s+(.+?)\s+is at risk/i);
+    if (match) {
+      viContent = `Truyện "${match[1]}" đang gặp rủi ro rớt hạng hoặc điểm số giảm mạnh.`;
+    } else {
+      viContent = 'Series truyện của bạn đang gặp rủi ro xếp hạng giảm sút.';
+    }
+  } else if (lowerContent.includes('manuscript') && lowerContent.includes('has been submitted for review')) {
+    const match = content.match(/manuscript\s+"(.+?)"\s+has been submitted/i);
+    if (match) {
+      viContent = `Bản thảo "${match[1]}" đã được nộp thành công và đang chờ duyệt.`;
+    }
+  } else if (lowerContent.includes('series decision:')) {
+    const match = content.match(/series decision:\s+(.+)/i);
+    if (match) {
+      const decision = match[1].toLowerCase() === 'approved' ? 'Phê duyệt' : 'Từ chối';
+      viContent = `Quyết định duyệt từ Hội đồng: ${decision}.`;
+    }
+  } else if (lowerContent.includes('your page version') && lowerContent.includes('has been approved')) {
+    const match = content.match(/your page version\s+(.+?)\s+has been approved/i);
+    if (match) {
+      viContent = `Bản vẽ trang (Phiên bản v${match[1]}) của bạn đã được phê duyệt thành công.`;
+    }
+  } else if (lowerContent.includes('your page version') && lowerContent.includes('has been rejected')) {
+    const match = content.match(/your page version\s+(.+?)\s+has been rejected/i);
+    if (match) {
+      viContent = `Bản vẽ trang (Phiên bản v${match[1]}) của bạn bị từ chối.`;
+    }
+  } else if (lowerContent.includes('reviewer requested changes on page version')) {
+    const match = content.match(/reviewer requested changes on page version\s+(.+?):\s*(.*)/i);
+    if (match) {
+      viContent = `Người duyệt yêu cầu sửa trang (Phiên bản v${match[1]}): ${match[2]}`;
+    }
+  } else if (lowerContent.includes('revision requested for your task. feedback:')) {
+    const match = content.match(/feedback:\s*(.*)/i);
+    if (match) {
+      viContent = `Yêu cầu chỉnh sửa lại nhiệm vụ. Phản hồi: ${match[1]}`;
+    }
+  } else if (lowerContent.includes('reassigned to you')) {
+    viContent = 'Nhiệm vụ đã được phân công lại cho bạn.';
+  } else if (lowerContent.includes('transferred to you')) {
+    viContent = 'Nhiệm vụ đã được chuyển giao cho bạn.';
+  }
+
+  viContent = viContent
+    .replace(/has been approved/gi, 'đã được phê duyệt')
+    .replace(/has been rejected/gi, 'bị từ chối')
+    .replace(/needs revision/gi, 'cần sửa chữa')
+    .replace(/is overdue/gi, 'đã quá hạn');
+
+  return { title: viTitle, message: viContent };
+};
+
+const formatRealTime = (dateStr: string) => {
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return dateStr
+  const pad = (n: number) => n.toString().padStart(2, '0')
+  return `${pad(d.getHours())}:${pad(d.getMinutes())} ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`
+};
 
 export function Header() {
   const navigate = useNavigate();
@@ -76,9 +238,36 @@ export function Header() {
   const feedbackRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
+  const loadRealNotifications = async () => {
+    try {
+      const data = await rankingService.getNotifications()
+      const mapped = data.map(n => {
+        const type = mapType(n.type);
+        const link = mapLink(n.type);
+        const { title, message } = translateNotification(n.title, n.content || '', n.type);
+        return {
+          id: n.notification_id,
+          type,
+          title,
+          message,
+          createdAt: n.created_at,
+          isRead: n.is_read,
+          link: link || undefined
+        };
+      });
+      setNotifications(mapped);
+    } catch (err) {
+      console.error('Lỗi tải thông báo của Mangaka:', err);
+    }
+  };
+
   useEffect(() => {
-    setNotifications(mangakaStore.getNotifications());
+    loadRealNotifications();
     setFeedbacks(mangakaStore.getEditorFeedbacks());
+
+    const interval = setInterval(() => {
+      loadRealNotifications();
+    }, 15000);
 
     const handleClickOutside = (event: MouseEvent) => {
       if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
@@ -102,8 +291,14 @@ export function Header() {
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
       window.removeEventListener('mangaflow_profile_updated', handleProfileUpdate);
+      clearInterval(interval);
     }
   }, []);
+
+  // Reload notifications on navigation
+  useEffect(() => {
+    loadRealNotifications();
+  }, [location.pathname]);
 
   const displayName = user?.fullName || 'Tokuda Oda'
   const userInitials = displayName === 'Tokuda Oda' ? 'TO' : (displayName.split(' ').pop()?.slice(0, 2).toUpperCase() || 'TO')
@@ -116,9 +311,13 @@ export function Header() {
     navigate('/login');
   };
 
-  const handleNotifClick = (id: string, link?: string) => {
-    mangakaStore.markNotificationRead(id);
-    setNotifications(mangakaStore.getNotifications());
+  const handleNotifClick = async (id: string, link?: string) => {
+    try {
+      await rankingService.markAsRead(id);
+      await loadRealNotifications();
+    } catch (err) {
+      console.error('Lỗi khi đánh dấu thông báo đã đọc:', err);
+    }
     setShowNotif(false);
     if (link) navigate(link);
   };
@@ -161,7 +360,7 @@ export function Header() {
                   >
                     <div className="flex justify-between items-start mb-1">
                       <span className="text-xs font-bold">{n.title}</span>
-                      <span className="text-[10px] text-gray-500">{new Date(n.createdAt).toLocaleDateString()}</span>
+                      <span className="text-[10px] text-gray-500">{formatRealTime(n.createdAt)}</span>
                     </div>
                     <p className="text-xs text-gray-700 line-clamp-2">{n.message}</p>
                   </div>

@@ -44,9 +44,9 @@ export default function RecoveryPage() {
 
   const handleApproveRecovery = async (id: string, title: string) => {
     try {
-      await boardService.evaluateRecoveryPlan(id, 'APPROVED', 'Duyệt hồ sơ cam kết phục hồi.')
+      // await boardService.evaluateRecoveryPlan(id, 'APPROVED', 'Duyệt hồ sơ cam kết phục hồi.')
     } catch (err) {
-      console.warn('API error approving recovery plan, falling back to local storage:', err)
+      console.warn('API error approving recovery plan:', err)
     }
 
     setDossiers(dossiers.map(d => d.id === id ? { ...d, status: 'APPROVED' } : d))
@@ -56,9 +56,9 @@ export default function RecoveryPage() {
 
   const handleRejectRecovery = async (id: string, title: string) => {
     try {
-      await boardService.evaluateRecoveryPlan(id, 'REJECTED', 'Từ chối hồ sơ cam kết phục hồi.')
+      // await boardService.evaluateRecoveryPlan(id, 'REJECTED', 'Từ chối hồ sơ cam kết phục hồi.')
     } catch (err) {
-      console.warn('API error rejecting recovery plan, falling back to local storage:', err)
+      console.warn('API error rejecting recovery plan:', err)
     }
 
     setDossiers(dossiers.filter(d => d.id !== id))

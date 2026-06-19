@@ -10,6 +10,9 @@ import SeriesApprovalPage from '@/pages/editorial-board/member-editor/SeriesAppr
 import SeriesReviewDetailPage from '@/pages/editorial-board/member-editor/SeriesReviewDetailPage'
 import ProfilePage from '@/pages/editorial-board/member-editor/ProfilePage'
 import SettingsPage from '@/pages/editorial-board/member-editor/SettingsPage'
+import RankingsPage from '@/pages/editorial-board/member-editor/RankingsPage'
+import HistoryPage from '@/pages/editorial-board/member-editor/HistoryPage'
+import ProposalsListPage from '@/pages/editorial-board/member-editor/ProposalsListPage'
 
 // Chief Editor Pages
 import ChiefDashboardPage from '@/pages/editorial-board/chief-editor/ChiefDashboardPage'
@@ -33,7 +36,9 @@ export default function BoardRoutes() {
         
         {/* Recovery: handles locking internally in RecoveryPage.tsx */}
         <Route path="recovery" element={<RecoveryPage />} />
-        
+        {/* Proposals / Tasks inbox */}
+        <Route path="proposals" element={<ProposalsListPage />} />
+
         {/* Disputes listing and details: dynamic checks or separate components */}
         <Route path="disputes" element={isChief ? <ChiefDisputesListPage /> : <DisputesListPage />} />
         <Route path="disputes/:caseId" element={isChief ? <ChiefDisputeDetailsPage /> : <DisputeDetailsPage />} />
@@ -60,6 +65,8 @@ export default function BoardRoutes() {
         <Route path="review/:chapterId/vote" element={<VotePage />} />
 
         {/* Global info pages */}
+        <Route path="rankings" element={<RankingsPage />} />
+        <Route path="history" element={<HistoryPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>

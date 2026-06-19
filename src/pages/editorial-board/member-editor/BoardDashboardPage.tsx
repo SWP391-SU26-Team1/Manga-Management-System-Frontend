@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router'
 import { CheckSquare, Square, TrendingUp, TrendingDown, Clock, ArrowRight, AlertCircle } from 'lucide-react'
-import { boardStore, QueueChapter, TodayTask, WeeklyRanking } from '@/data/boardMockData'
+import { QueueChapter, WeeklyRanking } from '@/types/board.types'
 import { boardService } from '@/services/board.service'
 import { rankingService } from '@/services/ranking.service'
 
 export default function BoardDashboardPage() {
   const [chapters, setChapters] = useState<QueueChapter[]>([])
-  const [tasks, setTasks] = useState<TodayTask[]>([])
   const [rankings, setRankings] = useState<WeeklyRanking[]>([])
 
   useEffect(() => {
@@ -18,75 +17,53 @@ export default function BoardDashboardPage() {
         if (queueRes && queueRes.length > 0) {
           const adapted = queueRes.map((c: any) => ({
             id: c.chapter_id || c.id,
-            title: c.title,
+            title: c.series?.title || c.title || 'Unknown Title',
             chapterNumber: c.chapter_number,
-            genre: c.genre || 'ACTION / SHONEN',
+            genre: c.series?.genre || c.genre || 'ACTION / SHONEN',
             progressLabel: c.progressLabel || 'EDIT',
             progressPercent: c.progressPercent || 75,
             timeLeftLabel: c.timeLeftLabel || '4h left',
             isUrgent: c.isUrgent || false,
             isNewSeries: c.isNewSeries || false,
-            coverUrl: c.thumbnail_image_url || c.coverUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=300&auto=format&fit=crop'
+            coverUrl: (c.thumbnail_image_url && c.thumbnail_image_url !== 'null' && c.thumbnail_image_url !== 'undefined') ? c.thumbnail_image_url : 
+                      (c.series?.cover_image_url && c.series?.cover_image_url !== 'null' && c.series?.cover_image_url !== 'undefined') ? c.series.cover_image_url : 
+                      c.coverUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=300&auto=format&fit=crop'
           }))
           setChapters(adapted)
         } else {
-          setChapters(boardStore.getQueueChapters())
+          setChapters([])
         }
       } catch (err) {
-        console.warn('API error fetching chapters, falling back to mock:', err)
-        setChapters(boardStore.getQueueChapters())
-      }
-
-      // 2. Fetch tasks from real API
-      try {
-        const tasksRes = await boardService.getTodayTasks()
-        if (tasksRes && tasksRes.length > 0) {
-          setTasks(tasksRes.map((t: any) => ({
-            id: t.id || t.task_id,
-            content: t.content || t.description || 'Task',
-            done: t.done || t.status === 'DONE'
-          })))
-        } else {
-          setTasks(boardStore.getTodayTasks())
-        }
-      } catch (err) {
-        console.warn('API error fetching tasks, falling back to mock:', err)
-        setTasks(boardStore.getTodayTasks())
+        console.warn('API error fetching chapters:', err)
+        setChapters([])
       }
 
       // 3. Fetch weekly rankings from real API
       try {
         const rankingRes = await rankingService.getWeekly()
         if (rankingRes && rankingRes.length > 0) {
-          const adapted = rankingRes.map((r: any) => ({
-            rank: r.rank,
-            title: r.title,
-            votes: r.views || r.votes || 12000,
+          const adapted = rankingRes.map((r: any, idx: number) => ({
+            id: r.series_ranking_id || r.id || `rank-${idx}`,
+            rank: r.rank_position || r.rank,
+            title: r.series?.title || r.title || 'Unknown Title',
+            votes: r.total_vote || r.views || r.votes || 12000,
             changePercent: r.score ? Math.floor((r.score % 10) + 1) : 4,
-            trend: r.trend === 'down' ? 'down' as const : 'up' as const
+            trend: r.trend === 'down' ? 'down' as const : 'up' as const,
+            coverUrl: (r.series?.cover_image_url && r.series?.cover_image_url !== 'null' && r.series?.cover_image_url !== 'undefined') ? r.series.cover_image_url : 'https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=300&auto=format&fit=crop'
           }))
           setRankings(adapted)
         } else {
-          setRankings(boardStore.getWeeklyRankings())
+          setRankings([])
         }
       } catch (err) {
-        console.warn('API error fetching rankings, falling back to mock:', err)
-        setRankings(boardStore.getWeeklyRankings())
+        console.warn('API error fetching rankings:', err)
+        setRankings([])
       }
     }
 
     loadData()
   }, [])
 
-  const handleToggleTask = async (taskId: string) => {
-    try {
-      await boardService.toggleTask(taskId)
-    } catch (err) {
-      console.warn('API error toggling task, toggling on mock store:', err)
-    }
-    boardStore.toggleTask(taskId)
-    setTasks(boardStore.getTodayTasks())
-  }
 
   // Calculate unread urgent reviews count
   const urgentCount = chapters.filter(c => c.isUrgent || c.timeLeftLabel === 'URGENT').length
@@ -159,6 +136,9 @@ export default function BoardDashboardPage() {
                         src={chapter.coverUrl} 
                         alt={chapter.title} 
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=300&auto=format&fit=crop';
+                        }}
                       />
                     </div>
                     <div className="min-w-0">
@@ -215,9 +195,9 @@ export default function BoardDashboardPage() {
             </h3>
             
             <div className="space-y-3">
-              {rankings.map((rank) => (
+              {rankings.map((rank: any) => (
                 <div 
-                  key={rank.rank}
+                  key={rank.id || rank.title}
                   className="flex items-center justify-between p-3 border-2 border-manga-ink shadow-[2px_2px_0px_rgba(0,0,0,1)] bg-zinc-50"
                 >
                   <div className="flex items-center gap-3">
@@ -277,36 +257,6 @@ export default function BoardDashboardPage() {
             <p className="text-[10px] text-gray-500 font-extrabold uppercase text-center leading-tight tracking-wider">
               NGƯỜI ĐỌC HOẠT ĐỘNG HÀNG NGÀY (7 NGÀY QUA)
             </p>
-          </div>
-
-          {/* Checklist Task Widget */}
-          <div className="bg-white border-4 border-manga-ink p-5 shadow-[6px_6px_0px_rgba(15,15,15,1)]">
-            <h3 className="font-manga text-xl font-black uppercase border-b-4 border-manga-ink pb-2 mb-4">
-              VIỆC CẦN LÀM HÔM NAY
-            </h3>
-            
-            <div className="space-y-3">
-              {tasks.map((task) => (
-                <div 
-                  key={task.id}
-                  onClick={() => handleToggleTask(task.id)}
-                  className={`flex items-start gap-3 p-2.5 border-2 border-manga-ink shadow-[2px_2px_0px_rgba(0,0,0,1)] cursor-pointer select-none transition-colors ${
-                    task.done ? 'bg-zinc-100 border-gray-400 text-gray-400' : 'bg-white text-manga-ink hover:bg-red-50/50'
-                  }`}
-                >
-                  <button className="shrink-0 mt-0.5 text-manga-red bg-transparent border-0 p-0 focus:outline-none cursor-pointer">
-                    {task.done ? (
-                      <CheckSquare className="w-4 h-4 text-gray-400" />
-                    ) : (
-                      <Square className="w-4 h-4 text-manga-ink" />
-                    )}
-                  </button>
-                  <span className={`text-xs font-bold leading-snug ${task.done ? 'line-through' : ''}`}>
-                    {task.content}
-                  </span>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </div>

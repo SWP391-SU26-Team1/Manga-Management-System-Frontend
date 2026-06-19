@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router'
 import { ZoomIn, Maximize2, Send, Save, ArrowRight, ArrowLeft, Star, CheckCircle } from 'lucide-react'
-import { boardStore, BoardComment, ChapterGrade } from '@/data/boardMockData'
+import { BoardComment, ChapterGrade } from '@/types/board.types'
 import { useNotifications } from '@/contexts/NotificationContext'
 import { boardService } from '@/services/board.service'
 
@@ -33,23 +33,8 @@ export function ChiefReadDraftPage() {
 
   const loadComments = async () => {
     if (!chapterId) return
-    try {
-      const res = await boardService.getComments(chapterId)
-      if (res && res.length > 0) {
-        setComments(res.map((c: any) => ({
-          id: c.comment_id || c.id,
-          author: c.username || c.author || 'USER',
-          role: c.role || 'Member Editor',
-          isChief: c.role === 'CHIEF' || c.isChief || c.username?.includes('CHIEF'),
-          time: c.created_at ? new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : c.time,
-          content: c.content
-        })))
-      } else {
-        setComments(boardStore.getComments(chapterId))
-      }
-    } catch (err) {
-      setComments(boardStore.getComments(chapterId))
-    }
+    // const res = await boardService.getComments(chapterId)
+    setComments([])
   }
 
   useEffect(() => {
@@ -61,7 +46,7 @@ export function ChiefReadDraftPage() {
     if (!newComment.trim() || !chapterId) return
     const commentText = newComment.trim()
     try {
-      await boardService.addComment(chapterId, commentText)
+      // await boardService.addComment(chapterId, commentText)
     } catch (err) {
       console.warn('API error sending comment, using fallback:', err)
     }
@@ -110,7 +95,7 @@ export function ChiefReadDraftPage() {
     localStorage.setItem(`board_comments_${chapterId}`, JSON.stringify(sorted))
     
     try {
-      await boardService.pinComment(chapterId || '', commentId, nextPinnedState)
+      // await boardService.pinComment(chapterId || '', commentId, nextPinnedState)
     } catch (err) {
       console.warn('API error pinning comment:', err)
     }
@@ -320,8 +305,7 @@ export function ChiefScorePage() {
 
   useEffect(() => {
     const loadGrade = async () => {
-      if (!chapterId) return
-      setGrade(boardStore.getGrade(chapterId))
+      // setGrade(boardStore.getGrade(chapterId))
     }
     loadGrade()
   }, [chapterId])
@@ -336,19 +320,19 @@ export function ChiefScorePage() {
       return
     }
     try {
-      await boardService.saveGrade({
-        chapter_id: grade.chapterId,
-        drawing: grade.drawing,
-        pacing: grade.pacing,
-        layout: grade.layout,
-        dialogue: grade.dialogue,
-        finish: grade.finish,
-        note: grade.note
-      })
+      // await boardService.saveGrade({
+      //   chapter_id: grade.chapterId,
+      //   drawing: grade.drawing,
+      //   pacing: grade.pacing,
+      //   layout: grade.layout,
+      //   dialogue: grade.dialogue,
+      //   finish: grade.finish,
+      //   note: grade.note
+      // })
     } catch (err) {
-      console.warn('API error saving grade, using fallback:', err)
+      console.warn('API error saving grade:', err)
     }
-    boardStore.saveGrade(grade)
+    // boardStore.saveGrade(grade)
     addNotification('RATING SUCCESSFUL', `Đã lưu điểm số thẩm định của Trưởng ban cho tác phẩm: ${chapterTitleDisplay}`, 'RATING', 'rating_success')
     setSuccess(true)
     setTimeout(() => {

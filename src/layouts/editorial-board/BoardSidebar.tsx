@@ -8,31 +8,37 @@ import {
   Award,
   Vote,
   Settings,
-  LogOut
+  LogOut,
+  FileText
 } from 'lucide-react'
 
 // Main panel menu items
 const mainMenuItems = [
   {
-    label: "Duyệt chapter",
+    label: "Tổng quan (Dashboard)",
     path: "/dashboard/editorial-board",
     icon: LayoutDashboard,
     exact: true
   },
   {
-    label: "Duyệt tác phẩm (Series)",
-    path: "/dashboard/editorial-board/series-approval",
-    icon: Vote
-  },
-  {
-    label: "Hồ sơ phục hồi",
-    path: "/dashboard/editorial-board/recovery",
-    icon: History
+    label: "Hộp thư công việc (Proposals)",
+    path: "/dashboard/editorial-board/proposals",
+    icon: FileText
   },
   {
     label: "Báo cáo tranh cãi",
     path: "/dashboard/editorial-board/disputes",
     icon: AlertTriangle
+  },
+  {
+    label: "Bảng Xếp Hạng",
+    path: "/dashboard/editorial-board/rankings",
+    icon: Award
+  },
+  {
+    label: "Lịch sử Phán quyết",
+    path: "/dashboard/editorial-board/history",
+    icon: History
   }
 ]
 
@@ -57,9 +63,8 @@ export default function BoardSidebar() {
     }
   }, [])
 
-  const isChief = user?.isChief || user?.email === 'chiefeditor@mangaflow.com'
   const displayName = user?.fullName || 'Minamoto Shizuka'
-  const userRoleText = isChief ? 'Chief Editor' : 'Member Editor'
+  const userRoleText = 'Member Editor'
   const userInitials = displayName === 'Minamoto Shizuka' ? 'MS' : (displayName.split(' ').pop()?.slice(0, 2).toUpperCase() || 'ME')
 
   const handleLogout = () => {
@@ -73,36 +78,23 @@ export default function BoardSidebar() {
   const chapterId = reviewMatch ? reviewMatch[1] : ''
 
   // Review panel menu items (depends on active chapter ID and role)
-  const reviewMenuItems = isChief
-    ? [
-        {
-          label: "Xem Bản Thảo",
-          path: `/dashboard/editorial-board/review/${chapterId}/draft`,
-          icon: BookOpen
-        },
-        {
-          label: "Xem Vote & Quyết định",
-          path: `/dashboard/editorial-board/review/${chapterId}/analysis`,
-          icon: Vote
-        }
-      ]
-    : [
-        {
-          label: "Xem Bản Thảo",
-          path: `/dashboard/editorial-board/review/${chapterId}/draft`,
-          icon: BookOpen
-        },
-        {
-          label: "Chấm Điểm",
-          path: `/dashboard/editorial-board/review/${chapterId}/score`,
-          icon: Award
-        },
-        {
-          label: "Vote",
-          path: `/dashboard/editorial-board/review/${chapterId}/vote`,
-          icon: Vote
-        }
-      ]
+  const reviewMenuItems = [
+    {
+      label: "Xem Bản Thảo",
+      path: `/dashboard/editorial-board/review/${chapterId}/draft`,
+      icon: BookOpen
+    },
+    {
+      label: "Chấm Điểm",
+      path: `/dashboard/editorial-board/review/${chapterId}/score`,
+      icon: Award
+    },
+    {
+      label: "Vote",
+      path: `/dashboard/editorial-board/review/${chapterId}/vote`,
+      icon: Vote
+    }
+  ]
 
   const activeMenuItems = isReviewMode ? reviewMenuItems : mainMenuItems
 

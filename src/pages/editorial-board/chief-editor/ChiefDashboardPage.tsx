@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router'
 import { CheckSquare, Square, TrendingUp, TrendingDown, Clock, ArrowRight, AlertCircle, Plus, Trash2 } from 'lucide-react'
-import { boardStore, QueueChapter, TodayTask, WeeklyRanking } from '@/data/boardMockData'
+import { QueueChapter, WeeklyRanking } from '@/types/board.types'
 import { boardService } from '@/services/board.service'
 import { rankingService } from '@/services/ranking.service'
 
 export default function ChiefDashboardPage() {
   const [chapters, setChapters] = useState<QueueChapter[]>([])
-  const [tasks, setTasks] = useState<TodayTask[]>([])
   const [rankings, setRankings] = useState<WeeklyRanking[]>([])
-  const [newTask, setNewTask] = useState('')
 
   useEffect(() => {
     const loadData = async () => {
@@ -30,25 +28,10 @@ export default function ChiefDashboardPage() {
           }))
           setChapters(adapted)
         } else {
-          setChapters(boardStore.getQueueChapters())
+          setChapters([])
         }
       } catch (err) {
-        setChapters(boardStore.getQueueChapters())
-      }
-
-      try {
-        const tasksRes = await boardService.getTodayTasks()
-        if (tasksRes && tasksRes.length > 0) {
-          setTasks(tasksRes.map((t: any) => ({
-            id: t.id || t.task_id,
-            content: t.content || t.description || 'Task',
-            done: t.done || t.status === 'DONE'
-          })))
-        } else {
-          setTasks(boardStore.getTodayTasks())
-        }
-      } catch (err) {
-        setTasks(boardStore.getTodayTasks())
+        setChapters([])
       }
 
       try {
@@ -63,40 +46,15 @@ export default function ChiefDashboardPage() {
           }))
           setRankings(adapted)
         } else {
-          setRankings(boardStore.getWeeklyRankings())
+          setRankings([])
         }
       } catch (err) {
-        setRankings(boardStore.getWeeklyRankings())
+        setRankings([])
       }
     }
     loadData()
   }, [])
 
-  const handleToggleTask = async (taskId: string) => {
-    try {
-      await boardService.toggleTask(taskId)
-    } catch (err) {
-      console.warn('API error toggling task, using fallback:', err)
-    }
-    boardStore.toggleTask(taskId)
-    setTasks(boardStore.getTodayTasks())
-  }
-
-  const handleAddTask = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newTask.trim()) return
-    const updated = [...tasks, { id: `t_${Date.now()}`, content: newTask.trim(), done: false }]
-    setTasks(updated)
-    boardStore.setTodayTasks(updated)
-    setNewTask('')
-  }
-
-  const handleDeleteTask = (taskId: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    const updated = tasks.filter(t => t.id !== taskId)
-    setTasks(updated)
-    boardStore.setTodayTasks(updated)
-  }
 
   const urgentCount = chapters.filter(c => c.isUrgent || c.timeLeftLabel === 'URGENT').length
 
@@ -324,63 +282,6 @@ export default function ChiefDashboardPage() {
             <p className="text-[10px] text-gray-500 font-extrabold uppercase text-center leading-tight tracking-wider">
               NGƯỜI ĐỌC HOẠT ĐỘNG HÀNG NGÀY (7 NGÀY QUA)
             </p>
-          </div>
-
-          {/* Checklist Task Widget: Chief Managed */}
-          <div className="bg-white border-4 border-manga-ink p-5 shadow-[6px_6px_0px_rgba(15,15,15,1)]">
-            <h3 className="font-manga text-xl font-black uppercase border-b-4 border-manga-ink pb-2 mb-4">
-              XỬ LÝ GIAO THỨC HÔM NAY
-            </h3>
-
-            {/* Input form to add new tasks */}
-            <form onSubmit={handleAddTask} className="flex gap-2 mb-4">
-              <input
-                type="text"
-                value={newTask}
-                onChange={e => setNewTask(e.target.value)}
-                placeholder="Thêm nhiệm vụ cụ thể..."
-                className="flex-1 border-2 border-manga-ink px-3 py-1.5 text-xs font-bold bg-zinc-50 outline-none focus:border-manga-red"
-              />
-              <button
-                type="submit"
-                className="bg-manga-ink hover:bg-manga-red text-white border-2 border-manga-ink px-4 py-1 font-manga font-bold text-xs uppercase shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all active:translate-y-0.5"
-              >
-                +
-              </button>
-            </form>
-            
-            <div className="space-y-3">
-              {tasks.map((task) => (
-                <div 
-                  key={task.id}
-                  onClick={() => handleToggleTask(task.id)}
-                  className={`flex items-start justify-between gap-2.5 p-2.5 border-2 border-manga-ink shadow-[2px_2px_0px_rgba(0,0,0,1)] cursor-pointer select-none transition-colors group ${
-                    task.done ? 'bg-zinc-100 border-gray-400 text-gray-400' : 'bg-white text-manga-ink hover:bg-red-50/50'
-                  }`}
-                >
-                  <div className="flex items-start gap-2.5">
-                    <button className="shrink-0 mt-0.5 text-manga-red bg-transparent border-0 p-0 focus:outline-none cursor-pointer">
-                      {task.done ? (
-                        <CheckSquare className="w-4 h-4 text-gray-400" />
-                      ) : (
-                        <Square className="w-4 h-4 text-manga-ink" />
-                      )}
-                    </button>
-                    <span className={`text-xs font-bold leading-snug ${task.done ? 'line-through' : ''}`}>
-                      {task.content}
-                    </span>
-                  </div>
-
-                  <button
-                    onClick={(e) => handleDeleteTask(task.id, e)}
-                    className="text-gray-400 hover:text-manga-red bg-transparent border-0 cursor-pointer font-bold text-xs px-1 select-none focus:outline-none opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Xóa đầu việc"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </div>

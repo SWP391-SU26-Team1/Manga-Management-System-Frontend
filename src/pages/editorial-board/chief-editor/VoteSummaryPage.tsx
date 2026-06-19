@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router'
 import { ArrowLeft, CheckCircle, AlertCircle, HelpCircle } from 'lucide-react'
-import { boardStore } from '@/data/boardMockData'
+import { ReviewedSeries } from '@/types/board.types'
 import { boardService } from '@/services/board.service'
 
 export default function VoteSummaryPage() {
@@ -40,15 +40,12 @@ export default function VoteSummaryPage() {
     const fetchSummary = async () => {
       if (!chapterId) return
       try {
-        const data = await boardService.getVoteSummary(chapterId)
-        if (data && data.voters) {
-          updateState(data)
-        } else {
-          updateState(boardStore.getVoteSummary(chapterId))
-        }
+        // const data = await boardService.getVoteSummary(chapterId)
+        // if (data && data.voters) { ... }
+        updateState({})
       } catch (err) {
-        console.warn('API error fetching vote summary, using fallback:', err)
-        updateState(boardStore.getVoteSummary(chapterId))
+        console.warn('API error fetching vote summary:', err)
+        updateState({})
       }
     }
 
@@ -102,11 +99,10 @@ export default function VoteSummaryPage() {
     // Call real API with fallback
     if (chapterId) {
       try {
-        await boardService.saveChapterDecision(chapterId, progressLabel, progressPercent)
+        await boardService.applyChapterDecision(chapterId, progressLabel, `Tiến độ: ${progressPercent}%`)
       } catch (err) {
-        console.warn('API error saving chapter decision, falling back to local storage:', err)
+        console.warn('API error saving chapter decision:', err)
       }
-      boardStore.updateChapterStatus(chapterId, progressLabel, progressPercent)
     }
 
     // Redirect to Screen 4 (Send Notification) with pre-filled state

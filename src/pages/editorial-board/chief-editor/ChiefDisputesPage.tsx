@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useParams, useNavigate } from 'react-router'
 import { AlertTriangle, Download, Lock, CheckCircle, Send, Eye, FileText, ChevronRight } from 'lucide-react'
-import { boardStore, DisputeCase } from '@/data/boardMockData'
+import { DisputeCase } from '@/types/board.types'
 import { disputeService } from '@/services/dispute.service'
 
 export function ChiefDisputesListPage() {
@@ -34,10 +34,10 @@ export function ChiefDisputesListPage() {
             } : undefined
           })))
         } else {
-          setCases(boardStore.getDisputeCases())
+          setCases([])
         }
       } catch (err) {
-        setCases(boardStore.getDisputeCases())
+        setCases([])
       }
     }
     loadCases()
@@ -219,15 +219,8 @@ export function ChiefDisputeDetailsPage() {
           return
         }
       } catch (err) {
-        console.warn('API error fetching dispute details, falling back to local storage:', err)
-      }
-      
-      const mockItem = boardStore.getDisputeCase(caseId)
-      if (mockItem) {
-        setCaseItem(mockItem)
-        if (mockItem.chiefDecision) setVerdict(mockItem.chiefDecision)
-        if (mockItem.chiefCompromise) setCompromiseText(mockItem.chiefCompromise)
-        if (mockItem.chiefNextActions) setNextActions(mockItem.chiefNextActions)
+        console.warn('API fetch failed:', err)
+        setCaseItem(undefined)
       }
     }
     loadDetail()
@@ -260,29 +253,12 @@ export function ChiefDisputeDetailsPage() {
     if (confirmStep === 1) {
       setConfirmStep(2)
     } else {
-      // Call real API with fallback
       if (caseId) {
         try {
           await disputeService.saveVerdict(caseId, verdict, compromiseText, nextActions)
         } catch (err) {
-          console.warn('API error saving dispute verdict, falling back to local storage:', err)
+          console.error('Failed to save verdict:', err)
         }
-        
-        // Local storage fallback
-        const list = boardStore.getDisputeCases()
-        const updated = list.map(c => {
-          if (c.id === caseId) {
-            return {
-              ...c,
-              status: 'DECIDED' as const,
-              chiefDecision: verdict,
-              chiefCompromise: compromiseText,
-              chiefNextActions: nextActions
-            }
-          }
-          return c
-        })
-        localStorage.setItem('board_disputes', JSON.stringify(updated))
       }
       setShowConfirmModal(false)
       // Redirect to Screen 4 (Send Notification) with Dispute context

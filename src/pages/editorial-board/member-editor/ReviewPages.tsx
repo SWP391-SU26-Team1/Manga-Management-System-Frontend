@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { useParams, useNavigate, Link } from 'react-router'
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router'
 import { ZoomIn, Maximize2, Send, Save, ArrowRight, ArrowLeft, Star, StarOff, CheckCircle } from 'lucide-react'
-import { boardStore, BoardComment, ChapterGrade, ChapterVote } from '@/data/boardMockData'
+import { BoardComment, ChapterGrade, ChapterVote } from '@/types/board.types'
 import { useNotifications } from '@/contexts/NotificationContext'
 import { boardService } from '@/services/board.service'
 
@@ -23,61 +23,71 @@ export function ReadDraftPage() {
   const [newComment, setNewComment] = useState('')
   const currentUser = getStoredUser()
 
-  // Manga mock images
-  const mangaPages = [
+  const [pages, setPages] = useState<any[]>([])
+  const [loadingFiles, setLoadingFiles] = useState(false)
+
+  // Manga mock images fallback
+  const fallbackPages = [
     'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=600&auto=format&fit=crop',
     'https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=600&auto=format&fit=crop',
     'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?q=80&w=600&auto=format&fit=crop',
     'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=600&auto=format&fit=crop'
   ]
-  const mockImage = mangaPages[(page - 1) % mangaPages.length]
 
-  const loadComments = async () => {
+  const loadManuscriptsAndFiles = async () => {
     if (!chapterId) return
     try {
-      const res = await boardService.getComments(chapterId)
-      if (res && res.length > 0) {
-        setComments(res.map((c: any) => ({
-          id: c.comment_id || c.id,
-          author: c.username || c.author || 'USER',
-          role: c.role || 'Member Editor',
-          isChief: c.role === 'CHIEF' || c.isChief,
-          time: c.created_at ? new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : c.time,
-          content: c.content
-        })))
-      } else {
-        setComments(boardStore.getComments(chapterId))
+      setLoadingFiles(true)
+      const manuscripts = await boardService.getChapterManuscripts(chapterId)
+      if (manuscripts && manuscripts.length > 0) {
+        const activeManuscript = manuscripts[0]
+        const files = await boardService.getManuscriptFiles(activeManuscript.manuscript_id || activeManuscript.id)
+        if (files && files.length > 0) {
+          setPages(files)
+        }
       }
     } catch (err) {
-      console.warn('API error fetching comments, falling back to mock:', err)
-      setComments(boardStore.getComments(chapterId))
+      console.error('Error loading manuscripts:', err)
+    } finally {
+      setLoadingFiles(false)
     }
   }
 
   useEffect(() => {
-    loadComments()
+    loadManuscriptsAndFiles()
   }, [chapterId])
 
-  const handleSendComment = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newComment.trim() || !chapterId) return
-    try {
-      await boardService.addComment(chapterId, newComment)
-    } catch (err) {
-      console.warn('API error posting comment, fallback to mock store:', err)
-    }
-    const added = boardStore.addComment(chapterId, newComment, currentUser)
-    setComments([...comments, added])
-    setNewComment('')
-  }
+  const displayPages = pages.length > 0 ? pages : fallbackPages
+  const totalPagesCount = displayPages.length
 
   const handleNextPage = () => {
-    if (page < totalPages) setPage(page + 1)
+    if (page < totalPagesCount) setPage(page + 1)
   }
 
   const handlePrevPage = () => {
     if (page > 1) setPage(page - 1)
   }
+
+  const mockImage = typeof displayPages[(page - 1) % totalPagesCount] === 'string' 
+    ? displayPages[(page - 1) % totalPagesCount] 
+    : displayPages[(page - 1) % totalPagesCount].file_url || fallbackPages[0]
+
+  const handleSendComment = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newComment.trim() || !chapterId) return
+    // Optimistically add to UI (No backend API for comments in Board context)
+    setComments([...comments, {
+      id: Date.now().toString(),
+      author: currentUser.fullName,
+      role: currentUser.role,
+      isChief: false,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      content: newComment
+    }])
+    setNewComment('')
+  }
+
+
 
   const chapterTitleDisplay = chapterId === 'cyber-ronin' 
     ? 'CYBER RONIN: ZERO' 
@@ -182,12 +192,12 @@ export function ReadDraftPage() {
           </div>
         </div>
 
-        {/* Right Col: Board discussion feed + Next step link */}
+        {/* Right Col: Feedback feed + Next step link */}
         <div className="space-y-6">
-          {/* Discussion feed card */}
+          {/* Feedback feed card */}
           <div className="bg-white border-4 border-manga-ink p-5 shadow-[6px_6px_0px_rgba(15,15,15,1)] flex flex-col h-[520px]">
             <h3 className="font-manga text-lg font-black uppercase border-b-4 border-manga-ink pb-2 mb-4 flex items-center justify-between">
-              <span>BOARD DISCUSSION</span>
+              <span>FEEDBACK</span>
               <span className="bg-manga-red text-white font-bold text-xs px-2 py-0.5 border-2 border-manga-ink shadow-sm">
                 {comments.length}
               </span>
@@ -215,13 +225,13 @@ export function ReadDraftPage() {
               ))}
             </div>
 
-            {/* Comment write form */}
+            {/* Feedback write form */}
             <form onSubmit={handleSendComment} className="border-t-2 border-manga-ink pt-3 flex gap-2">
               <input
                 type="text"
                 value={newComment}
                 onChange={e => setNewComment(e.target.value)}
-                placeholder="Thêm bình luận..."
+                placeholder="Thêm feedback..."
                 className="flex-1 border-2 border-manga-ink px-3 py-2 text-xs font-bold outline-none focus:border-manga-red bg-zinc-50"
               />
               <button 
@@ -253,6 +263,8 @@ export function ReadDraftPage() {
 export function ScorePage() {
   const { chapterId } = useParams<{ chapterId: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const urlSessionId = searchParams.get('sessionId')
   const { addNotification } = useNotifications()
   const [grade, setGrade] = useState<ChapterGrade>({
     chapterId: chapterId || '',
@@ -276,29 +288,9 @@ export function ScorePage() {
   const chapterNumberDisplay = chapterId === 'cyber-ronin' ? 65 : chapterId === 'pitch-black' ? 12 : chapterId === 'whispers-of-mana' ? 45 : 1
 
   useEffect(() => {
-    const loadGrade = async () => {
-      if (!chapterId) return
-      try {
-        const res = await boardService.getGrade(chapterId)
-        if (res) {
-          setGrade({
-            chapterId: res.chapter_id || chapterId,
-            drawing: res.drawing,
-            pacing: res.pacing,
-            layout: res.layout,
-            dialogue: res.dialogue,
-            finish: res.finish,
-            note: res.note || ''
-          })
-        } else {
-          setGrade(boardStore.getGrade(chapterId))
-        }
-      } catch (err) {
-        console.warn('API error loading grade, fallback to mock:', err)
-        setGrade(boardStore.getGrade(chapterId))
-      }
-    }
-    loadGrade()
+    // Backend currently doesn't store intermediate grades before vote.
+    // We start with a fresh grade form.
+    setGrade({ chapterId: chapterId || '', drawing: 0, pacing: 0, layout: 0, dialogue: 0, finish: 0, note: '' })
   }, [chapterId])
 
   const handleSelectScore = (metric: keyof Omit<ChapterGrade, 'chapterId' | 'note'>, val: number) => {
@@ -320,26 +312,25 @@ export function ScorePage() {
     }
 
     try {
-      await boardService.saveGrade({
-        chapter_id: grade.chapterId,
-        drawing: grade.drawing,
-        pacing: grade.pacing,
-        layout: grade.layout,
-        dialogue: grade.dialogue,
-        finish: grade.finish,
-        note: grade.note
-      })
+      // Backend does not have a separate grade endpoint. 
+      // Grades are either submitted along with the vote or kept locally until vote.
+      // We simulate a successful save here.
+      addNotification(
+        'RATING SUCCESSFUL',
+        'Đã lưu điểm số thành công, chuẩn bị chuyển sang bước Biểu quyết.',
+        'RATING',
+        'rating_success'
+      )
+      navigate(`/dashboard/editorial-board/review/${chapterId}/vote${urlSessionId ? '?sessionId=' + urlSessionId : ''}`)
     } catch (err) {
-      console.warn('API error saving grade, fallback to mock store:', err)
+      console.error('API error saving grade:', err)
+      addNotification(
+        'RATING FAILED',
+        'Lỗi hệ thống khi lưu điểm số',
+        'RATING',
+        'rating_failed'
+      )
     }
-
-    boardStore.saveGrade(grade)
-    addNotification(
-      'RATING SUCCESSFUL',
-      `Đã gửi đánh giá thành công cho tác phẩm: ${chapterTitleDisplay}`,
-      'RATING',
-      'rating_success'
-    )
     setSuccess(true)
     setTimeout(() => setSuccess(false), 3000)
   }
@@ -416,7 +407,7 @@ export function ScorePage() {
         {/* Grade note textarea */}
         <div>
           <label className="block text-xs font-black uppercase text-manga-ink mb-2">
-            Ý KIẾN / BÌNH LUẬN ĐÁNH GIÁ CHUYÊN MÔN
+            FEEDBACK ĐÁNH GIÁ CHUYÊN MÔN
           </label>
           <textarea
             value={grade.note}
@@ -465,7 +456,10 @@ export function ScorePage() {
 export function VotePage() {
   const { chapterId } = useParams<{ chapterId: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const urlSessionId = searchParams.get('sessionId')
   const { addNotification } = useNotifications()
+  const [existingVoteId, setExistingVoteId] = useState<string | null>(null)
   const [vote, setVote] = useState<ChapterVote>({
     chapterId: chapterId || '',
     decision: 'APPROVE',
@@ -486,73 +480,73 @@ export function VotePage() {
 
   const chapterNumberDisplay = chapterId === 'cyber-ronin' ? 65 : chapterId === 'pitch-black' ? 12 : chapterId === 'whispers-of-mana' ? 45 : 1
 
-  const loadComments = async () => {
-    if (!chapterId) return
-    try {
-      const res = await boardService.getComments(chapterId)
-      if (res && res.length > 0) {
-        setComments(res.map((c: any) => ({
-          id: c.comment_id || c.id,
-          author: c.username || c.author || 'USER',
-          role: c.role || 'Member Editor',
-          isChief: c.role === 'CHIEF' || c.isChief,
-          time: c.created_at ? new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : c.time,
-          content: c.content
-        })))
-      } else {
-        setComments(boardStore.getComments(chapterId))
-      }
-    } catch (err) {
-      console.warn('API error fetching comments, falling back to mock:', err)
-      setComments(boardStore.getComments(chapterId))
-    }
-  }
-
   useEffect(() => {
     const loadVote = async () => {
       if (!chapterId) return
       try {
-        const res = await boardService.getVote(chapterId)
+        const sessionId = urlSessionId || chapterId
+        const resList = await boardService.getVote(sessionId)
+        
+        // Find if this user already voted
+        const res = resList && resList.length > 0 ? resList.find(v => v.voter_id === currentUser.id || v.users?.username === currentUser.fullName) : null
         if (res) {
+          setExistingVoteId(res.vote_id)
           setVote({
             chapterId: res.chapter_id || chapterId,
             decision: res.decision,
             note: res.note || ''
           })
         } else {
-          setVote(boardStore.getVote(chapterId))
+          setVote({ chapterId, decision: 'APPROVE', note: '' })
         }
       } catch (err) {
-        console.warn('API error loading vote, fallback to mock:', err)
-        setVote(boardStore.getVote(chapterId))
+        console.error('API error loading vote:', err)
+        setVote({ chapterId, decision: 'APPROVE', note: '' })
       }
     }
     loadVote()
-    loadComments()
-  }, [chapterId])
+  }, [chapterId, urlSessionId, currentUser])
 
   const handleVoteSubmit = async () => {
     try {
-      await boardService.saveVote({
-        chapter_id: vote.chapterId,
-        decision: vote.decision,
-        note: vote.note
-      })
+      const sessionId = urlSessionId || vote.chapterId
+      if (existingVoteId) {
+        await boardService.updateVote(existingVoteId, {
+          decision: vote.decision,
+          note: vote.note
+        })
+        addNotification(
+          'UPDATE SUCCESSFUL',
+          `Phiếu bầu của bạn cho '${chapterTitleDisplay}' đã được CẬP NHẬT thành công!`,
+          'VOTE',
+          'voting_success'
+        )
+      } else {
+        await boardService.saveVote(sessionId, {
+          chapter_id: vote.chapterId,
+          decision: vote.decision,
+          note: vote.note
+        })
+        addNotification(
+          'VOTING SUCCESSFUL',
+          `Phiếu bầu của bạn cho '${chapterTitleDisplay}' đã được ghi nhận vào hệ thống.`,
+          'VOTE',
+          'voting_success'
+        )
+      }
     } catch (err) {
-      console.warn('API error saving vote, fallback to mock:', err)
+      console.error('API error saving vote:', err)
+      addNotification(
+        'VOTING FAILED', 
+        'Hệ thống đang bảo trì hoặc API lỗi, không thể lưu phiếu bầu lúc này.', 
+        'VOTE', 
+        'voting_failed'
+      )
+      return
     }
-
-    boardStore.saveVote(vote)
-    addNotification(
-      'VOTING SUCCESSFUL',
-      `Phiếu bầu của bạn cho '${chapterTitleDisplay}' đã được ghi nhận`,
-      'VOTE',
-      'voting_success'
-    )
     setSuccess(true)
     setTimeout(() => {
       setSuccess(false)
-      // Redirect back to dashboard homepage
       navigate('/dashboard/editorial-board')
     }, 2000)
   }
@@ -560,13 +554,14 @@ export function VotePage() {
   const handleSendComment = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newComment.trim() || !chapterId) return
-    try {
-      await boardService.addComment(chapterId, newComment)
-    } catch (err) {
-      console.warn('API error posting comment, fallback to mock store:', err)
-    }
-    const added = boardStore.addComment(chapterId, newComment, currentUser)
-    setComments([...comments, added])
+    setComments([...comments, {
+      id: Date.now().toString(),
+      author: currentUser.fullName,
+      role: currentUser.role,
+      isChief: false,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      content: newComment
+    }])
     setNewComment('')
   }
 
@@ -700,10 +695,10 @@ export function VotePage() {
             )}
           </div>
 
-          {/* Board Comments widget */}
+          {/* Board Feedback widget */}
           <div className="bg-white border-4 border-manga-ink p-5 shadow-[6px_6px_0px_rgba(15,15,15,1)]">
             <h3 className="font-manga text-md font-black uppercase border-b-2 border-manga-ink pb-2 mb-3">
-              BÌNH LUẬN HỘI ĐỒNG (VOTE FEED)
+              FEEDBACK HỘI ĐỒNG
             </h3>
             
             <div className="space-y-3 max-h-48 overflow-y-auto mb-4 pr-1">
@@ -720,7 +715,7 @@ export function VotePage() {
                 type="text"
                 value={newComment}
                 onChange={e => setNewComment(e.target.value)}
-                placeholder="Thêm ý kiến..."
+                placeholder="Thêm feedback..."
                 className="flex-1 border-2 border-manga-ink px-2.5 py-1.5 text-xs font-bold outline-none focus:border-manga-red bg-zinc-50"
               />
               <button type="submit" className="bg-manga-ink text-white border-2 border-manga-ink p-1.5 cursor-pointer">

@@ -1,16 +1,5 @@
 import api from './api'
 
-// Interfaces mapping to ERD and UI schemas
-export interface ChapterPage {
-  page_id: string
-  chapter_id: string
-  page_number: number
-  image_url: string
-  status: string
-  width?: number
-  height?: number
-}
-
 export interface BoardChapter {
   chapter_id: string
   series_id: string
@@ -21,175 +10,234 @@ export interface BoardChapter {
   publish_date?: string
 }
 
-export interface BoardComment {
-  comment_id: string
-  user_id: string
-  chapter_id: string
-  parent_comment_id?: string
-  content: string
-  created_at: string
-  username?: string // joined from USER
-  role?: string     // joined from USER
-}
-
-export interface GradePayload {
-  chapter_id: string
-  drawing: number
-  pacing: number
-  layout: number
-  dialogue: number
-  finish: number
-  note: string
-}
-
 export interface VotePayload {
-  chapter_id: string
+  chapter_id?: string
   decision: 'APPROVE' | 'REJECT' | 'REVISE'
   note: string
-}
-
-export interface BackendSeriesVotePayload {
-  series_id: string
-  decision: 'APPROVE' | 'REJECT'
-  note: string
+  score?: number
 }
 
 export const boardService = {
-  // GET /api/board/chapters - Fetches chapters waiting review (filtering status='BOARD_REVIEW' from CHAPTER table)
+  // --- 1. PROPOSALS / REVIEW SESSIONS ---
+  getProposals: async (page = 1, limit = 10): Promise<any> => {
+    const response = await api.get(`/api/board/proposals?page=${page}&limit=${limit}`)
+    return response.data
+  },
+
+  getPendingProposals: async (): Promise<any[]> => {
+    const response = await api.get('/api/board/proposals/pending')
+    return response.data.data || []
+  },
+
+  getProposalById: async (sessionId: string): Promise<any> => {
+    const response = await api.get(`/api/board/proposals/${sessionId}`)
+    return response.data.data || response.data
+  },
+
+  getProposalDetail: async (sessionId: string): Promise<any> => {
+    const response = await api.get(`/api/board/proposals/${sessionId}/detail`)
+    return response.data.data || response.data
+  },
+
+  getProposalManuscripts: async (sessionId: string): Promise<any[]> => {
+    const response = await api.get(`/api/board/proposals/${sessionId}/manuscripts`)
+    return response.data.data || []
+  },
+
+  getProposalFiles: async (sessionId: string): Promise<any[]> => {
+    const response = await api.get(`/api/board/proposals/${sessionId}/files`)
+    return response.data.data || []
+  },
+
+  // --- 2. MANUSCRIPTS & DOCUMENTS ---
+  getChapterManuscripts: async (chapterId: string): Promise<any[]> => {
+    const response = await api.get(`/api/board/chapters/${chapterId}/manuscripts`)
+    return response.data.data || []
+  },
+
+  getSeriesManuscripts: async (seriesId: string): Promise<any[]> => {
+    const response = await api.get(`/api/board/series/${seriesId}/manuscripts`)
+    return response.data.data || []
+  },
+
+  getManuscriptFiles: async (manuscriptId: string): Promise<any[]> => {
+    const response = await api.get(`/api/board/manuscripts/${manuscriptId}/files`)
+    return response.data.data || []
+  },
+
+  getPendingManuscripts: async (): Promise<any[]> => {
+    const response = await api.get('/api/board/manuscripts/pending')
+    return response.data.data || []
+  },
+
+  applyManuscriptDecision: async (manuscriptId: string, status: string, note?: string): Promise<any> => {
+    const action = status.toLowerCase() === 'approved' || status.toLowerCase() === 'approve' ? 'approve' : 'reject'
+    const response = await api.patch(`/api/board/manuscripts/${manuscriptId}/${action}`, { note })
+    return response.data
+  },
+
+  // --- 3. VOTES ---
+  getVote: async (sessionId: string): Promise<any[]> => {
+    const response = await api.get(`/api/board/review-sessions/${sessionId}/votes`)
+    return response.data.data || []
+  },
+
+  getVoteById: async (voteId: string): Promise<any> => {
+    const response = await api.get(`/api/board/votes/${voteId}`)
+    return response.data.data || response.data
+  },
+
+  saveVote: async (sessionId: string, vote: VotePayload): Promise<any> => {
+    const response = await api.post(`/api/board/review-sessions/${sessionId}/votes`, vote)
+    return response.data
+  },
+
+  updateVote: async (voteId: string, voteData: any): Promise<any> => {
+    const response = await api.patch(`/api/board/votes/${voteId}`, voteData)
+    return response.data
+  },
+
+  updateVoteStatus: async (voteId: string, status: string): Promise<any> => {
+    const response = await api.patch(`/api/board/votes/${voteId}/status`, { status })
+    return response.data
+  },
+
+  deleteVote: async (voteId: string): Promise<any> => {
+    const response = await api.delete(`/api/board/votes/${voteId}`)
+    return response.data
+  },
+
+  // --- 4. PROCESS RESULTS & DECISIONS ---
+  processReviewSessionResult: async (sessionId: string, resultData: any): Promise<any> => {
+    const response = await api.post(`/api/board/review-sessions/${sessionId}/process-result`, resultData)
+    return response.data
+  },
+
+  applyChapterDecision: async (chapterId: string, status: string, note?: string): Promise<any> => {
+    const action = status.toLowerCase() === 'approved' || status.toLowerCase() === 'approve' ? 'approve' : 'reject'
+    const response = await api.patch(`/api/board/chapters/${chapterId}/${action}`, { note })
+    return response.data
+  },
+
+  applySeriesDecision: async (seriesId: string, status: string, note?: string): Promise<any> => {
+    const action = status.toLowerCase() === 'approved' || status.toLowerCase() === 'approve' ? 'approve' : 'reject'
+    const response = await api.patch(`/api/board/series/${seriesId}/${action}`, { note })
+    return response.data
+  },
+
+  updateSeriesBoardStatus: async (seriesId: string, action: 'publish' | 'archive' | 'hide' | 'ban'): Promise<any> => {
+    const response = await api.patch(`/api/board/series/${seriesId}/${action}`)
+    return response.data
+  },
+
+  updateChapterBoardStatus: async (chapterId: string, action: 'publish' | 'archive' | 'hide' | 'ban'): Promise<any> => {
+    const response = await api.patch(`/api/board/chapters/${chapterId}/${action}`)
+    return response.data
+  },
+
+  // --- 5. DECISION HISTORY ---
+  getSeriesDecisionHistory: async (seriesId: string): Promise<any[]> => {
+    const response = await api.get(`/api/board/series/${seriesId}/decision-history`)
+    return response.data.data || []
+  },
+
+  getChapterDecisionHistory: async (chapterId: string): Promise<any[]> => {
+    const response = await api.get(`/api/board/chapters/${chapterId}/decision-history`)
+    return response.data.data || []
+  },
+
+  getReviewSessionHistory: async (sessionId: string): Promise<any[]> => {
+    const response = await api.get(`/api/board/review-sessions/${sessionId}/history`)
+    return response.data.data || []
+  },
+
+  // --- 6. RANKINGS ---
+  getRankingPeriods: async (): Promise<any[]> => {
+    const response = await api.get('/api/board/ranking-periods')
+    return response.data.data || []
+  },
+
+  getSeriesRankings: async (): Promise<any[]> => {
+    const response = await api.get('/api/board/series-rankings')
+    return response.data.data || []
+  },
+
+  getChapterRankings: async (): Promise<any[]> => {
+    const response = await api.get('/api/board/chapter-rankings')
+    return response.data.data || []
+  },
+
+  getRankingPeriodById: async (periodId: string): Promise<any> => {
+    const response = await api.get(`/api/board/ranking-periods/${periodId}`)
+    return response.data.data || response.data
+  },
+
+  getSeriesRankingHistory: async (seriesId: string): Promise<any[]> => {
+    const response = await api.get(`/api/board/rankings/series/${seriesId}/history`)
+    return response.data.data || []
+  },
+
+  getChapterRankingHistory: async (chapterId: string): Promise<any[]> => {
+    const response = await api.get(`/api/board/rankings/chapters/${chapterId}/history`)
+    return response.data.data || []
+  },
+
+  // --- 7. NOTIFICATIONS ---
+  getBoardNotifications: async (): Promise<any[]> => {
+    const response = await api.get('/api/board/notifications')
+    return response.data.data || []
+  },
+
+  getUnreadNotifications: async (): Promise<any[]> => {
+    const response = await api.get('/api/board/notifications/unread')
+    return response.data.data || []
+  },
+
+  markNotificationRead: async (id: string): Promise<any> => {
+    const response = await api.patch(`/api/board/notifications/${id}/read`)
+    return response.data
+  },
+
+  markAllNotificationsRead: async (): Promise<any> => {
+    const response = await api.patch('/api/board/notifications/read-all')
+    return response.data
+  },
+
+  deleteNotification: async (id: string): Promise<any> => {
+    const response = await api.delete(`/api/board/notifications/${id}`)
+    return response.data
+  },
+
+  sendNotification: async (notificationData: any): Promise<any> => {
+    // Note: requires admin role in backend
+    const response = await api.post('/api/board/notifications/decision-result', notificationData)
+    return response.data
+  },
+
+  sendProposalApprovedNotification: async (data: any): Promise<any> => {
+    const response = await api.post('/api/board/notifications/proposal-approved', data)
+    return response.data
+  },
+
+  sendProposalRejectedNotification: async (data: any): Promise<any> => {
+    const response = await api.post('/api/board/notifications/proposal-rejected', data)
+    return response.data
+  },
+
+  // --- 8. MISC PENDING ITEMS ---
   getQueueChapters: async (): Promise<BoardChapter[]> => {
-    const response = await api.get<BoardChapter[]>('/api/board/chapters')
-    return response.data
+    const response = await api.get('/api/board/chapters/pending')
+    return response.data.data || []
   },
 
-  // GET /api/board/pages/:chapterId - Fetches list of Pages for Chapter (maps to PAGE table)
-  getChapterPages: async (chapterId: string): Promise<ChapterPage[]> => {
-    const response = await api.get<ChapterPage[]>(`/api/chapters/${chapterId}/pages`)
-    return response.data
-  },
-
-  // GET /api/board/tasks - Fetches checklist tasks (maps to PAGE_TASK table for Member Editor)
-  getTodayTasks: async (): Promise<any[]> => {
-    const response = await api.get<any[]>('/api/board/tasks')
-    return response.data
-  },
-
-  // POST /api/board/tasks/toggle/:id - Toggles task status in PAGE_TASK
-  toggleTask: async (taskId: string): Promise<any> => {
-    const response = await api.post(`/api/board/tasks/toggle/${taskId}`)
-    return response.data
-  },
-
-  // GET /api/comments?chapter_id={chapterId} - Fetches comments for a chapter (maps to COMMENT table)
-  getComments: async (chapterId: string): Promise<BoardComment[]> => {
-    const response = await api.get<BoardComment[]>(`/api/comments`, {
-      params: { chapter_id: chapterId }
-    })
-    return response.data
-  },
-
-  // POST /api/comments - Posts comment to chapter discussion (maps to COMMENT table)
-  addComment: async (chapterId: string, content: string): Promise<BoardComment> => {
-    const response = await api.post<BoardComment>('/api/comments', {
-      chapter_id: chapterId,
-      content
-    })
-    return response.data
-  },
-
-  // GET /api/board/grades/:chapterId - Fetches grade for chapter (corresponds to proposed CHAPTER_GRADE table)
-  getGrade: async (chapterId: string): Promise<GradePayload> => {
-    const response = await api.get<GradePayload>(`/api/board/grades/${chapterId}`)
-    return response.data
-  },
-
-  // POST /api/board/grades - Saves scoring for a chapter (corresponds to proposed CHAPTER_GRADE table)
-  saveGrade: async (grade: GradePayload): Promise<GradePayload> => {
-    const response = await api.post<GradePayload>('/api/board/grades', grade)
-    return response.data
-  },
-
-  // GET /api/board/votes/:chapterId - Fetches vote for chapter (corresponds to proposed CHAPTER_VOTE table)
-  getVote: async (chapterId: string): Promise<VotePayload> => {
-    const response = await api.get<VotePayload>(`/api/board/votes/${chapterId}`)
-    return response.data
-  },
-
-  // POST /api/board/votes - Submits voting decision for a chapter (corresponds to proposed CHAPTER_VOTE table)
-  saveVote: async (vote: VotePayload): Promise<VotePayload> => {
-    const response = await api.post<VotePayload>('/api/board/votes', vote)
-    return response.data
-  },
-
-  // GET /api/board/series - Fetches series waiting review (maps to SERIES and REVIEW_SESSION tables)
   getReviewedSeries: async (): Promise<any[]> => {
-    const response = await api.get<any[]>('/api/board/series')
-    return response.data
+    const response = await api.get('/api/board/series/pending')
+    return response.data.data || []
   },
 
-  // GET /api/board/series/:seriesId - Fetches details of a reviewed series
   getSeriesById: async (seriesId: string): Promise<any> => {
-    const response = await api.get<any>(`/api/board/series/${seriesId}`)
-    return response.data
-  },
-
-  // POST /api/board/series-votes - Submits voting decision for a series (corresponds to SERIES_VOTE table)
-  saveSeriesVote: async (vote: BackendSeriesVotePayload): Promise<BackendSeriesVotePayload> => {
-    const response = await api.post<BackendSeriesVotePayload>('/api/board/series-votes', vote)
-    return response.data
-  },
-
-  // POST /api/board/chapters/:chapterId/decision - Chief final decision on Chapter
-  saveChapterDecision: async (chapterId: string, status: string, percent: number): Promise<any> => {
-    const response = await api.post(`/api/board/chapters/${chapterId}/decision`, { status, percent })
-    return response.data
-  },
-
-  // POST /api/board/series/:seriesId/decision - Chief final decision on Series
-  saveSeriesDecision: async (seriesId: string, status: string, note?: string): Promise<any> => {
-    const response = await api.post(`/api/board/series/${seriesId}/decision`, { status, note })
-    return response.data
-  },
-
-  // POST /api/board/sessions - Initiates a new council discussion session
-  createBoardSession: async (sessionData: { sessionName: string; seriesIds: string[]; memberIds: string[]; deadline: string }): Promise<any> => {
-    const response = await api.post('/api/board/sessions', sessionData)
-    return response.data
-  },
-
-  // GET /api/board/recovery - Fetches active recovery plans
-  getRecoveryPlans: async (): Promise<any[]> => {
-    const response = await api.get<any[]>('/api/board/recovery')
-    return response.data
-  },
-
-  // POST /api/board/recovery/:planId/evaluate - Evaluates recovery plans
-  evaluateRecoveryPlan: async (planId: string, action: string, note?: string): Promise<any> => {
-    const response = await api.post(`/api/board/recovery/${planId}/evaluate`, { action, note })
-    return response.data
-  },
-
-  // GET /api/board/votes/summary/:chapterId - Fetches vote summary for a chapter
-  getVoteSummary: async (chapterId: string): Promise<any> => {
-    const response = await api.get<any>(`/api/board/votes/summary/${chapterId}`)
-    return response.data
-  },
-
-  // POST /api/notifications - Sends a new official decision notification
-  sendNotification: async (notificationData: {
-    templateType: string
-    projectName: string
-    recipients: string[]
-    effectiveDate: string
-    extraNote?: string
-  }): Promise<any> => {
-    const response = await api.post('/api/notifications', notificationData)
-    return response.data
-  },
-
-  // POST /api/comments/:commentId/pin - Pins a comment in chapter discussion
-  pinComment: async (chapterId: string, commentId: string, isPinned: boolean): Promise<any> => {
-    const response = await api.post(`/api/comments/${commentId}/pin`, { chapter_id: chapterId, isPinned })
-    return response.data
+    const response = await api.get(`/api/series/${seriesId}`)
+    return response.data.data || response.data
   }
 }
 

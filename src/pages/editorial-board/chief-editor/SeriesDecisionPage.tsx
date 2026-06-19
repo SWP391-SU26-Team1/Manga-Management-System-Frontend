@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router'
 import { ArrowLeft, CheckCircle, AlertCircle, Trash2, Send } from 'lucide-react'
-import { boardStore } from '@/data/boardMockData'
+import { ReviewedSeries } from '@/types/board.types'
 import { boardService } from '@/services/board.service'
 
 export default function SeriesDecisionPage() {
@@ -24,11 +24,11 @@ export default function SeriesDecisionPage() {
         if (data) {
           setSeriesData(data)
         } else {
-          setSeriesData(boardStore.getReviewedSeriesById(seriesId))
+          setSeriesData(null)
         }
       } catch (err) {
         console.warn('API error fetching series data:', err)
-        setSeriesData(boardStore.getReviewedSeriesById(seriesId))
+        setSeriesData(null)
       }
     }
     fetchSeries()
@@ -80,7 +80,7 @@ export default function SeriesDecisionPage() {
     // Call real API with fallback
     const targetId = seriesId || 'void-walker'
     try {
-      await boardService.saveSeriesDecision(
+      await boardService.applySeriesDecision(
         targetId,
         statusLabel,
         `Quyết định chính thức của Trưởng ban: ${
@@ -91,9 +91,8 @@ export default function SeriesDecisionPage() {
         }`
       )
     } catch (err) {
-      console.warn('API error saving series decision, falling back to local storage:', err)
+      console.warn('API error saving series decision:', err)
     }
-    boardStore.updateSeriesStatus(targetId, statusLabel)
 
     // Redirect to Screen 4 (Send Notification) with pre-filled state
     navigate('/dashboard/editorial-board/send-notification', {

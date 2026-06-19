@@ -1,19 +1,21 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router'
 import { Calendar, User, BookOpen, CheckCircle, Clock } from 'lucide-react'
-import { boardStore, ReviewedSeries } from '@/data/boardMockData'
+
 import { boardService } from '@/services/board.service'
 
 export default function SeriesApprovalPage() {
-  const [seriesList, setSeriesList] = useState<ReviewedSeries[]>([])
+  const [seriesList, setSeriesList] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchSeries = async () => {
       try {
         const res = await boardService.getReviewedSeries()
-        if (res && res.length > 0) {
-          setSeriesList(res.map((s: any) => ({
+        let data = Array.isArray(res) ? res : []
+        
+        if (data.length > 0) {
+          setSeriesList(data.map((s: any) => ({
             id: s.id || s.series_id,
             title: s.title,
             authorName: s.authorName || s.author_name || 'Tác giả',
@@ -30,11 +32,11 @@ export default function SeriesApprovalPage() {
             } : undefined
           })))
         } else {
-          setSeriesList(boardStore.getReviewedSeries())
+          setSeriesList([])
         }
       } catch (err) {
-        console.warn('API error fetching reviewed series, falling back to mock store:', err)
-        setSeriesList(boardStore.getReviewedSeries())
+        console.warn('API error fetching reviewed series:', err)
+        setSeriesList([])
       } finally {
         setLoading(false)
       }

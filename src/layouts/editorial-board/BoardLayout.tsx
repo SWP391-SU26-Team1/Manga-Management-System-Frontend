@@ -14,8 +14,9 @@ export default function BoardLayout() {
   }
 
   const user = JSON.parse(storedUser)
-  // Let the user in if role is BOARD
-  if (user.role !== 'BOARD') {
+  const isBoardRole = ['BOARD', 'CHIEF_EDITOR', 'ADMIN'].includes(user.role?.toUpperCase())
+  
+  if (!isBoardRole) {
     return <Navigate to="/login" replace />
   }
 

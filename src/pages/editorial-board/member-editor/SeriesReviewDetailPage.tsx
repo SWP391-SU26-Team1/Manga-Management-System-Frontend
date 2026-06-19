@@ -1,25 +1,50 @@
 import React, { useState, useEffect } from 'react'
-import { useParams, useNavigate, Link } from 'react-router'
-import { ArrowLeft, User, Calendar, BookOpen, CheckCircle, Send, Plus } from 'lucide-react'
-import { boardStore, ReviewedSeries } from '@/data/boardMockData'
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router'
+import { ArrowLeft, User, Calendar, BookOpen, CheckCircle, Send, Plus, Star } from 'lucide-react'
 import { boardService } from '@/services/board.service'
 import { useNotifications } from '@/contexts/NotificationContext'
 
 export default function SeriesReviewDetailPage() {
   const { seriesId } = useParams<{ seriesId: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const urlSessionId = searchParams.get('sessionId')
   const { addNotification } = useNotifications()
 
   // User checking
   const storedUser = localStorage.getItem('mangaflow_user')
-  const user = storedUser ? JSON.parse(storedUser) : null
-  const isChief = user?.isChief || user?.email === 'chiefeditor@mangaflow.com'
+  const currentUser = storedUser ? JSON.parse(storedUser) : { id: '', fullName: 'Unknown', isChief: false, email: '' }
+  const isChief = currentUser?.isChief || currentUser?.email === 'chiefeditor@mangaflow.com'
 
-  const [series, setSeries] = useState<ReviewedSeries | undefined>(undefined)
+  const [series, setSeries] = useState<any | undefined>(undefined)
   const [decision, setDecision] = useState<'APPROVE' | 'REJECT'>('APPROVE')
   const [note, setNote] = useState('')
-  const [showSavedToast, setShowSavedToast] = useState(false)
   const [certify, setCertify] = useState(false)
+  const [showSavedToast, setShowSavedToast] = useState(false)
+  const [existingVoteId, setExistingVoteId] = useState<string | null>(null)
+
+  const [grade, setGrade] = useState<{ [key: string]: number }>({
+    plot: 0,
+    art: 0,
+    market: 0
+  })
+
+  const seriesCriteria = [
+    { key: 'plot', label: '1. Cốt truyện & Thế giới', desc: 'Sáng tạo, logic, độ hấp dẫn' },
+    { key: 'art', label: '2. Tạo hình & Concept', desc: 'Thiết kế nhân vật, phong cách' },
+    { key: 'market', label: '3. Tiềm năng Thương mại', desc: 'Phù hợp xu hướng độc giả' }
+  ]
+
+  const handleSelectScore = (key: string, score: number) => {
+    setGrade(prev => ({ ...prev, [key]: score }))
+  }
+
+  const calculateAverageScore = () => {
+    const scores = Object.values(grade).filter(v => v > 0)
+    if (scores.length === 0) return 0
+    const avg = scores.reduce((a, b) => a + b, 0) / scores.length
+    return Math.round(avg * 10) / 10
+  }
 
   const [comments, setComments] = useState<any[]>([
     { id: 1, author: 'MINH K. (ART DIRECTOR)', text: 'Cốt truyện cổ trang này có hướng khai thác mới lạ, nét vẽ minh họa của tác giả rất vững.', time: '2 giờ trước', isChief: false },
@@ -67,62 +92,65 @@ export default function SeriesReviewDetailPage() {
   }
 
   useEffect(() => {
-    const loadDetail = async () => {
+    const loadDetailAndVote = async () => {
       if (!seriesId) return
       try {
         const res = await boardService.getSeriesById(seriesId)
-        if (res) {
+        if (res && res.title) {
           setSeries({
             id: res.id || res.series_id || seriesId,
             title: res.title,
             authorName: res.authorName || res.author_name || 'Tác giả',
             coverUrl: res.coverUrl || res.cover_image_url || 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=300&auto=format&fit=crop',
-            genre: res.genre,
+            genre: res.genre || 'UNKNOWN',
             synopsis: res.synopsis || res.description || '',
             submittedAt: res.submittedAt || res.created_at || new Date().toISOString(),
             tantouName: res.tantouName || res.editor_name || 'Biên tập viên',
-            tantouOpinion: res.tantouOpinion || res.note || '',
-            vote: res.vote ? {
-              decision: res.vote.decision,
-              note: res.vote.note || '',
-              submittedAt: res.vote.submittedAt || res.vote.created_at
-            } : undefined
+            tantouOpinion: res.tantouOpinion || res.note || ''
           })
-          if (res.vote) {
-            setDecision(res.vote.decision)
-            setNote(res.vote.note || '')
-          }
         } else {
-          setSeries(boardStore.getReviewedSeriesById(seriesId))
+          setSeries(undefined)
         }
       } catch (err) {
-        console.warn('API error fetching series details, falling back to mock:', err)
-        const mockItem = boardStore.getReviewedSeriesById(seriesId)
-        setSeries(mockItem)
-        if (mockItem && mockItem.vote) {
-          setDecision(mockItem.vote.decision)
-          setNote(mockItem.vote.note || '')
+        console.warn('API error fetching series details:', err)
+        setSeries(undefined)
+      }
+
+      try {
+        if (urlSessionId) {
+          const resList = await boardService.getVote(urlSessionId)
+          const userVote = resList && resList.length > 0 ? resList.find(v => v.voter_id === currentUser.id || v.users?.username === currentUser.fullName) : null
+          
+          if (userVote) {
+            setExistingVoteId(userVote.vote_id)
+            setDecision(userVote.decision === 'APPROVE' || userVote.decision === 'APPROVED' ? 'APPROVE' : 'REJECT')
+            setNote(userVote.note || '')
+          }
         }
+      } catch (err) {
+        console.warn('API error fetching user votes:', err)
       }
     }
-    loadDetail()
-  }, [seriesId])
+    loadDetailAndVote()
+  }, [seriesId, urlSessionId, currentUser.id, currentUser.fullName])
 
   const handleSubmitVote = async () => {
     if (!seriesId || !series) return
     try {
-      await boardService.saveSeriesVote({
-        series_id: seriesId,
+      const sessionId = urlSessionId || `session_${seriesId}`
+      const payload = {
         decision,
-        note
-      })
+        note,
+        score: calculateAverageScore()
+      }
+      if (existingVoteId) {
+        await boardService.updateVote(existingVoteId, payload)
+      } else {
+        await boardService.saveVote(sessionId, payload)
+      }
     } catch (err) {
-      console.warn('API error submitting series vote, falling back to mock store:', err)
+      console.warn('API error submitting series vote:', err)
     }
-
-    boardStore.saveSeriesVote(seriesId, decision, note)
-    const updated = boardStore.getReviewedSeriesById(seriesId)
-    setSeries(updated)
     
     // Trigger sliding Neo-brutalist Toast Notification
     addNotification(
@@ -139,18 +167,42 @@ export default function SeriesReviewDetailPage() {
     }, 2500)
   }
 
+  const handleUpdateSeriesStatus = async (action: 'publish' | 'archive' | 'hide' | 'ban') => {
+    if (!seriesId) return
+    try {
+      await boardService.updateSeriesBoardStatus(seriesId, action)
+      addNotification(
+        'STATUS UPDATED',
+        `Bộ truyện đã được đổi trạng thái thành ${action.toUpperCase()} thành công.`,
+        'FEEDBACK',
+        'voting_success'
+      )
+      // Navigate back after a delay
+      setTimeout(() => navigate('/dashboard/editorial-board/series-approval'), 2000)
+    } catch (err) {
+      console.error('API error updating series status:', err)
+      addNotification(
+        'UPDATE FAILED',
+        `Lỗi hệ thống khi cố gắng thay đổi trạng thái gốc.`,
+        'RISK',
+        'voting_failed'
+      )
+    }
+  }
+
   const handleSubmitChiefDecision = async () => {
     if (!seriesId || !series || !certify) return
     
     // Call real API with fallback
     try {
-      await boardService.saveSeriesDecision(seriesId, decision === 'APPROVE' ? 'APPROVED' : 'REJECTED', note)
+      const sessionId = urlSessionId || `session_${seriesId}`
+      await boardService.processReviewSessionResult(sessionId, { 
+        decision: decision === 'APPROVE' ? 'APPROVED' : 'REJECTED', 
+        note 
+      })
     } catch (err) {
-      console.warn('API error saving chief series decision, falling back to local storage:', err)
+      console.warn('API error saving chief series decision:', err)
     }
-
-    // Save to store
-    boardStore.updateSeriesStatus(seriesId, decision === 'APPROVE' ? 'APPROVED' : 'REJECTED')
     
     // Trigger toast
     setShowSavedToast(true)
@@ -249,8 +301,46 @@ export default function SeriesReviewDetailPage() {
         <div className="h-1.5 w-24 bg-manga-red mt-2" />
       </div>
 
-      {/* Split grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start mb-8">
+      {/* If Chief, show Extended Actions Panel */}
+      {isChief && (
+        <div className="bg-white border-4 border-manga-red p-6 shadow-[6px_6px_0px_rgba(220,38,38,1)] mb-8">
+          <h3 className="font-manga text-xl font-black uppercase border-b-2 border-manga-red pb-2 mb-4 text-manga-red">
+            QUYỀN LỰC TRƯỞNG BAN: CHUYỂN TRẠNG THÁI GỐC TÁC PHẨM
+          </h3>
+          <p className="text-xs font-bold text-gray-500 mb-4 uppercase">
+            Thay vì thông qua biểu quyết, bạn có quyền cưỡng chế thay đổi trạng thái của toàn bộ Series này ngay lập tức.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <button
+              onClick={() => handleUpdateSeriesStatus('publish')}
+              className="py-3 font-manga font-bold text-xs uppercase bg-emerald-100 text-emerald-800 border-2 border-emerald-500 hover:bg-emerald-500 hover:text-white transition-colors shadow-[2px_2px_0px_rgba(0,0,0,1)]"
+            >
+              🚀 PUBLISH (ĐĂNG)
+            </button>
+            <button
+              onClick={() => handleUpdateSeriesStatus('archive')}
+              className="py-3 font-manga font-bold text-xs uppercase bg-gray-100 text-gray-800 border-2 border-gray-500 hover:bg-gray-600 hover:text-white transition-colors shadow-[2px_2px_0px_rgba(0,0,0,1)]"
+            >
+              📦 ARCHIVE (LƯU TRỮ)
+            </button>
+            <button
+              onClick={() => handleUpdateSeriesStatus('hide')}
+              className="py-3 font-manga font-bold text-xs uppercase bg-yellow-100 text-yellow-800 border-2 border-yellow-500 hover:bg-yellow-600 hover:text-white transition-colors shadow-[2px_2px_0px_rgba(0,0,0,1)]"
+            >
+              👁 HIDE (ẨN)
+            </button>
+            <button
+              onClick={() => handleUpdateSeriesStatus('ban')}
+              className="py-3 font-manga font-bold text-xs uppercase bg-red-100 text-red-800 border-2 border-red-500 hover:bg-red-600 hover:text-white transition-colors shadow-[2px_2px_0px_rgba(0,0,0,1)]"
+            >
+              🚫 BAN (CẤM)
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Main Review Section Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8 items-start">
         {/* Left Col (2 cols): Series Metadata & Storyboard Info + Member Votes Summary */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white border-4 border-manga-ink p-6 shadow-[6px_6px_0px_rgba(15,15,15,1)] flex flex-col md:flex-row gap-6">
@@ -391,7 +481,49 @@ export default function SeriesReviewDetailPage() {
           )}
         </div>
 
-        {/* Right Col: Decision / Vote Box */}
+        {/* Right Col: Grading & Decision / Vote Box */}
+        <div className="space-y-6">
+          {/* Grading Board */}
+          {!isChief && (
+            <div className="bg-white border-4 border-manga-ink p-6 shadow-[6px_6px_0px_rgba(15,15,15,1)]">
+              <div className="inline-block px-3 py-1 bg-manga-ink text-white font-bold uppercase text-[9px] border-2 border-manga-ink shadow-sm mb-4">
+                BẢNG ĐIỂM CHUYÊN MÔN
+              </div>
+              <div className="space-y-5">
+                {seriesCriteria.map((crit) => (
+                  <div key={crit.key} className="border-b-2 border-gray-100 pb-4">
+                    <div className="flex flex-col mb-2">
+                      <h4 className="text-xs font-black uppercase text-manga-ink leading-tight">
+                        {crit.label}
+                      </h4>
+                      <p className="text-[10px] text-gray-400 font-semibold mt-0.5">
+                        {crit.desc}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 bg-zinc-50 border-2 border-manga-ink p-1 shadow-sm w-fit">
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => (
+                        <button
+                          key={star}
+                          onClick={() => handleSelectScore(crit.key, star)}
+                          className="text-manga-ink hover:scale-110 active:scale-95 cursor-pointer bg-transparent border-0 p-0.5"
+                        >
+                          {star <= grade[crit.key] ? (
+                            <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                          ) : (
+                            <Star className="w-4 h-4 text-gray-300" />
+                          )}
+                        </button>
+                      ))}
+                      <span className="font-manga text-sm font-black ml-2 w-6 text-center">
+                        {grade[crit.key]}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
         {isChief ? (
           /* Trưởng ban Phán Quyết panel */
           <div className="bg-[#fff1f2] border-4 border-manga-ink p-6 shadow-[6px_6px_0px_rgba(15,15,15,1)]">
@@ -532,12 +664,13 @@ export default function SeriesReviewDetailPage() {
                   onClick={handleSubmitVote}
                   className="w-full bg-manga-ink text-white font-manga font-bold text-xs uppercase py-3 border-2 border-manga-ink shadow-[3px_3px_0px_rgba(0,0,0,1)] hover:bg-manga-red hover:shadow-[1px_1px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer text-center"
                 >
-                  Gửi phiếu biểu quyết
+                  {existingVoteId ? 'SỬA PHIẾU CỦA BẠN' : 'GỬI PHIẾU BIỂU QUYẾT'}
                 </button>
               </div>
             </div>
           </div>
         )}
+        </div>
       </div>
 
       {/* Discussion forum (Board comments thread) */}

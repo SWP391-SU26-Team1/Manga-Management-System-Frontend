@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router'
 import { AlertTriangle, Download, Lock, CheckCircle, Send, Eye } from 'lucide-react'
-import { boardStore, DisputeCase } from '@/data/boardMockData'
+import { DisputeCase } from '@/types/board.types'
 import { disputeService } from '@/services/dispute.service'
-
 // Helper to load current user
 const getStoredUser = () => {
   const data = localStorage.getItem('mangaflow_user')
@@ -14,7 +13,7 @@ const getStoredUser = () => {
 // 1. DISPUTES LIST PAGE
 // ==========================================
 export function DisputesListPage() {
-  const [cases, setCases] = useState<DisputeCase[]>([])
+  const [cases, setCases] = useState<any[]>([])
 
   useEffect(() => {
     const loadCases = async () => {
@@ -44,11 +43,11 @@ export function DisputesListPage() {
             } : undefined
           })))
         } else {
-          setCases(boardStore.getDisputeCases())
+          setCases([])
         }
       } catch (err) {
-        console.warn('API error fetching disputes, falling back to mock:', err)
-        setCases(boardStore.getDisputeCases())
+        console.warn('API error fetching disputes:', err)
+        setCases([])
       }
     }
     loadCases()
@@ -168,16 +167,11 @@ export function DisputeDetailsPage() {
             setReason(res.memberOpinion.reason)
           }
         } else {
-          setCaseItem(boardStore.getDisputeCase(caseId))
+          setCaseItem(undefined)
         }
       } catch (err) {
-        console.warn('API error fetching dispute details, falling back to mock:', err)
-        const mockItem = boardStore.getDisputeCase(caseId)
-        setCaseItem(mockItem)
-        if (mockItem && mockItem.memberOpinion) {
-          setLeaning(mockItem.memberOpinion.leaning)
-          setReason(mockItem.memberOpinion.reason)
-        }
+        console.warn('API error fetching dispute details:', err)
+        setCaseItem(undefined)
       }
     }
     loadDetail()
@@ -201,12 +195,8 @@ export function DisputeDetailsPage() {
     try {
       await disputeService.saveOpinion(caseId, leaning, reason)
     } catch (err) {
-      console.warn('API error saving dispute opinion, fallback to mock store:', err)
+      console.warn('API error saving dispute opinion:', err)
     }
-
-    boardStore.saveMemberDisputeOpinion(caseId, leaning, reason)
-    const updated = boardStore.getDisputeCase(caseId)
-    setCaseItem(updated)
     setShowSavedToast(true)
     setTimeout(() => setShowSavedToast(false), 3000)
   }

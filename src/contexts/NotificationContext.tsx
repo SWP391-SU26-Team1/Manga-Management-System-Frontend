@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { Bell, AlertTriangle, RefreshCw, FileText, Star, Vote, AlertCircle, X } from 'lucide-react'
+import { boardService } from '@/services/board.service'
 
 export interface Notification {
   id: string
@@ -34,64 +35,48 @@ interface NotificationContextType {
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined)
 
-const INITIAL_NOTIFICATIONS: Notification[] = [
-  {
-    id: 'n1',
-    title: 'BẢN THẢO MỚI CẦN REVIEW',
-    message: 'Yamamoto Ren đã nộp bản thảo Ch.49 – Shadow Realm Chronicles. Deadline review: 01/06/2026.',
-    time: '15 phút trước',
-    type: 'REVIEW',
-    category: 'standard',
-    unread: true
-  },
-  {
-    id: 'n2',
-    title: 'SERIES AT RISK',
-    message: 'Neon City Runners tụt xuống hạng #18. Cần chuẩn bị hồ sơ bảo vệ series ngay.',
-    time: '1 giờ trước',
-    type: 'RISK',
-    category: 'standard',
-    unread: true
-  },
-  {
-    id: 'n3',
-    title: 'BẢN NỘP LẠI ĐÃ ĐẾN',
-    message: 'Inoue Hana đã nộp lại bản sửa Ch.23 – Neon City Runners sau 3 góp ý của bạn.',
-    time: '2 giờ trước',
-    type: 'RESUBMIT',
-    category: 'standard',
-    unread: true
-  },
-  {
-    id: 'n4',
-    title: 'EDITORIAL BOARD PHẢN HỒI',
-    message: 'Hayashi Noboru đã phê duyệt báo cáo tháng 5. Xem chi tiết phản hồi tại đây.',
-    time: '5 giờ trước',
-    type: 'FEEDBACK',
-    category: 'standard',
-    unread: false
-  },
-  {
-    id: 'n5',
-    title: 'CHƯƠNG QUÁ HẠN',
-    message: "Dragon's Blood Legacy Ch.13 đã trễ 2 ngày. Tanaka Ryusei chưa nộp bản thảo.",
-    time: '1 ngày trước',
-    type: 'OVERDUE',
-    category: 'standard',
-    unread: false
-  }
-]
-
 export function NotificationProvider({ children }: { children: ReactNode }) {
-  const [notifications, setNotifications] = useState<Notification[]>(() => {
-    const stored = localStorage.getItem('mf_notifications')
-    return stored ? JSON.parse(stored) : INITIAL_NOTIFICATIONS
-  })
-  
+  const [notifications, setNotifications] = useState<Notification[]>([])
   const [toasts, setToasts] = useState<ToastAlert[]>([])
 
+  const fetchNotifications = async () => {
+    // Only fetch if user is logged in
+    const userStr = localStorage.getItem('mangaflow_user')
+    if (!userStr) return
+
+    try {
+      const data = await boardService.getBoardNotifications()
+      // Map API data to Notification interface
+      if (data && Array.isArray(data)) {
+        const mapped = data.map((item: any) => ({
+          id: item.id || item.notification_id || Math.random().toString(),
+          title: item.title || 'THÔNG BÁO',
+          message: item.message || item.content,
+          time: new Date(item.created_at || Date.now()).toLocaleDateString(),
+          type: item.type || 'REVIEW',
+          category: 'standard' as const,
+          unread: !item.is_read
+        }))
+        setNotifications(mapped)
+      }
+    } catch (err) {
+      console.error('Failed to load notifications from API', err)
+      // Fallback local storage
+      const stored = localStorage.getItem('mf_notifications')
+      if (stored) {
+        setNotifications(JSON.parse(stored))
+      }
+    }
+  }
+
   useEffect(() => {
-    localStorage.setItem('mf_notifications', JSON.stringify(notifications))
+    fetchNotifications()
+  }, [])
+
+  useEffect(() => {
+    if (notifications.length > 0) {
+      localStorage.setItem('mf_notifications', JSON.stringify(notifications))
+    }
   }, [notifications])
 
   const unreadCount = notifications.filter(n => n.unread).length
@@ -131,8 +116,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }, 3500)
   }
 
-  const markAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, unread: false })))
+  const markAllAsRead = async () => {
+    try {
+      await boardService.markAllNotificationsRead()
+      setNotifications(prev => prev.map(n => ({ ...n, unread: false })))
+    } catch (err) {
+      console.error('API failed to mark all notifications as read', err)
+      // Optimistic update
+      setNotifications(prev => prev.map(n => ({ ...n, unread: false })))
+    }
   }
 
   const dismissToast = (id: string) => {

@@ -35,6 +35,7 @@ import uploadService from '@/services/upload.service'
 import TaskDetailModal from '@/components/assistant/TaskDetailModal'
 
 const getTaskTypeName = (type: string) => {
+  if (!type) return 'NHIỆM VỤ'
   const maps: Record<string, string> = {
     inking: 'Character Lineart',
     coloring: 'Coloring',
@@ -50,8 +51,8 @@ const mapBackendTaskToAssistantTask = (task: PageTask): AssistantTask => {
   let mappedStatus: AssistantTask['status'] = 'Not Started'
   if (task.status === 'in_progress') mappedStatus = 'In Progress'
   else if (task.status === 'submitted') mappedStatus = 'Submitted'
-  else if (task.status === 'needs_revision') mappedStatus = 'Need Fix'
-  else if (task.status === 'completed') mappedStatus = 'Approved'
+  else if (task.status === 'needs_revision' || task.status === 'rejected') mappedStatus = 'Need Fix'
+  else if (task.status === 'completed' || task.status === 'approved') mappedStatus = 'Approved'
   else if (task.status === 'assigned') mappedStatus = 'Not Started'
 
   return {
@@ -64,13 +65,22 @@ const mapBackendTaskToAssistantTask = (task: PageTask): AssistantTask => {
     deadline: task.deadline ? task.deadline.split('T')[0] : '',
     status: mappedStatus,
     priority: task.priority || 'Medium',
-    note: task.description || '',
+    note: (task as any).content || task.description || '',
     referenceUrl: task.page?.image_url || undefined,
+    regionId: (task as any).region_id || undefined,
   }
 }
 
 export default function TasksPage() {
   const navigate = useNavigate()
+  
+  const getImageUrl = (url?: string | null) => {
+    if (!url) return 'https://images.unsplash.com/photo-1563089145-599997674d42?q=80&w=600&auto=format&fit=crop'
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url
+    const apiURL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+    return `${apiURL}${url.startsWith('/') ? '' : '/'}${url}`
+  }
+
   const [tasks, setTasks] = useState<AssistantTask[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -92,6 +102,7 @@ export default function TasksPage() {
   
   // Canvas Workspace State for VIEW (VIEW) action
   const [viewingTaskId, setViewingTaskId] = useState<string | null>(null)
+  const [viewingTaskDetail, setViewingTaskDetail] = useState<any | null>(null)
   const [zoomLevel, setZoomLevel] = useState(55) // Default 55% from figma mockup
   const [activeTab, setActiveTab] = useState<'info' | 'feedback' | 'resources'>('info')
   const [isTimelineExpanded, setIsTimelineExpanded] = useState(true)
@@ -134,6 +145,40 @@ export default function TasksPage() {
   useEffect(() => {
     loadTasksData()
   }, [])
+
+  useEffect(() => {
+    if (!viewingTaskId) {
+      setViewingTaskDetail(null)
+      return
+    }
+    const loadDetail = async () => {
+      try {
+        const detail = await assistantService.getTaskDetail(viewingTaskId)
+        
+        // Load submissions and feedbacks associated with submissions
+        try {
+          const subs = await assistantService.listTaskSubmissions(viewingTaskId)
+          if (subs && subs.length > 0) {
+            const promises = subs.map(s => 
+              assistantService.listSubmissionFeedbacks(s.submission_id)
+                .catch(() => [] as any[])
+            )
+            const results = await Promise.all(promises)
+            detail.feedbacks = results.flat().sort(
+              (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            )
+          }
+        } catch (subErr) {
+          console.error("Failed to load submission feedbacks for task detail:", subErr)
+        }
+        
+        setViewingTaskDetail(detail)
+      } catch (err) {
+        console.error("Error loading viewing task detail:", err)
+      }
+    }
+    loadDetail()
+  }, [viewingTaskId])
 
   const loadTasksData = async () => {
     setIsLoading(true)
@@ -215,17 +260,25 @@ export default function TasksPage() {
             onClick={() => handleOpenModal(task)}
             className="w-full flex items-center justify-center gap-1 mt-1.5 px-2 py-1 text-[10px] font-bold text-[#38B2AC] border border-[#38B2AC] hover:bg-[#E6FFFA] transition-colors cursor-pointer bg-white"
           >
-            <Check className="w-3 h-3" /> DONE
+            <Check className="w-3 h-3" /> ĐÃ DUYỆT
           </button>
         )
       case 'In Progress':
-      case 'Not Started':
         return (
           <button 
             onClick={() => handleOpenSubmitModal(task)}
             className="w-full mt-1.5 px-2 py-1 text-[10px] font-bold text-white bg-[#E63946] border border-[#E63946] hover:bg-white hover:text-[#E63946] transition-colors cursor-pointer"
           >
             NỘP
+          </button>
+        )
+      case 'Not Started':
+        return (
+          <button 
+            onClick={() => handleAcceptTask(task)}
+            className="w-full mt-1.5 px-2 py-1 text-[10px] font-bold text-white bg-amber-500 border border-amber-500 hover:bg-white hover:text-amber-500 transition-colors cursor-pointer"
+          >
+            NHẬN
           </button>
         )
       case 'Submitted':
@@ -793,76 +846,123 @@ export default function TasksPage() {
                     style={{ transform: `scale(${zoomLevel / 100})` }}
                   >
                     {/* Drawing White Sheet (600x880px) */}
-                    <div className="w-[600px] h-[880px] bg-white text-black border-4 border-black shadow-[8px_8px_0px_rgba(0,0,0,0.5)] relative overflow-hidden flex flex-col p-6 gap-4">
-                      
-                      {/* Top Sketch Panel (Art Task) */}
-                      <div className="flex-1 border-4 border-black relative bg-[#FAF9F6] p-4 flex flex-col justify-between overflow-hidden">
-                        
-                        {/* Art task highlighted outline */}
-                        <div className="absolute inset-0 border-[6px] border-[#E63946] pointer-events-none animate-pulse duration-1000" />
-                        
-                        {/* Figma Art Task badge */}
-                        <div className="absolute top-2 left-2 bg-[#E63946] text-white text-[9px] font-black uppercase tracking-wider py-1 px-2.5 flex items-center gap-1 border border-black z-20">
-                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-white" /> Art Task
+                    <div className="w-[600px] h-[880px] bg-white text-black border-4 border-black shadow-[8px_8px_0px_rgba(0,0,0,0.5)] relative overflow-hidden flex flex-col p-0">
+                      {task.referenceUrl ? (
+                        <div className="relative w-full h-full bg-zinc-50 select-none">
+                          <img 
+                            src={getImageUrl(task.referenceUrl)} 
+                            alt="Reference Page Draft" 
+                            className="w-full h-full object-fill pointer-events-none select-none"
+                            draggable={false}
+                          />
+
+                          {/* Render regions */}
+                          {viewingTaskDetail?.regions
+                            ?.filter((r: any) => r.page_id === viewingTaskDetail.page_id)
+                            ?.map((r: any) => {
+                            const rx = r.coordinates?.x ?? r.x ?? 0
+                            const ry = r.coordinates?.y ?? r.y ?? 0
+                            const rw = r.coordinates?.w ?? r.coordinates?.width ?? r.width ?? 0
+                            const rh = r.coordinates?.h ?? r.coordinates?.height ?? r.height ?? 0
+                            
+                            // Check if this region belongs to the current task
+                            const isCurrentTaskRegion = r.region_id === task.regionId
+                            
+                            return (
+                              <div
+                                key={r.region_id}
+                                className={`absolute border-2 ${
+                                  isCurrentTaskRegion 
+                                    ? 'border-[#E63946] bg-[#E63946]/20 z-20 shadow-[0_0_8px_rgba(230,57,70,0.5)]' 
+                                    : 'border-zinc-400 border-dashed bg-zinc-400/5 z-10'
+                                }`}
+                                style={{
+                                  left: `${rx}%`,
+                                  top: `${ry}%`,
+                                  width: `${rw}%`,
+                                  height: `${rh}%`
+                                }}
+                              >
+                                <div className={`absolute -top-6 left-[-2px] text-white text-[9px] font-black uppercase tracking-wider py-0.5 px-1.5 border border-black ${
+                                  isCurrentTaskRegion ? 'bg-[#E63946]' : 'bg-zinc-500'
+                                }`}>
+                                  {r.label || getTaskTypeName(r.region_type || r.type || '') || 'Vùng nhiệm vụ'}
+                                </div>
+                              </div>
+                            )
+                          })}
                         </div>
-
-                        {/* Top panel sketch detail */}
-                        <div className="w-full h-full flex flex-col items-center justify-center relative mt-3">
-                          {/* Character 1 Oval sketch */}
-                          <div className="absolute left-1/4 top-1/4 flex flex-col items-center">
-                            <div className="w-20 h-28 border-4 border-zinc-300 rounded-full flex items-center justify-center bg-white shadow-sm">
-                              <div className="w-4 h-4 border-2 border-zinc-300 rounded-full" />
+                      ) : (
+                        <>
+                          {/* Top Sketch Panel (Art Task) */}
+                          <div className="flex-1 border-4 border-black relative bg-[#FAF9F6] p-4 flex flex-col justify-between overflow-hidden">
+                            
+                            {/* Art task highlighted outline */}
+                            <div className="absolute inset-0 border-[6px] border-[#E63946] pointer-events-none animate-pulse duration-1000" />
+                            
+                            {/* Figma Art Task badge */}
+                            <div className="absolute top-2 left-2 bg-[#E63946] text-white text-[9px] font-black uppercase tracking-wider py-1 px-2.5 flex items-center gap-1 border border-black z-20">
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-white" /> Art Task
                             </div>
-                            <div className="h-16 w-1 border-2 border-zinc-300 mt-[-2px]" />
-                            <div className="w-16 h-0.5 border border-zinc-300 mt-2 rotate-12" />
-                          </div>
 
-                          {/* Character 2 Oval sketch */}
-                          <div className="absolute right-1/4 top-1/4 flex flex-col items-center">
-                            <div className="w-20 h-28 border-4 border-zinc-300 rounded-full flex items-center justify-center bg-white shadow-sm">
-                              <div className="w-4 h-4 border-2 border-zinc-300 rounded-full" />
+                            {/* Top panel sketch detail */}
+                            <div className="w-full h-full flex flex-col items-center justify-center relative mt-3">
+                              {/* Character 1 Oval sketch */}
+                              <div className="absolute left-1/4 top-1/4 flex flex-col items-center">
+                                <div className="w-20 h-28 border-4 border-zinc-300 rounded-full flex items-center justify-center bg-white shadow-sm">
+                                  <div className="w-4 h-4 border-2 border-zinc-300 rounded-full" />
+                                </div>
+                                <div className="h-16 w-1 border-2 border-zinc-300 mt-[-2px]" />
+                                <div className="w-16 h-0.5 border border-zinc-300 mt-2 rotate-12" />
+                              </div>
+
+                              {/* Character 2 Oval sketch */}
+                              <div className="absolute right-1/4 top-1/4 flex flex-col items-center">
+                                <div className="w-20 h-28 border-4 border-zinc-300 rounded-full flex items-center justify-center bg-white shadow-sm">
+                                  <div className="w-4 h-4 border-2 border-zinc-300 rounded-full" />
+                                </div>
+                                <div className="h-16 w-1 border-2 border-zinc-300 mt-[-2px]" />
+                                <div className="w-16 h-0.5 border border-zinc-300 mt-2 -rotate-12" />
+                              </div>
+
+                              {/* Speech bubble */}
+                              <div className="absolute top-8 right-8 bg-white border-2 border-zinc-350 p-2.5 rounded-full text-[10px] font-bold text-zinc-400 shadow-sm max-w-[100px] text-center leading-tight">
+                                "... Cám ơn..."
+                              </div>
                             </div>
-                            <div className="h-16 w-1 border-2 border-zinc-300 mt-[-2px]" />
-                            <div className="w-16 h-0.5 border border-zinc-300 mt-2 -rotate-12" />
+
+                            <div className="text-[9px] font-black uppercase tracking-widest text-zinc-350 select-none">PANEL 1 - DETAIL DRAWING</div>
                           </div>
 
-                          {/* Speech bubble */}
-                          <div className="absolute top-8 right-8 bg-white border-2 border-zinc-350 p-2.5 rounded-full text-[10px] font-bold text-zinc-400 shadow-sm max-w-[100px] text-center leading-tight">
-                            "... Cám ơn..."
-                          </div>
-                        </div>
+                          {/* Bottom split panels */}
+                          <div className="h-1/3 flex gap-4">
+                            {/* Bottom Left Panel (Close up of eye) */}
+                            <div className="w-1/2 border-4 border-black bg-[#FAF9F6] p-4 flex flex-col justify-between relative overflow-hidden">
+                              {/* Eye sketch drawing */}
+                              <div className="w-full h-full flex items-center justify-center relative">
+                                <div className="w-24 h-12 border-4 border-zinc-350 rounded-full relative flex items-center justify-center overflow-hidden">
+                                  <div className="w-8 h-8 border-4 border-zinc-700 bg-zinc-900 rounded-full" />
+                                  {/* Eye reflection */}
+                                  <div className="w-2 h-2 bg-white rounded-full absolute top-3 left-10" />
+                                </div>
+                              </div>
+                              <div className="text-[9px] font-black uppercase tracking-widest text-zinc-350 select-none">PANEL 2 - CLOSEUP EYE</div>
+                            </div>
 
-                        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-350 select-none">PANEL 1 - DETAIL DRAWING</div>
-                      </div>
-
-                      {/* Bottom split panels */}
-                      <div className="h-1/3 flex gap-4">
-                        {/* Bottom Left Panel (Close up of eye) */}
-                        <div className="w-1/2 border-4 border-black bg-[#FAF9F6] p-4 flex flex-col justify-between relative overflow-hidden">
-                          {/* Eye sketch drawing */}
-                          <div className="w-full h-full flex items-center justify-center relative">
-                            <div className="w-24 h-12 border-4 border-zinc-350 rounded-full relative flex items-center justify-center overflow-hidden">
-                              <div className="w-8 h-8 border-4 border-zinc-700 bg-zinc-900 rounded-full" />
-                              {/* Eye reflection */}
-                              <div className="w-2 h-2 bg-white rounded-full absolute top-3 left-10" />
+                            {/* Bottom Right Panel (Side character) */}
+                            <div className="w-1/2 border-4 border-black bg-[#FAF9F6] p-4 flex flex-col justify-between relative overflow-hidden">
+                              {/* Sketch ovals */}
+                              <div className="w-full h-full flex items-center justify-center relative">
+                                <div className="flex flex-col items-center">
+                                  <div className="w-14 h-20 border-4 border-zinc-300 rounded-full bg-white shadow-sm" />
+                                  <div className="h-10 w-0.5 border border-zinc-300 mt-[-2px]" />
+                                </div>
+                              </div>
+                              <div className="text-[9px] font-black uppercase tracking-widest text-zinc-350 select-none">PANEL 3 - SIDE SKETCH</div>
                             </div>
                           </div>
-                          <div className="text-[9px] font-black uppercase tracking-widest text-zinc-350 select-none">PANEL 2 - CLOSEUP EYE</div>
-                        </div>
-
-                        {/* Bottom Right Panel (Side character) */}
-                        <div className="w-1/2 border-4 border-black bg-[#FAF9F6] p-4 flex flex-col justify-between relative overflow-hidden">
-                          {/* Sketch ovals */}
-                          <div className="w-full h-full flex items-center justify-center relative">
-                            <div className="flex flex-col items-center">
-                              <div className="w-14 h-20 border-4 border-zinc-300 rounded-full bg-white shadow-sm" />
-                              <div className="h-10 w-0.5 border border-zinc-300 mt-[-2px]" />
-                            </div>
-                          </div>
-                          <div className="text-[9px] font-black uppercase tracking-widest text-zinc-350 select-none">PANEL 3 - SIDE SKETCH</div>
-                        </div>
-                      </div>
-
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -963,7 +1063,7 @@ export default function TasksPage() {
                           <div className="flex flex-col gap-1.5">
                             <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400">Mô tả nhiệm vụ</h4>
                             <p className="text-xs font-medium text-gray-700 leading-relaxed bg-zinc-50 p-3 border border-zinc-100">
-                              {task.note || 'Xem file brief trong resources để biết chi tiết nhiệm vụ.'}
+                              {viewingTaskDetail?.content || viewingTaskDetail?.description || task.note || 'Không có mô tả chi tiết cho nhiệm vụ này.'}
                             </p>
                           </div>
 
@@ -971,12 +1071,12 @@ export default function TasksPage() {
                           <div className="flex flex-col gap-1.5">
                             <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400">Người giao việc</h4>
                             <div className="flex items-center gap-3 p-2 border border-zinc-200">
-                              <div className="w-8 h-8 rounded-full bg-zinc-900 text-white font-black text-xs flex items-center justify-center shrink-0">
-                                PM
+                              <div className="w-8 h-8 rounded-full bg-[#E63946] text-white font-black text-xs flex items-center justify-center shrink-0 uppercase">
+                                {(task.assignedBy || 'M').charAt(0)}
                               </div>
                               <div>
-                                <p className="text-xs font-black text-manga-ink leading-none">Project Manager</p>
-                                <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">Editor</p>
+                                <p className="text-xs font-black text-manga-ink leading-none">{task.assignedBy}</p>
+                                <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">Mangaka / Editor</p>
                               </div>
                             </div>
                           </div>
@@ -986,7 +1086,7 @@ export default function TasksPage() {
                             <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400">Vùng được giao (1)</h4>
                             <div className="p-3 border border-zinc-200 bg-white flex flex-col gap-0.5">
                               <p className="text-xs font-black text-manga-ink leading-tight">Vùng nhiệm vụ</p>
-                              <p className="text-[10px] font-bold text-gray-400 uppercase">Art Task - 600x880px</p>
+                              <p className="text-[10px] font-bold text-[#E63946] uppercase">{task.layerType}</p>
                             </div>
                           </div>
 
@@ -1022,21 +1122,42 @@ export default function TasksPage() {
                       {activeTab === 'feedback' && (
                         <div className="flex flex-col gap-4">
                           <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400">Nhận xét từ Mangaka</h4>
-                          <div className="flex flex-col gap-3.5 divide-y divide-zinc-150">
-                            <div className="flex gap-3 items-start pt-2 first:pt-0">
-                              <div className="w-8 h-8 rounded-full bg-zinc-950 text-white font-black text-[10px] flex items-center justify-center shrink-0 border border-black shadow-sm">
-                                AT
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="text-xs font-black text-manga-ink leading-none">Akira Tanaka</span>
-                                  <span className="text-[8px] text-gray-400 font-bold uppercase tracking-tight">Mangaka</span>
-                                </div>
-                                <p className="text-xs font-medium text-gray-600 bg-zinc-50 p-2.5 border border-zinc-100 mt-1.5 leading-relaxed">
-                                  "Biểu cảm nhân vật cần mạnh mẽ, ánh mắt rõ nét. Chú ý bám sát brief mô tả."
-                                </p>
-                              </div>
-                            </div>
+                          <div className="flex flex-col gap-3.5 divide-y divide-zinc-150 max-h-[350px] overflow-y-auto pr-1">
+                            {viewingTaskDetail?.feedbacks && viewingTaskDetail.feedbacks.length > 0 ? (
+                              viewingTaskDetail.feedbacks.map((fb: any) => {
+                                const isFromMangaka = fb.mangaka_id !== null;
+                                const authorName = isFromMangaka 
+                                  ? (task.assignedBy || 'Mangaka') 
+                                  : 'Trợ lý';
+                                const roleText = isFromMangaka ? 'Mangaka' : 'Trợ lý';
+                                const initials = authorName.substring(0, 2).toUpperCase();
+                                const feedbackText = fb.content || fb.feedback_content || '';
+                                
+                                return (
+                                  <div key={fb.feedback_id || fb.id} className="flex gap-3 items-start pt-2 first:pt-0">
+                                    <div className={`w-8 h-8 rounded-full ${isFromMangaka ? 'bg-zinc-950' : 'bg-zinc-600'} text-white font-black text-[10px] flex items-center justify-center shrink-0 border border-black shadow-sm`}>
+                                      {initials}
+                                    </div>
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-xs font-black text-manga-ink leading-none">{authorName}</span>
+                                        <span className="text-[8px] text-gray-400 font-bold uppercase tracking-tight">{roleText}</span>
+                                        {fb.created_at && (
+                                          <span className="text-[8px] text-gray-400 ml-auto font-mono">
+                                            {new Date(fb.created_at).toLocaleDateString('vi-VN')}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p className="text-xs font-medium text-gray-600 bg-zinc-50 p-2.5 border border-zinc-100 mt-1.5 leading-relaxed whitespace-pre-wrap">
+                                        {feedbackText}
+                                      </p>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <p className="text-xs text-gray-400 font-bold italic py-4">Chưa có nhận xét hay phản hồi nào cho nhiệm vụ này.</p>
+                            )}
                           </div>
                         </div>
                       )}

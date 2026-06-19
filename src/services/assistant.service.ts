@@ -2,7 +2,7 @@ import api from './api'
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
-export type TaskStatus = 'assigned' | 'in_progress' | 'submitted' | 'needs_revision' | 'completed' | 'cancelled' | 'rejected'
+export type TaskStatus = 'assigned' | 'in_progress' | 'submitted' | 'needs_revision' | 'completed' | 'cancelled' | 'rejected' | 'approved'
 export type TaskType = 'inking' | 'coloring' | 'lettering' | 'cleaning' | 'sfx' | 'background'
 export type PriorityType = 'Low' | 'Medium' | 'High' | 'Urgent'
 
@@ -15,6 +15,7 @@ export interface PageTask {
   status: TaskStatus
   priority: PriorityType
   description: string
+  content?: string
   deadline: string
   created_at: string
   updated_at: string
@@ -137,6 +138,9 @@ export const assistantService = {
     limit?: number
   }): Promise<{ success: boolean; data: PageTask[]; pagination?: any }> => {
     const res = await api.get('/api/assistant/page-tasks', { params: filters })
+    if (res.data && Array.isArray(res.data.data)) {
+      res.data.data = res.data.data.filter((t: any) => t.status !== 'pending')
+    }
     return res.data
   },
 
@@ -146,12 +150,43 @@ export const assistantService = {
   },
 
   getTaskDetail: async (taskId: string): Promise<PageTaskDetail> => {
-    const res = await api.get<{ success: boolean; data: PageTaskDetail }>(`/api/assistant/page-tasks/${taskId}/detail`)
-    return res.data.data
+    // 1. Fetch core task info (succeeds!)
+    const taskRes = await api.get<{ success: boolean; data: PageTask }>(`/api/assistant/page-tasks/${taskId}`)
+    const task = taskRes.data.data
+
+    // 2. Fetch page annotations
+    let annotations: any[] = []
+    if (task.page_id) {
+      try {
+        const res = await api.get<{ success: boolean; data: any[] }>(`/api/assistant/pages/${task.page_id}/annotations`)
+        annotations = res.data.data || []
+      } catch (e) {
+        console.error('Failed to load annotations:', e)
+      }
+    }
+
+    // 3. Fetch page regions
+    let regions: any[] = []
+    if (task.page_id) {
+      try {
+        const res = await api.get<{ success: boolean; data: any[] }>(`/api/pages/${task.page_id}/regions`)
+        regions = res.data.data || []
+      } catch (e) {
+        console.error('Failed to load regions:', e)
+      }
+    }
+
+    // 4. Return combined details (feedbacks will be loaded on demand per submission)
+    return {
+      ...task,
+      regions,
+      annotations,
+      feedbacks: []
+    }
   },
 
   startTask: async (taskId: string): Promise<PageTask> => {
-    const res = await api.patch<{ success: boolean; data: PageTask }>(`/api/assistant/page-tasks/${taskId}/start`)
+    const res = await api.patch<{ success: boolean; data: PageTask }>(`/api/assistant/page-tasks/${taskId}/start`, {})
     return res.data.data
   },
 
@@ -166,7 +201,7 @@ export const assistantService = {
   },
 
   holdTaskWorkflow: async (taskId: string): Promise<PageTask> => {
-    const res = await api.patch<{ success: boolean; data: PageTask }>(`/api/assistant/page-tasks/${taskId}/hold`)
+    const res = await api.patch<{ success: boolean; data: PageTask }>(`/api/assistant/page-tasks/${taskId}/hold`, {})
     return res.data.data
   },
 
@@ -259,6 +294,67 @@ export const assistantService = {
 
   deleteNotification: async (notificationId: string): Promise<void> => {
     await api.delete(`/api/assistant/notifications/${notificationId}`)
+  },
+
+  // --- Drafts (Bản Nháp) ---
+  listDraftManuscripts: async (filters?: { series_id?: string; chapter_id?: string }): Promise<any[]> => {
+    const res = await api.get<{ success: boolean; data: any[] }>('/api/assistant/drafts/manuscripts', { params: filters })
+    return res.data.data
+  },
+
+  listDraftPages: async (filters?: { chapter_id?: string }): Promise<any[]> => {
+    const res = await api.get<{ success: boolean; data: any[] }>('/api/assistant/drafts/pages', { params: filters })
+    return res.data.data
+  },
+
+  getManuscriptDetail: async (manuscriptId: string): Promise<any> => {
+    const res = await api.get<{ success: boolean; data: any }>(`/api/assistant/drafts/manuscripts/${manuscriptId}`)
+    return res.data.data
+  },
+
+  getDraftPageDetail: async (pageId: string): Promise<any> => {
+    const res = await api.get<{ success: boolean; data: any }>(`/api/assistant/drafts/pages/${pageId}`)
+    return res.data.data
+  },
+
+  updateManuscriptDraft: async (manuscriptId: string, payload: { title?: string; content?: string }): Promise<any> => {
+    const res = await api.patch<{ success: boolean; data: any }>(`/api/assistant/drafts/manuscripts/${manuscriptId}`, payload)
+    return res.data.data
+  },
+
+  deleteManuscriptDraft: async (manuscriptId: string): Promise<void> => {
+    await api.delete(`/api/assistant/drafts/manuscripts/${manuscriptId}`)
+  },
+
+  // --- Drawing & Editing (Vẽ & Chỉnh sửa) ---
+  listDrawingPages: async (filters?: { chapter_id?: string; page_status?: string }): Promise<any[]> => {
+    const res = await api.get<{ success: boolean; data: any[] }>('/api/assistant/drawing/pages', { params: filters })
+    return res.data.data
+  },
+
+  getDrawingPageDetail: async (pageId: string): Promise<any> => {
+    const res = await api.get<{ success: boolean; data: any }>(`/api/assistant/drawing/pages/${pageId}`)
+    return res.data.data
+  },
+
+  listPageVersions: async (pageId: string): Promise<any[]> => {
+    const res = await api.get<{ success: boolean; data: any[] }>(`/api/assistant/drawing/pages/${pageId}/versions`)
+    return res.data.data
+  },
+
+  getVersionDetail: async (versionId: string): Promise<any> => {
+    const res = await api.get<{ success: boolean; data: any }>(`/api/assistant/drawing/versions/${versionId}`)
+    return res.data.data
+  },
+
+  listMyDrawingTasks: async (filters?: { task_type?: string; status?: string; overdue?: string }): Promise<any[]> => {
+    const res = await api.get<{ success: boolean; data: any[] }>('/api/assistant/drawing/tasks', { params: filters })
+    return res.data.data
+  },
+
+  updatePageDrawingStatus: async (pageId: string, status: string): Promise<any> => {
+    const res = await api.patch<{ success: boolean; data: any }>(`/api/assistant/drawing/pages/${pageId}/status`, { status })
+    return res.data.data
   },
 }
 

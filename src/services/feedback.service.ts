@@ -41,6 +41,12 @@ export const feedbackService = {
     return res.data.data ?? []
   },
 
+  /** GET /api/review/page-submissions/pending - Lấy danh sách submission đang chờ duyệt */
+  getPendingSubmissions: async (): Promise<any[]> => {
+    const res = await api.get<{ success: boolean; data: any[] }>('/api/review/page-submissions/pending')
+    return res.data.data ?? []
+  },
+
   /** GET /api/review/page-submissions/:submissionId - Lấy chi tiết submission */
   getSubmissionDetail: async (submissionId: string): Promise<any> => {
     const res = await api.get<{ success: boolean; data: any }>(`/api/review/page-submissions/${submissionId}`)
@@ -59,6 +65,40 @@ export const feedbackService = {
   /** DELETE /api/page-task-feedbacks/:feedbackId - Xóa feedback (Đánh dấu đã giải quyết) */
   delete: async (feedbackId: string): Promise<void> => {
     await api.delete(`/api/page-task-feedbacks/${feedbackId}`)
+  },
+
+  /** PATCH /api/review/page-submissions/:submissionId/approve */
+  approveSubmission: async (submissionId: string): Promise<any> => {
+    const res = await api.patch<{ success: boolean; data: any }>(
+      `/api/review/page-submissions/${submissionId}/approve`
+    )
+    return res.data.data
+  },
+
+  /** PATCH /api/review/page-submissions/:submissionId/reject */
+  rejectSubmission: async (submissionId: string): Promise<any> => {
+    const res = await api.patch<{ success: boolean; data: any }>(
+      `/api/review/page-submissions/${submissionId}/reject`
+    )
+    return res.data.data
+  },
+
+  /** PATCH /api/review/page-submissions/:submissionId/request-revision */
+  requestRevisionSubmission: async (submissionId: string, content: string): Promise<any> => {
+    const res = await api.patch<{ success: boolean; data: any }>(
+      `/api/review/page-submissions/${submissionId}/request-revision`,
+      { content }
+    )
+    return res.data.data
+  },
+
+  /** POST /api/page-submissions/:submissionId/feedbacks */
+  createSubmissionFeedback: async (submissionId: string, content: string): Promise<any> => {
+    const res = await api.post<{ success: boolean; data: any }>(
+      `/api/page-submissions/${submissionId}/feedbacks`,
+      { content }
+    )
+    return res.data.data
   },
 }
 

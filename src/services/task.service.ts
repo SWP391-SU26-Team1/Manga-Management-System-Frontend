@@ -92,7 +92,33 @@ export const taskService = {
       `/api/mangaka/series/${seriesId}/chapters/${chapterId}/pages/${pageId}/tasks`,
       mappedPayload
     )
-    return mapTask(res.data.data)
+    const task = mapTask(res.data.data)
+
+    // Automatically transition task to 'assigned' status if assigned_to is provided on creation
+    if (payload.assigned_to && task._id) {
+      try {
+        await api.patch(
+          `/api/mangaka/series/${seriesId}/chapters/${chapterId}/pages/${pageId}/tasks/${task._id}/assign`
+        )
+        task.status = 'assigned'
+      } catch (err) {
+        console.error('Failed to auto-assign task on creation:', err)
+      }
+    }
+    return task
+  },
+
+  /** PATCH assign task to transition from pending to assigned */
+  assign: async (
+    seriesId: string,
+    chapterId: string,
+    pageId: string,
+    taskId: string
+  ): Promise<any> => {
+    const res = await api.patch<{ success: boolean; data: any }>(
+      `/api/mangaka/series/${seriesId}/chapters/${chapterId}/pages/${pageId}/tasks/${taskId}/assign`
+    )
+    return res.data.data
   },
 
   /** DELETE xóa task */

@@ -16,6 +16,29 @@ export function SharedLayout({ header }: SharedLayoutProps) {
     return <Navigate to="/login" replace />
   }
 
+  let user: any = null
+  try {
+    user = JSON.parse(storedUser)
+  } catch {
+    return <Navigate to="/login" replace />
+  }
+
+  const role = user?.role // "MANGAKA", "ASSISTANT", "EDITOR", "BOARD"
+  const path = location.pathname
+
+  if (path.startsWith('/dashboard/mangaka') && role !== 'MANGAKA' && role !== 'ADMIN') {
+    return <Navigate to="/login" replace />
+  }
+  if (path.startsWith('/dashboard/assistant') && role !== 'ASSISTANT' && role !== 'ADMIN') {
+    return <Navigate to="/login" replace />
+  }
+  if (path.startsWith('/dashboard/tantou-editor') && role !== 'EDITOR' && role !== 'ADMIN') {
+    return <Navigate to="/login" replace />
+  }
+  if (path.startsWith('/dashboard/editorial-board') && role !== 'BOARD' && role !== 'ADMIN') {
+    return <Navigate to="/login" replace />
+  }
+
   const isDashboardRoot = location.pathname === '/dashboard/mangaka' || 
                           location.pathname === '/dashboard/assistant' ||
                           location.pathname === '/dashboard/board' ||

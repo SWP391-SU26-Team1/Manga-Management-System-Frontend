@@ -33,6 +33,7 @@ import { AssistantTask } from '@/data/assistantMockData'
 import assistantService, { PageTask } from '@/services/assistant.service'
 import uploadService from '@/services/upload.service'
 import TaskDetailModal from '@/components/assistant/TaskDetailModal'
+import userService from '@/services/user.service'
 
 const getTaskTypeName = (type: string) => {
   if (!type) return 'NHIỆM VỤ'
@@ -68,6 +69,8 @@ const mapBackendTaskToAssistantTask = (task: PageTask): AssistantTask => {
     note: (task as any).content || task.description || '',
     referenceUrl: task.page?.image_url || undefined,
     regionId: (task as any).region_id || undefined,
+    createdAt: task.created_at || '',
+    assignedById: task.users?.user_id || '',
   }
 }
 
@@ -80,6 +83,27 @@ export default function TasksPage() {
     const apiURL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
     return `${apiURL}${url.startsWith('/') ? '' : '/'}${url}`
   }
+
+  const downloadFile = async (url: string, filename: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+      showToast('success', `Đã tải về thành công file ${filename}`);
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      // Fallback to open in new tab if CORS or other error occurs
+      window.open(url, '_blank');
+      showToast('success', `Đã mở link tải file trong tab mới`);
+    }
+  };
 
   const [tasks, setTasks] = useState<AssistantTask[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -138,7 +162,13 @@ export default function TasksPage() {
   // Filters state
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'In Progress' | 'Not Started' | 'Submitted' | 'Need Fix' | 'Approved'>('ALL')
-  const [sortByDeadline, setSortByDeadline] = useState(true)
+  const [sortByDeadline, setSortByDeadline] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [assignedUsers, setAssignedUsers] = useState<Record<string, { fullName: string; avatarUrl?: string }>>({})
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery, statusFilter, sortByDeadline])
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -180,6 +210,26 @@ export default function TasksPage() {
     loadDetail()
   }, [viewingTaskId])
 
+  const loadAvatars = async (mappedTasks: AssistantTask[]) => {
+    const userIds = Array.from(new Set(mappedTasks.map(t => t.assignedById).filter(Boolean))) as string[]
+    for (const uid of userIds) {
+      if (!assignedUsers[uid]) {
+        try {
+          const profile = await userService.getUserById(uid)
+          setAssignedUsers(prev => ({
+            ...prev,
+            [uid]: {
+              fullName: profile.fullName || profile.username,
+              avatarUrl: profile.avatarUrl
+            }
+          }))
+        } catch (err) {
+          console.error("Failed to load user profile:", uid, err)
+        }
+      }
+    }
+  }
+
   const loadTasksData = async () => {
     setIsLoading(true)
     setError(null)
@@ -188,6 +238,7 @@ export default function TasksPage() {
       if (res && res.success) {
         const mapped = res.data.map(mapBackendTaskToAssistantTask)
         setTasks(mapped)
+        loadAvatars(mapped)
       } else {
         setTasks([])
       }
@@ -230,10 +281,6 @@ export default function TasksPage() {
     }
   }
 
-  // Get task reward payment helper (bỏ ký hiệu $)
-  const getTaskPayment = (taskId: string) => {
-    return '850.000 ₫'
-  }
 
   const getStatusBadge = (status?: string) => {
     switch (status) {
@@ -310,6 +357,16 @@ export default function TasksPage() {
       return dateStr.split('-').reverse().join('/');
     } catch {
       return dateStr;
+    }
+  }
+
+  const formatTimelineDate = (dateStr?: string) => {
+    if (!dateStr) return '';
+    try {
+      const dateOnly = dateStr.split('T')[0]
+      return dateOnly.split('-').reverse().join('/')
+    } catch {
+      return dateStr
     }
   }
 
@@ -501,15 +558,22 @@ export default function TasksPage() {
   // Sorting logic
   if (sortByDeadline) {
     filteredTasks.sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())
+  } else {
+    filteredTasks.sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+      if (dateB !== dateA) return dateB - dateA
+      return b.id.localeCompare(a.id)
+    })
   }
 
-  const displayTasks = filteredTasks.slice(0, 8);
+  const displayTasks = filteredTasks.slice((currentPage - 1) * 10, currentPage * 10);
 
   // Get current active viewed task for drawing workspace
   const viewedTask = safeTasks.find(t => t.id === viewingTaskId)
 
   return (
-    <div className="max-w-[1400px] mx-auto pb-12 font-sans relative">
+    <div className={`max-w-[1400px] mx-auto pb-12 font-sans ${viewingTaskId ? '' : 'relative'}`}>
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-4 right-4 z-[60] animate-bounce duration-300">
@@ -646,7 +710,7 @@ export default function TasksPage() {
                 className="flex items-center justify-between gap-4 bg-white border-2 border-manga-ink px-3 py-2 text-xs font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] transition-all cursor-pointer"
               >
                 <span className="flex items-center gap-1">
-                  <span className="text-manga-ink">⇅ Deadline ({sortByDeadline ? 'gần nhất' : 'tất cả'})</span>
+                  <span className="text-manga-ink">⇅ Sắp xếp: {sortByDeadline ? 'Deadline gần nhất' : 'Mới nhất trước'}</span>
                 </span>
                 <ChevronDown className="w-4 h-4 text-gray-500" />
               </button>
@@ -732,14 +796,36 @@ export default function TasksPage() {
             {/* Pagination Footer */}
             <div className="bg-white border-t-2 border-manga-ink p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
               <span className="text-xs font-semibold text-gray-500">
-                Hiển thị 1-{Math.min(8, filteredTasks.length)} / {filteredTasks.length} nhiệm vụ
+                Hiển thị {filteredTasks.length === 0 ? 0 : (currentPage - 1) * 10 + 1}-{Math.min(currentPage * 10, filteredTasks.length)} / {filteredTasks.length} nhiệm vụ
               </span>
               <div className="flex items-center gap-1">
-                <button className="w-7 h-7 flex items-center justify-center border border-gray-300 text-gray-500 hover:bg-gray-50 bg-white"><ChevronLeft className="w-4 h-4" /></button>
-                <button className="w-7 h-7 flex items-center justify-center bg-[#E63946] text-white font-bold text-xs border border-[#E63946]">1</button>
-                <button className="w-7 h-7 flex items-center justify-center border border-gray-300 text-gray-600 hover:bg-gray-50 font-bold text-xs bg-white">2</button>
-                <button className="w-7 h-7 flex items-center justify-center border border-gray-300 text-gray-600 hover:bg-gray-50 font-bold text-xs bg-white">3</button>
-                <button className="w-7 h-7 flex items-center justify-center border border-gray-300 text-gray-500 hover:bg-gray-50 bg-white"><ChevronRight className="w-4 h-4" /></button>
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="w-7 h-7 flex items-center justify-center border border-gray-300 text-gray-500 hover:bg-gray-50 bg-white disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                {Array.from({ length: Math.ceil(filteredTasks.length / 10) }, (_, i) => (
+                  <button
+                    key={i + 1}
+                    onClick={() => setCurrentPage(i + 1)}
+                    className={`w-7 h-7 flex items-center justify-center font-bold text-xs border cursor-pointer ${
+                      currentPage === i + 1 
+                        ? 'bg-[#E63946] text-white border-[#E63946]' 
+                        : 'border border-gray-300 text-gray-600 hover:bg-gray-50 bg-white'
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(filteredTasks.length / 10)))}
+                  disabled={currentPage === Math.ceil(filteredTasks.length / 10) || Math.ceil(filteredTasks.length / 10) === 0}
+                  className="w-7 h-7 flex items-center justify-center border border-gray-300 text-gray-500 hover:bg-gray-50 bg-white disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
             </div>
           </div>
@@ -766,10 +852,10 @@ export default function TasksPage() {
           const isSubmitted = task.status === 'Submitted';
           
           const statusText = getStatusText(task.status);
-          const payment = getTaskPayment(task.id);
+
 
           return (
-            <div className="bg-[#141416] border-4 border-manga-ink shadow-[6px_6px_0px_rgba(0,0,0,1)] overflow-hidden flex flex-col font-sans text-white h-[calc(100vh-140px)] select-none">
+            <div className="absolute inset-0 bg-[#141416] flex flex-col font-sans text-white select-none z-30 overflow-hidden">
               
               {/* Top Control Bar */}
               <div className="bg-[#1C1C1F] border-b-4 border-manga-ink p-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs shrink-0 z-10">
@@ -1009,16 +1095,11 @@ export default function TasksPage() {
                       </div>
                     </div>
 
-                    {/* Deadline and Payment */}
+                    {/* Deadline */}
                     <div className="flex items-center gap-4 text-xs font-bold bg-zinc-50 p-3 border border-zinc-200">
                       <div className="flex items-center gap-1.5 text-gray-500">
                         <Clock className="w-4 h-4 text-gray-400 shrink-0" />
                         <span>{formatDate(task.deadline)}</span>
-                      </div>
-                      <div className="h-4 w-px bg-zinc-300" />
-                      <div className="flex items-center gap-1.5 text-emerald-600">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                        <span>{payment}</span>
                       </div>
                     </div>
                   </div>
@@ -1071,11 +1152,21 @@ export default function TasksPage() {
                           <div className="flex flex-col gap-1.5">
                             <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400">Người giao việc</h4>
                             <div className="flex items-center gap-3 p-2 border border-zinc-200">
-                              <div className="w-8 h-8 rounded-full bg-[#E63946] text-white font-black text-xs flex items-center justify-center shrink-0 uppercase">
-                                {(task.assignedBy || 'M').charAt(0)}
-                              </div>
+                              {assignedUsers[task.assignedById || '']?.avatarUrl ? (
+                                <img
+                                  src={getImageUrl(assignedUsers[task.assignedById || '']?.avatarUrl)}
+                                  alt={assignedUsers[task.assignedById || '']?.fullName || task.assignedBy}
+                                  className="w-8 h-8 rounded-full object-cover shrink-0 border border-zinc-200"
+                                />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-[#E63946] text-white font-black text-xs flex items-center justify-center shrink-0 uppercase">
+                                  {(assignedUsers[task.assignedById || '']?.fullName || task.assignedBy || 'M').charAt(0)}
+                                </div>
+                              )}
                               <div>
-                                <p className="text-xs font-black text-manga-ink leading-none">{task.assignedBy}</p>
+                                <p className="text-xs font-black text-manga-ink leading-none">
+                                  {assignedUsers[task.assignedById || '']?.fullName || task.assignedBy}
+                                </p>
                                 <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">Mangaka / Editor</p>
                               </div>
                             </div>
@@ -1104,12 +1195,16 @@ export default function TasksPage() {
                               <div className="p-4 flex flex-col pl-6 border-l-2 border-zinc-200 gap-4 my-2 ml-4">
                                 <div className="relative flex flex-col gap-0.5">
                                   <div className="absolute -left-[23px] top-1 w-3.5 h-3.5 rounded-full border-2 border-[#E63946] bg-[#E63946]" />
-                                  <span className="text-[9px] font-black text-gray-400">14/05/2026</span>
+                                  <span className="text-[9px] font-black text-gray-400">
+                                    {formatTimelineDate(task.createdAt) || '14/05/2026'}
+                                  </span>
                                   <p className="text-xs font-bold text-manga-ink">Nhận nhiệm vụ</p>
                                 </div>
                                 <div className="relative flex flex-col gap-0.5">
                                   <div className="absolute -left-[23px] top-1 w-3.5 h-3.5 rounded-full border-2 border-zinc-300 bg-white" />
-                                  <span className="text-[9px] font-black text-gray-400">30/05/2026</span>
+                                  <span className="text-[9px] font-black text-gray-400">
+                                    {formatTimelineDate(task.deadline)}
+                                  </span>
                                   <p className="text-xs font-bold text-gray-400">Hạn chót nộp bài</p>
                                 </div>
                               </div>
@@ -1165,22 +1260,33 @@ export default function TasksPage() {
                       {/* Tab: Tài nguyên */}
                       {activeTab === 'resources' && (
                         <div className="flex flex-col gap-3">
-                          <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400">Tài nguyên nhiệm vụ (1)</h4>
-                          <div className="p-3 border-2 border-manga-ink bg-white flex items-center justify-between gap-3 shadow-[2px_2px_0px_rgba(0,0,0,1)]">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <Paperclip className="w-4.5 h-4.5 text-zinc-400 shrink-0" />
-                              <div className="min-w-0">
-                                <p className="text-xs font-bold text-manga-ink truncate leading-tight">brief_nhiemvu_1032.pdf</p>
-                                <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">2.4 MB</p>
+                          <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400">Tài nguyên nhiệm vụ</h4>
+                          {task.referenceUrl ? (
+                            <div className="p-3 border-2 border-manga-ink bg-white flex items-center justify-between gap-3 shadow-[2px_2px_0px_rgba(0,0,0,1)]">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <Paperclip className="w-4.5 h-4.5 text-zinc-400 shrink-0" />
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold text-manga-ink truncate leading-tight">
+                                    {task.referenceUrl.split('/').pop() || `draft_page_${task.pageNumber}.png`}
+                                  </p>
+                                  <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Ảnh bản thảo nhiệm vụ</p>
+                                </div>
                               </div>
+                              <button
+                                onClick={async () => {
+                                  showToast('success', 'Đang kết nối tải tệp tin...');
+                                  const fileUrl = getImageUrl(task.referenceUrl || '');
+                                  const fileName = (task.referenceUrl || '').split('/').pop() || `draft_page_${task.pageNumber}.png`;
+                                  await downloadFile(fileUrl, fileName);
+                                }}
+                                className="bg-zinc-100 hover:bg-[#E63946] hover:text-white text-zinc-700 px-2 py-1.5 text-[9px] font-black uppercase border border-zinc-300 hover:border-black transition-all cursor-pointer rounded-none"
+                              >
+                                Tải về
+                              </button>
                             </div>
-                            <button
-                              onClick={() => showToast('success', 'Đã bắt đầu tải tệp tin brief_nhiemvu_1032.pdf!')}
-                              className="bg-zinc-100 hover:bg-[#E63946] hover:text-white text-zinc-700 px-2 py-1.5 text-[9px] font-black uppercase border border-zinc-300 hover:border-black transition-all cursor-pointer rounded-none"
-                            >
-                              Tải về
-                            </button>
-                          </div>
+                          ) : (
+                            <p className="text-xs text-gray-400 font-bold italic py-4">Nhiệm vụ này không đính kèm tài nguyên tham khảo.</p>
+                          )}
                         </div>
                       )}
 
@@ -1443,118 +1549,79 @@ export default function TasksPage() {
               {/* Sub-header statistics row */}
               <div className="bg-zinc-50 border-b-2 border-zinc-200 px-6 py-3 flex items-center justify-between gap-3 text-xs">
                 <div className="flex items-center gap-2 font-bold text-zinc-600">
-                  <span>📁 3 file đính kèm</span>
+                  <span>📁 {task.referenceUrl ? 1 : 0} file đính kèm</span>
                   <span className="text-zinc-300">|</span>
-                  <span className="text-zinc-400 font-medium">Tổng ~81 MB</span>
+                  <span className="text-zinc-400 font-medium">Tài nguyên thật</span>
                 </div>
-                <button
-                  onClick={() => {
-                    showToast('success', 'Bắt đầu tải xuống toàn bộ tài nguyên (81 MB)!')
-                    setDownloadingTask(null)
-                  }}
-                  className="bg-[#E63946] hover:bg-white text-white hover:text-[#E63946] border border-[#E63946] px-3.5 py-1.5 text-[10px] font-black uppercase flex items-center gap-1.5 transition-all cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" /> TẢI TẤT CẢ
-                </button>
+                {task.referenceUrl && (
+                  <button
+                    onClick={async () => {
+                      showToast('success', 'Đang tải toàn bộ tệp tin...');
+                      const fileUrl = getImageUrl(task.referenceUrl || '');
+                      const fileName = (task.referenceUrl || '').split('/').pop() || `draft_page_${task.pageNumber}.png`;
+                      await downloadFile(fileUrl, fileName);
+                      setDownloadingTask(null);
+                    }}
+                    className="bg-[#E63946] hover:bg-white text-white hover:text-[#E63946] border border-[#E63946] px-3.5 py-1.5 text-[10px] font-black uppercase flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" /> TẢI TẤT CẢ
+                  </button>
+                )}
               </div>
 
               {/* Modal Content / Files list */}
               <div className="p-6 flex flex-col gap-5 overflow-y-auto max-h-[50vh]">
-                
-                {/* Section: TÀI LIỆU THAM KHẢO */}
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between text-[10px] font-black text-zinc-550 tracking-wider">
-                    <span>— TÀI LIỆU THAM KHẢO</span>
-                    <span className="text-zinc-400 font-medium">2 file</span>
-                  </div>
+                {task.referenceUrl ? (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between text-[10px] font-black text-zinc-550 tracking-wider">
+                      <span>— TÀI LIỆU THAM KHẢO</span>
+                      <span className="text-zinc-400 font-medium">1 file</span>
+                    </div>
 
-                  {/* File 1 */}
-                  <div className="border border-zinc-200 p-3 bg-white flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      {/* Purple box zip icon */}
-                      <div className="w-10 h-10 bg-purple-50 flex items-center justify-center shrink-0 border border-purple-100">
-                        <span className="text-xl">📦</span>
+                    {/* File 1 */}
+                    <div className="border border-zinc-200 p-3 bg-white flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 bg-blue-50 flex items-center justify-center shrink-0 border border-blue-100 overflow-hidden">
+                          <img 
+                            src={getImageUrl(task.referenceUrl)} 
+                            alt="Reference page preview" 
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-black text-zinc-800 truncate leading-tight">
+                            {task.referenceUrl.split('/').pop() || `draft_page_${task.pageNumber}.png`}
+                          </p>
+                          <p className="text-[10px] text-zinc-450 mt-1 font-medium leading-tight truncate">
+                            Bản thảo trang {task.pageNumber} của Chapter {task.chapterNumber}
+                          </p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-black text-zinc-800 truncate leading-tight">SW_cover_ref_vol1-2.zip</p>
-                        <p className="text-[10px] text-zinc-450 mt-1 font-medium leading-tight truncate">File gốc bìa Vol.1 và Vol.2 để giữ nhất quán</p>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="bg-blue-100 text-blue-700 text-[9px] font-black py-0.5 px-1.5">IMG</span>
+                        <button 
+                          onClick={async () => {
+                            showToast('success', 'Đang kết nối tải tệp tin...');
+                            const fileUrl = getImageUrl(task.referenceUrl || '');
+                            const fileName = (task.referenceUrl || '').split('/').pop() || `draft_page_${task.pageNumber}.png`;
+                            await downloadFile(fileUrl, fileName);
+                          }}
+                          className="bg-white hover:bg-zinc-50 border border-zinc-300 py-1.5 px-2.5 text-[9px] font-black uppercase flex items-center gap-1 cursor-pointer"
+                        >
+                          <Download className="w-3 h-3" /> TẢI XUỐNG
+                        </button>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="bg-purple-100 text-purple-700 text-[9px] font-black py-0.5 px-1.5">ZIP</span>
-                      <span className="text-[10px] text-gray-400 font-bold">67 MB</span>
-                      <button 
-                        onClick={() => showToast('success', 'Bắt đầu tải SW_cover_ref_vol1-2.zip!')}
-                        className="bg-white hover:bg-zinc-50 border border-zinc-300 py-1.5 px-2.5 text-[9px] font-black uppercase flex items-center gap-1 cursor-pointer"
-                      >
-                        <Download className="w-3 h-3" /> TẢI XUỐNG
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* File 2 */}
-                  <div className="border border-zinc-200 p-3 bg-white flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      {/* Red PDF icon */}
-                      <div className="w-10 h-10 bg-red-55/10 flex items-center justify-center shrink-0 border border-red-100">
-                        <span className="text-xl text-red-500">📄</span>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-black text-zinc-800 truncate leading-tight">SW_characters_pose_ref.pdf</p>
-                        <p className="text-[10px] text-zinc-450 mt-1 font-medium leading-tight truncate">Tư thế nhân vật đề xuất cho bìa Vol.3</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="bg-red-100 text-red-700 text-[9px] font-black py-0.5 px-1.5">PDF</span>
-                      <span className="text-[10px] text-gray-400 font-bold">9.1 MB</span>
-                      <button 
-                        onClick={() => showToast('success', 'Bắt đầu tải SW_characters_pose_ref.pdf!')}
-                        className="bg-white hover:bg-zinc-50 border border-zinc-300 py-1.5 px-2.5 text-[9px] font-black uppercase flex items-center gap-1 cursor-pointer"
-                      >
-                        <Download className="w-3 h-3" /> TẢI XUỐNG
-                      </button>
                     </div>
                   </div>
-                </div>
-
-                {/* Section: SCRIPT / KỊCH BẢN */}
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between text-[10px] font-black text-zinc-550 tracking-wider">
-                    <span>— SCRIPT / KỊCH BẢN</span>
-                    <span className="text-zinc-400 font-medium">1 file</span>
-                  </div>
-
-                  {/* File 3 */}
-                  <div className="border border-zinc-200 p-3 bg-white flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      {/* Red PDF icon */}
-                      <div className="w-10 h-10 bg-red-55/10 flex items-center justify-center shrink-0 border border-red-100">
-                        <span className="text-xl text-red-500">📄</span>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-black text-zinc-800 truncate leading-tight">SW_Vol3_cover_brief.pdf</p>
-                        <p className="text-[10px] text-zinc-450 mt-1 font-medium leading-tight truncate">Brief thiết kế bìa Volume 3 từ Mangaka</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="bg-red-100 text-red-700 text-[9px] font-black py-0.5 px-1.5">PDF</span>
-                      <span className="text-[10px] text-gray-400 font-bold">4.5 MB</span>
-                      <button 
-                        onClick={() => showToast('success', 'Bắt đầu tải SW_Vol3_cover_brief.pdf!')}
-                        className="bg-white hover:bg-zinc-50 border border-zinc-300 py-1.5 px-2.5 text-[9px] font-black uppercase flex items-center gap-1 cursor-pointer"
-                      >
-                        <Download className="w-3 h-3" /> TẢI XUỐNG
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
+                ) : (
+                  <p className="text-xs text-gray-400 font-bold italic py-4 text-center">Nhiệm vụ này không đính kèm tài nguyên tham khảo.</p>
+                )}
               </div>
 
               {/* Modal Footer */}
               <div className="bg-zinc-50 border-t-2 border-zinc-200 p-4 flex items-center justify-between gap-3">
                 <span className="text-[10px] font-bold text-gray-400">
-                  File được gắn kèm bởi Mangaka / Editor • Giao ngày 08/05/2026
+                  File được đính kèm gốc từ Mangaka / Editor
                 </span>
                 <button
                   type="button"

@@ -110,7 +110,7 @@ export default function FeedbackList({ submissionId, initialFeedbacks, onFeedbac
           </div>
         ) : (
           feedbacks.map((item) => {
-            const isMe = item.assistant_id !== null
+            const isMe = !item.mangaka_id
             return (
               <div
                 key={item.feedback_id}

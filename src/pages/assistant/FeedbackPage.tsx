@@ -33,6 +33,7 @@ interface TimelineStep {
   date: string;
   label: string;
   done: boolean;
+  active: boolean;
   key: string;
 }
 
@@ -197,33 +198,89 @@ export default function FeedbackPage() {
         status: activeTaskData.status
       } : { created_at: '', deadline: '', status: '' }
 
-      // Build dynamic timeline
+      // Build dynamic timeline based on task status & overdue state
       const steps: TimelineStep[] = []
-      steps.push({
-        date: '',
-        label: 'Nhận nhiệm vụ',
-        done: true,
-        key: 'assign'
-      })
+      
+      if (activeTaskData) {
+        const isApproved = activeTaskData.status === 'Approved'
+        const isSubmitted = activeTaskData.status === 'Submitted'
+        
+        // Parse deadline
+        const deadlineDate = activeTaskData.deadline ? new Date(activeTaskData.deadline) : null
+        const today = new Date()
+        const isOverdue = deadlineDate ? (today.getTime() > deadlineDate.getTime() && !isApproved) : false
 
-      const sortedSubs = [...(subs || [])].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-      sortedSubs.forEach((sub, idx) => {
+        const sortedSubs = [...(subs || [])].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+        
+        // Safe format helper for step dates
+        const formatStepDate = (dateStr?: string) => {
+          if (!dateStr) return ''
+          const d = new Date(dateStr)
+          if (isNaN(d.getTime())) return ''
+          return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
+        }
+
+        // Active step indexing:
+        // 0: Nhận nhiệm vụ (Active if In Progress / Need Fix and not overdue)
+        // 1: Nộp bản v1 (Active if Submitted and not overdue)
+        // 2: Hạn chót (Active if overdue)
+        // 3: Hoàn thành (Active if Approved)
+        let activeIdx = 0
+        if (isApproved) {
+          activeIdx = 3
+        } else if (isOverdue) {
+          activeIdx = 2
+        } else if (isSubmitted) {
+          activeIdx = 1
+        } else {
+          activeIdx = 0
+        }
+
+        // Step 1: Nhận nhiệm vụ
         steps.push({
-          date: new Date(sub.created_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
-          label: `Nộp bản v${idx + 1} (${sub.status === 'approved' ? 'Đã duyệt' : sub.status === 'needs_revision' ? 'Yêu cầu sửa' : 'Chờ duyệt'})`,
-          done: true,
-          key: `sub_${sub.submission_id}`
+          date: formatStepDate(activeTaskData.createdAt || new Date().toISOString()),
+          label: 'Nhận nhiệm vụ',
+          active: activeIdx === 0,
+          done: activeIdx >= 0,
+          key: 'assign'
         })
-      })
 
-      if (activeTaskData?.deadline) {
+        // Step 2: Nộp bản v1 (Chờ duyệt)
+        const latestSub = sortedSubs[sortedSubs.length - 1]
+        let subLabel = 'Nộp bản v1 (Chờ duyệt)'
+        if (latestSub) {
+          const subVer = sortedSubs.length
+          const statusText = latestSub.status === 'approved' ? 'Đã duyệt' : latestSub.status === 'needs_revision' ? 'Yêu cầu sửa' : 'Chờ duyệt'
+          subLabel = `Nộp bản v${subVer} (${statusText})`
+        }
         steps.push({
-          date: new Date(activeTaskData.deadline).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
-          label: 'Hạn chót (Deadline)',
-          done: activeTaskData.status === 'Approved',
+          date: latestSub ? formatStepDate(latestSub.created_at) : '',
+          label: subLabel,
+          active: activeIdx === 1,
+          done: activeIdx >= 1 || !!latestSub,
+          key: 'submission'
+        })
+
+        // Step 3: Hạn chót (Deadline)
+        steps.push({
+          date: formatStepDate(activeTaskData.deadline),
+          label: isOverdue ? 'Quá hạn nộp bài' : 'Hạn chót (Deadline)',
+          active: activeIdx === 2,
+          done: activeIdx >= 2 || isApproved,
           key: 'deadline'
         })
+
+        // Step 4: Hoàn thành
+        const approvedSub = sortedSubs.find(s => s.status === 'approved')
+        steps.push({
+          date: approvedSub ? formatStepDate(approvedSub.created_at) : '',
+          label: 'Hoàn thành',
+          active: activeIdx === 3,
+          done: activeIdx === 3,
+          key: 'completed'
+        })
       }
+      
       setActiveTimeline(steps)
 
       // 3. Load feedbacks for the latest submission if available
@@ -628,11 +685,18 @@ export default function FeedbackPage() {
                       return (
                         <div key={idx} className="relative flex flex-col gap-0.5">
                           {/* Bullet point indicator */}
-                          <div className={`absolute -left-[23px] top-1 w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center bg-white ${
-                            step.done ? 'border-[#E63946] bg-[#E63946]' : 'border-zinc-300 bg-white'
+                          <div className={`absolute -left-[23px] top-1 w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${
+                            step.active 
+                              ? 'border-[#E63946] bg-[#E63946] shadow-[0_0_6px_rgba(230,57,70,0.5)] animate-pulse' 
+                              : step.done 
+                                ? 'border-[#E63946] bg-white' 
+                                : 'border-zinc-300 bg-white'
                           }`}>
-                            {step.done && (
+                            {step.active && (
                               <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                            )}
+                            {!step.active && step.done && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#E63946]" />
                             )}
                           </div>
                           <div className="flex items-center gap-1.5">

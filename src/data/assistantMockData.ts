@@ -12,6 +12,7 @@ export interface AssistantTask {
   priority: 'Low' | 'Medium' | 'High' | 'Urgent';
   note: string;
   referenceUrl?: string; // Link ảnh/tài liệu tham khảo
+  regionId?: string; // Bounding box region ID
 }
 
 export interface AssistantSubmission {

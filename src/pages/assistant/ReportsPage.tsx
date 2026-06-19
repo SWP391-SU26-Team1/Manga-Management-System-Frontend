@@ -55,14 +55,14 @@ export default function ReportsPage() {
           }
 
           monthlyGroups[key].tasks++
-          if (task.status === 'completed') {
+          if (task.status === 'completed' || task.status === 'approved') {
             monthlyGroups[key].approved++
-          } else if (['assigned', 'in_progress', 'submitted', 'needs_revision'].includes(task.status)) {
+          } else if (['assigned', 'in_progress', 'submitted', 'needs_revision', 'rejected'].includes(task.status)) {
             monthlyGroups[key].pending++
           }
 
           // Calculate weekly completed tasks (pages) in last 7 days
-          if (task.status === 'completed') {
+          if (task.status === 'completed' || task.status === 'approved') {
             const diffTime = today.getTime() - date.getTime()
             const diffDays = diffTime / (1000 * 60 * 60 * 24)
             if (diffDays >= 0 && diffDays <= 7) {

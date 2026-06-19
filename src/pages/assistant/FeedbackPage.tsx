@@ -52,8 +52,8 @@ const mapBackendTaskToAssistantTask = (task: PageTask): AssistantTask => {
   let mappedStatus: AssistantTask['status'] = 'Not Started'
   if (task.status === 'in_progress') mappedStatus = 'In Progress'
   else if (task.status === 'submitted') mappedStatus = 'Submitted'
-  else if (task.status === 'needs_revision') mappedStatus = 'Need Fix'
-  else if (task.status === 'completed') mappedStatus = 'Approved'
+  else if (task.status === 'needs_revision' || task.status === 'rejected') mappedStatus = 'Need Fix'
+  else if (task.status === 'completed' || task.status === 'approved') mappedStatus = 'Approved'
   else if (task.status === 'assigned') mappedStatus = 'Not Started'
 
   return {
@@ -110,6 +110,35 @@ export default function FeedbackPage() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const [activeMarkerId, setActiveMarkerId] = useState<number | null>(null)
+
+  const getImageUrl = (url?: string | null) => {
+    if (!url) return 'https://images.unsplash.com/photo-1563089145-599997674d42?q=80&w=600&auto=format&fit=crop'
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url
+    const apiURL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+    return `${apiURL}${url.startsWith('/') ? '' : '/'}${url}`
+  }
+
+  const parseMarkersFromComments = () => {
+    const parsedMarkers: Array<{ index: number; x: number; y: number; text: string }> = []
+    activeFeedbacks.forEach((fb) => {
+      if (!fb.content) return
+      const lines = fb.content.split('\n')
+      lines.forEach((line) => {
+        const match = line.match(/Điểm\s*số\s*(\d+)\s*\(vị\s*trí\s*ngang\s*(\d+)%,\s*dọc\s*(\d+)%\):\s*(.*)/i)
+        if (match) {
+          parsedMarkers.push({
+            index: parseInt(match[1], 10),
+            x: parseFloat(match[2]),
+            y: parseFloat(match[3]),
+            text: match[4] || ''
+          })
+        }
+      })
+    })
+    return parsedMarkers
+  }
 
   // Load tasks on mount
   useEffect(() => {
@@ -542,6 +571,50 @@ export default function FeedbackPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Box 1.5: BẢN VẼ & ĐIỂM LỖI */}
+                {submissions.length > 0 && (
+                  <div className="bg-white border-2 border-manga-ink p-4 shadow-[3px_3px_0px_rgba(15,15,15,1)] flex flex-col gap-2">
+                    <h3 className="font-manga text-xs font-black uppercase tracking-wider text-manga-ink border-b-2 border-manga-ink pb-1.5">
+                      BẢN VẼ & ĐIỂM LỖI
+                    </h3>
+                    <div className="relative border border-gray-200 bg-gray-100 overflow-hidden flex items-center justify-center">
+                      <img
+                        src={getImageUrl(submissions[0].file_url)}
+                        alt="Latest Submission"
+                        className="w-full h-auto object-contain block"
+                      />
+                      {parseMarkersFromComments().map((marker) => (
+                        <div
+                          key={marker.index}
+                          className="absolute z-20"
+                          style={{ left: `${marker.x}%`, top: `${marker.y}%`, transform: 'translate(-50%, -50%)' }}
+                        >
+                          <div
+                            className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border-2 cursor-pointer transition-all ${
+                              activeMarkerId === marker.index
+                                ? 'bg-manga-red border-white text-white scale-110'
+                                : 'bg-white border-manga-red text-[#E63946]'
+                            }`}
+                            onClick={() => setActiveMarkerId(activeMarkerId === marker.index ? null : marker.index)}
+                            title={marker.text}
+                          >
+                            {marker.index}
+                          </div>
+                          {activeMarkerId === marker.index && (
+                            <div className="absolute top-7 left-1/2 -translate-x-1/2 bg-white text-zinc-800 border-2 border-manga-ink p-2 w-40 z-30 text-[10px] font-bold shadow-[2px_2px_0px_rgba(0,0,0,1)]">
+                              <p className="text-[9px] text-[#E63946] uppercase font-black">Lỗi #{marker.index}</p>
+                              <p className="mt-0.5 leading-snug">{marker.text}</p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[9px] text-gray-400 font-bold text-center mt-1 uppercase">
+                      Click vào các điểm tròn đỏ trên ảnh để xem chi tiết lỗi cần sửa
+                    </p>
+                  </div>
+                )}
 
                 {/* Box 2: TIẾN TRÌNH NỘP BÀI */}
                 <div className="bg-white border-2 border-manga-ink p-4 shadow-[3px_3px_0px_rgba(15,15,15,1)] flex flex-col">

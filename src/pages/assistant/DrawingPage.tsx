@@ -1,237 +1,235 @@
-import React, { useState } from 'react'
-import { PenTool, Layers, Grid3x3, ZoomIn, ZoomOut, RotateCcw, Save, Download, Eraser, Circle, Square, Minus } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router'
+import { PenTool, Layers, Clock, Eye, AlertTriangle, Loader2, BookOpen, ChevronRight } from 'lucide-react'
+import assistantService from '@/services/assistant.service'
 
-const CANVAS_TOOLS = [
-  { id: 'pen', label: 'Bút vẽ', icon: PenTool },
-  { id: 'eraser', label: 'Tẩy', icon: Eraser },
-  { id: 'line', label: 'Đường thẳng', icon: Minus },
-  { id: 'circle', label: 'Hình tròn', icon: Circle },
-  { id: 'rect', label: 'Hình chữ nhật', icon: Square },
-]
-
-const BRUSH_SIZES = [2, 4, 8, 12, 20]
-const PRESET_COLORS = [
-  '#1a1a1a', '#ffffff', '#E63946', '#457B9D', '#2A9D8F',
-  '#E9C46A', '#F4A261', '#264653', '#6D6875', '#B5838D',
-]
-
-const LAYER_LIST = [
-  { id: 'layer_bg', name: 'Background', visible: true, locked: false },
-  { id: 'layer_ink', name: 'Line Art', visible: true, locked: false },
-  { id: 'layer_sfx', name: 'SFX', visible: true, locked: false },
-  { id: 'layer_color', name: 'Coloring', visible: true, locked: true },
-]
+interface DrawingPageAPI {
+  page_id: string
+  page_number: number
+  chapter_id: string
+  status: string
+  created_at: string
+  updated_at: string
+  chapter?: {
+    chapter_id: string
+    chapter_number: number
+    title: string
+    series_id: string
+  }
+  page_version?: Array<{
+    version_id: string
+    version_number: number
+    version_type: string
+    image_url: string
+    created_at: string
+  }>
+  page_task?: Array<{
+    task_id: string
+    task_type: string
+    status: string
+    deadline: string
+    content: string
+    assistant_id: string
+  }>
+}
 
 export default function DrawingPage() {
-  const [activeTool, setActiveTool] = useState('pen')
-  const [activeColor, setActiveColor] = useState('#1a1a1a')
-  const [brushSize, setBrushSize] = useState(4)
-  const [zoom, setZoom] = useState(100)
-  const [showGrid, setShowGrid] = useState(false)
-  const [layers, setLayers] = useState(LAYER_LIST)
-  const [activeLayer, setActiveLayer] = useState('layer_ink')
-  const [showSaveMsg, setShowSaveMsg] = useState(false)
+  const navigate = useNavigate()
+  const [pages, setPages] = useState<DrawingPageAPI[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<string>('ALL')
 
-  const handleZoomIn = () => setZoom(prev => Math.min(prev + 10, 200))
-  const handleZoomOut = () => setZoom(prev => Math.max(prev - 10, 30))
+  useEffect(() => {
+    loadDrawingPages()
+  }, [])
 
-  const toggleLayerVisibility = (id: string) => {
-    setLayers(prev => prev.map(l => l.id === id ? { ...l, visible: !l.visible } : l))
+  const loadDrawingPages = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await assistantService.listDrawingPages()
+      setPages(data)
+    } catch (err: any) {
+      console.error(err)
+      setError('Không thể kết nối máy chủ để tải danh sách trang đang vẽ.')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleSave = () => {
-    setShowSaveMsg(true)
-    setTimeout(() => setShowSaveMsg(false), 2500)
+  const getImageUrl = (url?: string | null) => {
+    if (!url) return 'https://images.unsplash.com/photo-1563089145-599997674d42?q=80&w=600&auto=format&fit=crop'
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url
+    const apiURL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+    return `${apiURL}${url.startsWith('/') ? '' : '/'}${url}`
   }
+
+  // Filter pages
+  const filteredPages = pages.filter(page => {
+    if (statusFilter === 'ALL') return true
+    if (statusFilter === 'in_progress') return page.status === 'in_progress'
+    if (statusFilter === 'review') return page.status === 'review'
+    return true
+  })
 
   return (
-    <div className="max-w-7xl mx-auto pb-4">
-      {/* Page title */}
-      <div className="mb-5">
-        <h1 className="font-manga text-4xl font-bold uppercase text-manga-ink leading-none">VẼ & CHỈNH SỬA</h1>
-        <div className="h-1.5 w-24 bg-manga-red mt-3" />
+    <div className="max-w-[1200px] mx-auto pb-16 font-sans">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+        <div>
+          <h1 className="font-manga text-4xl font-bold uppercase text-manga-ink leading-none">VẼ & CHỈNH SỬA</h1>
+          <div className="h-1.5 w-24 bg-manga-red mt-3 mb-2" />
+          <p className="text-sm font-semibold text-gray-500">
+            Quản lý các trang phân cảnh đang vẽ nháp, sửa nét hoặc tô màu do Mangaka phân công
+          </p>
+        </div>
       </div>
 
-      {/* Save message */}
-      {showSaveMsg && (
-        <div className="flex items-center gap-3 bg-green-50 border-2 border-green-500 p-3 mb-4 manga-shadow-sm">
-          <Save className="w-4 h-4 text-green-600" />
-          <p className="font-bold text-green-800 text-sm">Đã lưu bản vẽ thành công!</p>
-        </div>
-      )}
+      {/* Filter Toolbar */}
+      <div className="flex gap-2 mb-6">
+        <button
+          onClick={() => setStatusFilter('ALL')}
+          className={`px-4 py-2 text-xs font-bold uppercase border-2 transition-colors cursor-pointer ${
+            statusFilter === 'ALL' ? 'bg-manga-ink text-white border-manga-ink' : 'bg-white text-gray-500 border-gray-200 hover:border-manga-ink'
+          }`}
+        >
+          Tất cả ({pages.length})
+        </button>
+        <button
+          onClick={() => setStatusFilter('in_progress')}
+          className={`px-4 py-2 text-xs font-bold uppercase border-2 transition-colors cursor-pointer ${
+            statusFilter === 'in_progress' ? 'bg-manga-ink text-white border-manga-ink' : 'bg-white text-gray-500 border-gray-200 hover:border-manga-ink'
+          }`}
+        >
+          Đang thực hiện ({pages.filter(p => p.status === 'in_progress').length})
+        </button>
+        <button
+          onClick={() => setStatusFilter('review')}
+          className={`px-4 py-2 text-xs font-bold uppercase border-2 transition-colors cursor-pointer ${
+            statusFilter === 'review' ? 'bg-manga-ink text-white border-manga-ink' : 'bg-white text-gray-500 border-gray-200 hover:border-manga-ink'
+          }`}
+        >
+          Chờ duyệt ({pages.filter(p => p.status === 'review').length})
+        </button>
+      </div>
 
-      {/* Editor layout */}
-      <div className="flex gap-4 h-[calc(100vh-260px)] min-h-[500px]">
-        {/* Left tool panel */}
-        <div className="w-14 bg-white border-2 border-manga-ink flex flex-col items-center py-3 gap-2 flex-shrink-0 manga-shadow-sm">
-          {CANVAS_TOOLS.map((tool) => {
-            const Icon = tool.icon
+      {loading ? (
+        <div className="py-24 flex items-center justify-center flex-col gap-3">
+          <Loader2 className="w-10 h-10 animate-spin text-manga-red" />
+          <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Đang tải danh sách trang vẽ...</span>
+        </div>
+      ) : error ? (
+        <div className="bg-[#FFF5F5] border-4 border-manga-ink p-8 text-center manga-shadow-sm">
+          <AlertTriangle className="w-12 h-12 text-[#E63946] mx-auto mb-3" />
+          <h3 className="font-bold text-[#E63946]">{error}</h3>
+          <button
+            onClick={loadDrawingPages}
+            className="mt-4 bg-[#E63946] text-white px-4 py-2 border-2 border-black font-bold uppercase text-xs hover:bg-white hover:text-[#E63946] transition-colors"
+          >
+            Tải lại
+          </button>
+        </div>
+      ) : filteredPages.length === 0 ? (
+        <div className="bg-white border-4 border-manga-ink p-12 text-center manga-shadow-sm">
+          <PenTool className="w-16 h-16 text-gray-300 mx-auto mb-3" />
+          <h3 className="font-manga text-2xl font-bold uppercase text-gray-500">Không có trang nào đang vẽ</h3>
+          <p className="text-sm text-gray-400 mt-2 font-medium">Bạn sẽ nhận được phân công vẽ phác thảo hoặc tô màu từ Mangaka chính.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredPages.map((page) => {
+            const sortedVersions = [...(page.page_version || [])].sort((a, b) => b.version_number - a.version_number)
+            const latestImage = sortedVersions[0]?.image_url || ''
+            
+            const myTasksOnPage = page.page_task || []
+            
             return (
-              <button
-                key={tool.id}
-                title={tool.label}
-                onClick={() => setActiveTool(tool.id)}
-                className={`w-9 h-9 flex items-center justify-center border-2 transition-colors ${
-                  activeTool === tool.id
-                    ? 'bg-manga-ink text-white border-manga-ink'
-                    : 'bg-white text-manga-ink border-transparent hover:border-manga-ink'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-              </button>
-            )
-          })}
-
-          <div className="w-8 h-0.5 bg-gray-200 my-1" />
-
-          {/* Brush sizes */}
-          {BRUSH_SIZES.map(size => (
-            <button
-              key={size}
-              title={`Cỡ bút: ${size}px`}
-              onClick={() => setBrushSize(size)}
-              className={`w-9 h-9 flex items-center justify-center border-2 transition-colors ${
-                brushSize === size
-                  ? 'bg-manga-red border-manga-ink'
-                  : 'bg-white border-transparent hover:border-manga-ink'
-              }`}
-            >
               <div
-                className="rounded-full bg-manga-ink"
-                style={{ width: Math.min(size, 16), height: Math.min(size, 16) }}
-              />
-            </button>
-          ))}
-        </div>
-
-        {/* Main canvas area */}
-        <div className="flex-1 flex flex-col gap-0 border-2 border-manga-ink overflow-hidden manga-shadow-sm">
-          {/* Canvas toolbar */}
-          <div className="bg-white border-b-2 border-manga-ink px-4 py-2 flex items-center gap-3 flex-shrink-0">
-            <div className="flex items-center gap-1">
-              <button onClick={handleZoomOut} className="w-7 h-7 flex items-center justify-center border border-manga-ink hover:bg-gray-100 transition-colors">
-                <ZoomOut className="w-3.5 h-3.5" />
-              </button>
-              <span className="text-xs font-bold text-manga-ink min-w-[48px] text-center">{zoom}%</span>
-              <button onClick={handleZoomIn} className="w-7 h-7 flex items-center justify-center border border-manga-ink hover:bg-gray-100 transition-colors">
-                <ZoomIn className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            <div className="h-5 w-0.5 bg-gray-200" />
-
-            <button
-              onClick={() => setShowGrid(g => !g)}
-              className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 border transition-colors ${
-                showGrid ? 'bg-manga-ink text-white border-manga-ink' : 'bg-white text-manga-ink border-manga-ink hover:bg-gray-50'
-              }`}
-            >
-              <Grid3x3 className="w-3.5 h-3.5" /> Lưới
-            </button>
-
-            <button className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 border border-manga-ink hover:bg-gray-50 transition-colors">
-              <RotateCcw className="w-3.5 h-3.5" /> Hoàn tác
-            </button>
-
-            <div className="ml-auto flex items-center gap-2">
-              <button
-                onClick={handleSave}
-                className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 bg-manga-ink text-white border-2 border-manga-ink hover:bg-manga-red transition-colors"
+                key={page.page_id}
+                className="bg-white border-4 border-manga-ink manga-shadow hover:translate-y-[-2px] transition-all flex flex-col group overflow-hidden"
               >
-                <Save className="w-3.5 h-3.5" /> Lưu
-              </button>
-              <button className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 border-2 border-manga-ink bg-white hover:bg-gray-50 transition-colors">
-                <Download className="w-3.5 h-3.5" /> Xuất file
-              </button>
-            </div>
-          </div>
+                <div className="relative aspect-[4/5] bg-zinc-100 border-b-4 border-manga-ink overflow-hidden flex items-center justify-center">
+                  {latestImage ? (
+                    <img
+                      src={getImageUrl(latestImage)}
+                      alt={`Page ${page.page_number}`}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  ) : (
+                    <div className="text-center p-4">
+                      <Layers className="w-12 h-12 text-zinc-300 mx-auto mb-2" />
+                      <span className="text-[10px] text-zinc-400 font-bold uppercase">Chưa có bản vẽ phác thảo</span>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <button
+                      onClick={() => navigate(`/dashboard/assistant/drawing-studio?pageId=${page.page_id}`)}
+                      className="bg-white text-manga-ink px-4 py-2.5 font-bold uppercase text-xs flex items-center gap-2 hover:bg-manga-red hover:text-white transition-colors border-2 border-manga-ink shadow-[3px_3px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] cursor-pointer"
+                    >
+                      <Eye className="w-4 h-4" /> Vào Không Gian Vẽ
+                    </button>
+                  </div>
+                  
+                  <div className="absolute top-3 left-3 bg-white border-2 border-manga-ink px-2.5 py-0.5 text-[10px] font-black uppercase shadow-[2px_2px_0px_rgba(0,0,0,1)]">
+                    Trang {page.page_number}
+                  </div>
 
-          {/* Canvas */}
-          <div className="flex-1 bg-[#f0f0f0] overflow-auto flex items-center justify-center relative">
-            <div
-              className="relative bg-white shadow-2xl"
-              style={{ width: `${zoom}%`, maxWidth: 800, aspectRatio: '4/5' }}
-            >
-              {/* Grid overlay */}
-              {showGrid && (
-                <div className="absolute inset-0 pointer-events-none" style={{
-                  backgroundImage: 'linear-gradient(rgba(0,0,0,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.08) 1px, transparent 1px)',
-                  backgroundSize: '24px 24px'
-                }} />
-              )}
+                  <div className="absolute top-3 right-3">
+                    <span className={`px-2 py-0.5 border text-[9px] font-black uppercase shadow-[2px_2px_0px_rgba(0,0,0,1)] ${
+                      page.status === 'in_progress'
+                        ? 'bg-blue-100 text-blue-700 border-blue-400'
+                        : 'bg-purple-100 text-purple-700 border-purple-400'
+                    }`}>
+                      {page.status === 'in_progress' ? 'Đang vẽ' : 'Chờ duyệt'}
+                    </span>
+                  </div>
+                </div>
 
-              {/* Panel guides */}
-              <div className="absolute inset-4 border-2 border-dashed border-gray-300 pointer-events-none" />
+                <div className="p-5 flex-1 flex flex-col justify-between gap-4">
+                  <div className="space-y-1">
+                    <h4 className="font-manga text-xl font-bold text-manga-ink uppercase leading-tight truncate">
+                      {page.chapter?.title || `Chương ${page.chapter?.chapter_number}`}
+                    </h4>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                      Mã phân cảnh: {page.page_id.slice(0, 8)}
+                    </p>
+                  </div>
 
-              {/* Placeholder canvas content */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="text-center">
-                  <PenTool className="w-12 h-12 text-gray-200 mx-auto mb-3" />
-                  <p className="text-sm font-bold text-gray-300 uppercase tracking-wide">Kéo, vẽ hoặc nhập ảnh để bắt đầu</p>
+                  <div className="space-y-2 border-t-2 border-dashed border-gray-200 pt-3">
+                    <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+                      Nhiệm vụ của bạn ({myTasksOnPage.length}):
+                    </p>
+                    <div className="space-y-1 max-h-[80px] overflow-y-auto pr-1">
+                      {myTasksOnPage.map((task, idx) => (
+                        <div key={task.task_id || idx} className="flex items-center justify-between text-xs font-semibold text-gray-700">
+                          <span className="truncate">• {task.task_type.toUpperCase()}</span>
+                          <span className={`text-[9px] font-bold px-1.5 uppercase border ${
+                            (task.status === 'completed' || task.status === 'approved') ? 'text-green-600 bg-green-50 border-green-300' :
+                            task.status === 'submitted' ? 'text-purple-600 bg-purple-50 border-purple-300' :
+                            (task.status === 'needs_revision' || task.status === 'rejected') ? 'text-red-600 bg-red-50 border-red-300' :
+                            'text-blue-600 bg-blue-50 border-blue-300'
+                          }`}>
+                            {task.status === 'approved' ? 'approved' : task.status === 'rejected' ? 'needs_revision' : task.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => navigate(`/dashboard/assistant/drawing-studio?pageId=${page.page_id}`)}
+                    className="w-full mt-2 py-2.5 bg-manga-ink hover:bg-[#E63946] text-white font-bold text-xs uppercase border-2 border-manga-ink hover:border-black transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <span>Vẽ ngay</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
-
-              {/* Cursor hint */}
-              <div className="absolute inset-0 cursor-crosshair" />
-            </div>
-          </div>
+            );
+          })}
         </div>
-
-        {/* Right panel: colors + layers */}
-        <div className="w-52 flex flex-col gap-3 flex-shrink-0">
-          {/* Color picker */}
-          <div className="bg-white border-2 border-manga-ink p-3 manga-shadow-sm">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Màu sắc</p>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 border-2 border-manga-ink flex-shrink-0" style={{ backgroundColor: activeColor }} />
-              <input
-                type="color"
-                value={activeColor}
-                onChange={(e) => setActiveColor(e.target.value)}
-                className="flex-1 h-8 border-2 border-manga-ink cursor-pointer bg-transparent"
-              />
-            </div>
-            <div className="grid grid-cols-5 gap-1">
-              {PRESET_COLORS.map((color) => (
-                <button
-                  key={color}
-                  onClick={() => setActiveColor(color)}
-                  className={`w-7 h-7 border-2 transition-transform hover:scale-110 ${activeColor === color ? 'border-manga-red scale-110' : 'border-manga-ink'}`}
-                  style={{ backgroundColor: color }}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Layers panel */}
-          <div className="bg-white border-2 border-manga-ink manga-shadow-sm flex-1 overflow-hidden flex flex-col">
-            <div className="border-b-2 border-manga-ink px-3 py-2 flex items-center gap-2">
-              <Layers className="w-3.5 h-3.5 text-manga-red" />
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600">Layers</p>
-            </div>
-            <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
-              {[...layers].reverse().map((layer) => (
-                <button
-                  key={layer.id}
-                  onClick={() => setActiveLayer(layer.id)}
-                  className={`w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-gray-50 transition-colors ${activeLayer === layer.id ? 'bg-blue-50' : ''}`}
-                >
-                  <button
-                    onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(layer.id) }}
-                    className={`w-4 h-4 flex-shrink-0 border border-manga-ink flex items-center justify-center transition-colors ${layer.visible ? 'bg-manga-ink' : 'bg-white'}`}
-                  >
-                    {layer.visible && <div className="w-1.5 h-1.5 bg-white" />}
-                  </button>
-                  <span className={`text-xs font-bold flex-1 ${activeLayer === layer.id ? 'text-manga-ink' : 'text-gray-600'}`}>
-                    {layer.name}
-                  </span>
-                  {layer.locked && <span className="text-[9px] text-gray-400 font-bold">🔒</span>}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   )
 }

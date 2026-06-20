@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router'
 import { 
   Search, 
@@ -26,13 +26,91 @@ import {
   ChevronUp,
   User,
   Paperclip,
-  Upload
+  Upload,
+  Loader2
 } from 'lucide-react'
-import { assistantStore, AssistantTask } from '@/data/assistantMockData'
+import { AssistantTask } from '@/data/assistantMockData'
+import assistantService, { PageTask } from '@/services/assistant.service'
+import uploadService from '@/services/upload.service'
+import TaskDetailModal from '@/components/assistant/TaskDetailModal'
+import userService from '@/services/user.service'
+
+const getTaskTypeName = (type: string) => {
+  if (!type) return 'NHIỆM VỤ'
+  const maps: Record<string, string> = {
+    inking: 'Character Lineart',
+    coloring: 'Coloring',
+    lettering: 'Lettering',
+    cleaning: 'Cleaning',
+    sfx: 'SFX Design',
+    background: 'Background'
+  }
+  return maps[type] || type.toUpperCase()
+}
+
+const mapBackendTaskToAssistantTask = (task: PageTask): AssistantTask => {
+  let mappedStatus: AssistantTask['status'] = 'Not Started'
+  if (task.status === 'in_progress') mappedStatus = 'In Progress'
+  else if (task.status === 'submitted') mappedStatus = 'Submitted'
+  else if (task.status === 'needs_revision' || task.status === 'rejected') mappedStatus = 'Need Fix'
+  else if (task.status === 'completed' || task.status === 'approved') mappedStatus = 'Approved'
+  else if (task.status === 'assigned') mappedStatus = 'Not Started'
+
+  return {
+    id: task.task_id,
+    seriesTitle: task.page?.chapter?.series?.title || 'Unknown Series',
+    chapterNumber: task.page?.chapter?.title ? parseInt(task.page.chapter.title.replace(/\D/g, '')) || 1 : 1,
+    pageNumber: task.page?.page_number || 1,
+    layerType: getTaskTypeName(task.task_type),
+    assignedBy: task.users?.name || task.users?.username || 'Mangaka/Editor',
+    deadline: task.deadline ? task.deadline.split('T')[0] : '',
+    status: mappedStatus,
+    priority: task.priority || 'Medium',
+    note: (task as any).content || task.description || '',
+    referenceUrl: task.page?.image_url || undefined,
+    regionId: (task as any).region_id || undefined,
+    createdAt: task.created_at || '',
+    assignedById: task.users?.user_id || '',
+  }
+}
 
 export default function TasksPage() {
   const navigate = useNavigate()
+  
+  const getImageUrl = (url?: string | null) => {
+    if (!url) return 'https://images.unsplash.com/photo-1563089145-599997674d42?q=80&w=600&auto=format&fit=crop'
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url
+    const apiURL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+    return `${apiURL}${url.startsWith('/') ? '' : '/'}${url}`
+  }
+
+  const downloadFile = async (url: string, filename: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+      showToast('success', `Đã tải về thành công file ${filename}`);
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      // Fallback to open in new tab if CORS or other error occurs
+      window.open(url, '_blank');
+      showToast('success', `Đã mở link tải file trong tab mới`);
+    }
+  };
+
   const [tasks, setTasks] = useState<AssistantTask[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isUploadingFile, setIsUploadingFile] = useState(false)
+  const [uploadedFileUrl, setUploadedFileUrl] = useState('')
+  const [error, setError] = useState<string | null>(null)
   
   // Modal State for EDIT (SỬA) action
   const [selectedTaskForModal, setSelectedTaskForModal] = useState<AssistantTask | null>(null)
@@ -48,6 +126,7 @@ export default function TasksPage() {
   
   // Canvas Workspace State for VIEW (VIEW) action
   const [viewingTaskId, setViewingTaskId] = useState<string | null>(null)
+  const [viewingTaskDetail, setViewingTaskDetail] = useState<any | null>(null)
   const [zoomLevel, setZoomLevel] = useState(55) // Default 55% from figma mockup
   const [activeTab, setActiveTab] = useState<'info' | 'feedback' | 'resources'>('info')
   const [isTimelineExpanded, setIsTimelineExpanded] = useState(true)
@@ -83,19 +162,92 @@ export default function TasksPage() {
   // Filters state
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'In Progress' | 'Not Started' | 'Submitted' | 'Need Fix' | 'Approved'>('ALL')
-  const [sortByDeadline, setSortByDeadline] = useState(true)
+  const [sortByDeadline, setSortByDeadline] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [assignedUsers, setAssignedUsers] = useState<Record<string, { fullName: string; avatarUrl?: string }>>({})
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery, statusFilter, sortByDeadline])
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     loadTasksData()
   }, [])
 
-  const loadTasksData = () => {
+  useEffect(() => {
+    if (!viewingTaskId) {
+      setViewingTaskDetail(null)
+      return
+    }
+    const loadDetail = async () => {
+      try {
+        const detail = await assistantService.getTaskDetail(viewingTaskId)
+        
+        // Load submissions and feedbacks associated with submissions
+        try {
+          const subs = await assistantService.listTaskSubmissions(viewingTaskId)
+          if (subs && subs.length > 0) {
+            const promises = subs.map(s => 
+              assistantService.listSubmissionFeedbacks(s.submission_id)
+                .catch(() => [] as any[])
+            )
+            const results = await Promise.all(promises)
+            detail.feedbacks = results.flat().sort(
+              (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            )
+          }
+        } catch (subErr) {
+          console.error("Failed to load submission feedbacks for task detail:", subErr)
+        }
+        
+        setViewingTaskDetail(detail)
+      } catch (err) {
+        console.error("Error loading viewing task detail:", err)
+      }
+    }
+    loadDetail()
+  }, [viewingTaskId])
+
+  const loadAvatars = async (mappedTasks: AssistantTask[]) => {
+    const userIds = Array.from(new Set(mappedTasks.map(t => t.assignedById).filter(Boolean))) as string[]
+    for (const uid of userIds) {
+      if (!assignedUsers[uid]) {
+        try {
+          const profile = await userService.getUserById(uid)
+          setAssignedUsers(prev => ({
+            ...prev,
+            [uid]: {
+              fullName: profile.fullName || profile.username,
+              avatarUrl: profile.avatarUrl
+            }
+          }))
+        } catch (err) {
+          console.error("Failed to load user profile:", uid, err)
+        }
+      }
+    }
+  }
+
+  const loadTasksData = async () => {
+    setIsLoading(true)
+    setError(null)
     try {
-      const fetchedTasks = assistantStore.getTasks();
-      setTasks(Array.isArray(fetchedTasks) ? fetchedTasks : []);
-    } catch (e) {
-      console.error("Error fetching tasks:", e);
-      setTasks([]);
+      const res = await assistantService.listMyTasks()
+      if (res && res.success) {
+        const mapped = res.data.map(mapBackendTaskToAssistantTask)
+        setTasks(mapped)
+        loadAvatars(mapped)
+      } else {
+        setTasks([])
+      }
+    } catch (err: any) {
+      console.error("Error fetching tasks:", err);
+      setError("Không thể kết nối danh sách nhiệm vụ từ backend API.")
+      setTasks([])
+    } finally {
+      setIsLoading(false)
     }
   }
   
@@ -129,10 +281,6 @@ export default function TasksPage() {
     }
   }
 
-  // Get task reward payment helper (bỏ ký hiệu $)
-  const getTaskPayment = (taskId: string) => {
-    return '850.000 ₫'
-  }
 
   const getStatusBadge = (status?: string) => {
     switch (status) {
@@ -159,17 +307,25 @@ export default function TasksPage() {
             onClick={() => handleOpenModal(task)}
             className="w-full flex items-center justify-center gap-1 mt-1.5 px-2 py-1 text-[10px] font-bold text-[#38B2AC] border border-[#38B2AC] hover:bg-[#E6FFFA] transition-colors cursor-pointer bg-white"
           >
-            <Check className="w-3 h-3" /> DONE
+            <Check className="w-3 h-3" /> ĐÃ DUYỆT
           </button>
         )
       case 'In Progress':
-      case 'Not Started':
         return (
           <button 
             onClick={() => handleOpenSubmitModal(task)}
             className="w-full mt-1.5 px-2 py-1 text-[10px] font-bold text-white bg-[#E63946] border border-[#E63946] hover:bg-white hover:text-[#E63946] transition-colors cursor-pointer"
           >
             NỘP
+          </button>
+        )
+      case 'Not Started':
+        return (
+          <button 
+            onClick={() => handleAcceptTask(task)}
+            className="w-full mt-1.5 px-2 py-1 text-[10px] font-bold text-white bg-amber-500 border border-amber-500 hover:bg-white hover:text-amber-500 transition-colors cursor-pointer"
+          >
+            NHẬN
           </button>
         )
       case 'Submitted':
@@ -201,6 +357,16 @@ export default function TasksPage() {
       return dateStr.split('-').reverse().join('/');
     } catch {
       return dateStr;
+    }
+  }
+
+  const formatTimelineDate = (dateStr?: string) => {
+    if (!dateStr) return '';
+    try {
+      const dateOnly = dateStr.split('T')[0]
+      return dateOnly.split('-').reverse().join('/')
+    } catch {
+      return dateStr
     }
   }
 
@@ -266,11 +432,45 @@ export default function TasksPage() {
   }
 
   // Handle final submission in the modal
-  const handleSubmitResult = (taskId: string) => {
-    assistantStore.updateTaskStatus(taskId, 'Submitted')
-    loadTasksData()
-    setSubmittingTask(null)
-    showToast('success', `Nộp kết quả thành công cho Task #${taskId}!`)
+  const handleSubmitResult = async (taskId: string) => {
+    if (!uploadedFileUrl) {
+      showToast('error', 'Vui lòng đính kèm file kết quả!')
+      return
+    }
+    setIsSubmitting(true)
+    try {
+      await assistantService.createSubmission(taskId, {
+        file_url: uploadedFileUrl,
+        submission_notes: submitNotes
+      })
+      loadTasksData()
+      setSubmittingTask(null)
+      showToast('success', `Nộp kết quả thành công cho Task #${taskId}!`)
+    } catch (err: any) {
+      console.error(err)
+      showToast('error', `Lỗi: ${err?.message || 'Không thể nộp kết quả'}`)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Handle uploading files for submission
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setIsUploadingFile(true)
+    try {
+      const res = await uploadService.uploadSingle(file, 'submissions')
+      setUploadedFileUrl(res.secure_url)
+      setAttachedFile({ name: file.name, size: `${(file.size / (1024 * 1024)).toFixed(1)} MB` })
+      showToast('success', 'Đã tải file lên Cloudinary thành công!')
+    } catch (err: any) {
+      console.error(err)
+      showToast('error', 'Không thể tải file lên Cloudinary.')
+    } finally {
+      setIsUploadingFile(false)
+    }
   }
 
   // Submit revision / open submit modal from edit modal
@@ -280,10 +480,15 @@ export default function TasksPage() {
   }
 
   // Accept task handler for the drawing workspace
-  const handleAcceptTask = (task: AssistantTask) => {
-    assistantStore.updateTaskStatus(task.id, 'In Progress')
-    loadTasksData() // refresh tasks in table and view
-    showToast('success', `Đã nhận thành công Nhiệm vụ #${task.id}! Bắt đầu vẽ nào.`)
+  const handleAcceptTask = async (task: AssistantTask) => {
+    try {
+      await assistantService.startTask(task.id)
+      loadTasksData() // refresh tasks in table and view
+      showToast('success', `Đã nhận thành công Nhiệm vụ #${task.id}! Bắt đầu vẽ nào.`)
+    } catch (err: any) {
+      console.error(err)
+      showToast('error', `Lỗi: ${err?.message || 'Không thể nhận nhiệm vụ'}`)
+    }
   }
 
   // Get status color config for modal
@@ -353,15 +558,22 @@ export default function TasksPage() {
   // Sorting logic
   if (sortByDeadline) {
     filteredTasks.sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())
+  } else {
+    filteredTasks.sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+      if (dateB !== dateA) return dateB - dateA
+      return b.id.localeCompare(a.id)
+    })
   }
 
-  const displayTasks = filteredTasks.slice(0, 8);
+  const displayTasks = filteredTasks.slice((currentPage - 1) * 10, currentPage * 10);
 
   // Get current active viewed task for drawing workspace
   const viewedTask = safeTasks.find(t => t.id === viewingTaskId)
 
   return (
-    <div className="max-w-[1400px] mx-auto pb-12 font-sans relative">
+    <div className={`max-w-[1400px] mx-auto pb-12 font-sans ${viewingTaskId ? '' : 'relative'}`}>
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-4 right-4 z-[60] animate-bounce duration-300">
@@ -498,7 +710,7 @@ export default function TasksPage() {
                 className="flex items-center justify-between gap-4 bg-white border-2 border-manga-ink px-3 py-2 text-xs font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] transition-all cursor-pointer"
               >
                 <span className="flex items-center gap-1">
-                  <span className="text-manga-ink">⇅ Deadline ({sortByDeadline ? 'gần nhất' : 'tất cả'})</span>
+                  <span className="text-manga-ink">⇅ Sắp xếp: {sortByDeadline ? 'Deadline gần nhất' : 'Mới nhất trước'}</span>
                 </span>
                 <ChevronDown className="w-4 h-4 text-gray-500" />
               </button>
@@ -584,14 +796,36 @@ export default function TasksPage() {
             {/* Pagination Footer */}
             <div className="bg-white border-t-2 border-manga-ink p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
               <span className="text-xs font-semibold text-gray-500">
-                Hiển thị 1-{Math.min(8, filteredTasks.length)} / {filteredTasks.length} nhiệm vụ
+                Hiển thị {filteredTasks.length === 0 ? 0 : (currentPage - 1) * 10 + 1}-{Math.min(currentPage * 10, filteredTasks.length)} / {filteredTasks.length} nhiệm vụ
               </span>
               <div className="flex items-center gap-1">
-                <button className="w-7 h-7 flex items-center justify-center border border-gray-300 text-gray-500 hover:bg-gray-50 bg-white"><ChevronLeft className="w-4 h-4" /></button>
-                <button className="w-7 h-7 flex items-center justify-center bg-[#E63946] text-white font-bold text-xs border border-[#E63946]">1</button>
-                <button className="w-7 h-7 flex items-center justify-center border border-gray-300 text-gray-600 hover:bg-gray-50 font-bold text-xs bg-white">2</button>
-                <button className="w-7 h-7 flex items-center justify-center border border-gray-300 text-gray-600 hover:bg-gray-50 font-bold text-xs bg-white">3</button>
-                <button className="w-7 h-7 flex items-center justify-center border border-gray-300 text-gray-500 hover:bg-gray-50 bg-white"><ChevronRight className="w-4 h-4" /></button>
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="w-7 h-7 flex items-center justify-center border border-gray-300 text-gray-500 hover:bg-gray-50 bg-white disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                {Array.from({ length: Math.ceil(filteredTasks.length / 10) }, (_, i) => (
+                  <button
+                    key={i + 1}
+                    onClick={() => setCurrentPage(i + 1)}
+                    className={`w-7 h-7 flex items-center justify-center font-bold text-xs border cursor-pointer ${
+                      currentPage === i + 1 
+                        ? 'bg-[#E63946] text-white border-[#E63946]' 
+                        : 'border border-gray-300 text-gray-600 hover:bg-gray-50 bg-white'
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(filteredTasks.length / 10)))}
+                  disabled={currentPage === Math.ceil(filteredTasks.length / 10) || Math.ceil(filteredTasks.length / 10) === 0}
+                  className="w-7 h-7 flex items-center justify-center border border-gray-300 text-gray-500 hover:bg-gray-50 bg-white disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
             </div>
           </div>
@@ -618,10 +852,10 @@ export default function TasksPage() {
           const isSubmitted = task.status === 'Submitted';
           
           const statusText = getStatusText(task.status);
-          const payment = getTaskPayment(task.id);
+
 
           return (
-            <div className="bg-[#141416] border-4 border-manga-ink shadow-[6px_6px_0px_rgba(0,0,0,1)] overflow-hidden flex flex-col font-sans text-white h-[calc(100vh-140px)] select-none">
+            <div className="absolute inset-0 bg-[#141416] flex flex-col font-sans text-white select-none z-30 overflow-hidden">
               
               {/* Top Control Bar */}
               <div className="bg-[#1C1C1F] border-b-4 border-manga-ink p-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs shrink-0 z-10">
@@ -698,76 +932,123 @@ export default function TasksPage() {
                     style={{ transform: `scale(${zoomLevel / 100})` }}
                   >
                     {/* Drawing White Sheet (600x880px) */}
-                    <div className="w-[600px] h-[880px] bg-white text-black border-4 border-black shadow-[8px_8px_0px_rgba(0,0,0,0.5)] relative overflow-hidden flex flex-col p-6 gap-4">
-                      
-                      {/* Top Sketch Panel (Art Task) */}
-                      <div className="flex-1 border-4 border-black relative bg-[#FAF9F6] p-4 flex flex-col justify-between overflow-hidden">
-                        
-                        {/* Art task highlighted outline */}
-                        <div className="absolute inset-0 border-[6px] border-[#E63946] pointer-events-none animate-pulse duration-1000" />
-                        
-                        {/* Figma Art Task badge */}
-                        <div className="absolute top-2 left-2 bg-[#E63946] text-white text-[9px] font-black uppercase tracking-wider py-1 px-2.5 flex items-center gap-1 border border-black z-20">
-                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-white" /> Art Task
+                    <div className="w-[600px] h-[880px] bg-white text-black border-4 border-black shadow-[8px_8px_0px_rgba(0,0,0,0.5)] relative overflow-hidden flex flex-col p-0">
+                      {task.referenceUrl ? (
+                        <div className="relative w-full h-full bg-zinc-50 select-none">
+                          <img 
+                            src={getImageUrl(task.referenceUrl)} 
+                            alt="Reference Page Draft" 
+                            className="w-full h-full object-fill pointer-events-none select-none"
+                            draggable={false}
+                          />
+
+                          {/* Render regions */}
+                          {viewingTaskDetail?.regions
+                            ?.filter((r: any) => r.page_id === viewingTaskDetail.page_id)
+                            ?.map((r: any) => {
+                            const rx = r.coordinates?.x ?? r.x ?? 0
+                            const ry = r.coordinates?.y ?? r.y ?? 0
+                            const rw = r.coordinates?.w ?? r.coordinates?.width ?? r.width ?? 0
+                            const rh = r.coordinates?.h ?? r.coordinates?.height ?? r.height ?? 0
+                            
+                            // Check if this region belongs to the current task
+                            const isCurrentTaskRegion = r.region_id === task.regionId
+                            
+                            return (
+                              <div
+                                key={r.region_id}
+                                className={`absolute border-2 ${
+                                  isCurrentTaskRegion 
+                                    ? 'border-[#E63946] bg-[#E63946]/20 z-20 shadow-[0_0_8px_rgba(230,57,70,0.5)]' 
+                                    : 'border-zinc-400 border-dashed bg-zinc-400/5 z-10'
+                                }`}
+                                style={{
+                                  left: `${rx}%`,
+                                  top: `${ry}%`,
+                                  width: `${rw}%`,
+                                  height: `${rh}%`
+                                }}
+                              >
+                                <div className={`absolute -top-6 left-[-2px] text-white text-[9px] font-black uppercase tracking-wider py-0.5 px-1.5 border border-black ${
+                                  isCurrentTaskRegion ? 'bg-[#E63946]' : 'bg-zinc-500'
+                                }`}>
+                                  {r.label || getTaskTypeName(r.region_type || r.type || '') || 'Vùng nhiệm vụ'}
+                                </div>
+                              </div>
+                            )
+                          })}
                         </div>
-
-                        {/* Top panel sketch detail */}
-                        <div className="w-full h-full flex flex-col items-center justify-center relative mt-3">
-                          {/* Character 1 Oval sketch */}
-                          <div className="absolute left-1/4 top-1/4 flex flex-col items-center">
-                            <div className="w-20 h-28 border-4 border-zinc-300 rounded-full flex items-center justify-center bg-white shadow-sm">
-                              <div className="w-4 h-4 border-2 border-zinc-300 rounded-full" />
+                      ) : (
+                        <>
+                          {/* Top Sketch Panel (Art Task) */}
+                          <div className="flex-1 border-4 border-black relative bg-[#FAF9F6] p-4 flex flex-col justify-between overflow-hidden">
+                            
+                            {/* Art task highlighted outline */}
+                            <div className="absolute inset-0 border-[6px] border-[#E63946] pointer-events-none animate-pulse duration-1000" />
+                            
+                            {/* Figma Art Task badge */}
+                            <div className="absolute top-2 left-2 bg-[#E63946] text-white text-[9px] font-black uppercase tracking-wider py-1 px-2.5 flex items-center gap-1 border border-black z-20">
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-white" /> Art Task
                             </div>
-                            <div className="h-16 w-1 border-2 border-zinc-300 mt-[-2px]" />
-                            <div className="w-16 h-0.5 border border-zinc-300 mt-2 rotate-12" />
-                          </div>
 
-                          {/* Character 2 Oval sketch */}
-                          <div className="absolute right-1/4 top-1/4 flex flex-col items-center">
-                            <div className="w-20 h-28 border-4 border-zinc-300 rounded-full flex items-center justify-center bg-white shadow-sm">
-                              <div className="w-4 h-4 border-2 border-zinc-300 rounded-full" />
+                            {/* Top panel sketch detail */}
+                            <div className="w-full h-full flex flex-col items-center justify-center relative mt-3">
+                              {/* Character 1 Oval sketch */}
+                              <div className="absolute left-1/4 top-1/4 flex flex-col items-center">
+                                <div className="w-20 h-28 border-4 border-zinc-300 rounded-full flex items-center justify-center bg-white shadow-sm">
+                                  <div className="w-4 h-4 border-2 border-zinc-300 rounded-full" />
+                                </div>
+                                <div className="h-16 w-1 border-2 border-zinc-300 mt-[-2px]" />
+                                <div className="w-16 h-0.5 border border-zinc-300 mt-2 rotate-12" />
+                              </div>
+
+                              {/* Character 2 Oval sketch */}
+                              <div className="absolute right-1/4 top-1/4 flex flex-col items-center">
+                                <div className="w-20 h-28 border-4 border-zinc-300 rounded-full flex items-center justify-center bg-white shadow-sm">
+                                  <div className="w-4 h-4 border-2 border-zinc-300 rounded-full" />
+                                </div>
+                                <div className="h-16 w-1 border-2 border-zinc-300 mt-[-2px]" />
+                                <div className="w-16 h-0.5 border border-zinc-300 mt-2 -rotate-12" />
+                              </div>
+
+                              {/* Speech bubble */}
+                              <div className="absolute top-8 right-8 bg-white border-2 border-zinc-350 p-2.5 rounded-full text-[10px] font-bold text-zinc-400 shadow-sm max-w-[100px] text-center leading-tight">
+                                "... Cám ơn..."
+                              </div>
                             </div>
-                            <div className="h-16 w-1 border-2 border-zinc-300 mt-[-2px]" />
-                            <div className="w-16 h-0.5 border border-zinc-300 mt-2 -rotate-12" />
+
+                            <div className="text-[9px] font-black uppercase tracking-widest text-zinc-350 select-none">PANEL 1 - DETAIL DRAWING</div>
                           </div>
 
-                          {/* Speech bubble */}
-                          <div className="absolute top-8 right-8 bg-white border-2 border-zinc-350 p-2.5 rounded-full text-[10px] font-bold text-zinc-400 shadow-sm max-w-[100px] text-center leading-tight">
-                            "... Cám ơn..."
-                          </div>
-                        </div>
+                          {/* Bottom split panels */}
+                          <div className="h-1/3 flex gap-4">
+                            {/* Bottom Left Panel (Close up of eye) */}
+                            <div className="w-1/2 border-4 border-black bg-[#FAF9F6] p-4 flex flex-col justify-between relative overflow-hidden">
+                              {/* Eye sketch drawing */}
+                              <div className="w-full h-full flex items-center justify-center relative">
+                                <div className="w-24 h-12 border-4 border-zinc-350 rounded-full relative flex items-center justify-center overflow-hidden">
+                                  <div className="w-8 h-8 border-4 border-zinc-700 bg-zinc-900 rounded-full" />
+                                  {/* Eye reflection */}
+                                  <div className="w-2 h-2 bg-white rounded-full absolute top-3 left-10" />
+                                </div>
+                              </div>
+                              <div className="text-[9px] font-black uppercase tracking-widest text-zinc-350 select-none">PANEL 2 - CLOSEUP EYE</div>
+                            </div>
 
-                        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-350 select-none">PANEL 1 - DETAIL DRAWING</div>
-                      </div>
-
-                      {/* Bottom split panels */}
-                      <div className="h-1/3 flex gap-4">
-                        {/* Bottom Left Panel (Close up of eye) */}
-                        <div className="w-1/2 border-4 border-black bg-[#FAF9F6] p-4 flex flex-col justify-between relative overflow-hidden">
-                          {/* Eye sketch drawing */}
-                          <div className="w-full h-full flex items-center justify-center relative">
-                            <div className="w-24 h-12 border-4 border-zinc-350 rounded-full relative flex items-center justify-center overflow-hidden">
-                              <div className="w-8 h-8 border-4 border-zinc-700 bg-zinc-900 rounded-full" />
-                              {/* Eye reflection */}
-                              <div className="w-2 h-2 bg-white rounded-full absolute top-3 left-10" />
+                            {/* Bottom Right Panel (Side character) */}
+                            <div className="w-1/2 border-4 border-black bg-[#FAF9F6] p-4 flex flex-col justify-between relative overflow-hidden">
+                              {/* Sketch ovals */}
+                              <div className="w-full h-full flex items-center justify-center relative">
+                                <div className="flex flex-col items-center">
+                                  <div className="w-14 h-20 border-4 border-zinc-300 rounded-full bg-white shadow-sm" />
+                                  <div className="h-10 w-0.5 border border-zinc-300 mt-[-2px]" />
+                                </div>
+                              </div>
+                              <div className="text-[9px] font-black uppercase tracking-widest text-zinc-350 select-none">PANEL 3 - SIDE SKETCH</div>
                             </div>
                           </div>
-                          <div className="text-[9px] font-black uppercase tracking-widest text-zinc-350 select-none">PANEL 2 - CLOSEUP EYE</div>
-                        </div>
-
-                        {/* Bottom Right Panel (Side character) */}
-                        <div className="w-1/2 border-4 border-black bg-[#FAF9F6] p-4 flex flex-col justify-between relative overflow-hidden">
-                          {/* Sketch ovals */}
-                          <div className="w-full h-full flex items-center justify-center relative">
-                            <div className="flex flex-col items-center">
-                              <div className="w-14 h-20 border-4 border-zinc-300 rounded-full bg-white shadow-sm" />
-                              <div className="h-10 w-0.5 border border-zinc-300 mt-[-2px]" />
-                            </div>
-                          </div>
-                          <div className="text-[9px] font-black uppercase tracking-widest text-zinc-350 select-none">PANEL 3 - SIDE SKETCH</div>
-                        </div>
-                      </div>
-
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -814,16 +1095,11 @@ export default function TasksPage() {
                       </div>
                     </div>
 
-                    {/* Deadline and Payment */}
+                    {/* Deadline */}
                     <div className="flex items-center gap-4 text-xs font-bold bg-zinc-50 p-3 border border-zinc-200">
                       <div className="flex items-center gap-1.5 text-gray-500">
                         <Clock className="w-4 h-4 text-gray-400 shrink-0" />
                         <span>{formatDate(task.deadline)}</span>
-                      </div>
-                      <div className="h-4 w-px bg-zinc-300" />
-                      <div className="flex items-center gap-1.5 text-emerald-600">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                        <span>{payment}</span>
                       </div>
                     </div>
                   </div>
@@ -868,7 +1144,7 @@ export default function TasksPage() {
                           <div className="flex flex-col gap-1.5">
                             <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400">Mô tả nhiệm vụ</h4>
                             <p className="text-xs font-medium text-gray-700 leading-relaxed bg-zinc-50 p-3 border border-zinc-100">
-                              {task.note || 'Xem file brief trong resources để biết chi tiết nhiệm vụ.'}
+                              {viewingTaskDetail?.content || viewingTaskDetail?.description || task.note || 'Không có mô tả chi tiết cho nhiệm vụ này.'}
                             </p>
                           </div>
 
@@ -876,12 +1152,22 @@ export default function TasksPage() {
                           <div className="flex flex-col gap-1.5">
                             <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400">Người giao việc</h4>
                             <div className="flex items-center gap-3 p-2 border border-zinc-200">
-                              <div className="w-8 h-8 rounded-full bg-zinc-900 text-white font-black text-xs flex items-center justify-center shrink-0">
-                                PM
-                              </div>
+                              {assignedUsers[task.assignedById || '']?.avatarUrl ? (
+                                <img
+                                  src={getImageUrl(assignedUsers[task.assignedById || '']?.avatarUrl)}
+                                  alt={assignedUsers[task.assignedById || '']?.fullName || task.assignedBy}
+                                  className="w-8 h-8 rounded-full object-cover shrink-0 border border-zinc-200"
+                                />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-[#E63946] text-white font-black text-xs flex items-center justify-center shrink-0 uppercase">
+                                  {(assignedUsers[task.assignedById || '']?.fullName || task.assignedBy || 'M').charAt(0)}
+                                </div>
+                              )}
                               <div>
-                                <p className="text-xs font-black text-manga-ink leading-none">Project Manager</p>
-                                <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">Editor</p>
+                                <p className="text-xs font-black text-manga-ink leading-none">
+                                  {assignedUsers[task.assignedById || '']?.fullName || task.assignedBy}
+                                </p>
+                                <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">Mangaka / Editor</p>
                               </div>
                             </div>
                           </div>
@@ -891,7 +1177,7 @@ export default function TasksPage() {
                             <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400">Vùng được giao (1)</h4>
                             <div className="p-3 border border-zinc-200 bg-white flex flex-col gap-0.5">
                               <p className="text-xs font-black text-manga-ink leading-tight">Vùng nhiệm vụ</p>
-                              <p className="text-[10px] font-bold text-gray-400 uppercase">Art Task - 600x880px</p>
+                              <p className="text-[10px] font-bold text-[#E63946] uppercase">{task.layerType}</p>
                             </div>
                           </div>
 
@@ -909,12 +1195,16 @@ export default function TasksPage() {
                               <div className="p-4 flex flex-col pl-6 border-l-2 border-zinc-200 gap-4 my-2 ml-4">
                                 <div className="relative flex flex-col gap-0.5">
                                   <div className="absolute -left-[23px] top-1 w-3.5 h-3.5 rounded-full border-2 border-[#E63946] bg-[#E63946]" />
-                                  <span className="text-[9px] font-black text-gray-400">14/05/2026</span>
+                                  <span className="text-[9px] font-black text-gray-400">
+                                    {formatTimelineDate(task.createdAt) || '14/05/2026'}
+                                  </span>
                                   <p className="text-xs font-bold text-manga-ink">Nhận nhiệm vụ</p>
                                 </div>
                                 <div className="relative flex flex-col gap-0.5">
                                   <div className="absolute -left-[23px] top-1 w-3.5 h-3.5 rounded-full border-2 border-zinc-300 bg-white" />
-                                  <span className="text-[9px] font-black text-gray-400">30/05/2026</span>
+                                  <span className="text-[9px] font-black text-gray-400">
+                                    {formatTimelineDate(task.deadline)}
+                                  </span>
                                   <p className="text-xs font-bold text-gray-400">Hạn chót nộp bài</p>
                                 </div>
                               </div>
@@ -927,21 +1217,42 @@ export default function TasksPage() {
                       {activeTab === 'feedback' && (
                         <div className="flex flex-col gap-4">
                           <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400">Nhận xét từ Mangaka</h4>
-                          <div className="flex flex-col gap-3.5 divide-y divide-zinc-150">
-                            <div className="flex gap-3 items-start pt-2 first:pt-0">
-                              <div className="w-8 h-8 rounded-full bg-zinc-950 text-white font-black text-[10px] flex items-center justify-center shrink-0 border border-black shadow-sm">
-                                AT
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="text-xs font-black text-manga-ink leading-none">Akira Tanaka</span>
-                                  <span className="text-[8px] text-gray-400 font-bold uppercase tracking-tight">Mangaka</span>
-                                </div>
-                                <p className="text-xs font-medium text-gray-600 bg-zinc-50 p-2.5 border border-zinc-100 mt-1.5 leading-relaxed">
-                                  "Biểu cảm nhân vật cần mạnh mẽ, ánh mắt rõ nét. Chú ý bám sát brief mô tả."
-                                </p>
-                              </div>
-                            </div>
+                          <div className="flex flex-col gap-3.5 divide-y divide-zinc-150 max-h-[350px] overflow-y-auto pr-1">
+                            {viewingTaskDetail?.feedbacks && viewingTaskDetail.feedbacks.length > 0 ? (
+                              viewingTaskDetail.feedbacks.map((fb: any) => {
+                                const isFromMangaka = fb.mangaka_id !== null;
+                                const authorName = isFromMangaka 
+                                  ? (task.assignedBy || 'Mangaka') 
+                                  : 'Trợ lý';
+                                const roleText = isFromMangaka ? 'Mangaka' : 'Trợ lý';
+                                const initials = authorName.substring(0, 2).toUpperCase();
+                                const feedbackText = fb.content || fb.feedback_content || '';
+                                
+                                return (
+                                  <div key={fb.feedback_id || fb.id} className="flex gap-3 items-start pt-2 first:pt-0">
+                                    <div className={`w-8 h-8 rounded-full ${isFromMangaka ? 'bg-zinc-950' : 'bg-zinc-600'} text-white font-black text-[10px] flex items-center justify-center shrink-0 border border-black shadow-sm`}>
+                                      {initials}
+                                    </div>
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-xs font-black text-manga-ink leading-none">{authorName}</span>
+                                        <span className="text-[8px] text-gray-400 font-bold uppercase tracking-tight">{roleText}</span>
+                                        {fb.created_at && (
+                                          <span className="text-[8px] text-gray-400 ml-auto font-mono">
+                                            {new Date(fb.created_at).toLocaleDateString('vi-VN')}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p className="text-xs font-medium text-gray-600 bg-zinc-50 p-2.5 border border-zinc-100 mt-1.5 leading-relaxed whitespace-pre-wrap">
+                                        {feedbackText}
+                                      </p>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <p className="text-xs text-gray-400 font-bold italic py-4">Chưa có nhận xét hay phản hồi nào cho nhiệm vụ này.</p>
+                            )}
                           </div>
                         </div>
                       )}
@@ -949,22 +1260,33 @@ export default function TasksPage() {
                       {/* Tab: Tài nguyên */}
                       {activeTab === 'resources' && (
                         <div className="flex flex-col gap-3">
-                          <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400">Tài nguyên nhiệm vụ (1)</h4>
-                          <div className="p-3 border-2 border-manga-ink bg-white flex items-center justify-between gap-3 shadow-[2px_2px_0px_rgba(0,0,0,1)]">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <Paperclip className="w-4.5 h-4.5 text-zinc-400 shrink-0" />
-                              <div className="min-w-0">
-                                <p className="text-xs font-bold text-manga-ink truncate leading-tight">brief_nhiemvu_1032.pdf</p>
-                                <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">2.4 MB</p>
+                          <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400">Tài nguyên nhiệm vụ</h4>
+                          {task.referenceUrl ? (
+                            <div className="p-3 border-2 border-manga-ink bg-white flex items-center justify-between gap-3 shadow-[2px_2px_0px_rgba(0,0,0,1)]">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <Paperclip className="w-4.5 h-4.5 text-zinc-400 shrink-0" />
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold text-manga-ink truncate leading-tight">
+                                    {task.referenceUrl.split('/').pop() || `draft_page_${task.pageNumber}.png`}
+                                  </p>
+                                  <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Ảnh bản thảo nhiệm vụ</p>
+                                </div>
                               </div>
+                              <button
+                                onClick={async () => {
+                                  showToast('success', 'Đang kết nối tải tệp tin...');
+                                  const fileUrl = getImageUrl(task.referenceUrl || '');
+                                  const fileName = (task.referenceUrl || '').split('/').pop() || `draft_page_${task.pageNumber}.png`;
+                                  await downloadFile(fileUrl, fileName);
+                                }}
+                                className="bg-zinc-100 hover:bg-[#E63946] hover:text-white text-zinc-700 px-2 py-1.5 text-[9px] font-black uppercase border border-zinc-300 hover:border-black transition-all cursor-pointer rounded-none"
+                              >
+                                Tải về
+                              </button>
                             </div>
-                            <button
-                              onClick={() => showToast('success', 'Đã bắt đầu tải tệp tin brief_nhiemvu_1032.pdf!')}
-                              className="bg-zinc-100 hover:bg-[#E63946] hover:text-white text-zinc-700 px-2 py-1.5 text-[9px] font-black uppercase border border-zinc-300 hover:border-black transition-all cursor-pointer rounded-none"
-                            >
-                              Tải về
-                            </button>
-                          </div>
+                          ) : (
+                            <p className="text-xs text-gray-400 font-bold italic py-4">Nhiệm vụ này không đính kèm tài nguyên tham khảo.</p>
+                          )}
                         </div>
                       )}
 
@@ -1023,216 +1345,13 @@ export default function TasksPage() {
       )}
 
       {/* Workspace Detail Modal popup for EDIT (SỬA) Action */}
-      {selectedTaskForModal && (() => {
-        const task = selectedTaskForModal;
-        const currentChecklist = checklistStates[task.id] || [false, false, false, false, false, false];
-        const checkedCount = currentChecklist.filter(Boolean).length;
-        const progressPercent = Math.round((checkedCount / 6) * 100);
-        const statusConfig = getStatusConfigForModal(task.status);
-        const priorityColor = getPriorityDotColor(task.priority);
-        const remainingText = getRemainingDaysText(task);
-
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in text-black">
-            <div className="bg-white border-4 border-manga-ink w-full max-w-4xl shadow-[6px_6px_0px_rgba(0,0,0,1)] overflow-hidden flex flex-col max-h-[90vh]">
-              
-              {/* Modal Header */}
-              <div className="bg-[#1C1C1F] text-white border-b-4 border-manga-ink p-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {/* PenTool square icon with pink border */}
-                  <div className="w-10 h-10 border-2 border-[#E63946] bg-[#2A2A2E] flex items-center justify-center shrink-0">
-                    <PenTool className="w-5 h-5 text-[#E63946]" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[10px] font-black text-[#E63946] tracking-wider uppercase">
-                        WORKSPACE — TASK #{task.id}
-                      </span>
-                      <span className={`text-[8px] font-black px-1.5 py-0.5 border ${statusConfig.text} ${statusConfig.bg} ${statusConfig.border} tracking-wide`}>
-                        {statusConfig.label}
-                      </span>
-                      <span className="text-[10px] font-bold text-zinc-400 flex items-center gap-1">
-                        <span className={`w-2 h-2 rounded-full ${priorityColor}`} />
-                        {getPriorityText(task.priority)}
-                      </span>
-                    </div>
-                    <h2 className="font-manga text-xl font-black tracking-wide leading-tight mt-1">
-                      {task.layerType}
-                    </h2>
-                    <p className="text-[11px] font-bold text-zinc-400 flex items-center gap-1.5 mt-0.5">
-                      <span>{task.seriesTitle}</span>
-                      <span className="text-zinc-600">•</span>
-                      <span className="text-red-400 flex items-center gap-1">
-                        <Clock className="w-3 h-3" /> Deadline: {formatDate(task.deadline)} ({remainingText})
-                      </span>
-                    </p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setSelectedTaskForModal(null)}
-                  className="text-zinc-400 hover:text-white border-2 border-transparent hover:border-zinc-700 p-1 transition-all cursor-pointer bg-transparent border-none"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-
-              {/* Modal Progress Section */}
-              <div className="bg-zinc-50 border-b-2 border-manga-ink px-6 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
-                <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
-                  <span className="font-manga text-xs font-black text-zinc-800 tracking-wider uppercase">TIẾN ĐỘ CÔNG VIỆC</span>
-                </div>
-                <div className="flex items-center gap-4 w-full sm:w-auto flex-1 max-w-md">
-                  {/* Progress bar container */}
-                  <div className="w-full h-3 bg-zinc-200 border-2 border-black rounded-none overflow-hidden relative">
-                    <div 
-                      className="h-full bg-[#E63946] transition-all duration-300"
-                      style={{ width: `${progressPercent}%` }}
-                    />
-                  </div>
-                  <span className="font-manga text-xs font-black text-zinc-800 shrink-0">
-                    {checkedCount}/6 • {progressPercent}%
-                  </span>
-                </div>
-              </div>
-
-              {/* Modal Body - 2 Columns */}
-              <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 overflow-y-auto">
-                
-                {/* Column Left: Checklist */}
-                <div className="flex flex-col gap-4">
-                  <div>
-                    <h3 className="font-manga text-xs font-black text-zinc-800 uppercase tracking-wider mb-1">
-                      CHECKLIST CÔNG VIỆC
-                    </h3>
-                    <p className="text-[10px] font-bold text-zinc-400 uppercase">{task.layerType}</p>
-                  </div>
-
-                  {/* Checklist items list */}
-                  <div className="flex flex-col gap-2.5">
-                    {CHECKLIST_ITEMS.map((label, idx) => {
-                      const isChecked = currentChecklist[idx];
-                      return (
-                        <button
-                          key={idx}
-                          onClick={() => handleToggleChecklist(task.id, idx)}
-                          className="w-full text-left flex items-start gap-3 p-2.5 border-2 border-zinc-200 hover:border-black bg-white hover:bg-zinc-50/50 transition-colors cursor-pointer group"
-                        >
-                          {/* Checkbox square */}
-                          <div className={`w-5 h-5 border-2 flex items-center justify-center shrink-0 transition-colors ${
-                            isChecked ? 'bg-[#E63946] border-[#E63946]' : 'bg-white border-zinc-300 group-hover:border-black'
-                          }`}>
-                            {isChecked && (
-                              <Check className="w-3.5 h-3.5 text-white stroke-[3px]" />
-                            )}
-                          </div>
-                          <span className={`text-xs font-bold leading-tight select-none ${
-                            isChecked ? 'text-zinc-400 line-through' : 'text-zinc-850'
-                          }`}>
-                            {label}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Action buttons under checklist */}
-                  <div className="flex flex-col sm:flex-row gap-3 mt-2">
-                    <button
-                      onClick={() => {
-                        setSelectedTaskForModal(null)
-                        setDownloadingTask(task)
-                      }}
-                      className="flex-1 bg-black hover:bg-zinc-800 text-white border-2 border-black py-2.5 px-3 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[1px] active:shadow-[1px_1px_0px_rgba(0,0,0,1)] transition-all"
-                    >
-                      <FileDown className="w-4 h-4 shrink-0" /> MỞ TÀI NGUYÊN & FILE NGUỒN
-                    </button>
-                    <button
-                      onClick={() => handleViewFeedbackPage(task.id)}
-                      className="flex-1 bg-white hover:bg-red-50/10 text-[#E63946] border-2 border-[#E63946] py-2.5 px-3 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_rgba(230,57,70,0.2)] hover:shadow-[2px_2px_0px_rgba(230,57,70,0.4)] transition-all"
-                    >
-                      <MessageSquare className="w-4 h-4 shrink-0" /> XEM PHẢN HỒI TỪ MANGAKA
-                    </button>
-                  </div>
-                </div>
-
-                {/* Column Right: Progress Notes */}
-                <div className="flex flex-col gap-4">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h3 className="font-manga text-xs font-black text-zinc-800 uppercase tracking-wider mb-1">
-                        GHI CHÚ TIẾN ĐỘ
-                      </h3>
-                      <p className="text-[10px] font-bold text-zinc-400 uppercase">TIẾN TRÌNH LÀM VIỆC</p>
-                    </div>
-                    <button
-                      onClick={() => handleSaveNotes(task.id)}
-                      className="bg-white hover:bg-zinc-50 border-2 border-black py-1.5 px-2.5 text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_rgba(0,0,0,1)] transition-all cursor-pointer"
-                    >
-                      <Save className="w-3.5 h-3.5 inline mr-1 shadow-none border-none" /> LƯU GHI CHÚ
-                    </button>
-                  </div>
-
-                  {/* Textarea */}
-                  <div className="relative flex-1 flex flex-col">
-                    <textarea
-                      value={editingNote}
-                      onChange={(e) => setEditingNote(e.target.value)}
-                      placeholder={`Ghi lại tiến độ và ghi chú trong khi làm Task #${task.id}...\n\nVí dụ:\n— Đã hoàn thành lineart trang 1-4, đang xử lý trang 5\n— Biểu cảm panel 3 cần chỉnh lại theo ref Akira gửi\n— Dự kiến hoàn thành trước ${formatDate(task.deadline)}`}
-                      className="w-full flex-1 min-h-[220px] p-3 text-xs font-semibold text-gray-700 bg-zinc-50/50 border-2 border-zinc-300 focus:border-black focus:bg-white focus:outline-none resize-none transition-all placeholder:text-gray-400 font-sans"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Modal Footer */}
-              <div className="bg-zinc-50 border-t-4 border-manga-ink p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <span className="text-xs font-bold text-gray-500">
-                  {checkedCount === 6 ? (
-                    <span className="text-emerald-600 flex items-center gap-1.5 font-black uppercase tracking-wide">
-                      <CheckCircle2 className="w-4 h-4 shrink-0" /> Hoàn thành tất cả checklist!
-                    </span>
-                  ) : (
-                    `Còn ${6 - checkedCount} hạng mục chưa xong`
-                  )}
-                </span>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setSelectedTaskForModal(null)}
-                    className="bg-white hover:bg-zinc-100 text-manga-ink border-2 border-black py-2.5 px-5 text-xs font-black uppercase tracking-wider cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[1px] active:shadow-[1px_1px_0px_rgba(0,0,0,1)] transition-all"
-                  >
-                    ĐÓNG
-                  </button>
-                  
-                  {/* Conditional Action Button */}
-                  {task.status === 'Approved' ? (
-                    <button
-                      disabled
-                      className="bg-emerald-50 text-emerald-600 border-2 border-emerald-500 py-2.5 px-5 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-not-allowed opacity-80"
-                    >
-                      <CheckCircle2 className="w-4 h-4 shrink-0" /> ĐÃ ĐƯỢC DUYỆT
-                    </button>
-                  ) : task.status === 'Submitted' ? (
-                    <button
-                      disabled
-                      className="bg-purple-50 text-purple-600 border-2 border-purple-500 py-2.5 px-5 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-not-allowed opacity-80"
-                    >
-                      <Clock className="w-4 h-4 shrink-0" /> ĐANG CHỜ DUYỆT
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleModalSubmitAction(task)}
-                      className="bg-[#E63946] hover:bg-white text-white hover:text-[#E63946] border-2 border-[#E63946] py-2.5 px-5 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[1px] active:shadow-[1px_1px_0px_rgba(0,0,0,1)] transition-all"
-                    >
-                      <Send className="w-4 h-4 shrink-0" /> NỘP BÀI SỬA ĐỔI
-                    </button>
-                  )}
-                </div>
-              </div>
-
-            </div>
-          </div>
-        );
-      })()}
+      {selectedTaskForModal && (
+        <TaskDetailModal
+          taskId={selectedTaskForModal.id}
+          onClose={() => setSelectedTaskForModal(null)}
+          onStatusChanged={loadTasksData}
+        />
+      )}
 
       {submittingTask && (() => {
         const task = submittingTask;
@@ -1310,7 +1429,12 @@ export default function TasksPage() {
                     FILE ĐÍNH KÈM <span className="text-[#E63946]">*</span>
                   </label>
                   
-                  {attachedFile ? (
+                  {isUploadingFile ? (
+                    <div className="border-2 border-dashed border-[#E63946] bg-red-50/10 p-6 flex flex-col items-center justify-center gap-2">
+                      <Loader2 className="w-6 h-6 animate-spin text-[#E63946]" />
+                      <p className="text-xs font-bold text-[#E63946]">Đang tải tệp lên Cloudinary...</p>
+                    </div>
+                  ) : attachedFile ? (
                     <div className="border-2 border-dashed border-[#E63946] bg-red-50/10 p-4 flex items-center justify-between">
                       <div className="flex items-center gap-2 min-w-0">
                         <Paperclip className="w-5 h-5 text-[#E63946] shrink-0" />
@@ -1320,7 +1444,7 @@ export default function TasksPage() {
                         </div>
                       </div>
                       <button 
-                        onClick={() => setAttachedFile(null)}
+                        onClick={() => { setAttachedFile(null); setUploadedFileUrl(''); }}
                         className="text-gray-400 hover:text-[#E63946] bg-transparent border-none cursor-pointer"
                       >
                         <X className="w-4 h-4" />
@@ -1328,7 +1452,7 @@ export default function TasksPage() {
                     </div>
                   ) : (
                     <div 
-                      onClick={() => setAttachedFile({ name: `${task.seriesTitle.toLowerCase().replace(/\s+/g, '_')}_ch${task.chapterNumber}_page${task.pageNumber}_draft.psd`, size: '24.8 MB' })}
+                      onClick={() => fileInputRef.current?.click()}
                       className="border-2 border-dashed border-zinc-300 hover:border-black p-6 flex flex-col items-center justify-center gap-2 cursor-pointer bg-zinc-50/50 hover:bg-zinc-50 transition-all"
                     >
                       <Paperclip className="w-6 h-6 text-zinc-400" />
@@ -1338,6 +1462,13 @@ export default function TasksPage() {
                       <p className="text-[10px] font-bold text-zinc-400">
                         .psd, .ai, .png, .jpg, .zip
                       </p>
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleImageUpload}
+                        accept=".psd,.ai,.png,.jpg,.jpeg,.zip"
+                        className="hidden"
+                      />
                     </div>
                   )}
                 </div>
@@ -1355,6 +1486,7 @@ export default function TasksPage() {
                 </button>
                 <button
                   type="button"
+                  disabled={isSubmitting || isUploadingFile}
                   onClick={() => {
                     if (!submitNotes.trim()) {
                       showToast('error', 'Vui lòng nhập ghi chú chỉnh sửa!')
@@ -1366,9 +1498,19 @@ export default function TasksPage() {
                     }
                     handleSubmitResult(task.id)
                   }}
-                  className="bg-[#E63946] hover:bg-white text-white hover:text-[#E63946] border-2 border-[#E63946] py-2.5 px-6 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[1px] active:shadow-[1px_1px_0px_rgba(0,0,0,1)] transition-all"
+                  className="bg-[#E63946] hover:bg-white text-white hover:text-[#E63946] border-2 border-[#E63946] py-2.5 px-6 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[1px] active:shadow-[1px_1px_0px_rgba(0,0,0,1)] transition-all disabled:opacity-60"
                 >
-                  <Upload className="w-4 h-4" /> NỘP KẾT QUẢ
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      <span>ĐANG NỘP...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      <span>NỘP KẾT QUẢ</span>
+                    </>
+                  )}
                 </button>
               </div>
 
@@ -1407,118 +1549,79 @@ export default function TasksPage() {
               {/* Sub-header statistics row */}
               <div className="bg-zinc-50 border-b-2 border-zinc-200 px-6 py-3 flex items-center justify-between gap-3 text-xs">
                 <div className="flex items-center gap-2 font-bold text-zinc-600">
-                  <span>📁 3 file đính kèm</span>
+                  <span>📁 {task.referenceUrl ? 1 : 0} file đính kèm</span>
                   <span className="text-zinc-300">|</span>
-                  <span className="text-zinc-400 font-medium">Tổng ~81 MB</span>
+                  <span className="text-zinc-400 font-medium">Tài nguyên thật</span>
                 </div>
-                <button
-                  onClick={() => {
-                    showToast('success', 'Bắt đầu tải xuống toàn bộ tài nguyên (81 MB)!')
-                    setDownloadingTask(null)
-                  }}
-                  className="bg-[#E63946] hover:bg-white text-white hover:text-[#E63946] border border-[#E63946] px-3.5 py-1.5 text-[10px] font-black uppercase flex items-center gap-1.5 transition-all cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" /> TẢI TẤT CẢ
-                </button>
+                {task.referenceUrl && (
+                  <button
+                    onClick={async () => {
+                      showToast('success', 'Đang tải toàn bộ tệp tin...');
+                      const fileUrl = getImageUrl(task.referenceUrl || '');
+                      const fileName = (task.referenceUrl || '').split('/').pop() || `draft_page_${task.pageNumber}.png`;
+                      await downloadFile(fileUrl, fileName);
+                      setDownloadingTask(null);
+                    }}
+                    className="bg-[#E63946] hover:bg-white text-white hover:text-[#E63946] border border-[#E63946] px-3.5 py-1.5 text-[10px] font-black uppercase flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" /> TẢI TẤT CẢ
+                  </button>
+                )}
               </div>
 
               {/* Modal Content / Files list */}
               <div className="p-6 flex flex-col gap-5 overflow-y-auto max-h-[50vh]">
-                
-                {/* Section: TÀI LIỆU THAM KHẢO */}
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between text-[10px] font-black text-zinc-550 tracking-wider">
-                    <span>— TÀI LIỆU THAM KHẢO</span>
-                    <span className="text-zinc-400 font-medium">2 file</span>
-                  </div>
+                {task.referenceUrl ? (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between text-[10px] font-black text-zinc-550 tracking-wider">
+                      <span>— TÀI LIỆU THAM KHẢO</span>
+                      <span className="text-zinc-400 font-medium">1 file</span>
+                    </div>
 
-                  {/* File 1 */}
-                  <div className="border border-zinc-200 p-3 bg-white flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      {/* Purple box zip icon */}
-                      <div className="w-10 h-10 bg-purple-50 flex items-center justify-center shrink-0 border border-purple-100">
-                        <span className="text-xl">📦</span>
+                    {/* File 1 */}
+                    <div className="border border-zinc-200 p-3 bg-white flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 bg-blue-50 flex items-center justify-center shrink-0 border border-blue-100 overflow-hidden">
+                          <img 
+                            src={getImageUrl(task.referenceUrl)} 
+                            alt="Reference page preview" 
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-black text-zinc-800 truncate leading-tight">
+                            {task.referenceUrl.split('/').pop() || `draft_page_${task.pageNumber}.png`}
+                          </p>
+                          <p className="text-[10px] text-zinc-450 mt-1 font-medium leading-tight truncate">
+                            Bản thảo trang {task.pageNumber} của Chapter {task.chapterNumber}
+                          </p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-black text-zinc-800 truncate leading-tight">SW_cover_ref_vol1-2.zip</p>
-                        <p className="text-[10px] text-zinc-450 mt-1 font-medium leading-tight truncate">File gốc bìa Vol.1 và Vol.2 để giữ nhất quán</p>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="bg-blue-100 text-blue-700 text-[9px] font-black py-0.5 px-1.5">IMG</span>
+                        <button 
+                          onClick={async () => {
+                            showToast('success', 'Đang kết nối tải tệp tin...');
+                            const fileUrl = getImageUrl(task.referenceUrl || '');
+                            const fileName = (task.referenceUrl || '').split('/').pop() || `draft_page_${task.pageNumber}.png`;
+                            await downloadFile(fileUrl, fileName);
+                          }}
+                          className="bg-white hover:bg-zinc-50 border border-zinc-300 py-1.5 px-2.5 text-[9px] font-black uppercase flex items-center gap-1 cursor-pointer"
+                        >
+                          <Download className="w-3 h-3" /> TẢI XUỐNG
+                        </button>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="bg-purple-100 text-purple-700 text-[9px] font-black py-0.5 px-1.5">ZIP</span>
-                      <span className="text-[10px] text-gray-400 font-bold">67 MB</span>
-                      <button 
-                        onClick={() => showToast('success', 'Bắt đầu tải SW_cover_ref_vol1-2.zip!')}
-                        className="bg-white hover:bg-zinc-50 border border-zinc-300 py-1.5 px-2.5 text-[9px] font-black uppercase flex items-center gap-1 cursor-pointer"
-                      >
-                        <Download className="w-3 h-3" /> TẢI XUỐNG
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* File 2 */}
-                  <div className="border border-zinc-200 p-3 bg-white flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      {/* Red PDF icon */}
-                      <div className="w-10 h-10 bg-red-55/10 flex items-center justify-center shrink-0 border border-red-100">
-                        <span className="text-xl text-red-500">📄</span>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-black text-zinc-800 truncate leading-tight">SW_characters_pose_ref.pdf</p>
-                        <p className="text-[10px] text-zinc-450 mt-1 font-medium leading-tight truncate">Tư thế nhân vật đề xuất cho bìa Vol.3</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="bg-red-100 text-red-700 text-[9px] font-black py-0.5 px-1.5">PDF</span>
-                      <span className="text-[10px] text-gray-400 font-bold">9.1 MB</span>
-                      <button 
-                        onClick={() => showToast('success', 'Bắt đầu tải SW_characters_pose_ref.pdf!')}
-                        className="bg-white hover:bg-zinc-50 border border-zinc-300 py-1.5 px-2.5 text-[9px] font-black uppercase flex items-center gap-1 cursor-pointer"
-                      >
-                        <Download className="w-3 h-3" /> TẢI XUỐNG
-                      </button>
                     </div>
                   </div>
-                </div>
-
-                {/* Section: SCRIPT / KỊCH BẢN */}
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between text-[10px] font-black text-zinc-550 tracking-wider">
-                    <span>— SCRIPT / KỊCH BẢN</span>
-                    <span className="text-zinc-400 font-medium">1 file</span>
-                  </div>
-
-                  {/* File 3 */}
-                  <div className="border border-zinc-200 p-3 bg-white flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      {/* Red PDF icon */}
-                      <div className="w-10 h-10 bg-red-55/10 flex items-center justify-center shrink-0 border border-red-100">
-                        <span className="text-xl text-red-500">📄</span>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-black text-zinc-800 truncate leading-tight">SW_Vol3_cover_brief.pdf</p>
-                        <p className="text-[10px] text-zinc-450 mt-1 font-medium leading-tight truncate">Brief thiết kế bìa Volume 3 từ Mangaka</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="bg-red-100 text-red-700 text-[9px] font-black py-0.5 px-1.5">PDF</span>
-                      <span className="text-[10px] text-gray-400 font-bold">4.5 MB</span>
-                      <button 
-                        onClick={() => showToast('success', 'Bắt đầu tải SW_Vol3_cover_brief.pdf!')}
-                        className="bg-white hover:bg-zinc-50 border border-zinc-300 py-1.5 px-2.5 text-[9px] font-black uppercase flex items-center gap-1 cursor-pointer"
-                      >
-                        <Download className="w-3 h-3" /> TẢI XUỐNG
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
+                ) : (
+                  <p className="text-xs text-gray-400 font-bold italic py-4 text-center">Nhiệm vụ này không đính kèm tài nguyên tham khảo.</p>
+                )}
               </div>
 
               {/* Modal Footer */}
               <div className="bg-zinc-50 border-t-2 border-zinc-200 p-4 flex items-center justify-between gap-3">
                 <span className="text-[10px] font-bold text-gray-400">
-                  File được gắn kèm bởi Mangaka / Editor • Giao ngày 08/05/2026
+                  File được đính kèm gốc từ Mangaka / Editor
                 </span>
                 <button
                   type="button"

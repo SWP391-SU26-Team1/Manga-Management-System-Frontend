@@ -11,12 +11,14 @@ import ReportsPage from '@/pages/assistant/ReportsPage'
 import AssistantFeedbackPage from '@/pages/assistant/FeedbackPage'
 import DraftsPage from '@/pages/assistant/DraftsPage'
 import DrawingPage from '@/pages/assistant/DrawingPage'
+import DrawingStudioPage from '@/pages/assistant/DrawingStudioPage'
 import ProfilePage from '@/pages/assistant/ProfilePage'
 import SettingsPage from '@/pages/assistant/SettingsPage'
 
 export default function AssistantRoutes() {
   return (
     <Routes>
+      {/* All routes wrapped in the shared sidebar + header layout */}
       <Route element={<AssistantLayout />}>
         <Route index element={<AssistantDashboardPage />} />
         <Route path="tasks" element={<TasksPage />} />
@@ -26,6 +28,7 @@ export default function AssistantRoutes() {
         <Route path="feedback" element={<AssistantFeedbackPage />} />
         <Route path="drafts" element={<DraftsPage />} />
         <Route path="drawing" element={<DrawingPage />} />
+        <Route path="drawing-studio" element={<DrawingStudioPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>

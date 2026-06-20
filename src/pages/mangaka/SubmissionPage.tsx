@@ -14,6 +14,7 @@ import { AssistantSubmission } from '@/data/mangakaMockData'
 import taskService from '@/services/task.service'
 import seriesService from '@/services/series.service'
 import chapterService from '@/services/chapter.service'
+import feedbackService from '@/services/feedback.service'
 
 const filters = ['Tất cả', 'Chờ duyệt', 'Cần chỉnh sửa', 'Đã duyệt & Đóng gói', 'Quá hạn']
 
@@ -35,6 +36,8 @@ export default function SubmissionPage() {
 
   const [zoomImage, setZoomImage] = useState<string | null>(null)
   const [zoomTitle, setZoomTitle] = useState<string>('')
+  
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
 
   const getImageUrl = (url?: string | null) => {
     if (!url) return 'https://images.unsplash.com/photo-1563089145-599997674d42?q=80&w=600&auto=format&fit=crop'
@@ -79,9 +82,26 @@ export default function SubmissionPage() {
       const tasks = await taskService.getAllTasks({ limit: 1000 })
       setRawTasks(tasks)
 
+      // Fetch pending submissions to map correct file URLs
+      let pendingSubs: any[] = []
+      try {
+        pendingSubs = await feedbackService.getPendingSubmissions()
+      } catch (subErr) {
+        console.error('Failed to load pending submissions from backend:', subErr)
+      }
+
+      const subMap: Record<string, string> = {}
+      const subIdMap: Record<string, string> = {}
+      pendingSubs.forEach((sub: any) => {
+        if (sub.task_id) {
+          subMap[sub.task_id] = sub.file_url
+          subIdMap[sub.task_id] = sub.submission_id
+        }
+      })
+
       // 4. Map tasks to AssistantSubmission
       const mapped: AssistantSubmission[] = tasks
-        .filter((t) => t.assistant_id && t.page_id)
+        .filter((t) => t.assistant_id && t.page_id && ['submitted', 'needs_revision', 'rejected', 'approved', 'completed'].includes(t.status))
         .map((t) => {
           const chapterInfo = cMap[t.page?.chapter_id]
           const chapterTitle = chapterInfo ? chapterInfo.title : 'Nhiệm vụ lẻ'
@@ -105,15 +125,22 @@ export default function SubmissionPage() {
           }
           const layerType = layerLabels[t.task_type] || t.task_type || 'Bản vẽ'
 
+          // previewUrl: the drawing file submitted by the assistant (or fallback to original page if none)
+          // originalImageUrl: the original draft uploaded by the mangaka (always t.page.image_url)
+          const assistantFileUrl = subMap[t.task_id] || t.page?.image_url
+          const originalDraftUrl = t.page?.image_url
+
           return {
             id: t.task_id,
+            submissionId: subIdMap[t.task_id] || undefined,
             assistantName: t.assistant?.name || t.assistant?.username || 'Trợ lý',
             chapterTitle,
             pageNumber: t.page?.page_number || 1,
             layerType,
             submittedAt: t.updated_at || t.created_at || new Date().toISOString(),
             fileName: `task_${t.task_id.slice(0, 8)}.psd`,
-            previewUrl: getImageUrl(t.page?.image_url),
+            previewUrl: getImageUrl(assistantFileUrl),
+            originalImageUrl: getImageUrl(originalDraftUrl),
             note: t.content || '',
             status: displayStatus,
           }
@@ -176,9 +203,20 @@ export default function SubmissionPage() {
 
     try {
       setIsMerging(true)
+      
+      // Nếu có nhận xét ghi kèm, tiến hành đăng feedback trước khi duyệt
+      if (selected.submissionId && comment.trim()) {
+        setMergeStep('Đang lưu nhận xét của Mangaka...')
+        await feedbackService.createSubmissionFeedback(selected.submissionId, comment.trim())
+      }
+
       setMergeStep('Đang gọi API phê duyệt từ backend...')
 
-      await taskService.approveTask(seriesId, chapterId, pageId, selected.id)
+      if (selected.submissionId) {
+        await feedbackService.approveSubmission(selected.submissionId)
+      } else {
+        await taskService.approveTask(seriesId, chapterId, pageId, selected.id)
+      }
 
       setMergeStep("Trích xuất layer 'Assistant submission'...")
       setTimeout(() => {
@@ -189,7 +227,10 @@ export default function SubmissionPage() {
             setIsMerging(false)
             setMergeStep('')
             setComment('')
-            alert(`Đã kết hợp layer thành công cho submission của ${selected.assistantName}! Bản thảo chính đã được cập nhật.`)
+            setToastMessage(`Đã kết hợp layer thành công cho submission của ${selected.assistantName}! Bản thảo chính đã được cập nhật.`)
+            setTimeout(() => {
+              setToastMessage(null)
+            }, 5000)
             loadData()
           }, 800)
         }, 800)
@@ -240,10 +281,14 @@ export default function SubmissionPage() {
 
     try {
       setLoading(true)
-      await taskService.requestRevision(seriesId, chapterId, pageId, selected.id, {
-        feedback_content: finalComment,
-        feedback_type: 'revision_request',
-      })
+      if (selected.submissionId) {
+        await feedbackService.requestRevisionSubmission(selected.submissionId, finalComment)
+      } else {
+        await taskService.requestRevision(seriesId, chapterId, pageId, selected.id, {
+          feedback_content: finalComment,
+          feedback_type: 'revision_request',
+        })
+      }
       alert(`Đã gửi yêu cầu chỉnh sửa thành công cho ${selected.assistantName}.`)
       setComment('')
       setMarkers([])
@@ -451,14 +496,14 @@ export default function SubmissionPage() {
                     <div className="border-2 border-manga-ink bg-gray-100 relative overflow-hidden group flex items-center justify-center min-h-[300px]">
                       <div className="relative inline-block w-full">
                         <img
-                          src="https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=400&auto=format&fit=crop"
+                          src={selected.originalImageUrl || "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=400&auto=format&fit=crop"}
                           alt="Original Outline"
                           className="w-full h-auto object-contain block grayscale contrast-125"
                         />
                         <div className="absolute inset-0 bg-black/15 pointer-events-none" />
                         <button
                           onClick={() => {
-                            setZoomImage("https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=800&auto=format&fit=crop")
+                            setZoomImage(selected.originalImageUrl || "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=800&auto=format&fit=crop")
                             setZoomTitle("Bản Phác Thảo Gốc")
                           }}
                           className="absolute bottom-2 right-2 bg-white border border-manga-ink p-1.5 hover:bg-gray-100 transition-colors opacity-0 group-hover:opacity-100 flex items-center justify-center shadow-[2px_2px_0px_rgba(0,0,0,1)] z-10"
@@ -798,6 +843,10 @@ export default function SubmissionPage() {
                   <div className="flex flex-col gap-2 mt-auto">
                     <button
                       onClick={async () => {
+                        if (selected.status === 'Need Fix') {
+                          alert('Nhiệm vụ này đã được gửi yêu cầu chỉnh sửa trước đó và đang ở bên phía Trợ lý để sửa. Bạn cần đợi Trợ lý nộp bài mới để có thể duyệt hoặc tiếp tục yêu cầu chỉnh sửa.')
+                          return
+                        }
                         await handleReject()
                         setZoomImage(null)
                       }}
@@ -815,6 +864,22 @@ export default function SubmissionPage() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification ở góc dưới bên phải */}
+      {toastMessage && (
+        <div className="fixed bottom-4 right-4 z-[9999] animate-bounce duration-300">
+          <div className="bg-white border-2 border-manga-ink manga-shadow-sm p-4 flex items-center gap-3 text-manga-ink max-w-sm rounded-none">
+            <CheckCircle className="w-6 h-6 text-green-600 shrink-0" />
+            <div>
+              <p className="font-manga text-sm font-black uppercase tracking-wider text-manga-ink">Thành Công!</p>
+              <p className="text-xs font-bold text-gray-700 mt-0.5">{toastMessage}</p>
+            </div>
+            <button onClick={() => setToastMessage(null)} className="ml-2 hover:bg-gray-100 p-1 bg-transparent border-none cursor-pointer">
+              <X className="w-4 h-4 text-gray-400" />
+            </button>
           </div>
         </div>
       )}

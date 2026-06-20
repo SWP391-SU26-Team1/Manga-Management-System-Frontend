@@ -242,7 +242,7 @@ export default function TaskDetailModal({ taskId, onClose, onStatusChanged }: Ta
                         MÔ TẢ CÔNG VIỆC
                       </h3>
                       <p className="text-xs font-medium text-gray-700 leading-relaxed whitespace-pre-wrap">
-                        {taskDetail.description || 'Không có mô tả chi tiết cho nhiệm vụ này.'}
+                        {taskDetail.content || taskDetail.description || 'Không có mô tả chi tiết cho nhiệm vụ này.'}
                       </p>
                     </div>
 

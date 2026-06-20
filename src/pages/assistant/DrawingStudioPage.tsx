@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef, MouseEvent as ReactMouseEvent } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { useToast } from '@/contexts/ToastContext';
 import {
   Pen, Eraser, MousePointer2, Square, Circle, ArrowUpRight, Type, 
   MapPin, Undo2, Redo2, Trash2, Hand, ZoomIn, ZoomOut, Maximize, 
   FileDown, Save, Upload, Send, CheckCircle2, X, AlertTriangle, 
-  Layers, MessageSquare, ListTodo, FileImage, Grid, ImagePlus
+  Layers, MessageSquare, ListTodo, FileImage, Grid, ImagePlus, Loader2
 } from 'lucide-react';
+import assistantService from '@/services/assistant.service';
+import uploadService from '@/services/upload.service';
 
 // --- Types ---
 type Point = { x: number; y: number };
@@ -18,46 +20,40 @@ type Stroke = {
   size: number;
   points: Point[];
 };
-type Region = {
+
+interface MappedRegion {
   id: string;
   name: string;
   type: string;
-  status: 'Chưa làm' | 'Chờ làm' | 'Đang làm' | 'Đã xong';
+  status: 'Chưa làm' | 'Đang làm' | 'Đã xong' | string;
   x: number;
   y: number;
   w: number;
   h: number;
   desc: string;
-};
+}
 
-// --- Mock Data ---
-const TASK_INFO = {
-  id: '#1038',
-  series: 'Dark Rising Chronicles',
-  chapter: 'Chương 7',
-  page: 'Trang 18',
-  type: 'Character Lineart',
-  deadline: '18/05/2026',
-  priority: 'High',
-  assignedBy: 'Tanaka Hiroshi',
-  status: 'In Progress',
-  reward: '850.000đ',
-};
-
-const INITIAL_REGIONS: Region[] = [
-  { id: 'r1', name: 'Kira - Nhân vật chính', type: 'Character Lineart', status: 'Đang làm', x: 50, y: 50, w: 200, h: 300, desc: 'Đi nét chi tiết khuôn mặt và giáp vai của Kira.' },
-  { id: 'r2', name: 'Vael - Phản diện', type: 'Character Lineart', status: 'Đang làm', x: 300, y: 80, w: 220, h: 280, desc: 'Tập trung vào biểu cảm tức giận của Vael.' },
-  { id: 'r3', name: 'Bùa ngải & Hiệu ứng', type: 'Magic Effect', status: 'Chờ làm', x: 100, y: 380, w: 150, h: 120, desc: 'Vẽ thêm hiệu ứng khói ma thuật xung quanh tay Kira.' },
-  { id: 'r4', name: 'Background - Phòng đá', type: 'Background Art', status: 'Chưa làm', x: 20, y: 550, w: 560, h: 250, desc: 'Thêm chi tiết nứt vỡ trên tường đá và đổ bóng.' },
-  { id: 'r5', name: 'Hội thoại Vael', type: 'Lettering', status: 'Chưa làm', x: 350, y: 380, w: 180, h: 140, desc: 'Căn chỉnh chữ trong bong bóng thoại của Vael cho cân đối.' },
-];
+interface MappedFeedback {
+  id: string;
+  region: string;
+  text: string;
+  date: string;
+  resolved: boolean;
+}
 
 const COLORS = ['#000000', '#E63946', '#3B82F6', '#10B981', '#F59E0B', '#FFFFFF'];
 
 export default function DrawingStudioPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const pageId = searchParams.get('pageId') || '';
   const { showToast } = useToast();
 
+  // Loading States
+  const [loading, setLoading] = useState(true);
+  const [pageDetail, setPageDetail] = useState<any>(null);
+  const [activeTask, setActiveTask] = useState<any>(null);
+  
   // Workspace layout states
   const [activeTab, setActiveTab] = useState<'regions' | 'layers' | 'feedback' | 'submit'>('regions');
   
@@ -81,8 +77,8 @@ export default function DrawingStudioPage() {
   const [currentStroke, setCurrentStroke] = useState<Stroke | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   
-  // Feature states
-  const [regions, setRegions] = useState(INITIAL_REGIONS);
+  // Dynamic features state
+  const [regions, setRegions] = useState<MappedRegion[]>([]);
   const [activeRegionId, setActiveRegionId] = useState<string | null>(null);
   const [regionFilter, setRegionFilter] = useState('Tất cả');
   
@@ -94,31 +90,100 @@ export default function DrawingStudioPage() {
   });
 
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploadedFileUrl, setUploadedFileUrl] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
   const [submitNote, setSubmitNote] = useState('');
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Feedback
-  const [feedbacks, setFeedbacks] = useState([
-    { id: 'f1', region: 'Vael - Phản diện', text: 'Mắt trái của Vael hơi nhỏ, em chỉnh to ra chút nhé.', date: '16/05/2026', resolved: false },
-  ]);
+  // Feedbacks
+  const [feedbacks, setFeedbacks] = useState<MappedFeedback[]>([]);
 
-  // Load drafts
+  // 1. Fetch Page Detail & Set Up Workspace
   useEffect(() => {
-    const draft = localStorage.getItem('mangaflow_drawing_draft_1038');
-    if (draft) {
-      try {
-        const parsed = JSON.parse(draft);
-        if (parsed.strokes) setStrokes(parsed.strokes);
-        if (parsed.bgImage) {
-          setBgImage(parsed.bgImage);
-          const img = new Image();
-          img.onload = () => setCanvasSize({ width: img.naturalWidth, height: img.naturalHeight });
-          img.src = parsed.bgImage;
-        }
-      } catch (e) {}
+    if (!pageId) {
+      navigate('/dashboard/assistant/drawing');
+      return;
     }
-  }, []);
+    loadPageData();
+  }, [pageId]);
+
+  const loadPageData = async () => {
+    setLoading(true);
+    try {
+      // Get detail
+      const detail = await assistantService.getDrawingPageDetail(pageId);
+      setPageDetail(detail);
+
+      // Find active assistant task
+      const stored = localStorage.getItem('mangaflow_user');
+      const user = stored ? JSON.parse(stored) : null;
+      const myTask = detail.page_task?.find((t: any) => t.assistant_id === user?.user_id && t.status !== 'completed')
+        || detail.page_task?.[0];
+      setActiveTask(myTask);
+
+      // Map regions
+      const mappedRegs = (detail.page_region || []).map((r: any) => ({
+        id: r.region_id,
+        name: r.name || `Vùng ${r.region_id.slice(0, 4)}`,
+        type: r.type || 'Chưa phân loại',
+        status: r.status || 'Chờ làm',
+        x: r.x || 0,
+        y: r.y || 0,
+        w: r.width || 100,
+        h: r.height || 100,
+        desc: r.description || ''
+      }));
+      setRegions(mappedRegs);
+
+      // Resolve latest image url as background
+      const sortedVersions = [...(detail.page_version || [])].sort(
+        (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      const latestImg = sortedVersions[0]?.image_url || '';
+      if (latestImg) {
+        setBgImage(latestImg);
+        const img = new Image();
+        img.onload = () => setCanvasSize({ width: img.naturalWidth || 600, height: img.naturalHeight || 850 });
+        img.src = getImageUrl(latestImg);
+      }
+
+      // Map feedbacks from annotations or feedbacks list
+      const fbList = (detail.annotation || []).map((ann: any, idx: number) => ({
+        id: ann.annotation_id || `fb-${idx}`,
+        region: ann.region_id ? (mappedRegs.find((reg: any) => reg.id === ann.region_id)?.name || 'Vùng chỉ định') : 'Phản hồi chung',
+        text: ann.content || '',
+        date: new Date(ann.created_at).toLocaleDateString('vi-VN'),
+        resolved: ann.status === 'resolved'
+      }));
+      setFeedbacks(fbList);
+
+      // Load draft strokes from LocalStorage for this specific page
+      const draft = localStorage.getItem(`mangaflow_drawing_draft_${pageId}`);
+      if (draft) {
+        try {
+          const parsed = JSON.parse(draft);
+          if (parsed.strokes) setStrokes(parsed.strokes);
+        } catch (e) {
+          console.error('Lỗi đọc bản nháp nét vẽ:', e);
+        }
+      }
+
+    } catch (err: any) {
+      console.error(err);
+      showToast('Không thể tải thông tin phòng vẽ.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getImageUrl = (url?: string | null) => {
+    if (!url) return 'https://images.unsplash.com/photo-1563089145-599997674d42?q=80&w=600&auto=format&fit=crop';
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
+    const apiURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    return `${apiURL}${url.startsWith('/') ? '' : '/'}${url}`;
+  };
 
   // --- Canvas Logic ---
   
@@ -208,7 +273,7 @@ export default function DrawingStudioPage() {
     if (window.confirm('Bạn có chắc chắn muốn xóa toàn bộ nét vẽ chỉnh sửa nhanh?')) {
       setHistory([...history, strokes]);
       setStrokes([]);
-      showToast('Đã xóa bảng vẽ');
+      showToast('Đã xóa nét vẽ chỉnh sửa nhanh.');
     }
   };
 
@@ -320,80 +385,66 @@ export default function DrawingStudioPage() {
   // --- Handlers ---
   const handleSaveDraft = () => {
     const draftData = {
-      taskId: TASK_INFO.id,
-      series: TASK_INFO.series,
-      chapter: TASK_INFO.chapter,
-      page: TASK_INFO.page,
-      type: TASK_INFO.type,
+      pageId,
       updatedAt: new Date().toISOString(),
-      strokes,
-      bgImage
+      strokes
     };
     
-    // Save specific draft
-    localStorage.setItem('mangaflow_drawing_draft_1038', JSON.stringify(draftData));
-    
-    // Also save to global drafts list for Drafts page
-    const allDraftsStr = localStorage.getItem('mangaflow_all_drafts');
-    let allDrafts: any[] = [];
-    if (allDraftsStr) {
-      try { allDrafts = JSON.parse(allDraftsStr); } catch (e) {}
-    }
-    const existingIndex = allDrafts.findIndex(d => d.taskId === TASK_INFO.id);
-    if (existingIndex >= 0) {
-      allDrafts[existingIndex] = draftData;
-    } else {
-      allDrafts.push(draftData);
-    }
-    localStorage.setItem('mangaflow_all_drafts', JSON.stringify(allDrafts));
-
-    showToast('Đã lưu bản nháp thành công!');
+    // Save draft strokes to localStorage
+    localStorage.setItem(`mangaflow_drawing_draft_${pageId}`, JSON.stringify(draftData));
+    showToast('Đã lưu nét vẽ nháp thành công!');
   };
 
-  const handleUploadBg = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        if (ev.target?.result) {
-          const imgUrl = ev.target.result as string;
-          const img = new Image();
-          img.onload = () => {
-            setCanvasSize({ width: img.naturalWidth, height: img.naturalHeight });
-            setBgImage(imgUrl);
-            setScale(0.5);
-            if (containerRef.current) {
-              containerRef.current.scrollLeft = 0;
-              containerRef.current.scrollTop = 0;
-            }
-            showToast('Đã tải ảnh lên canvas (Tự động Zoom 50%)');
-          };
-          img.src = imgUrl;
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setUploadedFile(e.target.files[0]);
-      setActiveTab('submit');
-      showToast('Đã tải lên file chỉnh sửa');
+      setUploadedFile(file);
+      setIsUploading(true);
+      try {
+        const result = await uploadService.uploadSingle(file, 'submissions');
+        setUploadedFileUrl(result.secure_url);
+        setActiveTab('submit');
+        showToast('Tải file vẽ lên máy chủ thành công!');
+      } catch (err: any) {
+        console.error(err);
+        showToast('Không thể tải file vẽ lên server.');
+        setUploadedFile(null);
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 
   const handleSubmit = () => {
+    if (!uploadedFileUrl) {
+      showToast('Vui lòng tải lên file chỉnh sửa trước khi nộp!');
+      return;
+    }
     setShowSubmitModal(true);
   };
 
-  const confirmSubmit = () => {
-    setShowSubmitModal(false);
-    TASK_INFO.status = 'Submitted';
-    showToast('Nộp bài thành công! Task chuyển trạng thái "Đã Nộp"');
-    setTimeout(() => {
-      navigate('/dashboard/assistant/tasks');
-    }, 1500);
+  const confirmSubmit = async () => {
+    if (!activeTask) {
+      showToast('Không có nhiệm vụ hoạt động để nộp kết quả.');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await assistantService.createSubmission(activeTask.task_id, {
+        file_url: uploadedFileUrl,
+        submission_notes: submitNote
+      });
+      showToast('Nộp bản vẽ thành công!');
+      setShowSubmitModal(false);
+      setTimeout(() => {
+        navigate('/dashboard/assistant/drawing');
+      }, 1500);
+    } catch (err: any) {
+      console.error(err);
+      showToast(`Gửi bài thất bại: ${err?.message || 'Lỗi hệ thống'}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const filteredRegions = regions.filter(r => regionFilter === 'Tất cả' || r.status === regionFilter);
@@ -408,7 +459,7 @@ export default function DrawingStudioPage() {
   };
 
   // Zoom to region
-  const zoomToRegion = (r: Region) => {
+  const zoomToRegion = (r: MappedRegion) => {
     setActiveRegionId(r.id);
     // Center the region
     setScale(1.5);
@@ -421,6 +472,15 @@ export default function DrawingStudioPage() {
       }
     }, 50);
   };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <Loader2 className="w-10 h-10 animate-spin text-manga-red" />
+        <p className="font-bold uppercase text-gray-500">Đang khởi tạo không gian vẽ...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-[calc(100vh-6rem)] min-h-[700px] font-sans">
@@ -435,47 +495,58 @@ export default function DrawingStudioPage() {
       <div className="bg-white border-b-4 border-manga-ink p-4 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 shrink-0">
         <div className="min-w-0">
           <h1 className="font-manga text-xl font-bold uppercase text-manga-red tracking-wide truncate">
-            KHÔNG GIAN LÀM VIỆC — TASK {TASK_INFO.id}
+            KHÔNG GIAN LÀM VIỆC — TRANG {pageDetail?.page_number}
           </h1>
           <div className="flex items-center gap-2 text-xs font-bold text-gray-500 mt-1 whitespace-nowrap overflow-x-auto pb-1 hide-scrollbar">
-            <span className="text-manga-ink">{TASK_INFO.series}</span>
+            <span className="text-manga-ink">{pageDetail?.chapter?.series?.title || 'Series'}</span>
             <span>•</span>
-            <span>{TASK_INFO.chapter} - {TASK_INFO.page}</span>
+            <span>{pageDetail?.chapter?.title} - Trang {pageDetail?.page_number}</span>
             <span>•</span>
-            <span className="text-[#3b82f6] uppercase border border-[#3b82f6] px-1.5 py-0.5 rounded">{TASK_INFO.type}</span>
+            <span className="text-[#3b82f6] uppercase border border-[#3b82f6] px-1.5 py-0.5 rounded">
+              {activeTask ? activeTask.task_type.toUpperCase() : 'DRAWING'}
+            </span>
             <span>•</span>
-            <span className="text-[#E63946]">Hạn: {TASK_INFO.deadline}</span>
+            <span className="text-[#E63946]">Hạn: {activeTask?.deadline ? new Date(activeTask.deadline).toLocaleDateString() : 'N/A'}</span>
           </div>
         </div>
 
         <div className="flex flex-wrap xl:flex-nowrap items-center justify-start xl:justify-end gap-2 shrink-0">
-          <label className="flex items-center gap-1.5 px-3 py-2 bg-white border-2 border-manga-ink text-manga-ink font-bold text-xs uppercase hover:bg-gray-100 transition cursor-pointer" title="Tải ảnh máy bạn lên Canvas">
-            <ImagePlus className="w-4 h-4" /> Tải ảnh lên
-            <input type="file" className="hidden" accept="image/*" onChange={handleUploadBg} />
+          <label className="flex items-center gap-1.5 px-3 py-2 bg-white border-2 border-manga-ink text-manga-ink font-bold text-xs uppercase hover:bg-gray-100 transition cursor-pointer animate-pulse" title="Tải ảnh máy bạn lên Canvas">
+            <ImagePlus className="w-4 h-4" /> Đổi hình nền
+            <input type="file" className="hidden" accept="image/*" onChange={(e) => {
+              if(e.target.files?.[0]) {
+                const url = URL.createObjectURL(e.target.files[0]);
+                setBgImage(url);
+                showToast('Đã đổi hình nền tạm thời.');
+              }
+            }} />
           </label>
 
-          <button 
-            onClick={() => showToast('Đang tải file gốc...')}
+          <a 
+            href={getImageUrl(bgImage)}
+            target="_blank"
+            rel="noopener noreferrer"
             className="flex items-center gap-1.5 px-3 py-2 bg-white border-2 border-manga-ink text-manga-ink font-bold text-xs uppercase hover:bg-gray-100 transition cursor-pointer"
           >
             <FileDown className="w-4 h-4" /> Tải file gốc
-          </button>
+          </a>
           
           <button 
             onClick={handleSaveDraft}
             className="flex items-center gap-1.5 px-3 py-2 bg-white border-2 border-manga-ink text-manga-ink font-bold text-xs uppercase hover:bg-gray-100 transition cursor-pointer"
           >
-            <Save className="w-4 h-4" /> Lưu bản nháp
+            <Save className="w-4 h-4" /> Lưu bản nháp nét vẽ
           </button>
 
-          <label className="flex items-center gap-1.5 px-3 py-2 bg-manga-ink border-2 border-manga-ink text-white font-bold text-xs uppercase hover:bg-gray-800 transition cursor-pointer">
-            <Upload className="w-4 h-4" /> Upload file sửa
-            <input type="file" className="hidden" accept="image/*,.psd" onChange={handleFileUpload} />
+          <label className={`flex items-center gap-1.5 px-3 py-2 bg-manga-ink border-2 border-manga-ink text-white font-bold text-xs uppercase hover:bg-gray-800 transition cursor-pointer ${isUploading ? 'opacity-50' : ''}`}>
+            {isUploading ? 'Đang tải...' : 'Upload file sửa'}
+            <input type="file" disabled={isUploading} className="hidden" accept="image/*,.psd" onChange={handleFileUpload} />
           </label>
 
           <button 
             onClick={handleSubmit}
-            className="flex items-center gap-1.5 px-4 py-2 bg-[#E63946] border-2 border-black text-white font-bold text-xs uppercase hover:bg-red-600 transition shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer"
+            disabled={!uploadedFileUrl}
+            className="flex items-center gap-1.5 px-4 py-2 bg-[#E63946] border-2 border-black text-white font-bold text-xs uppercase hover:bg-red-600 transition shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             <Send className="w-4 h-4" /> Nộp cho Mangaka
           </button>
@@ -503,7 +574,7 @@ export default function DrawingStudioPage() {
               key={t.id}
               onClick={() => setTool(t.id as ToolType)}
               title={t.title}
-              className={`p-2.5 rounded transition cursor-pointer ${tool === t.id ? 'bg-[#E63946] text-white' : 'text-gray-400 hover:text-white hover:bg-zinc-800'}`}
+              className={`p-2.5 rounded transition cursor-pointer border-none ${tool === t.id ? 'bg-[#E63946] text-white' : 'text-gray-400 hover:text-white hover:bg-zinc-800'}`}
             >
               <t.icon className="w-5 h-5" />
             </button>
@@ -524,10 +595,10 @@ export default function DrawingStudioPage() {
           <div className="w-10 h-px bg-zinc-700 my-2" />
 
           {/* Actions */}
-          <button onClick={undo} title="Undo" className="p-2 text-gray-400 hover:text-white hover:bg-zinc-800 rounded cursor-pointer">
+          <button onClick={undo} title="Undo" className="p-2 text-gray-400 hover:text-white hover:bg-zinc-800 rounded cursor-pointer border-none bg-transparent">
             <Undo2 className="w-5 h-5" />
           </button>
-          <button onClick={clearCanvas} title="Xóa tất cả nét vẽ" className="p-2 text-red-400 hover:text-red-300 hover:bg-zinc-800 rounded mt-auto cursor-pointer">
+          <button onClick={clearCanvas} title="Xóa tất cả nét vẽ" className="p-2 text-red-400 hover:text-red-300 hover:bg-zinc-800 rounded mt-auto cursor-pointer border-none bg-transparent">
             <Trash2 className="w-5 h-5" />
           </button>
         </div>
@@ -537,11 +608,11 @@ export default function DrawingStudioPage() {
           
           {/* Zoom Controls Overlay (Fixed relative to the canvas area) */}
           <div className="absolute bottom-4 left-4 bg-zinc-900 border-2 border-black rounded shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-white flex items-center z-30">
-            <button onClick={() => setScale(s => Math.max(0.5, s - 0.2))} className="p-2 hover:bg-zinc-800 border-r border-zinc-700 cursor-pointer"><ZoomOut className="w-4 h-4" /></button>
+            <button onClick={() => setScale(s => Math.max(0.5, s - 0.2))} className="p-2 hover:bg-zinc-800 border-r border-zinc-700 cursor-pointer bg-transparent text-white border-none"><ZoomOut className="w-4 h-4" /></button>
             <span className="text-xs font-bold px-3">{Math.round(scale * 100)}%</span>
-            <button onClick={() => setScale(s => Math.min(3, s + 0.2))} className="p-2 hover:bg-zinc-800 border-l border-zinc-700 cursor-pointer"><ZoomIn className="w-4 h-4" /></button>
-            <button onClick={fitToScreen} title="Fit to screen" className="p-2 hover:bg-zinc-800 border-l border-zinc-700 cursor-pointer"><Maximize className="w-4 h-4" /></button>
-            <button onClick={() => setShowGrid(!showGrid)} title="Toggle Grid" className={`p-2 hover:bg-zinc-800 border-l border-zinc-700 cursor-pointer ${showGrid ? 'text-[#E63946]' : ''}`}><Grid className="w-4 h-4" /></button>
+            <button onClick={() => setScale(s => Math.min(3, s + 0.2))} className="p-2 hover:bg-zinc-800 border-l border-zinc-700 cursor-pointer bg-transparent text-white border-none"><ZoomIn className="w-4 h-4" /></button>
+            <button onClick={fitToScreen} title="Fit to screen" className="p-2 hover:bg-zinc-800 border-l border-zinc-700 cursor-pointer bg-transparent text-white border-none"><Maximize className="w-4 h-4" /></button>
+            <button onClick={() => setShowGrid(!showGrid)} title="Toggle Grid" className={`p-2 hover:bg-zinc-800 border-l border-zinc-700 cursor-pointer bg-transparent border-none ${showGrid ? 'text-[#E63946]' : 'text-white'}`}><Grid className="w-4 h-4" /></button>
           </div>
 
           {/* Scrollable Container */}
@@ -571,7 +642,7 @@ export default function DrawingStudioPage() {
                   {/* Manga Page Background */}
                   {layers.original && (
                     <img 
-                      src={bgImage} 
+                      src={getImageUrl(bgImage)} 
                       alt="Manga Page"
                       className="absolute inset-0 w-full h-full object-contain opacity-80 select-none pointer-events-none grayscale"
                     />
@@ -599,17 +670,17 @@ export default function DrawingStudioPage() {
           
           {/* Tabs */}
           <div className="flex border-b-2 border-gray-200 bg-white">
-            <button onClick={() => setActiveTab('regions')} className={`flex-1 py-3 text-[10px] font-black uppercase flex flex-col items-center justify-center gap-1 cursor-pointer transition ${activeTab === 'regions' ? 'bg-manga-ink text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+            <button onClick={() => setActiveTab('regions')} className={`flex-1 py-3 text-[10px] font-black uppercase flex flex-col items-center justify-center gap-1 cursor-pointer border-none transition ${activeTab === 'regions' ? 'bg-manga-ink text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
               <ListTodo className="w-4 h-4" /> Vùng của tôi
             </button>
-            <button onClick={() => setActiveTab('layers')} className={`flex-1 py-3 text-[10px] font-black uppercase flex flex-col items-center justify-center gap-1 cursor-pointer transition ${activeTab === 'layers' ? 'bg-manga-ink text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+            <button onClick={() => setActiveTab('layers')} className={`flex-1 py-3 text-[10px] font-black uppercase flex flex-col items-center justify-center gap-1 cursor-pointer border-none transition ${activeTab === 'layers' ? 'bg-manga-ink text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
               <Layers className="w-4 h-4" /> Lớp hiển thị
             </button>
-            <button onClick={() => setActiveTab('feedback')} className={`flex-1 py-3 text-[10px] font-black uppercase flex flex-col items-center justify-center gap-1 relative cursor-pointer transition ${activeTab === 'feedback' ? 'bg-manga-ink text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+            <button onClick={() => setActiveTab('feedback')} className={`flex-1 py-3 text-[10px] font-black uppercase flex flex-col items-center justify-center gap-1 relative cursor-pointer border-none transition ${activeTab === 'feedback' ? 'bg-manga-ink text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
               <MessageSquare className="w-4 h-4" /> Phản hồi
-              <span className="absolute top-2 right-4 w-2 h-2 bg-[#E63946] rounded-full"></span>
+              {feedbacks.length > 0 && <span className="absolute top-2 right-4 w-2 h-2 bg-[#E63946] rounded-full"></span>}
             </button>
-            <button onClick={() => setActiveTab('submit')} className={`flex-1 py-3 text-[10px] font-black uppercase flex flex-col items-center justify-center gap-1 cursor-pointer transition ${activeTab === 'submit' ? 'bg-manga-ink text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+            <button onClick={() => setActiveTab('submit')} className={`flex-1 py-3 text-[10px] font-black uppercase flex flex-col items-center justify-center gap-1 cursor-pointer border-none transition ${activeTab === 'submit' ? 'bg-manga-ink text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
               <FileImage className="w-4 h-4" /> Nộp bài
             </button>
           </div>
@@ -709,23 +780,27 @@ export default function DrawingStudioPage() {
             {/* --- FEEDBACK TAB --- */}
             {activeTab === 'feedback' && (
               <div className="space-y-4">
-                {feedbacks.map(f => (
-                  <div key={f.id} className={`border-2 border-black p-4 bg-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition ${f.resolved ? 'opacity-60 grayscale' : 'border-l-4 border-l-[#E63946]'}`}>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-[10px] font-black uppercase text-[#E63946]">Từ: Tanaka Hiroshi (Sensei)</span>
-                      <span className="text-[10px] font-bold text-gray-400">{f.date}</span>
+                {feedbacks.length === 0 ? (
+                  <p className="text-xs font-bold text-gray-400 text-center">Chưa có phản hồi hay chỉnh sửa nào.</p>
+                ) : (
+                  feedbacks.map(f => (
+                    <div key={f.id} className={`border-2 border-black p-4 bg-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition ${f.resolved ? 'opacity-60 resolved grayscale' : 'border-l-4 border-l-[#E63946]'}`}>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-[10px] font-black uppercase text-[#E63946]">Ý kiến từ Mangaka</span>
+                        <span className="text-[10px] font-bold text-gray-400">{f.date}</span>
+                      </div>
+                      <h4 className="font-bold text-xs uppercase mb-2">Vùng: {f.region}</h4>
+                      <p className="text-sm italic text-gray-700 bg-gray-50 p-2 border border-gray-200 mb-3">{f.text}</p>
+                      <button 
+                        onClick={() => setFeedbacks(feedbacks.map(fb => fb.id === f.id ? {...fb, resolved: true} : fb))}
+                        disabled={f.resolved}
+                        className="w-full text-xs font-bold border-2 border-black p-2 uppercase hover:bg-gray-100 disabled:bg-gray-100 disabled:text-gray-400 cursor-pointer disabled:cursor-not-allowed transition"
+                      >
+                        {f.resolved ? 'Đã xử lý' : 'Đánh dấu đã xử lý'}
+                      </button>
                     </div>
-                    <h4 className="font-bold text-xs uppercase mb-2">Vùng: {f.region}</h4>
-                    <p className="text-sm italic text-gray-700 bg-gray-50 p-2 border border-gray-200 mb-3">{f.text}</p>
-                    <button 
-                      onClick={() => setFeedbacks(feedbacks.map(fb => fb.id === f.id ? {...fb, resolved: true} : fb))}
-                      disabled={f.resolved}
-                      className="w-full text-xs font-bold border-2 border-black p-2 uppercase hover:bg-gray-100 disabled:bg-gray-100 disabled:text-gray-400 cursor-pointer disabled:cursor-not-allowed transition"
-                    >
-                      {f.resolved ? 'Đã xử lý' : 'Đánh dấu đã xử lý'}
-                    </button>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             )}
 
@@ -735,13 +810,16 @@ export default function DrawingStudioPage() {
                 <div className="bg-white border-2 border-black p-4 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
                   <h3 className="font-bold text-sm uppercase mb-3 border-b-2 border-manga-ink pb-2">File Chỉnh Sửa</h3>
                   
-                  {uploadedFile ? (
+                  {uploadedFileUrl ? (
                     <div className="mb-4">
                       <div className="border border-dashed border-gray-300 bg-gray-50 h-32 flex items-center justify-center text-xs text-gray-500 mb-2 overflow-hidden">
-                         <img src={URL.createObjectURL(uploadedFile)} alt="preview" className="max-w-full max-h-full object-contain" />
+                         <img src={getImageUrl(uploadedFileUrl)} alt="preview" className="max-w-full max-h-full object-contain" />
                       </div>
-                      <p className="text-[10px] font-bold text-emerald-600 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> {uploadedFile.name}</p>
-                      <button onClick={() => setUploadedFile(null)} className="text-[10px] text-[#E63946] underline mt-1 cursor-pointer font-bold">Xóa file</button>
+                      <p className="text-[10px] font-bold text-emerald-600 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> {uploadedFile?.name || 'file_edit.psd'}</p>
+                      <button onClick={() => {
+                        setUploadedFile(null);
+                        setUploadedFileUrl('');
+                      }} className="text-[10px] text-[#E63946] underline mt-1 cursor-pointer font-bold border-none bg-transparent">Xóa file</button>
                     </div>
                   ) : (
                     <div className="mb-4 text-center border-2 border-dashed border-gray-300 p-4">
@@ -769,7 +847,7 @@ export default function DrawingStudioPage() {
 
                   <button 
                     onClick={handleSubmit}
-                    disabled={!confirmChecked}
+                    disabled={!confirmChecked || !uploadedFileUrl}
                     className="w-full bg-[#E63946] text-white border-2 border-black font-black uppercase py-3 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer"
                   >
                     Nộp kết quả
@@ -789,24 +867,29 @@ export default function DrawingStudioPage() {
           <div className="bg-white border-4 border-black w-full max-w-md shadow-[8px_8px_0px_0px_rgba(230,57,70,1)] animate-zoom-in">
             <div className="bg-manga-ink p-4 text-white flex justify-between items-center">
               <h3 className="font-manga text-xl uppercase font-bold tracking-wide">Xác nhận Nộp Bài</h3>
-              <button onClick={() => setShowSubmitModal(false)} className="hover:text-[#E63946] transition cursor-pointer"><X className="w-6 h-6" /></button>
+              <button onClick={() => setShowSubmitModal(false)} className="hover:text-[#E63946] transition cursor-pointer bg-transparent border-none text-white"><X className="w-6 h-6" /></button>
             </div>
             <div className="p-6">
-              <p className="font-bold mb-4 text-gray-800">Bạn sắp nộp bài cho Task <span className="text-[#E63946]">#{TASK_INFO.id}</span>.</p>
+              <p className="font-bold mb-4 text-gray-800">Bạn sắp nộp bài cho nhiệm vụ này.</p>
               <div className="bg-gray-50 p-4 text-sm mb-6 border border-gray-200 shadow-inner">
-                <p className="mb-2"><strong className="text-gray-900 uppercase text-xs">Series:</strong> <span className="font-bold text-gray-700">{TASK_INFO.series}</span></p>
-                <p className="mb-2"><strong className="text-gray-900 uppercase text-xs">Tiến độ vùng:</strong> <span className="font-bold text-emerald-600">{regions.filter(r => r.status === 'Đã xong').length} / {regions.length} hoàn thành</span></p>
+                <p className="mb-2"><strong className="text-gray-900 uppercase text-xs">Phân cảnh:</strong> <span className="font-bold text-gray-700">Trang {pageDetail?.page_number}</span></p>
+                <p className="mb-2"><strong className="text-gray-900 uppercase text-xs">Vùng nhiệm vụ:</strong> <span className="font-bold text-emerald-600">{regions.filter(r => r.status === 'Đã xong').length} / {regions.length} hoàn thành</span></p>
                 <p><strong className="text-gray-900 uppercase text-xs block mb-1">Ghi chú:</strong> <span className="italic text-gray-600">{submitNote || '(Không có ghi chú)'}</span></p>
               </div>
-              <div className="flex gap-3">
-                <button onClick={() => setShowSubmitModal(false)} className="flex-1 py-2 font-bold uppercase border-2 border-black hover:bg-gray-100 transition cursor-pointer">Hủy</button>
-                <button onClick={confirmSubmit} className="flex-1 py-2 font-bold uppercase border-2 border-black bg-[#E63946] text-white hover:bg-red-600 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition cursor-pointer">Đồng ý Nộp</button>
+              <div className="flex gap-4">
+                <button onClick={() => setShowSubmitModal(false)} className="flex-1 py-3 border-2 border-black font-bold text-xs uppercase hover:bg-gray-150 transition">Hủy</button>
+                <button 
+                  onClick={confirmSubmit} 
+                  disabled={isSubmitting}
+                  className="flex-1 py-3 bg-[#E63946] text-white border-2 border-black font-black uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-red-600 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  {isSubmitting ? 'Đang gửi...' : 'Xác nhận nộp'}
+                </button>
               </div>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }

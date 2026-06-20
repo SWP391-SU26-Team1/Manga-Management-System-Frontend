@@ -3,6 +3,18 @@ import { AlertTriangle, Clock, CheckCircle2, TrendingUp, Bell, ArrowRight, Activ
 import { Link } from 'react-router'
 import assistantService, { DashboardOverview, DashboardPerformance, PerformanceBySeriesItem, AssistantNotification } from '@/services/assistant.service'
 
+const getTaskTypeName = (type: string) => {
+  const maps: Record<string, string> = {
+    inking: 'Character Lineart',
+    coloring: 'Coloring',
+    lettering: 'Lettering',
+    cleaning: 'Cleaning',
+    sfx: 'SFX Design',
+    background: 'Background'
+  }
+  return maps[type] || type.toUpperCase()
+}
+
 export default function AssistantDashboardPage() {
   const [overview, setOverview] = useState<DashboardOverview | null>(null)
   const [performance, setPerformance] = useState<DashboardPerformance | null>(null)
@@ -22,23 +34,42 @@ export default function AssistantDashboardPage() {
         assistantService.getPerformance(),
         assistantService.getBySeries(),
         assistantService.listNotifications({ limit: 6 }),
-        assistantService.listMyTasks({ status: 'completed' })
+        assistantService.listMyTasks()
       ])
 
       setOverview(overData)
       setPerformance(perfData)
       setSeriesList(seriesData || [])
-      setNotifications(notifsRes?.data || [])
 
       // Calculate weekly completed count (last 7 days)
+      const allTasks = tasksRes?.data || []
       const last7Days = new Date()
       last7Days.setDate(last7Days.getDate() - 7)
-      const weeklyCount = (tasksRes?.data || []).filter(task => {
+      const weeklyCount = allTasks.filter(task => {
+        if (task.status !== 'completed' && task.status !== 'approved') return false
         if (!task.updated_at) return false
         const updatedAt = new Date(task.updated_at)
         return updatedAt >= last7Days
       }).length
       setWeeklyCompleted(weeklyCount)
+
+      // Dynamically detect overdue tasks and create red warning notifications
+      const overdueTasks = allTasks.filter(task => {
+        if (!task.deadline || task.status === 'completed' || task.status === 'approved') return false
+        return new Date().getTime() > new Date(task.deadline).getTime()
+      })
+
+      const localOverdueNotifs = overdueTasks.map((task: any) => ({
+        notification_id: `local_overdue_${task.task_id}`,
+        user_id: '',
+        title: 'CẢNH BÁO QUÁ HẠN!',
+        content: `Nhiệm vụ [${getTaskTypeName(task.task_type)}] của Ch.${task.page?.chapter?.title ? parseInt(task.page.chapter.title.replace(/\D/g, '')) || 1 : 1} - Trang ${task.page?.page_number || 1} (${task.page?.chapter?.series?.title || ''}) đã quá hạn chót nộp bài (${task.deadline ? task.deadline.split('T')[0].split('-').reverse().join('/') : ''}). Hãy khẩn trương hoàn thành!`,
+        type: 'URGENT',
+        is_read: false,
+        created_at: new Date().toISOString()
+      }))
+
+      setNotifications([...localOverdueNotifs, ...(notifsRes?.data || [])].slice(0, 6))
     } catch (err: any) {
       console.error('Error fetching dashboard data:', err)
       setError('Không thể kết nối máy chủ để tải dữ liệu trang chủ.')

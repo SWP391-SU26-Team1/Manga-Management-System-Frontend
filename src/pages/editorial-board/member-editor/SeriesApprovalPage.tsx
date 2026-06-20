@@ -8,29 +8,59 @@ export default function SeriesApprovalPage() {
   const [seriesList, setSeriesList] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
+  const storedUser = localStorage.getItem('mangaflow_user')
+  const currentUser = storedUser ? JSON.parse(storedUser) : null
+
   useEffect(() => {
     const fetchSeries = async () => {
       try {
-        const res = await boardService.getReviewedSeries()
-        let data = Array.isArray(res) ? res : []
+        const [resSeries, resProposals] = await Promise.all([
+          boardService.getReviewedSeries(),
+          boardService.getPendingProposals()
+        ])
+        
+        let data = Array.isArray(resSeries) ? resSeries : []
+        let proposals = Array.isArray(resProposals) ? resProposals : []
         
         if (data.length > 0) {
-          setSeriesList(data.map((s: any) => ({
-            id: s.id || s.series_id,
-            title: s.title,
-            authorName: s.authorName || s.author_name || 'Tác giả',
-            coverUrl: s.coverUrl || s.cover_image_url || 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=300&auto=format&fit=crop',
-            genre: s.genre,
-            synopsis: s.synopsis || s.description || '',
-            submittedAt: s.submittedAt || s.created_at || new Date().toISOString(),
-            tantouName: s.tantouName || s.editor_name || 'Biên tập viên',
-            tantouOpinion: s.tantouOpinion || s.note || '',
-            vote: s.vote ? {
-              decision: s.vote.decision,
-              note: s.vote.note || '',
-              submittedAt: s.vote.submittedAt || s.vote.created_at
-            } : undefined
-          })))
+          const enrichedSeries = await Promise.all(data.map(async (s: any) => {
+            const seriesId = s.id || s.series_id
+            let userVote = undefined
+            let matchedSessionId = undefined
+            
+            const session = proposals.find(p => p.series_id === seriesId)
+            matchedSessionId = session ? session.session_id : `session_${seriesId}`
+            
+            if (currentUser) {
+              try {
+                const votes = await boardService.getVote(matchedSessionId)
+                if (Array.isArray(votes)) {
+                  userVote = votes.find((v: any) => v.voter_id === currentUser.id || v.users?.username === currentUser.fullName || v.users?.username === currentUser.username)
+                }
+              } catch (e) {
+                console.warn('API error fetching user votes:', e)
+              }
+            }
+
+            return {
+              id: seriesId,
+              title: s.title,
+              authorName: s.authorName || s.author_name || 'Tác giả',
+              coverUrl: s.coverUrl || s.cover_image_url || 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=300&auto=format&fit=crop',
+              genre: s.genre,
+              synopsis: s.synopsis || s.description || '',
+              submittedAt: s.submittedAt || s.created_at || new Date().toISOString(),
+              tantouName: s.tantouName || s.editor_name || 'Biên tập viên',
+              tantouOpinion: s.tantouOpinion || s.note || '',
+              sessionId: matchedSessionId,
+              vote: userVote ? {
+                decision: userVote.decision,
+                note: userVote.note || '',
+                submittedAt: userVote.created_at
+              } : undefined
+            }
+          }))
+          setSeriesList(enrichedSeries)
         } else {
           setSeriesList([])
         }
@@ -136,7 +166,7 @@ export default function SeriesApprovalPage() {
                   </div>
 
                   <Link
-                    to={`/dashboard/editorial-board/series-approval/${series.id}`}
+                    to={series.sessionId ? `/dashboard/editorial-board/series-approval/${series.id}?sessionId=${series.sessionId}` : `/dashboard/editorial-board/series-approval/${series.id}`}
                     className="bg-manga-ink text-white font-manga font-bold text-xs uppercase px-5 py-2 border-2 border-manga-ink shadow-[3px_3px_0px_rgba(0,0,0,1)] hover:bg-manga-red hover:shadow-[1px_1px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] transition-all"
                   >
                     Xem & Biểu quyết

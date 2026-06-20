@@ -8,6 +8,7 @@ export default function ProfilePage() {
   const [editName, setEditName] = useState('')
   const [editEmail, setEditEmail] = useState('')
   const [editAvatarUrl, setEditAvatarUrl] = useState('')
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -29,27 +30,57 @@ export default function ProfilePage() {
     }
   }, [])
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (profile) {
-      const updatedProfile = {
-        ...profile,
-        fullName: editName,
-        email: editEmail,
-        avatarUrl: editAvatarUrl
+      try {
+        let finalAvatarUrl = editAvatarUrl;
+        
+        // If there's a new file, upload it first to get a real URL for the backend
+        if (avatarFile) {
+          const { default: uploadService } = await import('@/services/upload.service');
+          const uploadRes = await uploadService.uploadSingle(avatarFile, 'avatars');
+          finalAvatarUrl = uploadRes.secure_url;
+          setEditAvatarUrl(finalAvatarUrl);
+        }
+
+        const payload = {
+          name: editName,
+          email: editEmail,
+          avatar_url: finalAvatarUrl
+        };
+        
+        // Update to backend if user id exists
+        if (profile.id) {
+          const { default: userService } = await import('@/services/user.service');
+          await userService.updateProfile(profile.id, payload);
+        }
+        
+        const updatedProfile = {
+          ...profile,
+          fullName: editName,
+          email: editEmail,
+          avatarUrl: finalAvatarUrl
+        }
+        setProfile(updatedProfile)
+        localStorage.setItem('mangaflow_user', JSON.stringify(updatedProfile))
+        
+        // Clear selected file after successful save
+        setAvatarFile(null)
+        
+        // Update header & sidebar avatar by dispatching a custom event
+        window.dispatchEvent(new Event('mangaflow_profile_updated'))
+        
+        setIsEditing(false)
+      } catch (error) {
+        console.error('Failed to update profile:', error)
       }
-      setProfile(updatedProfile)
-      localStorage.setItem('mangaflow_user', JSON.stringify(updatedProfile))
-      
-      // Update header & sidebar avatar by dispatching a custom event
-      window.dispatchEvent(new Event('mangaflow_profile_updated'))
-      
-      setIsEditing(false)
     }
   }
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setAvatarFile(file); // Save file for uploading later
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64 = reader.result as string;
@@ -74,6 +105,7 @@ export default function ProfilePage() {
       setEditName(profile.fullName)
       setEditEmail(profile.email)
       setEditAvatarUrl(profile.avatarUrl || '')
+      setAvatarFile(null)
       
       // Revert the localStorage and header/sidebar avatars to original profile
       localStorage.setItem('mangaflow_user', JSON.stringify(profile));

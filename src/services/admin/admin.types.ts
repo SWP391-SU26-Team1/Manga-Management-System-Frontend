@@ -106,6 +106,17 @@ export type Series = {
   updated_at?: string
 }
 
+export type SeriesDetail = Series & {
+  chapter?: Chapter[]
+  series_member?: Array<{
+    series_member_id: string
+    series_id: string
+    user_id: string
+    role_in_series: string
+    users?: Pick<User, 'user_id' | 'username' | 'name' | 'avatar_url' | 'role'> | null
+  }>
+}
+
 export type Chapter = {
   id?: string
   chapter_id: string
@@ -120,6 +131,11 @@ export type Chapter = {
   publish_date?: string | null
   created_at: string
   updated_at?: string
+  series?: Pick<Series, 'series_id' | 'title'> | null
+}
+
+export type ChapterDetail = Chapter & {
+  page?: Page[]
 }
 
 export type Page = {
@@ -157,6 +173,9 @@ export type PageTask = {
   content?: string | null
   created_at: string
   updated_at?: string
+  page?: Pick<Page, 'page_id' | 'page_number' | 'chapter_id'> | null
+  assistant?: Pick<User, 'user_id' | 'username' | 'name' | 'avatar_url'> | null
+  assigned_by?: Pick<User, 'user_id' | 'username' | 'name' | 'avatar_url'> | null
 }
 
 export type ReviewSession = {
@@ -198,6 +217,8 @@ export type Vote = {
   created_at: string
   status: VoteStatus
   users?: Pick<User, 'user_id' | 'username' | 'email'> | null
+  voter?: Pick<User, 'user_id' | 'username' | 'name' | 'email'> | null
+  session?: Pick<ReviewSession, 'session_id' | 'name' | 'status' | 'series_id' | 'chapter_id'> | null
 }
 
 export type ReviewSessionProcessResult = {
@@ -216,6 +237,7 @@ export type Notification = {
   type?: string | null
   is_read: boolean
   created_at: string
+  user?: Pick<User, 'user_id' | 'username' | 'name' | 'email' | 'role'> | null
 }
 
 export type ActivityLog = {
@@ -242,12 +264,53 @@ export type DashboardOverview = {
 
 export type TaskStats = {
   total: number
-  by_status: Record<PageTaskStatus, number>
+  by_status: Partial<Record<PageTaskStatus, number>>
   overdue: number
 }
 
 export type EntityStats<TStatus extends string> = {
   total: number
-  by_status?: Record<TStatus, number>
-  by_role?: Record<UserRole, number>
+  by_status?: Partial<Record<TStatus, number>>
+  by_role?: Partial<Record<UserRole, number>>
+}
+
+export type UserStats = EntityStats<UserStatus> & {
+  by_role: Partial<Record<UserRole, number>>
+  by_status: Partial<Record<UserStatus, number>>
+}
+
+export type SeriesStats = EntityStats<SeriesStatus> & {
+  by_status: Partial<Record<SeriesStatus, number>>
+}
+
+export type ReviewStats = EntityStats<ReviewSessionStatus> & {
+  by_status: Partial<Record<ReviewSessionStatus, number>>
+}
+
+export type RankingStats = {
+  total_periods: number
+  total_series_rankings: number
+  total_chapter_rankings: number
+}
+
+export type NotificationStats = {
+  total: number
+  unread: number
+  by_type: Record<string, number>
+}
+
+export type SystemHealth = {
+  status: 'ok' | string
+  db_latency_ms: number
+  counts: {
+    users: number
+    series: number
+    tasks: number
+  }
+  timestamp: string
+}
+
+export type StorageUsage = {
+  manuscript_files: { count: number }
+  page_versions: { count: number }
 }

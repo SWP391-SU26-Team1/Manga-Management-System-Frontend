@@ -106,10 +106,10 @@ export default function LoginPage() {
         navigate('/dashboard/assistant')
       } else if (storedUserData.role === 'EDITOR') {
         navigate('/dashboard/tantou-editor')
-      } else if (['BOARD', 'CHIEF_EDITOR', 'ADMIN'].includes(storedUserData.role?.toUpperCase())) {
-        navigate('/dashboard/editorial-board')
-      } else if (storedUserData.role === 'ADMIN') {
+      } else if (storedUserData.role?.toUpperCase() === 'ADMIN') {
         navigate('/dashboard/admin')
+      } else if (['BOARD', 'CHIEF_EDITOR'].includes(storedUserData.role?.toUpperCase())) {
+        navigate('/dashboard/editorial-board')
       } else {
         navigate('/')
       }

@@ -168,18 +168,13 @@ export default function SeriesReviewDetailPage() {
 
     } catch (err) {
       console.warn('API error submitting series vote:', err)
-    addNotification(
-      'VOTING SUCCESSFUL',
-      `Phiếu biểu quyết bộ truyện '${series.title}' đã được gửi thành công`,
-      'VOTE',
-      'voting_success'
-    )
-    
-    setShowSavedToast(true)
-    setTimeout(() => {
-      setShowSavedToast(false)
-      navigate('/dashboard/editorial-board/series-approval')
-    }, 2500)
+      addNotification(
+        'VOTE FAILED',
+        'Tác phẩm này chưa được Admin / Tantou tạo Phiên duyệt chính thức nên không thể lưu phiếu biểu quyết!',
+        'RISK',
+        'voting_failed'
+      )
+    }
   }
 
   const handleUpdateSeriesStatus = async (action: 'publish' | 'archive' | 'hide' | 'ban') => {

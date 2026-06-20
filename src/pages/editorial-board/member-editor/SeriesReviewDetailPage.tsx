@@ -137,7 +137,10 @@ export default function SeriesReviewDetailPage() {
   const handleSubmitVote = async () => {
     if (!seriesId || !series) return
     try {
-      const sessionId = urlSessionId || `session_${seriesId}`
+      if (!urlSessionId) {
+        throw new Error("Missing official Review Session. Cannot vote.");
+      }
+      const sessionId = urlSessionId
       const payload = {
         decision,
         note,
@@ -148,11 +151,23 @@ export default function SeriesReviewDetailPage() {
       } else {
         await boardService.saveVote(sessionId, payload)
       }
+
+      // Trigger sliding Neo-brutalist Toast Notification
+      addNotification(
+        'VOTING SUCCESSFUL',
+        `Phiếu biểu quyết bộ truyện '${series.title}' đã được gửi thành công`,
+        'VOTE',
+        'voting_success'
+      )
+      
+      setShowSavedToast(true)
+      setTimeout(() => {
+        setShowSavedToast(false)
+        navigate('/dashboard/editorial-board/series-approval')
+      }, 1500)
+
     } catch (err) {
       console.warn('API error submitting series vote:', err)
-    }
-    
-    // Trigger sliding Neo-brutalist Toast Notification
     addNotification(
       'VOTING SUCCESSFUL',
       `Phiếu biểu quyết bộ truyện '${series.title}' đã được gửi thành công`,

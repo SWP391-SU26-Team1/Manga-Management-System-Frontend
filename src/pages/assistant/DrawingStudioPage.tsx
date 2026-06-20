@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import assistantService from '@/services/assistant.service';
 import uploadService from '@/services/upload.service';
+import api from '@/services/api';
 
 // --- Types ---
 type Point = { x: number; y: number };
@@ -150,13 +151,21 @@ export default function DrawingStudioPage() {
       }
 
       // Map feedbacks from annotations or feedbacks list
-      const fbList = (detail.annotation || []).map((ann: any, idx: number) => ({
-        id: ann.annotation_id || `fb-${idx}`,
-        region: ann.region_id ? (mappedRegs.find((reg: any) => reg.id === ann.region_id)?.name || 'Vùng chỉ định') : 'Phản hồi chung',
-        text: ann.content || '',
-        date: new Date(ann.created_at).toLocaleDateString('vi-VN'),
-        resolved: ann.status === 'resolved'
-      }));
+      const fbList = (detail.annotation || []).map((ann: any, idx: number) => {
+        let regionName = 'Phản hồi chung';
+        if (ann.region_id) {
+          regionName = mappedRegs.find((reg: any) => reg.id === ann.region_id)?.name || 'Vùng chỉ định';
+        } else if (ann.x !== undefined && ann.y !== undefined) {
+          regionName = `Điểm số ${idx + 1} (vị trí: ${ann.x}%, ${ann.y}%)`;
+        }
+        return {
+          id: ann.annotation_id || `fb-${idx}`,
+          region: regionName,
+          text: ann.content || '',
+          date: new Date(ann.created_at).toLocaleDateString('vi-VN'),
+          resolved: ann.status === 'resolved'
+        };
+      });
       setFeedbacks(fbList);
 
       // Load draft strokes from LocalStorage for this specific page
@@ -323,6 +332,32 @@ export default function DrawingStudioPage() {
       });
     }
 
+    // Draw Manga Annotations (Pins/Markers)
+    if (layers.mangaka && pageDetail?.annotation) {
+      pageDetail.annotation.forEach((ann: any, idx: number) => {
+        if (ann.x === undefined || ann.y === undefined) return;
+        
+        const posX = (ann.x / 100) * canvas.width;
+        const posY = (ann.y / 100) * canvas.height;
+
+        // Draw pin circle
+        ctx.beginPath();
+        ctx.arc(posX, posY, 10, 0, 2 * Math.PI);
+        ctx.fillStyle = '#E63946';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.fill();
+        ctx.stroke();
+
+        // Draw index/number inside the pin
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 10px Inter';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(idx + 1), posX, posY);
+      });
+    }
+
     // Draw Assistant Quick Edits (Strokes)
     if (layers.assistantQuickEdit) {
       const allStrokes = currentStroke ? [...strokes, currentStroke] : strokes;
@@ -380,7 +415,7 @@ export default function DrawingStudioPage() {
       });
     }
 
-  }, [strokes, currentStroke, regions, activeRegionId, layers, showGrid]);
+  }, [strokes, currentStroke, regions, activeRegionId, layers, showGrid, pageDetail]);
 
   // --- Handlers ---
   const handleSaveDraft = () => {
@@ -792,7 +827,16 @@ export default function DrawingStudioPage() {
                       <h4 className="font-bold text-xs uppercase mb-2">Vùng: {f.region}</h4>
                       <p className="text-sm italic text-gray-700 bg-gray-50 p-2 border border-gray-200 mb-3">{f.text}</p>
                       <button 
-                        onClick={() => setFeedbacks(feedbacks.map(fb => fb.id === f.id ? {...fb, resolved: true} : fb))}
+                        onClick={async () => {
+                          try {
+                            if (!f.id.startsWith('fb-')) {
+                              await api.patch(`/api/annotations/${f.id}/status`, { status: 'resolved' })
+                            }
+                            setFeedbacks(feedbacks.map(fb => fb.id === f.id ? {...fb, resolved: true} : fb))
+                          } catch (err) {
+                            console.error('Failed to resolve annotation status:', err)
+                          }
+                        }}
                         disabled={f.resolved}
                         className="w-full text-xs font-bold border-2 border-black p-2 uppercase hover:bg-gray-100 disabled:bg-gray-100 disabled:text-gray-400 cursor-pointer disabled:cursor-not-allowed transition"
                       >

@@ -18,6 +18,7 @@ import AssistantRoutes from './assistant/AssistantRoutes'
 import TantouRoutes from './tantou/TantouRoutes'
 import BoardRoutes from './editorial-board/BoardRoutes'
 import UserRoutes from './user/UserRoutes'
+import AdminRoutes from './admin/AdminRoutes'
 
 export default function AppRoutes() {
   return (
@@ -37,6 +38,7 @@ export default function AppRoutes() {
       <Route path="/dashboard/assistant/*" element={<AssistantRoutes />} />
       <Route path="/dashboard/tantou-editor/*" element={<TantouRoutes />} />
       <Route path="/dashboard/editorial-board/*" element={<BoardRoutes />} />
+      <Route path="/dashboard/admin/*" element={<AdminRoutes />} />
       <Route path="/dashboard/user/*" element={<UserRoutes />} />
     </Routes>
   )

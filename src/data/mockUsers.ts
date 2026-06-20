@@ -1,4 +1,4 @@
-export type UserRole = 'MANGAKA' | 'ASSISTANT' | 'EDITOR' | 'BOARD';
+export type UserRole = 'MANGAKA' | 'ASSISTANT' | 'EDITOR' | 'BOARD' | 'ADMIN';
 
 export interface UserProfile {
   id: string;
@@ -104,6 +104,22 @@ export const MOCK_USERS: UserProfile[] = [
       rating: 4.9
     },
     publications: ['Báo cáo Xuất bản Thường niên', 'Hội đồng Duyệt Serialization']
+  },
+  {
+    id: 'usr_admin_001',
+    username: 'admin',
+    email: 'admin@mangaflow.com',
+    password: 'Password123!',
+    role: 'ADMIN',
+    fullName: 'System Admin',
+    avatarUrl: 'https://i.pravatar.cc/150?u=mangaflow_admin',
+    bio: 'Quan tri he thong MangaFlow.',
+    stats: {
+      projectsCompleted: 0,
+      activeProjects: 0,
+      rating: 5.0
+    },
+    publications: ['MangaFlow Admin Console']
   }
 ];
 

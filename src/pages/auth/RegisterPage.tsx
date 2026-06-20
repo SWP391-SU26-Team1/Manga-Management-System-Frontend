@@ -39,8 +39,13 @@ export default function RegisterPage() {
         ? '/dashboard/assistant'
         : registeredUser.role === 'EDITOR'
         ? '/dashboard/tantou-editor'
+
         : registeredUser.role === 'BOARD'
         ? '/dashboard/editorial-board'
+
+        : registeredUser.role === 'ADMIN'
+        ? '/dashboard/admin'
+
         : '/'
     navigate(dashboardPath)
   }

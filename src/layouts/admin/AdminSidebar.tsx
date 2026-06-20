@@ -1,0 +1,39 @@
+import React from 'react'
+import { Link, useLocation } from 'react-router'
+import { adminNav } from '@/configs/navigation/adminNav'
+
+export default function AdminSidebar() {
+  const location = useLocation()
+  const isActive = (path: string, exact?: boolean) => exact ? location.pathname === path : location.pathname.startsWith(path)
+
+  return (
+    <aside className="fixed left-0 top-0 z-40 hidden h-screen w-[300px] flex-col bg-[#282828] text-white shadow-[4px_0_0_rgba(0,0,0,1)] xl:flex">
+      <div className="px-8 py-8">
+        <Link to="/dashboard/admin">
+          <h1 className="font-manga text-4xl font-black uppercase text-white">MangaFlow</h1>
+          <p className="mt-1 text-xs font-black uppercase text-manga-red">Admin console</p>
+        </Link>
+      </div>
+      <nav className="flex-1 overflow-y-auto px-5 pb-6">
+        <div className="space-y-1">
+          {adminNav.map((item) => {
+            const Icon = item.icon
+            const active = isActive(item.path, item.exact)
+            return (
+              <Link key={item.path} to={item.path} className={`flex items-center gap-4 border-2 px-5 py-4 text-sm font-black uppercase ${active ? 'border-manga-ink bg-manga-red text-white shadow-[5px_5px_0_rgba(0,0,0,1)]' : 'border-transparent text-gray-300 hover:bg-[#333] hover:text-white'}`}>
+                <Icon className="h-5 w-5 shrink-0" />
+                <span>{item.label}</span>
+              </Link>
+            )
+          })}
+        </div>
+      </nav>
+      <div className="border-t-2 border-black p-5">
+        <div className="flex items-center gap-3 border border-white/20 bg-white/5 p-3">
+          <div className="flex h-10 w-10 items-center justify-center border-2 border-black bg-manga-red text-sm font-black">AD</div>
+          <div><p className="text-sm font-black uppercase">Cổng quản trị</p><p className="mt-1 text-xs text-gray-400">API trực tiếp</p></div>
+        </div>
+      </div>
+    </aside>
+  )
+}

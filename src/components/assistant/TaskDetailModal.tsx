@@ -253,17 +253,43 @@ export default function TaskDetailModal({ taskId, onClose, onStatusChanged }: Ta
                           GHI CHÚ CHI TIẾT (ANNOTATIONS)
                         </h3>
                         <div className="space-y-3">
-                          {taskDetail.annotations.map((annot, i) => (
-                            <div key={annot.annotation_id || i} className="flex gap-2 items-start text-xs border-b border-gray-50 pb-2 last:border-0 last:pb-0">
-                              <ChevronRight className="w-4 h-4 text-[#457B9D] flex-shrink-0 mt-0.5" />
-                              <div>
-                                <p className="font-semibold text-gray-800">{annot.note_text || annot.content}</p>
-                                {annot.created_at && (
-                                  <span className="text-[9px] text-gray-400 font-bold uppercase">{formatDeadline(annot.created_at)}</span>
-                                )}
-                              </div>
-                            </div>
-                          ))}
+                          {taskDetail.annotations
+                            .filter((annot: any) => !annot.task_id || annot.task_id === taskId)
+                            .map((annot, i) => {
+                              const isResolved = annot.status === 'resolved';
+                              const hasCoordinates = annot.x !== undefined && annot.y !== undefined && annot.x !== null && annot.y !== null;
+                              return (
+                                <div key={annot.annotation_id || i} className="flex gap-2 items-start text-xs border-b border-gray-50 pb-2 last:border-0 last:pb-0">
+                                  <ChevronRight className="w-4 h-4 text-[#457B9D] flex-shrink-0 mt-0.5" />
+                                  <div className="flex-1">
+                                    <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+                                      {isResolved ? (
+                                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-sm text-[9px] font-extrabold uppercase tracking-wider bg-emerald-100 text-emerald-700 border border-emerald-200">
+                                          Đã sửa
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-sm text-[9px] font-extrabold uppercase tracking-wider bg-red-100 text-red-700 border border-red-200">
+                                          Cần sửa
+                                        </span>
+                                      )}
+                                      {hasCoordinates && (
+                                        <span className="text-[10px] text-gray-500 font-bold">
+                                          Điểm số {i + 1} (vị trí: {annot.x}%, {annot.y}%)
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="font-semibold text-gray-800 pr-2">
+                                      {annot.note_text || annot.content}
+                                    </p>
+                                    {annot.created_at && (
+                                      <span className="text-[9px] text-gray-400 font-bold uppercase block mt-0.5">
+                                        {formatDeadline(annot.created_at)}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
                         </div>
                       </div>
                     )}
@@ -322,7 +348,7 @@ export default function TaskDetailModal({ taskId, onClose, onStatusChanged }: Ta
                             className="w-full bg-[#E63946] text-white border-2 border-black py-3 font-bold uppercase text-xs shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:bg-white hover:text-[#E63946] hover:translate-y-[2px] hover:translate-x-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all flex items-center justify-center gap-2 cursor-pointer"
                           >
                             <Check className="w-4 h-4 stroke-[3]" />
-                            NỘP BẢN VẼ HOÀN THÀNH
+                            NỘP LẠI BẢN VẼ MỚI
                           </button>
 
                           {taskDetail.status === 'in_progress' && (

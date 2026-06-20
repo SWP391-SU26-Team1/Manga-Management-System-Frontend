@@ -15,6 +15,7 @@ import taskService from '@/services/task.service'
 import seriesService from '@/services/series.service'
 import chapterService from '@/services/chapter.service'
 import feedbackService from '@/services/feedback.service'
+import api from '@/services/api'
 
 const filters = ['Tất cả', 'Chờ duyệt', 'Cần chỉnh sửa', 'Đã duyệt & Đóng gói', 'Quá hạn']
 
@@ -279,8 +280,41 @@ export default function SubmissionPage() {
         : `Yêu cầu chỉnh sửa chi tiết các điểm sau:\n${markerNotes}`
     }
 
+    const userStr = localStorage.getItem('mangaflow_user')
+    let userId = ''
+    if (userStr) {
+      try {
+        const parsed = JSON.parse(userStr)
+        userId = parsed.user?.id || parsed.id || ''
+      } catch {
+        // ignore
+      }
+    }
+
     try {
       setLoading(true)
+
+      // Save markers as annotations on the backend
+      if (markers.length > 0 && userId) {
+        await Promise.all(
+          markers.map(async (m) => {
+            try {
+              await api.post('/api/annotations', {
+                page_id: pageId,
+                user_id: userId,
+                task_id: selected.id,
+                x: Math.round(m.x),
+                y: Math.round(m.y),
+                content: m.text || 'Cần chỉnh sửa nét vẽ',
+                status: 'active'
+              })
+            } catch (err) {
+              console.error('Failed to save annotation marker:', err)
+            }
+          })
+        )
+      }
+
       if (selected.submissionId) {
         await feedbackService.requestRevisionSubmission(selected.submissionId, finalComment)
       } else {
@@ -289,7 +323,10 @@ export default function SubmissionPage() {
           feedback_type: 'revision_request',
         })
       }
-      alert(`Đã gửi yêu cầu chỉnh sửa thành công cho ${selected.assistantName}.`)
+      setToastMessage(`Đã gửi yêu cầu chỉnh sửa thành công cho ${selected.assistantName}.`)
+      setTimeout(() => {
+        setToastMessage(null)
+      }, 5000)
       setComment('')
       setMarkers([])
       loadData()

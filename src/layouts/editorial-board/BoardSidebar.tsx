@@ -78,20 +78,21 @@ export default function BoardSidebar() {
   const chapterId = reviewMatch ? reviewMatch[1] : ''
 
   // Review panel menu items (depends on active chapter ID and role)
+  const searchStr = location.search || ''
   const reviewMenuItems = [
     {
       label: "Xem Bản Thảo",
-      path: `/dashboard/editorial-board/review/${chapterId}/draft`,
+      path: `/dashboard/editorial-board/review/${chapterId}/draft${searchStr}`,
       icon: BookOpen
     },
     {
       label: "Chấm Điểm",
-      path: `/dashboard/editorial-board/review/${chapterId}/score`,
+      path: `/dashboard/editorial-board/review/${chapterId}/score${searchStr}`,
       icon: Award
     },
     {
       label: "Vote",
-      path: `/dashboard/editorial-board/review/${chapterId}/vote`,
+      path: `/dashboard/editorial-board/review/${chapterId}/vote${searchStr}`,
       icon: Vote
     }
   ]

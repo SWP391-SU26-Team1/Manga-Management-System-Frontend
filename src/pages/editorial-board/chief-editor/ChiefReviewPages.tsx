@@ -4,6 +4,8 @@ import { ZoomIn, Maximize2, Send, Save, ArrowRight, ArrowLeft, Star, CheckCircle
 import { BoardComment, ChapterGrade } from '@/types/board.types'
 import { useNotifications } from '@/contexts/NotificationContext'
 import { boardService } from '@/services/board.service'
+import { pageService } from '@/services/page.service'
+import { chapterService } from '@/services/chapter.service'
 
 // Helper to load current user
 const getStoredUser = () => {
@@ -17,19 +19,18 @@ const getStoredUser = () => {
 export function ChiefReadDraftPage() {
   const { chapterId } = useParams<{ chapterId: string }>()
   const navigate = useNavigate()
-  const [page, setPage] = useState(12)
-  const totalPages = 45
+  const [page, setPage] = useState(1)
   const [comments, setComments] = useState<BoardComment[]>([])
   const [newComment, setNewComment] = useState('')
   const currentUser = getStoredUser()
 
-  const mangaPages = [
-    'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=600&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=600&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?q=80&w=600&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=600&auto=format&fit=crop'
+  const [pages, setPages] = useState<any[]>([])
+  const [loadingFiles, setLoadingFiles] = useState(false)
+  const [chapterInfo, setChapterInfo] = useState<any>(null)
+
+  const fallbackPages = [
+    'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=600&auto=format&fit=crop'
   ]
-  const mockImage = mangaPages[(page - 1) % mangaPages.length]
 
   const loadComments = async () => {
     if (!chapterId) return
@@ -37,9 +38,37 @@ export function ChiefReadDraftPage() {
     setComments([])
   }
 
+  const loadManuscriptsAndFiles = async () => {
+    if (!chapterId) return
+    try {
+      setLoadingFiles(true)
+      const chapterData = await chapterService.getById(chapterId)
+      if (chapterData) setChapterInfo(chapterData)
+
+      const chapterPages = await pageService.getByChapterId(chapterId)
+      if (chapterPages && chapterPages.length > 0) {
+        const sortedPages = chapterPages.sort((a, b) => a.page_number - b.page_number)
+        setPages(sortedPages)
+      }
+    } catch (err) {
+      console.error('Error loading manuscripts or chapter info:', err)
+    } finally {
+      setLoadingFiles(false)
+    }
+  }
+
   useEffect(() => {
     loadComments()
+    loadManuscriptsAndFiles()
   }, [chapterId])
+
+  const displayPages = pages.length > 0 ? pages : fallbackPages
+  const totalPagesCount = displayPages.length
+
+  const targetPage = displayPages[(page - 1) % totalPagesCount]
+  const mockImage = typeof targetPage === 'string' 
+    ? targetPage 
+    : targetPage?.image_url || targetPage?.file_url || fallbackPages[0]
 
   const handleSendComment = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -101,15 +130,8 @@ export function ChiefReadDraftPage() {
     }
   }
 
-  const chapterTitleDisplay = chapterId === 'cyber-ronin' 
-    ? 'CYBER RONIN: ZERO' 
-    : chapterId === 'crimson-petal' 
-    ? 'CRIMSON PETAL' 
-    : chapterId === 'pitch-black' 
-    ? 'PITCH BLACK' 
-    : 'WHISPERS OF MANA'
-
-  const chapterNumberDisplay = chapterId === 'cyber-ronin' ? 65 : chapterId === 'pitch-black' ? 12 : chapterId === 'whispers-of-mana' ? 45 : 1
+  const chapterTitleDisplay = chapterInfo?.title || 'WHISPERS OF MANA'
+  const chapterNumberDisplay = chapterInfo?.chapter_number || 1
 
   return (
     <div className="max-w-6xl mx-auto pb-12 font-sans text-manga-ink">
@@ -169,10 +191,10 @@ export function ChiefReadDraftPage() {
               >
                 ← TRANG TRƯỚC
               </button>
-              <span className="font-manga text-xl font-black">{page} / {totalPages}</span>
+              <span className="font-manga text-xl font-black">{page} / {totalPagesCount}</span>
               <button 
-                onClick={() => page < totalPages && setPage(page + 1)}
-                disabled={page >= totalPages}
+                onClick={() => page < totalPagesCount && setPage(page + 1)}
+                disabled={page >= totalPagesCount}
                 className="px-4 py-1.5 bg-white border-2 border-manga-ink font-bold text-xs uppercase shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:bg-zinc-50 disabled:opacity-40 cursor-pointer"
               >
                 TRANG TIẾP →

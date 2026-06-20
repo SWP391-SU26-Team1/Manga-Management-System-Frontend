@@ -4,6 +4,8 @@ import { ZoomIn, Maximize2, Send, Save, ArrowRight, ArrowLeft, Star, StarOff, Ch
 import { BoardComment, ChapterGrade, ChapterVote } from '@/types/board.types'
 import { useNotifications } from '@/contexts/NotificationContext'
 import { boardService } from '@/services/board.service'
+import { pageService } from '@/services/page.service'
+import { chapterService } from '@/services/chapter.service'
 
 // Helper to load current user
 const getStoredUser = () => {
@@ -17,37 +19,39 @@ const getStoredUser = () => {
 export function ReadDraftPage() {
   const { chapterId } = useParams<{ chapterId: string }>()
   const navigate = useNavigate()
-  const [page, setPage] = useState(12)
-  const totalPages = 45
+  const [searchParams] = useSearchParams()
+  const urlSessionId = searchParams.get('sessionId')
+  const [page, setPage] = useState(1)
   const [comments, setComments] = useState<BoardComment[]>([])
   const [newComment, setNewComment] = useState('')
   const currentUser = getStoredUser()
 
   const [pages, setPages] = useState<any[]>([])
   const [loadingFiles, setLoadingFiles] = useState(false)
+  const [chapterInfo, setChapterInfo] = useState<any>(null)
 
   // Manga mock images fallback
   const fallbackPages = [
-    'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=600&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=600&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?q=80&w=600&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=600&auto=format&fit=crop'
+    'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=600&auto=format&fit=crop'
   ]
 
   const loadManuscriptsAndFiles = async () => {
     if (!chapterId) return
     try {
       setLoadingFiles(true)
-      const manuscripts = await boardService.getChapterManuscripts(chapterId)
-      if (manuscripts && manuscripts.length > 0) {
-        const activeManuscript = manuscripts[0]
-        const files = await boardService.getManuscriptFiles(activeManuscript.manuscript_id || activeManuscript.id)
-        if (files && files.length > 0) {
-          setPages(files)
-        }
+      // Load true chapter info
+      const chapterData = await chapterService.getById(chapterId)
+      if (chapterData) setChapterInfo(chapterData)
+
+      // Load true draft pages
+      const chapterPages = await pageService.getByChapterId(chapterId)
+      if (chapterPages && chapterPages.length > 0) {
+        // Sort by page_number
+        const sortedPages = chapterPages.sort((a, b) => a.page_number - b.page_number)
+        setPages(sortedPages)
       }
     } catch (err) {
-      console.error('Error loading manuscripts:', err)
+      console.error('Error loading manuscripts or chapter info:', err)
     } finally {
       setLoadingFiles(false)
     }
@@ -68,9 +72,10 @@ export function ReadDraftPage() {
     if (page > 1) setPage(page - 1)
   }
 
-  const mockImage = typeof displayPages[(page - 1) % totalPagesCount] === 'string' 
-    ? displayPages[(page - 1) % totalPagesCount] 
-    : displayPages[(page - 1) % totalPagesCount].file_url || fallbackPages[0]
+  const targetPage = displayPages[(page - 1) % totalPagesCount]
+  const mockImage = typeof targetPage === 'string' 
+    ? targetPage 
+    : targetPage?.image_url || targetPage?.file_url || fallbackPages[0]
 
   const handleSendComment = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -89,15 +94,8 @@ export function ReadDraftPage() {
 
 
 
-  const chapterTitleDisplay = chapterId === 'cyber-ronin' 
-    ? 'CYBER RONIN: ZERO' 
-    : chapterId === 'crimson-petal' 
-    ? 'CRIMSON PETAL' 
-    : chapterId === 'pitch-black' 
-    ? 'PITCH BLACK' 
-    : 'WHISPERS OF MANA'
-
-  const chapterNumberDisplay = chapterId === 'cyber-ronin' ? 65 : chapterId === 'pitch-black' ? 12 : chapterId === 'whispers-of-mana' ? 45 : 1
+  const chapterTitleDisplay = chapterInfo?.title || 'WHISPERS OF MANA'
+  const chapterNumberDisplay = chapterInfo?.chapter_number || 1
 
   return (
     <div className="max-w-6xl mx-auto pb-12 font-sans">
@@ -162,12 +160,12 @@ export function ReadDraftPage() {
               </button>
               
               <span className="font-manga text-xl font-black">
-                {page} / {totalPages}
+                {page} / {totalPagesCount}
               </span>
 
               <button 
                 onClick={handleNextPage}
-                disabled={page >= totalPages}
+                disabled={page >= totalPagesCount}
                 className="px-4 py-1.5 bg-white border-2 border-manga-ink font-bold text-xs uppercase shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:bg-zinc-50 disabled:opacity-40 disabled:shadow-none disabled:translate-y-0 cursor-pointer"
               >
                 TRANG TIẾP →
@@ -245,7 +243,7 @@ export function ReadDraftPage() {
 
           {/* Next Flow Step Button */}
           <Link
-            to={`/dashboard/editorial-board/review/${chapterId}/score`}
+            to={`/dashboard/editorial-board/review/${chapterId}/score${urlSessionId ? `?sessionId=${urlSessionId}` : ''}`}
             className="flex items-center justify-center gap-2 w-full py-4 bg-manga-ink text-white font-manga font-bold text-sm uppercase tracking-wider border-4 border-manga-ink shadow-[6px_6px_0px_rgba(0,0,0,1)] hover:bg-manga-red hover:translate-y-[2px] hover:shadow-[4px_4px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none transition-all text-center block"
           >
             <span>Đến bước chấm điểm</span>
@@ -347,7 +345,7 @@ export function ScorePage() {
     <div className="max-w-4xl mx-auto pb-12 font-sans">
       <div className="mb-4 flex items-center justify-between">
         <Link 
-          to={`/dashboard/editorial-board/review/${chapterId}/draft`}
+          to={`/dashboard/editorial-board/review/${chapterId}/draft${urlSessionId ? `?sessionId=${urlSessionId}` : ''}`}
           className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-manga-ink hover:text-manga-red transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -440,7 +438,7 @@ export function ScorePage() {
 
       {/* Next Step Link */}
       <Link
-        to={`/dashboard/editorial-board/review/${chapterId}/vote`}
+        to={`/dashboard/editorial-board/review/${chapterId}/vote${urlSessionId ? `?sessionId=${urlSessionId}` : ''}`}
         className="flex items-center justify-center gap-2 w-full py-4 bg-manga-red text-white font-manga font-bold text-sm uppercase tracking-wider border-4 border-manga-ink shadow-[6px_6px_0px_rgba(15,15,15,1)] hover:bg-red-700 hover:translate-y-[2px] hover:shadow-[4px_4px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none transition-all text-center block"
       >
         <span>Tiến hành biểu quyết xuất bản</span>
@@ -523,7 +521,6 @@ export function VotePage() {
         )
       } else {
         await boardService.saveVote(sessionId, {
-          chapter_id: vote.chapterId,
           decision: vote.decision,
           note: vote.note
         })
@@ -569,7 +566,7 @@ export function VotePage() {
     <div className="max-w-6xl mx-auto pb-12 font-sans">
       <div className="mb-4 flex items-center justify-between">
         <Link 
-          to={`/dashboard/editorial-board/review/${chapterId}/score`}
+          to={`/dashboard/editorial-board/review/${chapterId}/score${urlSessionId ? `?sessionId=${urlSessionId}` : ''}`}
           className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-manga-ink hover:text-manga-red transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -604,7 +601,7 @@ export function VotePage() {
                 className="w-full h-full object-cover select-none"
               />
               <div className="absolute top-2 left-2 bg-manga-red text-white text-[9px] font-black px-2 py-0.5 border-2 border-manga-ink shadow-sm">
-                12 / 45
+                BẢN XEM TRƯỚC
               </div>
             </div>
             

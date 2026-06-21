@@ -11,10 +11,8 @@ export default function ProposalsListPage() {
   useEffect(() => {
     const fetchProposals = async () => {
       try {
-        const res = await boardService.getProposals(1, 50)
-        let data = res?.data || res
-        if (!Array.isArray(data)) data = []
-        setProposals(data)
+        const data = await boardService.getPendingProposals()
+        setProposals(data || [])
       } catch (err) {
         console.error('Failed to load proposals', err)
       } finally {

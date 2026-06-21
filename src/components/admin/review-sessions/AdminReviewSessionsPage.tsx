@@ -10,6 +10,7 @@ import type {
 } from '@/services/admin/admin.types'
 import { reviewSessionApi } from '@/services/admin/reviewSessionApi'
 import { voteApi } from '@/services/admin/voteApi'
+import { boardService } from '@/services/board.service'
 import { ConfirmDialog } from './ConfirmDialog'
 import { EmptyState } from './EmptyState'
 import { ErrorState } from './ErrorState'
@@ -383,6 +384,28 @@ export function AdminReviewSessionsPage() {
       const result = (await reviewSessionApi.processResult(sessionId)) as ReviewSessionProcessResult
       setResults((current) => ({ ...current, [sessionId]: result }))
       setVoteCounts((current) => ({ ...current, [sessionId]: result.total_votes }))
+
+      // Apply the dominant decision to the chapter or series
+      let decisionStr = ''
+      const upperDec = result.dominant_decision?.toUpperCase() || ''
+      if (upperDec === 'APPROVE' || upperDec === 'APPROVED') decisionStr = 'approve'
+      else if (upperDec === 'REJECT' || upperDec === 'REJECTED') decisionStr = 'reject'
+
+      if (decisionStr) {
+        const chapterId = session.chapter_id || (session as any).chapterId
+        const seriesId = session.series_id || (session as any).seriesId
+        
+        try {
+          if (chapterId) {
+            await boardService.applyChapterDecision(chapterId, decisionStr, `Automatically ${decisionStr}d based on board votes.`)
+          }
+          if (seriesId) {
+            await boardService.applySeriesDecision(seriesId, decisionStr, `Automatically ${decisionStr}d based on board votes.`)
+          }
+        } catch (e) {
+          console.error("Error applying decisions:", e)
+        }
+      }
       notify('success', 'Vote result processed successfully.')
       await loadSessions()
     } catch (processError) {

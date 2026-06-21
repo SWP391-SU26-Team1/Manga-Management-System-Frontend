@@ -836,6 +836,9 @@ export default function TasksPage() {
           const task = viewedTask || safeTasks[0];
           if (!task) return null;
           
+          const currentRegionIndex = viewingTaskDetail?.regions?.findIndex((r: any) => r.region_id === task.regionId) ?? -1;
+          const regionLabel = currentRegionIndex !== -1 ? `Vùng ${currentRegionIndex + 1}` : 'Vùng nhiệm vụ';
+          
           // Status labels translated to match mockup
           const getStatusText = (status: AssistantTask['status']) => {
             switch (status) {
@@ -945,7 +948,7 @@ export default function TasksPage() {
                           {/* Render regions */}
                           {viewingTaskDetail?.regions
                             ?.filter((r: any) => r.page_id === viewingTaskDetail.page_id)
-                            ?.map((r: any) => {
+                            ?.map((r: any, idx: number) => {
                             const rx = r.coordinates?.x ?? r.x ?? 0
                             const ry = r.coordinates?.y ?? r.y ?? 0
                             const rw = r.coordinates?.w ?? r.coordinates?.width ?? r.width ?? 0
@@ -953,6 +956,11 @@ export default function TasksPage() {
                             
                             // Check if this region belongs to the current task
                             const isCurrentTaskRegion = r.region_id === task.regionId
+                            const isNearTop = ry < 7
+                            const isTooShort = rh < 6
+                            const verticalClass = isNearTop
+                              ? (isTooShort ? 'top-full mt-0.5' : 'top-0')
+                              : '-top-6'
                             
                             return (
                               <div
@@ -969,10 +977,10 @@ export default function TasksPage() {
                                   height: `${rh}%`
                                 }}
                               >
-                                <div className={`absolute -top-6 left-[-2px] text-white text-[9px] font-black uppercase tracking-wider py-0.5 px-1.5 border border-black ${
+                                <div className={`absolute ${verticalClass} left-[-2px] text-white text-[9px] font-black uppercase tracking-wider py-0.5 px-1.5 border border-black z-30 ${
                                   isCurrentTaskRegion ? 'bg-[#E63946]' : 'bg-zinc-500'
                                 }`}>
-                                  {r.label || getTaskTypeName(r.region_type || r.type || '') || 'Vùng nhiệm vụ'}
+                                  {`Vùng ${idx + 1}`}
                                 </div>
                               </div>
                             )
@@ -1176,7 +1184,7 @@ export default function TasksPage() {
                           <div className="flex flex-col gap-1.5">
                             <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400">Vùng được giao (1)</h4>
                             <div className="p-3 border border-zinc-200 bg-white flex flex-col gap-0.5">
-                              <p className="text-xs font-black text-manga-ink leading-tight">Vùng nhiệm vụ</p>
+                              <p className="text-xs font-black text-manga-ink leading-tight">{regionLabel}</p>
                               <p className="text-[10px] font-bold text-[#E63946] uppercase">{task.layerType}</p>
                             </div>
                           </div>

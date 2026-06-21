@@ -45,9 +45,9 @@ export function TaskTable({ tasks, onDeleteTask, onEditTask, onAssignTask }: Tas
     switch (s) {
       case "approved":
       case "completed":
-        return <span className="bg-manga-red text-white border-manga-ink border px-2 py-0.5 text-xs font-bold uppercase">Approved</span>;
+        return <span className="bg-manga-red text-white border-manga-ink border px-2 py-0.5 text-xs font-bold uppercase">Đã duyệt</span>;
       case "submitted":
-        return <span className="bg-blue-100 text-blue-800 border-blue-300 border px-2 py-0.5 text-xs font-bold uppercase">Submitted</span>;
+        return <span className="bg-blue-100 text-blue-800 border-blue-300 border px-2 py-0.5 text-xs font-bold uppercase">Chờ duyệt</span>;
       case "doing":
       case "in_progress":
         return <span className="bg-yellow-100 text-yellow-800 border-yellow-300 border px-2 py-0.5 text-xs font-bold uppercase">Đang làm</span>;
@@ -55,13 +55,13 @@ export function TaskTable({ tasks, onDeleteTask, onEditTask, onAssignTask }: Tas
         return <span className="bg-orange-100 text-orange-800 border-orange-300 border px-2 py-0.5 text-xs font-bold uppercase">Chờ xác nhận</span>;
       case "need fix":
       case "rejected":
-        return <span className="bg-red-100 text-red-800 border-red-300 border px-2 py-0.5 text-xs font-bold uppercase">Need Fix</span>;
+        return <span className="bg-red-100 text-red-800 border-red-300 border px-2 py-0.5 text-xs font-bold uppercase">Cần sửa</span>;
       case "cancelled":
-        return <span className="bg-gray-400 text-white border-gray-500 border px-2 py-0.5 text-xs font-bold uppercase">Cancelled</span>;
+        return <span className="bg-gray-400 text-white border-gray-500 border px-2 py-0.5 text-xs font-bold uppercase">Đã hủy</span>;
       case "pending":
-        return <span className="bg-[#FFEEDB] text-[#E65C00] border-[#FFB870] border px-2 py-0.5 text-xs font-bold uppercase">Pending</span>;
+        return <span className="bg-[#FFEEDB] text-[#E65C00] border-[#FFB870] border px-2 py-0.5 text-xs font-bold uppercase">Chờ giao</span>;
       default:
-        return <span className="bg-gray-100 text-gray-500 border-gray-300 border px-2 py-0.5 text-xs font-bold uppercase">Not Started</span>;
+        return <span className="bg-gray-100 text-gray-500 border-gray-300 border px-2 py-0.5 text-xs font-bold uppercase">Chưa bắt đầu</span>;
     }
   };
 

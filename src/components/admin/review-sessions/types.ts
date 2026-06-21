@@ -96,7 +96,7 @@ export type ChapterOption = Partial<
 }
 
 export const emptyVoteForm: VoteFormValues = {
-  decision: 'approved',
+  decision: 'APPROVE',
   score: '8',
   note: '',
   status: 'submitted',

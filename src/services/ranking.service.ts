@@ -53,10 +53,10 @@ export interface RankingEntry {
 }
 
 export const rankingService = {
-  /** GET /api/board/rankings/series/top - Lấy danh sách xếp hạng series (board prefix) */
+  /** GET /api/rankings/series/top - Lấy danh sách xếp hạng series */
   getTopSeries: async (limit: number = 20): Promise<BackendSeriesRanking[]> => {
     const response = await api.get<{ success: boolean; data: BackendSeriesRanking[] }>(
-      '/api/board/rankings/series/top',
+      '/api/rankings/series/top',
       { params: { limit } }
     )
     return response.data.data ?? []
@@ -64,7 +64,7 @@ export const rankingService = {
 
   /** Alias cho getTopSeries — dùng cho Dashboard widget */
   getWeekly: async (): Promise<RankingEntry[]> => {
-    const response = await api.get('/api/board/rankings/series/top')
+    const response = await api.get('/api/rankings/series/top')
     return response.data.data ?? []
   },
 

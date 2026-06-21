@@ -118,7 +118,6 @@ export function TaskTable({ tasks, onDeleteTask, onEditTask, onAssignTask }: Tas
                 <div className="truncate text-manga-ink" title={task.note}>
                   {task.note}
                 </div>
-                <div className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">ID: {task.id}</div>
               </td>
 
               {/* Assistant */}

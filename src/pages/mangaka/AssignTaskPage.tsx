@@ -59,6 +59,7 @@ function AssignTaskContent() {
   const [annotations, setAnnotations] = useState<AreaMarkup[]>([])
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null)
   const [isDrawing, setIsDrawing] = useState(false)
+  const [isMouseDown, setIsMouseDown] = useState(false)
   const [startPos, setStartPos] = useState({ x: 0, y: 0 })
   const [currentPos, setCurrentPos] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
@@ -328,22 +329,7 @@ function AssignTaskContent() {
     setIsSubmitting(true)
     try {
       const apiTaskType: TaskType = LAYER_TYPE_MAP[layerType] ?? 'inking'
-      let dbRegionId = selectedAnn.id
-
-      // If the region is newly drawn locally, save it on backend first
-      if (selectedAnn.id.startsWith('vung-')) {
-        const newReg = await regionService.create(selectedSeriesId, selectedChapterId, selectedPageId, {
-          region_type: apiTaskType,
-          coordinates: {
-            x: selectedAnn.x,
-            y: selectedAnn.y,
-            w: selectedAnn.w,
-            h: selectedAnn.h
-          },
-          label: selectedAnn.label
-        })
-        dbRegionId = newReg.region_id
-      }
+      const dbRegionId = selectedAnn.id
 
       await taskService.create(selectedSeriesId, selectedChapterId, selectedPageId, {
         assigned_to: assignedTo,
@@ -445,37 +431,73 @@ function AssignTaskContent() {
     const rect = imageContainerRef.current.getBoundingClientRect()
     const x = ((e.clientX - rect.left) / rect.width) * 100 / zoom
     const y = ((e.clientY - rect.top) / rect.height) * 100 / zoom
-    setIsDrawing(true)
+    setIsMouseDown(true)
     setStartPos({ x, y })
     setCurrentPos({ x, y })
   }
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDrawing || !imageContainerRef.current) return
+    if (!isMouseDown || !imageContainerRef.current) return
     const rect = imageContainerRef.current.getBoundingClientRect()
     const x = Math.max(0, Math.min(((e.clientX - rect.left) / rect.width) * 100 / zoom, 100))
     const y = Math.max(0, Math.min(((e.clientY - rect.top) / rect.height) * 100 / zoom, 100))
-    setCurrentPos({ x, y })
+    
+    if (!isDrawing) {
+      const dx = Math.abs(x - startPos.x)
+      const dy = Math.abs(y - startPos.y)
+      // Bắt đầu kéo vẽ khi di chuyển chuột vượt quá 1% kích thước khung chứa
+      if (dx > 1 || dy > 1) {
+        setIsDrawing(true)
+      }
+    } else {
+      setCurrentPos({ x, y })
+    }
   }
 
-  const handleMouseUp = () => {
+  const handleMouseUp = async () => {
+    setIsMouseDown(false)
     if (!isDrawing) return
     setIsDrawing(false)
     const width = Math.abs(currentPos.x - startPos.x)
     const height = Math.abs(currentPos.y - startPos.y)
     if (width > 2 && height > 2) {
-      const newId = `vung-${Date.now()}`
-      const newAnnotation: AreaMarkup = {
-        id: newId,
-        x: Math.min(startPos.x, currentPos.x),
-        y: Math.min(startPos.y, currentPos.y),
-        w: width,
-        h: height,
-        label: `Vùng ${annotations.length + 1}`,
+      if (!selectedSeriesId || !selectedChapterId || !selectedPageId) {
+        alert('Vui lòng chọn đầy đủ Series, Chapter và Trang trước khi vẽ!')
+        return
       }
-      setAnnotations([...annotations, newAnnotation])
-      setActiveAnnotationId(newId)
-      setNote(prev => prev + (prev ? '\n' : '') + `Yêu cầu tại [${newAnnotation.label}]: `)
+      try {
+        const apiTaskType: TaskType = LAYER_TYPE_MAP[layerType] ?? 'inking'
+        const label = `Vùng ${annotations.length + 1}`
+        
+        // Lưu vùng vẽ lên backend ngay lập tức
+        const newReg = await regionService.create(selectedSeriesId, selectedChapterId, selectedPageId, {
+          region_type: apiTaskType,
+          coordinates: {
+            x: Math.min(startPos.x, currentPos.x),
+            y: Math.min(startPos.y, currentPos.y),
+            w: width,
+            h: height
+          },
+          label
+        })
+        
+        const newAnnotation: AreaMarkup = {
+          id: newReg.region_id,
+          x: Math.min(startPos.x, currentPos.x),
+          y: Math.min(startPos.y, currentPos.y),
+          w: width,
+          h: height,
+          label,
+          saved: true
+        }
+        
+        setAnnotations(prev => [...prev, newAnnotation])
+        setActiveAnnotationId(newReg.region_id)
+        setNote(prev => prev + (prev ? '\n' : '') + `Yêu cầu tại [${newAnnotation.label}]: `)
+      } catch (err) {
+        console.error('Lỗi khi tạo vùng vẽ trên backend:', err)
+        alert('Không thể lưu vùng vẽ lên hệ thống, vui lòng thử lại.')
+      }
     }
   }
 
@@ -703,6 +725,11 @@ function AssignTaskContent() {
 
                     {annotations.map(ann => {
                       const isActive = ann.id === activeAnnotationId
+                      const isNearTop = ann.y < 7
+                      const isTooShort = ann.h < 6
+                      const verticalClass = isNearTop
+                        ? (isTooShort ? 'top-full mt-0.5' : 'top-0')
+                        : '-top-6'
                       return (
                         <div
                           key={ann.id}
@@ -710,16 +737,21 @@ function AssignTaskContent() {
                           className={`absolute border-2 ${isActive ? 'border-manga-red bg-manga-red/20 z-20' : 'border-manga-red border-dashed bg-manga-red/5 z-10'} group transition-colors`}
                           style={{ left: `${ann.x}%`, top: `${ann.y}%`, width: `${ann.w}%`, height: `${ann.h}%` }}
                         >
-                          <div className="absolute -top-6 left-[-2px] bg-manga-red text-white text-[10px] font-bold px-1.5 py-0.5 whitespace-nowrap">{ann.label}</div>
+                          <div className={`absolute ${verticalClass} left-[-2px] bg-manga-red text-white text-[10px] font-bold px-1.5 py-0.5 whitespace-nowrap z-30`}>{ann.label}</div>
                           {isActive && (
                             <button
                               type="button"
-                              onMouseDown={e => {
+                              onMouseDown={async e => {
                                 e.stopPropagation()
+                                try {
+                                  await regionService.delete(selectedSeriesId, selectedChapterId, selectedPageId, ann.id)
+                                } catch (err) {
+                                  console.error('Lỗi khi xóa vùng vẽ trên backend:', err)
+                                }
                                 setAnnotations(annotations.filter(a => a.id !== ann.id))
                                 if (activeAnnotationId === ann.id) setActiveAnnotationId(null)
                               }}
-                              className="absolute -top-6 right-0 bg-manga-ink text-white p-0.5 hover:bg-red-700 transition-colors"
+                              className={`absolute ${verticalClass} right-0 bg-manga-ink text-white p-0.5 hover:bg-red-700 transition-colors z-30`}
                             >
                               <X className="w-3.5 h-3.5" />
                             </button>

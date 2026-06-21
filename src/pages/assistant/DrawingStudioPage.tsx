@@ -124,18 +124,31 @@ export default function DrawingStudioPage() {
         || detail.page_task?.[0];
       setActiveTask(myTask);
 
-      // Map regions
-      const mappedRegs = (detail.page_region || []).map((r: any) => ({
-        id: r.region_id,
-        name: r.name || `Vùng ${r.region_id.slice(0, 4)}`,
-        type: r.type || 'Chưa phân loại',
-        status: r.status || 'Chờ làm',
-        x: r.x || 0,
-        y: r.y || 0,
-        w: r.width || 100,
-        h: r.height || 100,
-        desc: r.description || ''
-      }));
+      // Map regions and associate with task details
+      const mappedRegs = (detail.page_region || []).map((r: any, idx: number) => {
+        const linkedTask = detail.page_task?.find((t: any) => t.region_id === r.region_id);
+        
+        // Việt hóa trạng thái nhiệm vụ tương ứng của vùng vẽ
+        const getStatusLabel = (status?: string) => {
+          if (!status) return 'Chưa làm';
+          const s = status.toLowerCase();
+          if (s === 'approved' || s === 'completed') return 'Đã xong';
+          if (s === 'in_progress' || s === 'doing') return 'Đang làm';
+          return 'Chưa làm';
+        };
+
+        return {
+          id: r.region_id,
+          name: `Vùng ${idx + 1}`,
+          type: linkedTask ? linkedTask.task_type.toUpperCase() : 'KHUNG HÌNH',
+          status: getStatusLabel(linkedTask?.status),
+          x: r.x || 0,
+          y: r.y || 0,
+          w: r.width || 100,
+          h: r.height || 100,
+          desc: linkedTask ? linkedTask.description : 'Khung được tác giả phân rã trên trang.'
+        };
+      });
       setRegions(mappedRegs);
 
       // Resolve latest image url as background
@@ -328,7 +341,8 @@ export default function DrawingStudioPage() {
         // Label
         ctx.fillStyle = r.id === activeRegionId ? '#E63946' : 'rgba(230, 57, 70, 0.7)';
         ctx.font = 'bold 12px Inter';
-        ctx.fillText(r.name, r.x, r.y - 6);
+        const labelY = r.y < 15 ? r.y + 14 : r.y - 6;
+        ctx.fillText(r.name, r.x, labelY);
       });
     }
 

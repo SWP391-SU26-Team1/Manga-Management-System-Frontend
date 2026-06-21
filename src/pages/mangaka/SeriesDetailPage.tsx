@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router'
 import {
   BookOpen, Clock, Layers, PlusSquare,
-  FileCheck, ClipboardList, CheckCircle, AlertCircle, BarChart2, AlertTriangle, Users, UserPlus
+  FileCheck, ClipboardList, CheckCircle, AlertCircle, BarChart2, AlertTriangle, Users, UserPlus, X
 } from 'lucide-react'
 import { seriesService, SeriesAPI, getErrorMessage } from '@/services/series.service'
 import { chapterService, ChapterAPI } from '@/services/chapter.service'
 import { pageService, PageAPI } from '@/services/page.service'
 import { taskService } from '@/services/task.service'
+import userService from '@/services/user.service'
 import { MangaPage } from '@/data/mangakaMockData'
 import { ChapterLayerTable } from '@/components/mangaka/ChapterLayerTable'
 
@@ -29,6 +30,28 @@ export default function SeriesDetailPage() {
   const [memberError, setMemberError] = useState('')
   const [memberSuccess, setMemberSuccess] = useState('')
   const [isAddingMember, setIsAddingMember] = useState(false)
+  const [availableAssistants, setAvailableAssistants] = useState<any[]>([])
+
+  // Member Delete Confirmation Modal States
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [memberToDelete, setMemberToDelete] = useState<string | null>(null)
+
+  // Custom Alert Modal States
+  const [alertModal, setAlertModal] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error';
+  }>({
+    show: false,
+    title: '',
+    message: '',
+    type: 'success'
+  })
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' = 'success') => {
+    setAlertModal({ show: true, title, message, type })
+  }
 
   // Page Expansion & Manga Reader States
   const [expandedChapterId, setExpandedChapterId] = useState<string | null>(null)
@@ -169,14 +192,19 @@ export default function SeriesDetailPage() {
       setIsLoading(true)
       setError('')
       try {
-        const [s, chs, mems] = await Promise.all([
+        const [s, chs, mems, asts] = await Promise.all([
           seriesService.getById(seriesId),
           chapterService.getBySeriesId(seriesId),
           seriesService.getMembers(seriesId),
+          userService.listAssistants().catch(() => []),
         ])
         setSeries(s)
         setChapters([...chs].sort((a, b) => b.chapter_number - a.chapter_number))
         setMembers(mems)
+        setAvailableAssistants(asts)
+        if (asts.length > 0) {
+          setNewMemberUserId(asts[0].id)
+        }
       } catch (err) {
         setError(getErrorMessage(err))
       } finally {
@@ -209,15 +237,23 @@ export default function SeriesDetailPage() {
     }
   }
 
-  const handleRemoveMember = async (seriesMemberId: string) => {
-    if (!window.confirm('Bạn có chắc muốn xóa thành viên này khỏi Series?')) return
+  const handleRemoveMember = (seriesMemberId: string) => {
+    setMemberToDelete(seriesMemberId)
+    setShowDeleteConfirm(true)
+  }
+
+  const confirmRemoveMember = async () => {
+    if (!memberToDelete) return
     try {
-      await seriesService.removeMember(seriesId!, seriesMemberId)
-      alert('Đã xóa thành viên thành công!')
+      await seriesService.removeMember(seriesId!, memberToDelete)
+      showAlert('Thành công', 'Đã xóa thành viên khỏi Series thành công!', 'success')
       const mems = await seriesService.getMembers(seriesId!)
       setMembers(mems)
     } catch (err) {
-      alert(getErrorMessage(err))
+      showAlert('Lỗi', getErrorMessage(err), 'error')
+    } finally {
+      setShowDeleteConfirm(false)
+      setMemberToDelete(null)
     }
   }
 
@@ -611,16 +647,21 @@ export default function SeriesDetailPage() {
                       )}
 
                       <div>
-                        <label className="block text-xs uppercase tracking-widest mb-1.5">User ID Trợ lý (UUID) *</label>
-                        <input
-                          type="text"
+                        <label className="block text-xs uppercase tracking-widest mb-1.5">Chọn Trợ lý *</label>
+                        <select
                           required
                           value={newMemberUserId}
                           onChange={e => setNewMemberUserId(e.target.value)}
-                          placeholder="Nhập UUID từ Supabase..."
-                          className="w-full border-2 border-manga-ink px-3 py-2 text-sm focus:outline-none focus:border-manga-red bg-white"
-                        />
-                        <p className="text-[10px] text-gray-400 mt-1">Copy mã UUID (User ID) của tài khoản trợ lý</p>
+                          className="w-full border-2 border-manga-ink px-3 py-2 text-sm focus:outline-none focus:border-manga-red bg-white font-bold"
+                        >
+                          <option value="">-- Chọn Trợ lý --</option>
+                          {availableAssistants.map(ast => (
+                            <option key={ast.id} value={ast.id}>
+                              {ast.fullName}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-[10px] text-gray-400 mt-1">Chọn trợ lý hoạt động trong hệ thống</p>
                       </div>
 
                       <div>
@@ -824,6 +865,92 @@ export default function SeriesDetailPage() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Remove Member Confirmation Modal */}
+      {showDeleteConfirm && memberToDelete && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white border-4 border-manga-ink manga-shadow max-w-md w-full animate-in fade-in zoom-in-95 duration-150 text-black">
+            <div className="p-4 border-b-4 border-manga-ink bg-gray-50 flex justify-between items-center">
+              <h2 className="font-manga font-bold text-xl uppercase flex items-center gap-2 text-manga-red">
+                Xác nhận xóa thành viên
+              </h2>
+              <button 
+                onClick={() => {
+                  setShowDeleteConfirm(false)
+                  setMemberToDelete(null)
+                }} 
+                className="hover:text-red-500 cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm font-bold text-gray-700">
+                Bạn có chắc chắn muốn xóa thành viên này khỏi Series?
+              </p>
+              <div className="bg-amber-50 border-2 border-amber-300 p-3 text-xs text-amber-800 font-bold leading-relaxed">
+                ⚠️ Lưu ý: Hành động này chỉ xóa thành viên khỏi Series này. Tài khoản và vai trò của họ trong hệ thống vẫn được giữ nguyên, không bị ảnh hưởng.
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDeleteConfirm(false)
+                    setMemberToDelete(null)
+                  }}
+                  className="px-4 py-2 border-2 border-manga-ink font-bold uppercase text-xs hover:bg-gray-100 transition-colors cursor-pointer"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmRemoveMember}
+                  className="px-4 py-2 bg-manga-red border-2 border-manga-ink text-white font-bold uppercase text-xs hover:bg-red-700 hover:text-white transition-colors cursor-pointer"
+                >
+                  Xác nhận xóa
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Alert Modal */}
+      {alertModal.show && (
+        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white border-4 border-manga-ink manga-shadow max-w-sm w-full animate-in fade-in zoom-in-95 duration-150 text-black">
+            <div className="p-4 border-b-4 border-manga-ink bg-gray-50 flex justify-between items-center">
+              <h2 className={`font-manga font-bold text-xl uppercase flex items-center gap-2 ${
+                alertModal.type === 'success' ? 'text-green-600' : 'text-manga-red'
+              }`}>
+                {alertModal.title}
+              </h2>
+              <button 
+                onClick={() => setAlertModal(prev => ({ ...prev, show: false }))} 
+                className="hover:text-red-500 cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm font-bold text-gray-700 leading-relaxed">
+                {alertModal.message}
+              </p>
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setAlertModal(prev => ({ ...prev, show: false }))}
+                  className={`px-6 py-2 border-2 border-manga-ink text-white font-bold uppercase text-xs hover:bg-opacity-90 transition-colors cursor-pointer ${
+                    alertModal.type === 'success' ? 'bg-green-600' : 'bg-manga-red'
+                  }`}
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

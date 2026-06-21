@@ -16,18 +16,19 @@ import seriesService from '@/services/series.service'
 import chapterService from '@/services/chapter.service'
 import feedbackService from '@/services/feedback.service'
 import api from '@/services/api'
+import regionService from '@/services/region.service'
 
 const filters = ['Tất cả', 'Chờ duyệt', 'Cần chỉnh sửa', 'Đã duyệt & Đóng gói', 'Quá hạn']
 
 export default function SubmissionPage() {
   const [submissionsList, setSubmissionsList] = useState<AssistantSubmission[]>([])
   const [selectedId, setSelectedId] = useState('')
+  const [pageRegions, setPageRegions] = useState<any[]>([])
+  const [isLoadingRegions, setIsLoadingRegions] = useState(false)
   const [activeFilter, setActiveFilter] = useState('Tất cả')
   const [comment, setComment] = useState('')
   const [isMerging, setIsMerging] = useState(false)
   const [mergeStep, setMergeStep] = useState('')
-  const [markers, setMarkers] = useState<{x: number, y: number, text: string, id: string}[]>([])
-  const [activeMarkerId, setActiveMarkerId] = useState<string | null>(null)
   
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -165,8 +166,6 @@ export default function SubmissionPage() {
 
   const refreshSubmissions = () => {
     loadData()
-    setMarkers([])
-    setActiveMarkerId(null)
   }
 
   useEffect(() => {
@@ -182,6 +181,62 @@ export default function SubmissionPage() {
   }, [])
 
   const selected = submissionsList.find((s) => s.id === selectedId) || submissionsList[0]
+  const rawTask = selected ? rawTasks.find((t) => t.task_id === selected.id) : null
+
+  useEffect(() => {
+    if (!selected) {
+      setPageRegions([])
+      return
+    }
+    const currentRawTask = rawTasks.find((t) => t.task_id === selected.id)
+    if (!currentRawTask) {
+      setPageRegions([])
+      return
+    }
+    const pageId = currentRawTask.page_id
+    const chapterId = currentRawTask.page?.chapter_id
+    const chapterInfo = chaptersMap[chapterId]
+    const seriesId = chapterInfo?.seriesId
+
+    if (!seriesId || !chapterId || !pageId) {
+      setPageRegions([])
+      return
+    }
+
+    let isSubscribed = true
+    const fetchRegions = async () => {
+      setIsLoadingRegions(true)
+      try {
+        const regs = await regionService.getByPage(seriesId, chapterId, pageId)
+        if (isSubscribed) {
+          setPageRegions(regs)
+        }
+      } catch (err) {
+        console.error('Failed to load page regions for submission', err)
+        if (isSubscribed) {
+          setPageRegions([])
+        }
+      } finally {
+        if (isSubscribed) {
+          setIsLoadingRegions(false)
+        }
+      }
+    }
+
+    fetchRegions()
+    return () => {
+      isSubscribed = false
+    }
+  }, [selectedId, submissionsList, rawTasks, chaptersMap])
+
+  const mappedRegions = pageRegions.map((r: any, idx: number) => ({
+    id: r.region_id,
+    x: r.coordinates?.x ?? r.x ?? 0,
+    y: r.coordinates?.y ?? r.y ?? 0,
+    w: r.coordinates?.w ?? r.coordinates?.width ?? r.width ?? 0,
+    h: r.coordinates?.h ?? r.coordinates?.height ?? r.height ?? 0,
+    label: `Vùng ${idx + 1}`,
+  }))
 
   const handleMergeLayer = async () => {
     if (!selected) return
@@ -244,10 +299,60 @@ export default function SubmissionPage() {
     }
   }
 
+  const handleDownloadFile = async () => {
+    if (!selected || !selected.previewUrl) {
+      alert('Không có file hoặc URL để tải về.')
+      return
+    }
+
+    try {
+      const response = await fetch(selected.previewUrl)
+      if (!response.ok) throw new Error('Network response was not ok')
+      const blob = await response.blob()
+      
+      // Determine the extension from the previewUrl or content-type
+      let ext = 'png'
+      if (selected.previewUrl.toLowerCase().includes('.jpg') || selected.previewUrl.toLowerCase().includes('.jpeg')) {
+        ext = 'jpg'
+      } else if (selected.previewUrl.toLowerCase().includes('.psd')) {
+        ext = 'psd'
+      } else if (selected.previewUrl.toLowerCase().includes('.zip')) {
+        ext = 'zip'
+      } else {
+        const mimeType = blob.type
+        if (mimeType === 'image/jpeg') ext = 'jpg'
+        else if (mimeType === 'image/png') ext = 'png'
+        else if (mimeType === 'image/webp') ext = 'webp'
+        else if (mimeType === 'image/gif') ext = 'gif'
+        else if (mimeType === 'application/x-photoshop' || mimeType === 'image/vnd.adobe.photoshop') ext = 'psd'
+        else if (mimeType === 'application/zip') ext = 'zip'
+      }
+
+      // Generate file name matching the format: chapter_page_layertype_assistant.ext
+      const cleanChapterTitle = selected.chapterTitle.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_')
+      const cleanLayerType = selected.layerType.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_')
+      const cleanAssistantName = selected.assistantName.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_')
+      const filename = `${cleanChapterTitle}_Page${selected.pageNumber}_${cleanLayerType}_by_${cleanAssistantName}.${ext}`
+
+      const blobUrl = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(blobUrl)
+    } catch (err) {
+      console.error('Failed to download file directly via fetch:', err)
+      // Fallback: open in new tab
+      window.open(selected.previewUrl, '_blank')
+    }
+  }
+
   const handleReject = async () => {
     if (!selected) return
-    if (!comment.trim() && markers.length === 0) {
-      alert('Vui lòng nhập nhận xét hoặc click chọn điểm lỗi trên ảnh để gửi yêu cầu sửa chữa!')
+    if (!comment.trim()) {
+      alert('Vui lòng nhập nhận xét để gửi yêu cầu sửa chữa!')
       return
     }
 
@@ -267,53 +372,10 @@ export default function SubmissionPage() {
       return
     }
 
-    let finalComment = comment.trim()
-    if (markers.length > 0) {
-      const markerNotes = markers
-        .map(
-          (m, idx) =>
-            `- Điểm số ${idx + 1} (vị trí ngang ${Math.round(m.x)}%, dọc ${Math.round(m.y)}%): ${m.text || 'Cần chỉnh sửa nét vẽ'}`
-        )
-        .join('\n')
-      finalComment = finalComment
-        ? `${finalComment}\n\nChi tiết các điểm lỗi cần sửa:\n${markerNotes}`
-        : `Yêu cầu chỉnh sửa chi tiết các điểm sau:\n${markerNotes}`
-    }
-
-    const userStr = localStorage.getItem('mangaflow_user')
-    let userId = ''
-    if (userStr) {
-      try {
-        const parsed = JSON.parse(userStr)
-        userId = parsed.user?.id || parsed.id || ''
-      } catch {
-        // ignore
-      }
-    }
+    const finalComment = comment.trim()
 
     try {
       setLoading(true)
-
-      // Save markers as annotations on the backend
-      if (markers.length > 0 && userId) {
-        await Promise.all(
-          markers.map(async (m) => {
-            try {
-              await api.post('/api/annotations', {
-                page_id: pageId,
-                user_id: userId,
-                task_id: selected.id,
-                x: Math.round(m.x),
-                y: Math.round(m.y),
-                content: m.text || 'Cần chỉnh sửa nét vẽ',
-                status: 'active'
-              })
-            } catch (err) {
-              console.error('Failed to save annotation marker:', err)
-            }
-          })
-        )
-      }
 
       if (selected.submissionId) {
         await feedbackService.requestRevisionSubmission(selected.submissionId, finalComment)
@@ -328,7 +390,6 @@ export default function SubmissionPage() {
         setToastMessage(null)
       }, 5000)
       setComment('')
-      setMarkers([])
       loadData()
     } catch (err) {
       console.error(err)
@@ -336,38 +397,6 @@ export default function SubmissionPage() {
     } finally {
       setLoading(false)
     }
-  }
-
-  const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
-    if (selected?.status === 'Approved') return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-    
-    const newMarker = { x, y, text: '', id: `marker-${Date.now()}` };
-    setMarkers([...markers, newMarker]);
-    setActiveMarkerId(newMarker.id);
-  }
-
-  const handleZoomImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
-    if (selected?.status === 'Approved') return;
-    if (zoomTitle === "Bản Phác Thảo Gốc") return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-    
-    const newMarker = { x, y, text: '', id: `marker-${Date.now()}` };
-    setMarkers([...markers, newMarker]);
-    setActiveMarkerId(newMarker.id);
-  }
-
-  const updateMarkerText = (id: string, text: string) => {
-    setMarkers(markers.map(m => m.id === id ? { ...m, text } : m));
-  }
-
-  const deleteMarker = (id: string) => {
-    setMarkers(markers.filter(m => m.id !== id));
-    if (activeMarkerId === id) setActiveMarkerId(null);
   }
 
   const filteredSubmissions = submissionsList.filter((sub) => {
@@ -560,56 +589,49 @@ export default function SubmissionPage() {
                         <img
                           src={selected.previewUrl}
                           alt="Submitted Layer"
-                          className={`w-full h-auto object-contain block ${selected.status !== 'Approved' ? 'cursor-crosshair' : ''}`}
-                          onClick={handleImageClick}
+                          className="w-full h-auto object-contain block"
                         />
-                        {selected.status !== 'Approved' && (
-                          <div className="absolute border-2 border-manga-red bg-red-500/10 pointer-events-none" style={{ top: '15%', left: '10%', width: '80%', height: '70%' }}>
-                            <span className="absolute -top-4 left-0 text-[8px] font-bold bg-manga-red text-white px-1 uppercase">
-                              {selected.layerType} Layer
-                            </span>
-                          </div>
-                        )}
-                        {markers.map((marker, index) => (
-                          <div 
-                            key={marker.id}
-                            className="absolute z-20"
-                            style={{ left: `${marker.x}%`, top: `${marker.y}%`, transform: 'translate(-50%, -50%)' }}
-                            onClick={(e) => { e.stopPropagation(); setActiveMarkerId(marker.id); }}
-                          >
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border-2 cursor-pointer transition-colors ${
-                              activeMarkerId === marker.id ? 'bg-manga-red border-white text-white scale-110' : 'bg-white border-manga-red text-manga-red'
-                            }`}>
-                              {index + 1}
+                        {selected.status !== 'Approved' && mappedRegions.map((r) => {
+                          const isActive = r.id === rawTask?.region_id
+                          const isNearTop = r.y < 7
+                          const isTooShort = r.h < 6
+                          const verticalClass = isNearTop
+                            ? (isTooShort ? 'top-full mt-0.5' : 'top-0')
+                            : '-top-6'
+                          return (
+                            <div
+                              key={`thumb-reg-${r.id}`}
+                              className={`absolute border-2 pointer-events-none transition-all ${
+                                isActive
+                                  ? 'border-manga-red bg-red-500/10 z-20 shadow-[0_0_8px_rgba(239,68,68,0.4)]'
+                                  : 'border-dashed border-zinc-400 bg-zinc-400/5 opacity-60 hover:opacity-100 z-10'
+                              }`}
+                              style={{
+                                left: `${r.x}%`,
+                                top: `${r.y}%`,
+                                width: `${r.w}%`,
+                                height: `${r.h}%`
+                              }}
+                            >
+                              <span className={`absolute ${verticalClass} left-[-2px] text-[8px] font-bold px-1 uppercase z-30 ${
+                                isActive ? 'bg-manga-red text-white' : 'bg-zinc-500 text-white'
+                              }`}>
+                                {r.label} {isActive && `(${selected.layerType} Layer)`}
+                              </span>
                             </div>
-                            {activeMarkerId === marker.id && (
-                              <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-white border-2 border-manga-ink manga-shadow-sm p-2 w-48 z-30" onClick={e => e.stopPropagation()}>
-                                <textarea 
-                                  autoFocus
-                                  value={marker.text}
-                                  onChange={(e) => updateMarkerText(marker.id, e.target.value)}
-                                  placeholder="Nhập lỗi cần sửa..."
-                                  className="w-full text-xs font-bold border border-gray-300 p-1 mb-1 focus:outline-none"
-                                  rows={2}
-                                />
-                                <div className="flex justify-between">
-                                  <button className="text-[10px] text-red-600 font-bold uppercase hover:underline" onClick={() => deleteMarker(marker.id)}>Xóa</button>
-                                  <button className="text-[10px] text-manga-ink font-bold uppercase hover:underline" onClick={() => setActiveMarkerId(null)}>Xong</button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                          )
+                        })}
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
                             setZoomImage(selected.previewUrl)
                             setZoomTitle(selected.status === 'Approved' ? "Bản thảo đã hòa trộn" : `Bản vẽ Trợ lý gửi (${selected.layerType})`)
                           }}
-                          className="absolute bottom-2 right-2 bg-white border border-manga-ink p-1.5 hover:bg-gray-100 transition-colors opacity-0 group-hover:opacity-100 flex items-center justify-center shadow-[2px_2px_0px_rgba(0,0,0,1)] z-10"
+                          className="absolute bottom-3 right-3 bg-manga-ink text-white font-bold text-xs uppercase px-3 py-1.5 hover:bg-gray-800 hover:-translate-y-0.5 hover:shadow-[3px_3px_0px_rgba(239,68,68,1)] transition-all flex items-center gap-1.5 z-30 shadow-[3px_3px_0px_rgba(0,0,0,1)] border-2 border-white"
                           title="Phóng to"
                         >
-                          <Maximize2 className="w-3.5 h-3.5 text-manga-ink" />
+                          <Maximize2 className="w-3.5 h-3.5 text-white" />
+                          <span>Xem Phóng To Vùng Giao Task</span>
                         </button>
                       </div>
                     </div>
@@ -666,12 +688,6 @@ export default function SubmissionPage() {
                       placeholder="Nếu có yêu cầu chỉnh sửa, hãy điền lý do tại đây trước khi chọn 'Yêu cầu chỉnh sửa'..."
                       className="w-full border-2 border-manga-ink px-3 py-2 text-sm font-bold resize-none focus:outline-none focus:border-manga-red bg-white"
                     />
-                    {markers.length > 0 && (
-                      <div className="mt-2 text-xs text-manga-red font-bold">
-                        * Đã đánh dấu {markers.length} điểm lỗi trên ảnh. 
-                        Nội dung comment sẽ tự động đính kèm các điểm lỗi này.
-                      </div>
-                    )}
                   </div>
                 )}
 
@@ -709,13 +725,7 @@ export default function SubmissionPage() {
 
                 <div className="flex gap-2 mt-2">
                   <button
-                    onClick={() => {
-                      if (selected.previewUrl) {
-                        window.open(selected.previewUrl, '_blank')
-                      } else {
-                        alert('Không có file hoặc URL để tải về.')
-                      }
-                    }}
+                    onClick={handleDownloadFile}
                     className="flex-1 bg-white text-manga-ink font-bold text-xs uppercase py-2 border border-manga-ink hover:bg-gray-100 transition-colors flex items-center justify-center gap-1"
                   >
                     <Download className="w-3.5 h-3.5" /> Tải file PSD/Ảnh
@@ -774,41 +784,40 @@ export default function SubmissionPage() {
                   <img 
                     src={zoomImage} 
                     alt="Zoomed preview" 
-                    className={`max-h-[70vh] w-auto max-w-full block ${zoomTitle !== "Bản Phác Thảo Gốc" && selected?.status !== 'Approved' ? 'cursor-crosshair' : ''}`}
-                    onClick={handleZoomImageClick}
+                    className="max-h-[70vh] w-auto max-w-full block"
                   />
                   
-                  {/* Render markers in Lightbox modal */}
-                  {zoomTitle !== "Bản Phác Thảo Gốc" && markers.map((marker, index) => (
-                    <div 
-                      key={marker.id}
-                      className="absolute z-20"
-                      style={{ left: `${marker.x}%`, top: `${marker.y}%`, transform: 'translate(-50%, -50%)' }}
-                      onClick={(e) => { e.stopPropagation(); setActiveMarkerId(marker.id); }}
-                    >
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border-2 cursor-pointer transition-colors ${
-                        activeMarkerId === marker.id ? 'bg-manga-red border-white text-white scale-110' : 'bg-white border-manga-red text-manga-red'
-                      }`}>
-                        {index + 1}
+                  {/* Render regions in Lightbox modal */}
+                  {zoomTitle !== "Bản Phác Thảo Gốc" && selected?.status !== 'Approved' && mappedRegions.map((r) => {
+                    const isActive = r.id === rawTask?.region_id
+                    const isNearTop = r.y < 7
+                    const isTooShort = r.h < 6
+                    const verticalClass = isNearTop
+                      ? (isTooShort ? 'top-full mt-0.5' : 'top-0')
+                      : '-top-6'
+                    return (
+                      <div
+                        key={`zoom-reg-${r.id}`}
+                        className={`absolute border-2 pointer-events-none transition-all ${
+                          isActive
+                            ? 'border-manga-red bg-red-500/10 z-20 shadow-[0_0_8px_rgba(239,68,68,0.4)]'
+                            : 'border-dashed border-zinc-400 bg-zinc-400/5 opacity-60 hover:opacity-100 z-10'
+                        }`}
+                        style={{
+                          left: `${r.x}%`,
+                          top: `${r.y}%`,
+                          width: `${r.w}%`,
+                          height: `${r.h}%`
+                        }}
+                      >
+                        <span className={`absolute ${verticalClass} left-[-2px] text-[8px] font-bold px-1 uppercase z-30 ${
+                          isActive ? 'bg-manga-red text-white' : 'bg-zinc-500 text-white'
+                        }`}>
+                          {r.label} {isActive && `(${selected.layerType} Layer)`}
+                        </span>
                       </div>
-                      {activeMarkerId === marker.id && (
-                        <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-white border-2 border-manga-ink manga-shadow-sm p-2 w-48 z-30" onClick={e => e.stopPropagation()}>
-                          <textarea 
-                            autoFocus
-                            value={marker.text}
-                            onChange={(e) => updateMarkerText(marker.id, e.target.value)}
-                            placeholder="Nhập lỗi cần sửa..."
-                            className="w-full text-xs font-bold border border-gray-300 p-1 mb-1 focus:outline-none"
-                            rows={2}
-                          />
-                          <div className="flex justify-between">
-                            <button className="text-[10px] text-red-600 font-bold uppercase hover:underline" onClick={() => deleteMarker(marker.id)}>Xóa</button>
-                            <button className="text-[10px] text-manga-ink font-bold uppercase hover:underline" onClick={() => setActiveMarkerId(null)}>Xong</button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
 
@@ -831,51 +840,6 @@ export default function SubmissionPage() {
                     />
                   </div>
 
-                  <div className="flex-1 min-h-[150px] flex flex-col gap-2">
-                    <label className="text-[10px] font-bold uppercase text-gray-500 block">
-                      Danh sách điểm lỗi ({markers.length})
-                    </label>
-                    <div className="flex-1 overflow-y-auto border border-gray-200 p-2 flex flex-col gap-2 max-h-[250px]">
-                      {markers.map((marker, index) => (
-                        <div key={marker.id} className={`p-2 border-2 text-xs font-bold transition-all ${activeMarkerId === marker.id ? 'border-manga-red bg-red-50/20' : 'border-gray-300 bg-gray-50'}`}>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="bg-manga-red text-white font-mono px-1 text-[10px]">
-                              Điểm #{index + 1}
-                            </span>
-                            <span className="text-[9px] text-gray-400">
-                              x: {Math.round(marker.x)}%, y: {Math.round(marker.y)}%
-                            </span>
-                          </div>
-                          <input
-                            type="text"
-                            value={marker.text}
-                            onChange={(e) => updateMarkerText(marker.id, e.target.value)}
-                            placeholder="Nhập mô tả lỗi..."
-                            className="w-full text-xs font-bold border border-gray-300 p-1 mb-1 focus:outline-none"
-                          />
-                          <div className="flex justify-between mt-1">
-                            <button
-                              onClick={() => deleteMarker(marker.id)}
-                              className="text-[9px] text-red-600 font-bold uppercase hover:underline"
-                            >
-                              Xóa điểm
-                            </button>
-                            <button
-                              onClick={() => setActiveMarkerId(activeMarkerId === marker.id ? null : marker.id)}
-                              className="text-[9px] text-manga-ink font-bold uppercase hover:underline"
-                            >
-                              {activeMarkerId === marker.id ? 'Thu nhỏ' : 'Chọn'}
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                      {markers.length === 0 && (
-                        <div className="text-center text-gray-400 py-6 text-xs italic">
-                          Click trực tiếp lên ảnh bên trái để đánh dấu các vị trí lỗi cần sửa.
-                        </div>
-                      )}
-                    </div>
-                  </div>
 
                   <div className="flex flex-col gap-2 mt-auto">
                     <button

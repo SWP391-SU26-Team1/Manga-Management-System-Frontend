@@ -170,7 +170,6 @@ export default function SeriesPage() {
                 createdAt: s.created_at,
               }}
               chapterCount={chapterCounts[s._id] ?? 0}
-              onCreateChapter={() => {}}
             />
 
           ))}

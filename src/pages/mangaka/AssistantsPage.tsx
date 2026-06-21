@@ -4,6 +4,7 @@ import { Assistant, LayerTask } from '@/data/mangakaMockData'
 import { Link } from 'react-router'
 import { seriesService, SeriesAPI } from '@/services/series.service'
 import { taskService } from '@/services/task.service'
+import userService from '@/services/user.service'
 
 const TASK_TYPE_MAP: Record<string, string> = {
   inking: 'Line Art',
@@ -24,11 +25,35 @@ export default function AssistantsPage() {
   // Modals state
   const [showAddModal, setShowAddModal] = useState(false)
   const [showStatsModal, setShowStatsModal] = useState<Assistant | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [assistantToDelete, setAssistantToDelete] = useState<{
+    seriesId: string;
+    seriesMemberId: string;
+    name: string;
+  } | null>(null)
+
+  // Custom Alert Modal States
+  const [alertModal, setAlertModal] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error';
+  }>({
+    show: false,
+    title: '',
+    message: '',
+    type: 'success'
+  })
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' = 'success') => {
+    setAlertModal({ show: true, title, message, type })
+  }
 
   // Form state
   const [newAssistantUserId, setNewAssistantUserId] = useState('')
   const [selectedSeriesId, setSelectedSeriesId] = useState('')
   const [newRole, setNewRole] = useState('Line Art')
+  const [availableAssistants, setAvailableAssistants] = useState<any[]>([])
 
   useEffect(() => {
     refreshData()
@@ -93,6 +118,13 @@ export default function AssistantsPage() {
 
       setAssistants(assistantsList)
       setSubmissionsCount(allTasks.filter((t: any) => t.status === 'submitted').length)
+
+      // 4. Load available assistants for select list
+      const asts = await userService.listAssistants().catch(() => [])
+      setAvailableAssistants(asts)
+      if (asts.length > 0 && !newAssistantUserId) {
+        setNewAssistantUserId(asts[0].id)
+      }
     } catch (err) {
       console.error('Lỗi khi tải dữ liệu trợ lý:', err)
     } finally {
@@ -112,27 +144,35 @@ export default function AssistantsPage() {
       setNewAssistantUserId('')
       setShowAddModal(false)
       await refreshData()
-      alert('Đã thêm trợ lý vào dự án thành công!')
+      showAlert('Thành công', 'Đã thêm trợ lý vào dự án thành công!', 'success')
     } catch (err: any) {
       console.error(err)
-      alert('Không thể thêm trợ lý. Lỗi: ' + (err.response?.data?.message || err.message))
+      showAlert('Lỗi', 'Không thể thêm trợ lý. Lỗi: ' + (err.response?.data?.message || err.message), 'error')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleRemoveAssistant = async (seriesId: string, seriesMemberId: string, name: string) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa trợ lý ${name} khỏi series này?`)) return
+  const handleRemoveAssistant = (seriesId: string, seriesMemberId: string, name: string) => {
+    setAssistantToDelete({ seriesId, seriesMemberId, name })
+    setShowDeleteConfirm(true)
+  }
+
+  const confirmRemoveAssistant = async () => {
+    if (!assistantToDelete) return
+    const { seriesId, seriesMemberId } = assistantToDelete
     try {
       setLoading(true)
       await seriesService.removeMember(seriesId, seriesMemberId)
       await refreshData()
-      alert('Đã xóa trợ lý khỏi dự án!')
+      showAlert('Thành công', 'Đã xóa trợ lý khỏi dự án!', 'success')
     } catch (err: any) {
       console.error(err)
-      alert('Không thể xóa trợ lý. Lỗi: ' + (err.response?.data?.message || err.message))
+      showAlert('Lỗi', 'Không thể xóa trợ lý. Lỗi: ' + (err.response?.data?.message || err.message), 'error')
     } finally {
       setLoading(false)
+      setShowDeleteConfirm(false)
+      setAssistantToDelete(null)
     }
   }
 
@@ -341,15 +381,18 @@ export default function AssistantsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-bold uppercase text-gray-500 mb-1">User ID Trợ Lý (UUID)</label>
-                <input 
-                  type="text" 
+                <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Chọn Trợ Lý</label>
+                <select 
                   value={newAssistantUserId} 
                   onChange={e => setNewAssistantUserId(e.target.value)}
-                  className="w-full border-2 border-manga-ink p-2 font-bold focus:ring-2 focus:ring-manga-red"
-                  placeholder="Dán UUID của trợ lý..."
+                  className="w-full border-2 border-manga-ink p-2 font-bold focus:ring-2 focus:ring-manga-red bg-white"
                   required
-                />
+                >
+                  <option value="">-- Chọn Trợ lý --</option>
+                  {availableAssistants.map(ast => (
+                    <option key={ast.id} value={ast.id}>{ast.fullName}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Chuyên môn (Layer Role)</label>
@@ -417,6 +460,92 @@ export default function AssistantsPage() {
 
               <div className="mt-6 pt-4 border-t-2 border-dashed border-gray-300 text-center">
                 <p className="text-sm font-bold text-gray-600">"Trợ lý này có tốc độ làm việc khá ổn định, ít khi bị trễ hạn. Nét vẽ Line Art rất sạch sẽ và chắc tay."</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Remove Assistant Confirmation Modal */}
+      {showDeleteConfirm && assistantToDelete && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white border-4 border-manga-ink manga-shadow max-w-md w-full animate-in fade-in zoom-in-95 duration-150 text-black">
+            <div className="p-4 border-b-4 border-manga-ink bg-gray-50 flex justify-between items-center">
+              <h2 className="font-manga font-bold text-xl uppercase flex items-center gap-2 text-manga-red">
+                Xác nhận xóa trợ lý
+              </h2>
+              <button 
+                onClick={() => {
+                  setShowDeleteConfirm(false)
+                  setAssistantToDelete(null)
+                }} 
+                className="hover:text-red-500 cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm font-bold text-gray-700">
+                Bạn có chắc chắn muốn xóa trợ lý {assistantToDelete.name} khỏi Series này?
+              </p>
+              <div className="bg-amber-50 border-2 border-amber-300 p-3 text-xs text-amber-800 font-bold leading-relaxed text-left">
+                ⚠️ Lưu ý: Hành động này chỉ xóa trợ lý khỏi Series này. Tài khoản và vai trò của họ trong hệ thống vẫn được giữ nguyên, không bị ảnh hưởng.
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDeleteConfirm(false)
+                    setAssistantToDelete(null)
+                  }}
+                  className="px-4 py-2 border-2 border-manga-ink font-bold uppercase text-xs hover:bg-gray-100 transition-colors cursor-pointer"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmRemoveAssistant}
+                  className="px-4 py-2 bg-manga-red border-2 border-manga-ink text-white font-bold uppercase text-xs hover:bg-red-700 hover:text-white transition-colors cursor-pointer"
+                >
+                  Xác nhận xóa
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Alert Modal */}
+      {alertModal.show && (
+        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white border-4 border-manga-ink manga-shadow max-w-sm w-full animate-in fade-in zoom-in-95 duration-150 text-black text-left">
+            <div className="p-4 border-b-4 border-manga-ink bg-gray-50 flex justify-between items-center">
+              <h2 className={`font-manga font-bold text-xl uppercase flex items-center gap-2 ${
+                alertModal.type === 'success' ? 'text-green-600' : 'text-manga-red'
+              }`}>
+                {alertModal.title}
+              </h2>
+              <button 
+                onClick={() => setAlertModal(prev => ({ ...prev, show: false }))} 
+                className="hover:text-red-500 cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm font-bold text-gray-700 leading-relaxed">
+                {alertModal.message}
+              </p>
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setAlertModal(prev => ({ ...prev, show: false }))}
+                  className={`px-6 py-2 border-2 border-manga-ink text-white font-bold uppercase text-xs hover:bg-opacity-90 transition-colors cursor-pointer ${
+                    alertModal.type === 'success' ? 'bg-green-600' : 'bg-manga-red'
+                  }`}
+                >
+                  OK
+                </button>
               </div>
             </div>
           </div>

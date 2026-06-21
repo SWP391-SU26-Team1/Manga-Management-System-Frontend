@@ -6,6 +6,7 @@ export interface UserProfile {
   email: string;
   password: string; // Chỉ dùng cho mock login, thực tế không lưu plain text
   role: UserRole;
+  isChief?: boolean; // Cờ đánh dấu trưởng ban biên tập (Chief Editor)
   fullName: string;
   avatarUrl: string;
   bio: string;
@@ -21,6 +22,24 @@ export interface UserProfile {
 }
 
 export const MOCK_USERS: UserProfile[] = [
+  {
+    id: 'usr_board_chief',
+    username: 'chief_editor',
+    email: 'chiefeditor@mangaflow.com',
+    password: 'Password123!',
+    role: 'BOARD',
+    isChief: true,
+    fullName: 'Trần K. (Chief Editor)',
+    avatarUrl: 'https://i.pravatar.cc/150?u=chief_editor',
+    bio: 'Trưởng ban Biên tập tối cao tại MangaFlow. Người có thẩm quyền ra quyết định xuất bản và phán quyết tranh chấp cuối cùng.',
+    stats: {
+      followers: 180,
+      projectsCompleted: 420,
+      activeProjects: 50,
+      rating: 5.0
+    },
+    publications: ['Biên niên sử MangaFlow', 'Chiến lược Nội dung Toàn cầu']
+  },
   {
     id: 'usr_mangaka_001',
     username: 'mangaka_sensei',

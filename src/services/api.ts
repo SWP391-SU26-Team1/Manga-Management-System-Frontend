@@ -31,7 +31,9 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('mangaflow_user')
-      window.location.href = '/login'
+      if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }

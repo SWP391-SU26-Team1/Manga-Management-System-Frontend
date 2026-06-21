@@ -44,13 +44,27 @@ export interface BackendNotification {
   created_at: string
 }
 
+export interface RankingEntry {
+  rank: number
+  title: string
+  votes: number
+  trend: 'up' | 'down'
+  changePercent: number
+}
+
 export const rankingService = {
-  /** GET /api/rankings/series/top - Lấy danh sách xếp hạng series */
+  /** GET /api/board/rankings/series/top - Lấy danh sách xếp hạng series (board prefix) */
   getTopSeries: async (limit: number = 20): Promise<BackendSeriesRanking[]> => {
     const response = await api.get<{ success: boolean; data: BackendSeriesRanking[] }>(
-      '/api/rankings/series/top',
+      '/api/board/rankings/series/top',
       { params: { limit } }
     )
+    return response.data.data ?? []
+  },
+
+  /** Alias cho getTopSeries — dùng cho Dashboard widget */
+  getWeekly: async (): Promise<RankingEntry[]> => {
+    const response = await api.get('/api/board/rankings/series/top')
     return response.data.data ?? []
   },
 

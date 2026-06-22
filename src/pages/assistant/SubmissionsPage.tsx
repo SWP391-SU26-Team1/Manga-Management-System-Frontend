@@ -46,7 +46,7 @@ export default function SubmissionsPage() {
       setLoading(true)
       setError(null)
       
-      const tasksRes = await assistantService.listMyTasks()
+      const tasksRes = await assistantService.listMyTasks({ limit: 100 })
       const tasksList = tasksRes.data || []
       
       const submittedTasks = tasksList.filter((t: any) => 

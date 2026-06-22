@@ -162,7 +162,7 @@ export default function FeedbackPage() {
   const loadTasks = async () => {
     setIsLoadingTasks(true)
     try {
-      const res = await assistantService.listMyTasks()
+      const res = await assistantService.listMyTasks({ limit: 100 })
       if (res && res.success) {
         // Filter tasks that are in progress, need revision or review
         const relevant = res.data

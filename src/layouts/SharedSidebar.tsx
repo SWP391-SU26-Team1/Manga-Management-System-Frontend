@@ -12,8 +12,10 @@ const getNavConfig = (role: string) => {
   switch (role) {
     case 'MANGAKA': return mangakaNav;
     case 'ASSISTANT': return assistantNav;
-    case 'EDITORIAL_BOARD': return boardNav;
-    case 'TANTOU': return tantouNav;
+    case 'EDITORIAL_BOARD':
+    case 'BOARD': return boardNav;
+    case 'TANTOU':
+    case 'EDITOR': return tantouNav;
     default: return [];
   }
 }
@@ -22,8 +24,10 @@ const getRoleText = (role: string) => {
   switch (role) {
     case 'MANGAKA': return 'PHÒNG LÀM VIỆC MANGAKA';
     case 'ASSISTANT': return 'Phòng làm việc Trợ lý';
-    case 'EDITORIAL_BOARD': return 'Editorial Board Panel';
-    case 'TANTOU': return 'Tantou Editor Panel';
+    case 'EDITORIAL_BOARD':
+    case 'BOARD': return 'Editorial Board Panel';
+    case 'TANTOU':
+    case 'EDITOR': return 'Tantou Editor Panel';
     default: return 'MANGAFLOW PANEL';
   }
 }
@@ -32,8 +36,10 @@ const getDashboardPath = (role: string) => {
   switch (role) {
     case 'MANGAKA': return '/dashboard/mangaka';
     case 'ASSISTANT': return '/dashboard/assistant';
-    case 'EDITORIAL_BOARD': return '/dashboard/board';
-    case 'TANTOU': return '/dashboard/tantou';
+    case 'EDITORIAL_BOARD':
+    case 'BOARD': return '/dashboard/editorial-board';
+    case 'TANTOU':
+    case 'EDITOR': return '/dashboard/tantou-editor';
     default: return '/';
   }
 }

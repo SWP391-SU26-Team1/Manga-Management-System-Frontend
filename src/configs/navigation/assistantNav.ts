@@ -36,7 +36,7 @@ export const assistantNav = [
   },
   {
     label: "Vẽ & Chỉnh Sửa",
-    path: "/dashboard/assistant/drawing",
+    path: "/dashboard/assistant/drawing-studio",
     icon: PenTool
   }
 ]

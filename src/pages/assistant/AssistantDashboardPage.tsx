@@ -34,7 +34,7 @@ export default function AssistantDashboardPage() {
         assistantService.getPerformance(),
         assistantService.getBySeries(),
         assistantService.listNotifications({ limit: 6 }),
-        assistantService.listMyTasks()
+        assistantService.listMyTasks({ limit: 100 })
       ])
 
       setOverview(overData)

@@ -5,7 +5,8 @@ import {
   Pen, Eraser, MousePointer2, Square, Circle, ArrowUpRight, Type, 
   MapPin, Undo2, Redo2, Trash2, Hand, ZoomIn, ZoomOut, Maximize, 
   FileDown, Save, Upload, Send, CheckCircle2, X, AlertTriangle, 
-  Layers, MessageSquare, ListTodo, FileImage, Grid, ImagePlus, Loader2
+  Layers, MessageSquare, ListTodo, FileImage, Grid, ImagePlus, Loader2,
+  ArrowLeft
 } from 'lucide-react';
 import assistantService from '@/services/assistant.service';
 import uploadService from '@/services/upload.service';
@@ -20,6 +21,7 @@ type Stroke = {
   color: string;
   size: number;
   points: Point[];
+  text?: string;
 };
 
 interface MappedRegion {
@@ -101,10 +103,215 @@ export default function DrawingStudioPage() {
   // Feedbacks
   const [feedbacks, setFeedbacks] = useState<MappedFeedback[]>([]);
 
+  // Selector lists states
+  const [selectorSeriesList, setSelectorSeriesList] = useState<any[]>([]);
+  const [selectorChaptersMap, setSelectorChaptersMap] = useState<Record<string, any[]>>({}); // series_id -> chapters
+  const [selectorPagesMap, setSelectorPagesMap] = useState<Record<string, any[]>>({}); // chapter_id -> pages
+  
+  // Selected IDs states
+  const [selSeriesId, setSelSeriesId] = useState<string>('');
+  const [selChapterId, setSelChapterId] = useState<string>('');
+  const [selPageId, setSelPageId] = useState<string>('');
+
+  // Load selectors data on mount
+  useEffect(() => {
+    loadSelectorsData();
+  }, []);
+
+  const loadSelectorsData = async () => {
+    try {
+      const res = await assistantService.listMyTasks({ limit: 100 });
+      if (res && res.success && Array.isArray(res.data)) {
+        const seriesMap: Record<string, { series_id: string; title: string }> = {};
+        const chaptersMap: Record<string, Record<string, { chapter_id: string; title: string; chapter_number: number }>> = {};
+        const pagesMap: Record<string, Record<string, { page_id: string; page_number: number }>> = {};
+        
+        res.data.forEach((task: any) => {
+          const page = task.page;
+          if (!page) return;
+          const chapter = page.chapter;
+          if (!chapter) return;
+          const series = chapter.series;
+          if (!series) return;
+          
+          seriesMap[series.series_id] = {
+            series_id: series.series_id,
+            title: series.title
+          };
+          
+          if (!chaptersMap[series.series_id]) {
+            chaptersMap[series.series_id] = {};
+          }
+          chaptersMap[series.series_id][chapter.chapter_id] = {
+            chapter_id: chapter.chapter_id,
+            title: chapter.title,
+            chapter_number: chapter.chapter_number || 0
+          };
+          
+          if (!pagesMap[chapter.chapter_id]) {
+            pagesMap[chapter.chapter_id] = {};
+          }
+          pagesMap[chapter.chapter_id][page.page_id] = {
+            page_id: page.page_id,
+            page_number: page.page_number
+          };
+        });
+        
+        const seriesList = Object.values(seriesMap);
+        
+        const finalChaptersMap: Record<string, any[]> = {};
+        Object.keys(chaptersMap).forEach(seriesId => {
+          finalChaptersMap[seriesId] = Object.values(chaptersMap[seriesId]).sort((a, b) => a.chapter_number - b.chapter_number);
+        });
+        
+        const finalPagesMap: Record<string, any[]> = {};
+        Object.keys(pagesMap).forEach(chapterId => {
+          finalPagesMap[chapterId] = Object.values(pagesMap[chapterId]).sort((a, b) => a.page_number - b.page_number);
+        });
+        
+        setSelectorSeriesList(seriesList);
+        setSelectorChaptersMap(finalChaptersMap);
+        setSelectorPagesMap(finalPagesMap);
+
+        // Auto-redirect if pageId is missing!
+        if (!pageId) {
+          let firstPageId = '';
+          for (const series of seriesList) {
+            const chapters = finalChaptersMap[series.series_id] || [];
+            for (const ch of chapters) {
+              const pgs = finalPagesMap[ch.chapter_id] || [];
+              if (pgs.length > 0) {
+                firstPageId = pgs[0].page_id;
+                break;
+              }
+            }
+            if (firstPageId) break;
+          }
+          if (firstPageId) {
+            navigate(`/dashboard/assistant/drawing-studio?pageId=${firstPageId}`, { replace: true });
+          } else {
+            setLoading(false);
+          }
+        }
+      } else {
+        if (!pageId) setLoading(false);
+      }
+    } catch (e) {
+      console.error('Lỗi khi tải danh sách nhiệm vụ làm bộ chọn:', e);
+      if (!pageId) setLoading(false);
+    }
+  };
+
+  const checkUnsavedStrokes = (): boolean => {
+    if (strokes.length === 0) return false;
+    const draftStr = localStorage.getItem(`mangaflow_drawing_draft_${pageId}`);
+    if (!draftStr) {
+      return strokes.length > 0;
+    }
+    try {
+      const parsed = JSON.parse(draftStr);
+      const savedStrokes = parsed.strokes || [];
+      if (savedStrokes.length !== strokes.length) return true;
+      return JSON.stringify(savedStrokes) !== JSON.stringify(strokes);
+    } catch (e) {
+      return true;
+    }
+  };
+
+  const handlePageSwitch = (newPageId: string) => {
+    if (!newPageId || newPageId === pageId) return;
+    
+    if (checkUnsavedStrokes()) {
+      const confirmLeave = window.confirm(
+        'Bạn có nét vẽ chưa lưu trên Canvas của trang hiện tại. Nếu chuyển trang, các thay đổi chưa lưu này sẽ bị mất.\n\nBạn có chắc chắn muốn chuyển trang không?'
+      );
+      if (!confirmLeave) {
+        setSelPageId(pageId);
+        return;
+      }
+    }
+    
+    setStrokes([]);
+    setHistory([]);
+    navigate(`/dashboard/assistant/drawing-studio?pageId=${newPageId}`);
+  };
+
+  const handleSeriesChange = (seriesId: string) => {
+    setSelSeriesId(seriesId);
+    const chapters = selectorChaptersMap[seriesId] || [];
+    if (chapters.length > 0) {
+      const firstChapterId = chapters[0].chapter_id;
+      setSelChapterId(firstChapterId);
+      
+      const pages = selectorPagesMap[firstChapterId] || [];
+      if (pages.length > 0) {
+        const firstPageId = pages[0].page_id;
+        setSelPageId(firstPageId);
+        handlePageSwitch(firstPageId);
+      } else {
+        setSelChapterId('');
+        setSelPageId('');
+      }
+    } else {
+      setSelChapterId('');
+      setSelPageId('');
+    }
+  };
+
+  const handleChapterChange = (chapterId: string) => {
+    setSelChapterId(chapterId);
+    const pages = selectorPagesMap[chapterId] || [];
+    if (pages.length > 0) {
+      const firstPageId = pages[0].page_id;
+      setSelPageId(firstPageId);
+      handlePageSwitch(firstPageId);
+    } else {
+      setSelPageId('');
+    }
+  };
+
+  const handlePageChange = (pId: string) => {
+    setSelPageId(pId);
+    handlePageSwitch(pId);
+  };
+
+  const getSeriesOptions = () => {
+    const list = [...selectorSeriesList];
+    const currentSeriesId = pageDetail?.chapter?.series_id;
+    const currentSeriesTitle = pageDetail?.chapter?.series?.title || 'Bộ truyện hiện tại';
+    
+    if (currentSeriesId && !list.some(s => s.series_id === currentSeriesId)) {
+      list.push({ series_id: currentSeriesId, title: currentSeriesTitle });
+    }
+    return list;
+  };
+
+  const getChapterOptions = () => {
+    const list = selectorChaptersMap[selSeriesId] ? [...selectorChaptersMap[selSeriesId]] : [];
+    const currentChapterId = pageDetail?.chapter_id;
+    const currentChapterTitle = pageDetail?.chapter?.title || 'Chương hiện tại';
+    const currentChapterNumber = pageDetail?.chapter?.chapter_number || 0;
+    
+    if (currentChapterId && !list.some(c => c.chapter_id === currentChapterId)) {
+      list.push({ chapter_id: currentChapterId, title: currentChapterTitle, chapter_number: currentChapterNumber });
+    }
+    return list.sort((a, b) => a.chapter_number - b.chapter_number);
+  };
+
+  const getPageOptions = () => {
+    const list = selectorPagesMap[selChapterId] ? [...selectorPagesMap[selChapterId]] : [];
+    const currentPageId = pageDetail?.page_id;
+    const currentPageNumber = pageDetail?.page_number || 0;
+    
+    if (currentPageId && !list.some(p => p.page_id === currentPageId)) {
+      list.push({ page_id: currentPageId, page_number: currentPageNumber });
+    }
+    return list.sort((a, b) => a.page_number - b.page_number);
+  };
+
   // 1. Fetch Page Detail & Set Up Workspace
   useEffect(() => {
     if (!pageId) {
-      navigate('/dashboard/assistant/drawing');
       return;
     }
     loadPageData();
@@ -113,6 +320,12 @@ export default function DrawingStudioPage() {
   const loadPageData = async () => {
     setLoading(true);
     try {
+      // Automatically enable Mangaka Annotation layer (Vùng được giao) when page loads/switches
+      setLayers(prev => ({
+        ...prev,
+        mangaka: true
+      }));
+
       // Get detail
       const detail = await assistantService.getDrawingPageDetail(pageId);
       setPageDetail(detail);
@@ -126,7 +339,17 @@ export default function DrawingStudioPage() {
 
       // Map regions and associate with task details
       const mappedRegs = (detail.page_region || []).map((r: any, idx: number) => {
-        const linkedTask = detail.page_task?.find((t: any) => t.region_id === r.region_id);
+        const regionLabel = `Vùng ${idx + 1}`;
+        const linkedTask = detail.page_task?.find((t: any) => {
+          const isMine = t.assistant_id === user?.user_id;
+          const matchId = t.region_id && t.region_id === r.region_id;
+          const matchText = t.content && t.content.toLowerCase().includes(regionLabel.toLowerCase());
+          return isMine && (matchId || matchText);
+        }) || detail.page_task?.find((t: any) => {
+          const matchId = t.region_id && t.region_id === r.region_id;
+          const matchText = t.content && t.content.toLowerCase().includes(regionLabel.toLowerCase());
+          return matchId || matchText;
+        });
         
         // Việt hóa trạng thái nhiệm vụ tương ứng của vùng vẽ
         const getStatusLabel = (status?: string) => {
@@ -139,28 +362,48 @@ export default function DrawingStudioPage() {
 
         return {
           id: r.region_id,
-          name: `Vùng ${idx + 1}`,
+          name: regionLabel,
           type: linkedTask ? linkedTask.task_type.toUpperCase() : 'KHUNG HÌNH',
           status: getStatusLabel(linkedTask?.status),
           x: r.x || 0,
           y: r.y || 0,
           w: r.width || 100,
           h: r.height || 100,
-          desc: linkedTask ? linkedTask.description : 'Khung được tác giả phân rã trên trang.'
+          desc: linkedTask ? (linkedTask.content || linkedTask.description || '') : 'Khung được tác giả phân rã trên trang.'
         };
       });
       setRegions(mappedRegs);
 
+      // Auto-focus and highlight the region assigned to the assistant's active task
+      if (myTask?.region_id) {
+        setActiveRegionId(myTask.region_id);
+        const targetReg = mappedRegs.find((r: any) => r.id === myTask.region_id);
+        if (targetReg) {
+          setTimeout(() => {
+            zoomToRegion(targetReg);
+          }, 400);
+        }
+      } else if (mappedRegs.length > 0) {
+        setActiveRegionId(mappedRegs[0].id);
+        setTimeout(() => {
+          zoomToRegion(mappedRegs[0]);
+        }, 400);
+      }
+
       // Resolve latest image url as background
       const sortedVersions = [...(detail.page_version || [])].sort(
-        (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        (a: any, b: any) => b.version_number - a.version_number
       );
-      const latestImg = sortedVersions[0]?.image_url || '';
+      const latestImg = sortedVersions[0]?.image_url || detail.image_url || '';
       if (latestImg) {
         setBgImage(latestImg);
         const img = new Image();
         img.onload = () => setCanvasSize({ width: img.naturalWidth || 600, height: img.naturalHeight || 850 });
         img.src = getImageUrl(latestImg);
+      } else {
+        const fallbackUrl = "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?q=80&w=600&auto=format&fit=crop";
+        setBgImage(fallbackUrl);
+        setCanvasSize({ width: 600, height: 850 });
       }
 
       // Map feedbacks from annotations or feedbacks list
@@ -180,6 +423,13 @@ export default function DrawingStudioPage() {
         };
       });
       setFeedbacks(fbList);
+
+      // Sync selector dropdown selections to current page
+      if (detail.chapter) {
+        setSelSeriesId(detail.chapter.series_id || '');
+        setSelChapterId(detail.chapter_id || '');
+        setSelPageId(detail.page_id || '');
+      }
 
       // Load draft strokes from LocalStorage for this specific page
       const draft = localStorage.getItem(`mangaflow_drawing_draft_${pageId}`);
@@ -226,10 +476,18 @@ export default function DrawingStudioPage() {
       } else if (tool === 'select') {
         // Find clicked region
         const pos = getMousePos(e);
-        const clickedRegion = regions.find(r => 
-          pos.x >= r.x && pos.x <= r.x + r.w &&
-          pos.y >= r.y && pos.y <= r.y + r.h
-        );
+        const canvas = canvasRef.current;
+        const canvasW = canvas?.width || 600;
+        const canvasH = canvas?.height || 850;
+
+        const clickedRegion = regions.find(r => {
+          const rx = (r.x / 100) * canvasW;
+          const ry = (r.y / 100) * canvasH;
+          const rw = (r.w / 100) * canvasW;
+          const rh = (r.h / 100) * canvasH;
+          return pos.x >= rx && pos.x <= rx + rw &&
+                 pos.y >= ry && pos.y <= ry + rh;
+        });
         if (clickedRegion) {
           setActiveRegionId(clickedRegion.id);
           setActiveTab('regions');
@@ -242,16 +500,93 @@ export default function DrawingStudioPage() {
 
     if (!layers.assistantQuickEdit) return; // Cannot draw if layer hidden
 
-    setIsDrawing(true);
     const pos = getMousePos(e);
+
+    if (tool === 'eraser') {
+      setIsDrawing(true);
+      setHistory([...history, strokes]); // Save history before erasing
+      eraseStrokesNear(pos);
+      return;
+    }
+
+    // Xử lý vẽ nhãn chữ (Text) và Ghim bình luận (Pin)
+    if (tool === 'text') {
+      const textVal = prompt('Nhập văn bản ghi chú:');
+      if (!textVal) return;
+      const newStroke: Stroke = {
+        id: Date.now().toString(),
+        tool: 'text',
+        color,
+        size: brushSize,
+        points: [pos],
+        text: textVal
+      };
+      setStrokes([...strokes, newStroke]);
+      setHistory([...history, strokes]);
+      return;
+    }
+
+    if (tool === 'pin') {
+      const pinNote = prompt('Nhập nội dung ghim chú thích:');
+      if (!pinNote) return;
+      const newStroke: Stroke = {
+        id: Date.now().toString(),
+        tool: 'pin',
+        color: '#E63946', // Ghim có màu đỏ nổi bật
+        size: brushSize,
+        points: [pos],
+        text: pinNote
+      };
+      setStrokes([...strokes, newStroke]);
+      setHistory([...history, strokes]);
+      return;
+    }
+
+    setIsDrawing(true);
     const newStroke: Stroke = {
       id: Date.now().toString(),
       tool,
-      color: tool === 'eraser' ? '#ffffff' : color, 
+      color, 
       size: brushSize,
       points: [pos],
     };
     setCurrentStroke(newStroke);
+  };
+
+  const eraseStrokesNear = (pos: Point) => {
+    const eraseRadius = Math.max(20, brushSize * 6); // forgiving erase radius
+    const remainingStrokes = strokes.filter(stroke => {
+      if (stroke.points.length === 0) return false;
+      
+      // For pen: check distance to any segment/point
+      if (stroke.tool === 'pen') {
+        const isNear = stroke.points.some(pt => {
+          const dist = Math.sqrt((pt.x - pos.x) ** 2 + (pt.y - pos.y) ** 2);
+          return dist <= eraseRadius;
+        });
+        return !isNear;
+      }
+      
+      // For text, pin, rect, circle, arrow: check bounding box or start/end points
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      stroke.points.forEach(pt => {
+        if (pt.x < minX) minX = pt.x;
+        if (pt.x > maxX) maxX = pt.x;
+        if (pt.y < minY) minY = pt.y;
+        if (pt.y > maxY) maxY = pt.y;
+      });
+
+      // Pad the bounding box slightly
+      const padding = eraseRadius;
+      const insideBox = pos.x >= minX - padding && pos.x <= maxX + padding &&
+                         pos.y >= minY - padding && pos.y <= maxY + padding;
+                         
+      return !insideBox;
+    });
+
+    if (remainingStrokes.length !== strokes.length) {
+      setStrokes(remainingStrokes);
+    }
   };
 
   const draw = (e: ReactMouseEvent) => {
@@ -264,24 +599,88 @@ export default function DrawingStudioPage() {
       return;
     }
 
-    if (!isDrawing || !currentStroke) return;
+    if (!isDrawing) return;
+
+    if (tool === 'eraser') {
+      const pos = getMousePos(e);
+      eraseStrokesNear(pos);
+      return;
+    }
+
+    if (!currentStroke) return;
     
     const pos = getMousePos(e);
-    setCurrentStroke({
-      ...currentStroke,
-      points: [...currentStroke.points, pos],
-    });
+
+    // Vẽ trực tiếp nét vẽ phân đoạn lên canvas ở thời gian thực (Zero-latency drawing feedback)
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (ctx && currentStroke.points.length > 0) {
+      const prevPos = currentStroke.points[currentStroke.points.length - 1];
+      ctx.beginPath();
+      ctx.strokeStyle = currentStroke.color;
+      ctx.lineWidth = currentStroke.size;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      
+      if (currentStroke.tool === 'eraser') {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.lineWidth = currentStroke.size * 2;
+      } else {
+        ctx.globalCompositeOperation = 'source-over';
+      }
+      
+      if (currentStroke.tool === 'pen' || currentStroke.tool === 'eraser') {
+        ctx.moveTo(prevPos.x, prevPos.y);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
+    // Mutate trong mảng points để giữ hiệu năng cực cao mà không bắt React re-render liên tục khi rê chuột
+    currentStroke.points.push(pos);
   };
 
   const stopDrawing = () => {
     setIsPanning(false);
-    if (!isDrawing || !currentStroke) return;
+    if (!isDrawing) return;
     
     setIsDrawing(false);
+    if (tool === 'eraser') return;
+
+    if (!currentStroke) return;
+    
     const newStrokes = [...strokes, currentStroke];
     setStrokes(newStrokes);
-    setHistory([...history, strokes]); // Save previous state to history
+    setHistory([...history, strokes]); // Lưu trạng thái phục vụ Undo
     setCurrentStroke(null);
+  };
+
+  // --- Touch Event Handlers cho thiết bị di động/máy tính bảng ---
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      const simulatedEvent = {
+        clientX: touch.clientX,
+        clientY: touch.clientY,
+      } as any;
+      startDrawing(simulatedEvent);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      const simulatedEvent = {
+        clientX: touch.clientX,
+        clientY: touch.clientY,
+      } as any;
+      draw(simulatedEvent);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    stopDrawing();
   };
 
   const undo = () => {
@@ -325,50 +724,30 @@ export default function DrawingStudioPage() {
     // Draw Manga Annotations (Regions)
     if (layers.mangaka) {
       regions.forEach(r => {
+        // Convert percentage coordinates (0-100) to actual canvas pixels
+        const rx = (r.x / 100) * canvas.width;
+        const ry = (r.y / 100) * canvas.height;
+        const rw = (r.w / 100) * canvas.width;
+        const rh = (r.h / 100) * canvas.height;
+
         ctx.strokeStyle = r.id === activeRegionId ? '#E63946' : 'rgba(230, 57, 70, 0.5)';
         ctx.lineWidth = r.id === activeRegionId ? 4 : 2;
         ctx.setLineDash(r.id === activeRegionId ? [] : [5, 5]);
         
-        ctx.strokeRect(r.x, r.y, r.w, r.h);
+        ctx.strokeRect(rx, ry, rw, rh);
         
         // Background for active
         if (r.id === activeRegionId) {
           ctx.fillStyle = 'rgba(230, 57, 70, 0.1)';
-          ctx.fillRect(r.x, r.y, r.w, r.h);
+          ctx.fillRect(rx, ry, rw, rh);
         }
 
         ctx.setLineDash([]);
         // Label
         ctx.fillStyle = r.id === activeRegionId ? '#E63946' : 'rgba(230, 57, 70, 0.7)';
         ctx.font = 'bold 12px Inter';
-        const labelY = r.y < 15 ? r.y + 14 : r.y - 6;
-        ctx.fillText(r.name, r.x, labelY);
-      });
-    }
-
-    // Draw Manga Annotations (Pins/Markers)
-    if (layers.mangaka && pageDetail?.annotation) {
-      pageDetail.annotation.forEach((ann: any, idx: number) => {
-        if (ann.x === undefined || ann.y === undefined) return;
-        
-        const posX = (ann.x / 100) * canvas.width;
-        const posY = (ann.y / 100) * canvas.height;
-
-        // Draw pin circle
-        ctx.beginPath();
-        ctx.arc(posX, posY, 10, 0, 2 * Math.PI);
-        ctx.fillStyle = '#E63946';
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
-        ctx.fill();
-        ctx.stroke();
-
-        // Draw index/number inside the pin
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 10px Inter';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(String(idx + 1), posX, posY);
+        const labelY = ry < 15 ? ry + 14 : ry - 6;
+        ctx.fillText(r.name, rx, labelY);
       });
     }
 
@@ -424,6 +803,31 @@ export default function DrawingStudioPage() {
           ctx.lineTo(end.x, end.y);
           ctx.fillStyle = stroke.color;
           ctx.fill();
+        } else if (stroke.tool === 'text') {
+          const start = stroke.points[0];
+          ctx.fillStyle = stroke.color;
+          ctx.font = `bold ${stroke.size * 2 + 12}px sans-serif`;
+          ctx.fillText(stroke.text || '', start.x, start.y);
+        } else if (stroke.tool === 'pin') {
+          const start = stroke.points[0];
+          ctx.beginPath();
+          ctx.arc(start.x, start.y, 10, 0, 2 * Math.PI);
+          ctx.fillStyle = '#E63946';
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2;
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 11px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('!', start.x, start.y);
+
+          ctx.fillStyle = '#18181b';
+          ctx.font = 'bold 9px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(stroke.text || '', start.x, start.y + 18);
         }
         ctx.globalCompositeOperation = 'source-over';
       });
@@ -442,6 +846,147 @@ export default function DrawingStudioPage() {
     // Save draft strokes to localStorage
     localStorage.setItem(`mangaflow_drawing_draft_${pageId}`, JSON.stringify(draftData));
     showToast('Đã lưu nét vẽ nháp thành công!');
+  };
+
+  const drawStrokesToCtx = (ctx: CanvasRenderingContext2D) => {
+    const allStrokes = strokes;
+    allStrokes.forEach(stroke => {
+      if (stroke.points.length === 0) return;
+      
+      ctx.beginPath();
+      ctx.strokeStyle = stroke.color;
+      ctx.lineWidth = stroke.size;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      if (stroke.tool === 'eraser') {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.lineWidth = stroke.size * 2;
+      } else {
+        ctx.globalCompositeOperation = 'source-over';
+      }
+
+      if (stroke.tool === 'pen' || stroke.tool === 'eraser') {
+        ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+        for (let i = 1; i < stroke.points.length; i++) {
+          ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+        }
+        ctx.stroke();
+      } else if (stroke.tool === 'rect') {
+        const start = stroke.points[0];
+        const end = stroke.points[stroke.points.length - 1];
+        ctx.strokeRect(start.x, start.y, end.x - start.x, end.y - start.y);
+      } else if (stroke.tool === 'circle') {
+        const start = stroke.points[0];
+        const end = stroke.points[stroke.points.length - 1];
+        const radius = Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2));
+        ctx.beginPath();
+        ctx.arc(start.x, start.y, radius, 0, 2 * Math.PI);
+        ctx.stroke();
+      } else if (stroke.tool === 'arrow') {
+        const start = stroke.points[0];
+        const end = stroke.points[stroke.points.length - 1];
+        ctx.moveTo(start.x, start.y);
+        ctx.lineTo(end.x, end.y);
+        ctx.stroke();
+        const angle = Math.atan2(end.y - start.y, end.x - start.x);
+        ctx.beginPath();
+        ctx.moveTo(end.x, end.y);
+        ctx.lineTo(end.x - 10 * Math.cos(angle - Math.PI / 6), end.y - 10 * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(end.x - 10 * Math.cos(angle + Math.PI / 6), end.y - 10 * Math.sin(angle + Math.PI / 6));
+        ctx.lineTo(end.x, end.y);
+        ctx.fillStyle = stroke.color;
+        ctx.fill();
+      } else if (stroke.tool === 'text') {
+        const start = stroke.points[0];
+        ctx.fillStyle = stroke.color;
+        ctx.font = `bold ${stroke.size * 2 + 12}px sans-serif`;
+        ctx.fillText(stroke.text || '', start.x, start.y);
+      } else if (stroke.tool === 'pin') {
+        const start = stroke.points[0];
+        ctx.beginPath();
+        ctx.arc(start.x, start.y, 10, 0, 2 * Math.PI);
+        ctx.fillStyle = '#E63946';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('!', start.x, start.y);
+
+        ctx.fillStyle = '#18181b';
+        ctx.font = 'bold 9px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(stroke.text || '', start.x, start.y + 18);
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    });
+  };
+
+  const handleDownloadEditedImage = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    showToast('Đang xử lý hình ảnh ghép...');
+
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = canvasSize.width;
+    tempCanvas.height = canvasSize.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    if (!tempCtx) return;
+
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        tempCtx.drawImage(img, 0, 0, tempCanvas.width, tempCanvas.height);
+        drawStrokesToCtx(tempCtx);
+        
+        const dataURL = tempCanvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = `page_${pageDetail?.page_number || 'draft'}_edited.png`;
+        link.href = dataURL;
+        link.click();
+        showToast('Đã tải hình ảnh đã chỉnh sửa về máy!');
+      } catch (err) {
+        console.error('CORS or security error saving canvas:', err);
+        // Fallback: download just the drawing strokes
+        const fallbackCanvas = document.createElement('canvas');
+        fallbackCanvas.width = canvasSize.width;
+        fallbackCanvas.height = canvasSize.height;
+        const fallbackCtx = fallbackCanvas.getContext('2d');
+        if (fallbackCtx) {
+          drawStrokesToCtx(fallbackCtx);
+          const dataURL = fallbackCanvas.toDataURL('image/png');
+          const link = document.createElement('a');
+          link.download = `page_${pageDetail?.page_number || 'draft'}_strokes_only.png`;
+          link.href = dataURL;
+          link.click();
+          showToast('Tải ảnh vẽ thành công (chỉ có nét vẽ do giới hạn bảo mật ảnh nền).');
+        }
+      }
+    };
+    img.onerror = () => {
+      // Fallback: download just the drawing strokes
+      const fallbackCanvas = document.createElement('canvas');
+      fallbackCanvas.width = canvasSize.width;
+      fallbackCanvas.height = canvasSize.height;
+      const fallbackCtx = fallbackCanvas.getContext('2d');
+      if (fallbackCtx) {
+        drawStrokesToCtx(fallbackCtx);
+        const dataURL = fallbackCanvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = `page_${pageDetail?.page_number || 'draft'}_strokes_only.png`;
+        link.href = dataURL;
+        link.click();
+        showToast('Tải ảnh vẽ thành công (chỉ có nét vẽ).');
+      }
+    };
+    img.src = getImageUrl(bgImage);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -513,9 +1058,16 @@ export default function DrawingStudioPage() {
     // Center the region
     setScale(1.5);
     setTimeout(() => {
-      if (containerRef.current) {
-        const cx = (r.x + r.w / 2) * 1.5;
-        const cy = (r.y + r.h / 2) * 1.5;
+      if (containerRef.current && canvasRef.current) {
+        const canvasW = canvasRef.current.width;
+        const canvasH = canvasRef.current.height;
+        const rx = (r.x / 100) * canvasW;
+        const ry = (r.y / 100) * canvasH;
+        const rw = (r.w / 100) * canvasW;
+        const rh = (r.h / 100) * canvasH;
+
+        const cx = (rx + rw / 2) * 1.5;
+        const cy = (ry + rh / 2) * 1.5;
         containerRef.current.scrollLeft = cx - containerRef.current.clientWidth / 2;
         containerRef.current.scrollTop = cy - containerRef.current.clientHeight / 2;
       }
@@ -531,31 +1083,91 @@ export default function DrawingStudioPage() {
     );
   }
 
+  if (!pageId) {
+    return (
+      <div className="flex-1 bg-white border-4 border-manga-ink p-12 text-center shadow-[6px_6px_0px_rgba(0,0,0,1)] my-8 max-w-[800px] mx-auto flex flex-col items-center justify-center min-h-[300px]">
+        <Pen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+        <h3 className="font-manga text-2xl font-bold uppercase text-manga-ink">Không có phân công vẽ</h3>
+        <p className="text-sm font-semibold text-gray-500 mt-2 max-w-md mx-auto">
+          Hiện tại bạn chưa được giao bất kỳ vùng vẽ nào từ tác giả (Mangaka). Vui lòng đợi tác giả giao nhiệm vụ vẽ hoặc chỉnh sửa phác thảo.
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col h-[calc(100vh-6rem)] min-h-[700px] font-sans">
+    <div className="flex flex-col h-full w-full font-sans overflow-hidden">
       
       {/* Top Banner Note */}
-      <div className="bg-amber-50 border-b border-amber-200 p-2 text-center text-xs font-bold text-amber-700 flex justify-center items-center gap-2">
+      <div className="bg-amber-50 border-b border-amber-200 p-2 text-center text-xs font-bold text-amber-700 flex justify-center items-center gap-2 shrink-0">
         <AlertTriangle className="w-4 h-4" />
         Chỉnh sửa trên web chỉ dùng cho annotation và chỉnh sửa nhanh. Assistant có thể tải file về chỉnh sửa chuyên sâu bằng Clip Studio Paint rồi upload kết quả lại.
       </div>
 
       {/* Top Toolbar */}
       <div className="bg-white border-b-4 border-manga-ink p-4 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 shrink-0">
-        <div className="min-w-0">
-          <h1 className="font-manga text-xl font-bold uppercase text-manga-red tracking-wide truncate">
-            KHÔNG GIAN LÀM VIỆC — TRANG {pageDetail?.page_number}
-          </h1>
-          <div className="flex items-center gap-2 text-xs font-bold text-gray-500 mt-1 whitespace-nowrap overflow-x-auto pb-1 hide-scrollbar">
-            <span className="text-manga-ink">{pageDetail?.chapter?.series?.title || 'Series'}</span>
-            <span>•</span>
-            <span>{pageDetail?.chapter?.title} - Trang {pageDetail?.page_number}</span>
-            <span>•</span>
-            <span className="text-[#3b82f6] uppercase border border-[#3b82f6] px-1.5 py-0.5 rounded">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 pb-1">
+            {/* Quay lại Button */}
+            <button
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-1 px-2.5 py-1 bg-white border-2 border-black font-black uppercase text-[10px] shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 hover:shadow-[1px_1px_0px_rgba(0,0,0,1)] transition cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Quay lại
+            </button>
+
+            <span className="font-manga text-xl font-bold uppercase text-manga-red tracking-wide shrink-0">
+              KHÔNG GIAN LÀM VIỆC —
+            </span>
+            
+            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm font-bold text-manga-ink">
+              {/* Series Select */}
+              <select
+                value={selSeriesId}
+                onChange={(e) => handleSeriesChange(e.target.value)}
+                className="border-b-2 border-black border-t-0 border-l-0 border-r-0 pb-0.5 font-bold text-sm bg-transparent uppercase focus:outline-none cursor-pointer max-w-[200px] truncate"
+              >
+                {getSeriesOptions().map(s => (
+                  <option key={s.series_id} value={s.series_id}>{s.title}</option>
+                ))}
+              </select>
+              
+              <span className="text-gray-400 font-bold shrink-0">/</span>
+              
+              {/* Chapter Select */}
+              <select
+                value={selChapterId}
+                onChange={(e) => handleChapterChange(e.target.value)}
+                disabled={getChapterOptions().length === 0}
+                className="border-b-2 border-black border-t-0 border-l-0 border-r-0 pb-0.5 font-bold text-sm bg-transparent uppercase focus:outline-none disabled:opacity-50 cursor-pointer max-w-[200px] truncate"
+              >
+                {getChapterOptions().map(c => (
+                  <option key={c.chapter_id} value={c.chapter_id}>CH.{c.chapter_number}: {c.title}</option>
+                ))}
+              </select>
+              
+              <span className="text-gray-400 font-bold shrink-0">/</span>
+              
+              {/* Page Select */}
+              <select
+                value={selPageId}
+                onChange={(e) => handlePageChange(e.target.value)}
+                disabled={getPageOptions().length === 0}
+                className="border-b-2 border-black border-t-0 border-l-0 border-r-0 pb-0.5 font-bold text-sm bg-transparent uppercase focus:outline-none disabled:opacity-50 cursor-pointer"
+              >
+                {getPageOptions().map(p => (
+                  <option key={p.page_id} value={p.page_id}>Trang {p.page_number}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs font-bold text-gray-500 mt-1">
+            <span className="text-[#3b82f6] uppercase border border-[#3b82f6] px-1.5 py-0.5 rounded shrink-0">
               {activeTask ? activeTask.task_type.toUpperCase() : 'DRAWING'}
             </span>
-            <span>•</span>
-            <span className="text-[#E63946]">Hạn: {activeTask?.deadline ? new Date(activeTask.deadline).toLocaleDateString() : 'N/A'}</span>
+            <span className="text-[#E63946] shrink-0">Hạn: {activeTask?.deadline ? new Date(activeTask.deadline).toLocaleDateString() : 'N/A'}</span>
           </div>
         </div>
 
@@ -585,6 +1197,13 @@ export default function DrawingStudioPage() {
             className="flex items-center gap-1.5 px-3 py-2 bg-white border-2 border-manga-ink text-manga-ink font-bold text-xs uppercase hover:bg-gray-100 transition cursor-pointer"
           >
             <Save className="w-4 h-4" /> Lưu bản nháp nét vẽ
+          </button>
+
+          <button 
+            onClick={handleDownloadEditedImage}
+            className="flex items-center gap-1.5 px-3 py-2 bg-[#457B9D] border-2 border-black text-white font-bold text-xs uppercase hover:bg-[#356280] transition cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 hover:shadow-[1px_1px_0px_rgba(0,0,0,1)]"
+          >
+            <FileImage className="w-4 h-4" /> Tải ảnh đã sửa
           </button>
 
           <label className={`flex items-center gap-1.5 px-3 py-2 bg-manga-ink border-2 border-manga-ink text-white font-bold text-xs uppercase hover:bg-gray-800 transition cursor-pointer ${isUploading ? 'opacity-50' : ''}`}>
@@ -698,7 +1317,7 @@ export default function DrawingStudioPage() {
                   )}
 
                   {/* Interactive Canvas */}
-                  <canvas
+                   <canvas
                     ref={canvasRef}
                     width={canvasSize.width}
                     height={canvasSize.height}
@@ -707,6 +1326,10 @@ export default function DrawingStudioPage() {
                     onMouseMove={draw}
                     onMouseUp={stopDrawing}
                     onMouseLeave={stopDrawing}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                    onTouchCancel={handleTouchEnd}
                   />
                 </div>
               </div>
@@ -771,17 +1394,45 @@ export default function DrawingStudioPage() {
                       
                       {/* Change Status */}
                       <select 
-                        className="w-full border border-gray-300 p-1.5 text-xs font-bold cursor-pointer hover:border-[#E63946] focus:outline-none"
+                        className="w-full border border-gray-300 p-1.5 text-xs font-bold cursor-pointer hover:border-[#E63946] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                         value={r.status}
-                        onChange={(e) => {
-                          const newRegions = regions.map(reg => reg.id === r.id ? { ...reg, status: e.target.value as any } : reg);
+                        disabled={r.status === 'Đã xong'}
+                        onChange={async (e) => {
+                          const newStatus = e.target.value;
+                          const newRegions = regions.map(reg => reg.id === r.id ? { ...reg, status: newStatus as any } : reg);
                           setRegions(newRegions);
+
+                          // Find matching task and update status in database
+                          const regionLabel = r.name;
+                          const task = pageDetail?.page_task?.find((t: any) => {
+                            if (t.region_id && t.region_id === r.id) return true;
+                            if (t.content && t.content.toLowerCase().includes(regionLabel.toLowerCase())) return true;
+                            return false;
+                          });
+
+                          if (task) {
+                            try {
+                              if (newStatus === 'Đang làm') {
+                                await assistantService.startTask(task.task_id);
+                                showToast(`Đã bắt đầu làm nhiệm vụ [${regionLabel}]!`);
+                              } else if (newStatus === 'Chưa làm') {
+                                await assistantService.holdTaskWorkflow(task.task_id);
+                                showToast(`Đã tạm dừng nhiệm vụ [${regionLabel}].`);
+                              }
+                              // Refresh details to sync all states
+                              const detail = await assistantService.getDrawingPageDetail(pageId);
+                              setPageDetail(detail);
+                            } catch (err: any) {
+                              console.error(err);
+                              showToast('Không thể cập nhật trạng thái nhiệm vụ lên máy chủ.');
+                            }
+                          }
                         }}
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <option>Chưa làm</option>
-                        <option>Đang làm</option>
-                        <option>Đã xong</option>
+                        {r.status === 'Đã xong' && <option value="Đã xong">Đã xong</option>}
+                        <option value="Chưa làm" disabled={r.status === 'Đang làm'}>Chưa làm</option>
+                        <option value="Đang làm">Đang làm</option>
                       </select>
                     </div>
                   ))}

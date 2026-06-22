@@ -39,18 +39,20 @@ export function SharedLayout({ header }: SharedLayoutProps) {
     return <Navigate to="/login" replace />
   }
 
+  const isDrawingStudio = location.pathname.includes('/drawing-studio');
+
   const isDashboardRoot = location.pathname === '/dashboard/mangaka' || 
                           location.pathname === '/dashboard/assistant' ||
-                          location.pathname === '/dashboard/board' ||
-                          location.pathname === '/dashboard/tantou';
+                          location.pathname === '/dashboard/editorial-board' ||
+                          location.pathname === '/dashboard/tantou-editor';
 
   return (
     <div className="flex h-screen bg-[#fafafa] font-sans text-manga-ink overflow-hidden">
       <SharedSidebar />
       <div className="flex-1 flex flex-col ml-64 h-full overflow-hidden">
         {header}
-        <main className="flex-1 p-8 overflow-y-auto relative">
-          {!isDashboardRoot && (
+        <main className={`flex-1 relative ${isDrawingStudio ? 'p-0 overflow-hidden' : 'p-8 overflow-y-auto'}`}>
+          {!isDashboardRoot && !isDrawingStudio && (
             <button
               onClick={() => navigate(-1)}
               className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-manga-ink hover:text-[#E63946] transition-colors mb-6 focus:outline-none cursor-pointer"

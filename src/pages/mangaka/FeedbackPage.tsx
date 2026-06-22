@@ -47,9 +47,28 @@ export default function FeedbackPage() {
       // 3. Load feedbacks
       const rawFeedbacks = await feedbackService.getAll()
 
+      // Get current logged-in user from localStorage
+      const storedUser = localStorage.getItem('mangaflow_user')
+      let currentUserId = ''
+      if (storedUser) {
+        try {
+          const parsed = JSON.parse(storedUser)
+          currentUserId = parsed.id || parsed.user_id || ''
+        } catch (e) {
+          console.error('Failed to parse user from localStorage', e)
+        }
+      }
+
+      // Filter: Only keep feedbacks from the Editor (Tantou).
+      // Editor's comments are in page_task_feedback with editor's user_id as mangaka_id.
+      // So fb.mangaka_id must not be null (excluding Assistant comments) and must not be current Mangaka's ID.
+      const filteredRaw = rawFeedbacks.filter(
+        (fb) => fb.mangaka_id !== null && fb.mangaka_id !== currentUserId
+      )
+
       // 4. Resolve submission details for each feedback in parallel
       const mappedFeedbacks: EditorFeedback[] = await Promise.all(
-        rawFeedbacks.map(async (fb) => {
+        filteredRaw.map(async (fb) => {
           try {
             let pageNumber: number | undefined
             let chapterNumber: number | undefined

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { Bell, AlertTriangle, RefreshCw, FileText, Star, Vote, AlertCircle, X } from 'lucide-react'
 import { boardService } from '@/services/board.service'
+import api from '@/services/api'
 
 export interface Notification {
   id: string
@@ -45,7 +46,23 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     if (!userStr) return
 
     try {
-      const data = await boardService.getBoardNotifications()
+      let data = []
+      let role = ''
+      try {
+        const parsed = JSON.parse(userStr)
+        role = parsed.role || ''
+      } catch (e) {
+        // ignore
+      }
+
+      if (role === 'BOARD' || role === 'EDITORIAL_BOARD') {
+        data = await boardService.getBoardNotifications()
+      } else {
+        // Fetch general notifications for other roles to avoid 403 Forbidden
+        const res = await api.get('/api/notifications')
+        data = res.data.data
+      }
+
       // Map API data to Notification interface
       if (data && Array.isArray(data)) {
         const mapped = data.map((item: any) => ({

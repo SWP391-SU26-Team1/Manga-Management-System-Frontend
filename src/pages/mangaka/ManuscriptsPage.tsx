@@ -6,6 +6,7 @@ import { chapterService } from '@/services/chapter.service'
 import { pageService } from '@/services/page.service'
 import { uploadService } from '@/services/upload.service'
 import { manuscriptService, ManuscriptAPI } from '@/services/manuscript.service'
+import { rankingService } from '@/services/ranking.service'
 
 const getChapterDisplayStatus = (ch: any, m?: any) => {
   if (m) {
@@ -20,7 +21,7 @@ const getChapterDisplayStatus = (ch: any, m?: any) => {
         return 'ĐANG SOẠN'
       case 'needs_revision':
       case 'rejected':
-        return 'CẦN CHỈNH SỬA'
+        return 'NHẬN XÉT TỪ EDITOR'
       case 'submitted':
       case 'in_review':
         return 'CHỜ BOARD DUYỆT'
@@ -44,7 +45,7 @@ const getChapterDisplayStatus = (ch: any, m?: any) => {
     case 'published':
       return 'ĐÃ DUYỆT'
     case 'rejected':
-      return 'CẦN CHỈNH SỬA'
+      return 'NHẬN XÉT TỪ EDITOR'
     default:
       return 'ĐANG VẼ LỚP'
   }
@@ -56,8 +57,8 @@ const getStatusDisplay = (displayStatus: string) => {
       return { label: 'ĐANG SOẠN', classes: 'bg-orange-500 text-white border-2 border-black font-extrabold' }
     case 'GỢI Ý TỪ TRỢ LÝ':
       return { label: 'GỢI Ý TỪ TRỢ LÝ', classes: 'bg-red-550 bg-red-500 text-white border-2 border-black font-extrabold' }
-    case 'CẦN CHỈNH SỬA':
-      return { label: 'CẦN CHỈNH SỬA', classes: 'bg-red-500 text-white border-2 border-red-500 font-extrabold' }
+    case 'NHẬN XÉT TỪ EDITOR':
+      return { label: 'NHẬN XÉT TỪ EDITOR', classes: 'bg-red-500 text-white border-2 border-black font-extrabold' }
     case 'ĐANG VẼ LỚP':
       return { label: 'ĐANG VẼ LỚP', classes: 'bg-black text-white border-2 border-black font-extrabold' }
     case 'CHỜ BOARD DUYỆT':
@@ -74,6 +75,7 @@ export default function ManuscriptsPage() {
   const [manuscripts, setManuscripts] = useState<ManuscriptAPI[]>([])
   const [chapterPagesMap, setChapterPagesMap] = useState<{ [key: string]: number }>({})
   const [seriesList, setSeriesList] = useState<SeriesAPI[]>([])
+  const [notifications, setNotifications] = useState<any[]>([])
   
   const [activeTab, setActiveTab] = useState('TẤT CẢ')
   const [showSubmitModal, setShowSubmitModal] = useState(false)
@@ -89,6 +91,7 @@ export default function ManuscriptsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [viewingSuggestion, setViewingSuggestion] = useState<any | null>(null)
+  const [viewingEditorComment, setViewingEditorComment] = useState<any | null>(null)
 
   // Load data from services
   const loadData = async () => {
@@ -113,6 +116,14 @@ export default function ManuscriptsPage() {
 
       setChapters(allChs)
       setManuscripts(allMs)
+
+      // Fetch notifications to extract editor feedback notes
+      try {
+        const notifs = await rankingService.getNotifications()
+        setNotifications(notifs)
+      } catch (err) {
+        console.error('Failed to load notifications:', err)
+      }
 
       // Fetch page counts for all chapters in parallel
       const pageCountsMap: { [key: string]: number } = {}
@@ -265,6 +276,17 @@ export default function ManuscriptsPage() {
     const displayStatus = getChapterDisplayStatus(ch, latestManuscript)
     const statusDisplay = getStatusDisplay(displayStatus)
 
+    // Find editor feedback from notifications matching type ms_fb:<manuscriptId>
+    let editorComment = ''
+    if (latestManuscript) {
+      const matchNotif = notifications.find(
+        (n) => n.type === `ms_fb:${latestManuscript._id}`
+      )
+      if (matchNotif) {
+        editorComment = matchNotif.content
+      }
+    }
+
     return {
       id: ch._id,
       seriesId: ch.series_id,
@@ -277,6 +299,7 @@ export default function ManuscriptsPage() {
       displayStatus: displayStatus,
       statusDisplay: statusDisplay,
       latestManuscript: latestManuscript,
+      editorComment: editorComment,
       createdAt: ch.created_at
     }
   })
@@ -295,7 +318,7 @@ export default function ManuscriptsPage() {
   // Calculate stats
   const totalChapters = enrichedChapters.length
   const drawingCount = enrichedChapters.filter(ch => ch.displayStatus === 'ĐANG VẼ LỚP').length
-  const needFixCount = enrichedChapters.filter(ch => ch.displayStatus === 'CẦN CHỈNH SỬA').length
+  const needFixCount = enrichedChapters.filter(ch => ch.displayStatus === 'NHẬN XÉT TỪ EDITOR').length
   const completedCount = enrichedChapters.filter(ch => ch.displayStatus === 'ĐÃ DUYỆT').length
 
   if (isLoading) {
@@ -367,7 +390,7 @@ export default function ManuscriptsPage() {
           <div className="border-2 border-[#E63946] bg-white p-5 flex flex-col items-center justify-center shadow-[4px_4px_0px_rgba(0,0,0,1)]">
             <AlertTriangle className="w-6 h-6 mb-2 text-[#E63946]" />
             <span className="text-3xl font-black font-mono text-[#E63946] leading-none">{needFixCount}</span>
-            <span className="text-[9px] font-extrabold text-[#E63946] mt-2 uppercase tracking-widest">CẦN CHỈNH SỬA</span>
+            <span className="text-[9px] font-extrabold text-[#E63946] mt-2 uppercase tracking-widest">NHẬN XÉT TỪ EDITOR</span>
           </div>
 
           <div className="border-2 border-black bg-white p-5 flex flex-col items-center justify-center shadow-[4px_4px_0px_rgba(0,0,0,1)]">
@@ -379,7 +402,7 @@ export default function ManuscriptsPage() {
 
         {/* Filters Tabs */}
         <div className="flex gap-2 mb-6 flex-wrap">
-          {['TẤT CẢ', 'ĐANG SOẠN', 'GỢI Ý TỪ TRỢ LÝ', 'CẦN CHỈNH SỬA', 'ĐANG VẼ LỚP', 'CHỜ BOARD DUYỆT', 'ĐÃ DUYỆT'].map(tab => (
+          {['TẤT CẢ', 'ĐANG SOẠN', 'GỢI Ý TỪ TRỢ LÝ', 'NHẬN XÉT TỪ EDITOR', 'ĐANG VẼ LỚP', 'CHỜ BOARD DUYỆT', 'ĐÃ DUYỆT'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -410,7 +433,7 @@ export default function ManuscriptsPage() {
             <tbody>
               {filteredChapters.map((ch) => {
                 const statusDisplay = ch.statusDisplay
-                const isNeedFix = statusDisplay.label === 'CẦN CHỈNH SỬA'
+                const isNeedFix = statusDisplay.label === 'NHẬN XÉT TỪ EDITOR'
 
                 return (
                   <tr key={ch.id} className="border-b-2 border-black font-semibold text-xs text-black">
@@ -461,6 +484,15 @@ export default function ManuscriptsPage() {
                           >
                             <BookOpen className="w-3.5 h-3.5 flex-shrink-0 text-red-650" />
                             XEM GỢI Ý TỪ TRỢ LÝ
+                          </button>
+                        )}
+                        {ch.displayStatus === 'NHẬN XÉT TỪ EDITOR' && ch.latestManuscript && (
+                          <button
+                            onClick={() => setViewingEditorComment(ch)}
+                            className="flex items-center gap-1.5 text-[10px] font-black text-red-600 uppercase hover:underline text-left whitespace-nowrap cursor-pointer"
+                          >
+                            <BookOpen className="w-3.5 h-3.5 flex-shrink-0 text-red-650" />
+                            XEM NHẬN XÉT TỪ EDITOR
                           </button>
                         )}
                         {isNeedFix && ch.latestManuscript && (
@@ -715,6 +747,52 @@ export default function ManuscriptsPage() {
               >
                 Đến trang cộng tác kịch bản
               </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Viewing Editor Comment Modal */}
+      {viewingEditorComment && viewingEditorComment.latestManuscript && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white border-4 border-black w-full max-w-2xl shadow-[8px_8px_0px_rgba(0,0,0,1)] flex flex-col max-h-[90vh]">
+            <div className="bg-black text-white p-4 flex justify-between items-center border-b-2 border-black flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-[#E63946]" />
+                <span className="font-manga text-lg font-bold uppercase tracking-wider">Xem Nhận Xét Từ Editor</span>
+              </div>
+              <button onClick={() => setViewingEditorComment(null)} className="text-white hover:text-[#E63946] cursor-pointer">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4 overflow-y-auto flex-1 text-black">
+              <div className="flex flex-wrap gap-2 mb-2">
+                <span className="bg-black text-white text-[9px] font-black uppercase px-2 py-0.5">
+                  Tác phẩm: {viewingEditorComment.seriesTitle}
+                </span>
+                <span className="bg-gray-100 border border-black text-black text-[9px] font-black uppercase px-2 py-0.5">
+                  Chương {viewingEditorComment.chapterNumber}: {viewingEditorComment.title}
+                </span>
+              </div>
+
+              <h2 className="font-manga text-2xl font-black text-black border-b-2 border-dashed border-gray-250 pb-2 uppercase">
+                {viewingEditorComment.latestManuscript.title}
+              </h2>
+
+              <div className="bg-red-50 border-2 border-red-500 p-4 font-sans text-sm leading-relaxed whitespace-pre-wrap max-h-[50vh] overflow-y-auto">
+                {viewingEditorComment.editorComment || <em className="text-gray-400">Không có ý kiến nhận xét chi tiết...</em>}
+              </div>
+            </div>
+
+            <div className="p-4 border-t-2 border-dashed border-gray-200 flex gap-4 bg-gray-50 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setViewingEditorComment(null)}
+                className="w-full py-3 bg-[#E63946] text-white border-2 border-black font-black uppercase text-center transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:bg-red-750 text-xs flex items-center justify-center gap-2 cursor-pointer"
+              >
+                Đồng ý và Quay lại
+              </button>
             </div>
           </div>
         </div>

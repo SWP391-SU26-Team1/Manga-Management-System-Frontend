@@ -16,7 +16,7 @@ export const mangakaNav = [
   { label: 'Trang Chủ', path: '/dashboard/mangaka', icon: LayoutDashboard },
   { label: 'Series của tôi', path: '/dashboard/mangaka/series', icon: BookOpen },
   { label: 'Tạo Series mới', path: '/dashboard/mangaka/create-series', icon: PlusSquare },
-  { label: 'Tạo Bản Thảo mới', path: '/dashboard/mangaka/create-manuscript', icon: FilePlus },
+  { label: 'Nộp Bản Thảo mới', path: '/dashboard/mangaka/create-manuscript', icon: FilePlus },
   { label: 'Quản lý Chapter', path: '/dashboard/mangaka/manuscripts', icon: FileText },
   { label: 'Giao việc trợ lý', path: '/dashboard/mangaka/assign-task', icon: ClipboardList },
   { label: 'Duyệt kết quả', path: '/dashboard/mangaka/submission', icon: Clock },

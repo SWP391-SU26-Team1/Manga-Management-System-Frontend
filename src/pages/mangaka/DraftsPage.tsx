@@ -162,7 +162,7 @@ export default function DraftsPage() {
               to="/dashboard/mangaka/create-manuscript"
               className="bg-[#E63946] text-white border-2 border-black font-bold uppercase py-2.5 px-5 shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none transition-all flex items-center gap-2 text-xs"
             >
-              + TẠO BẢN THẢO MỚI
+              + NỘP BẢN THẢO CHO TANTOU
             </Link>
           </div>
 
@@ -183,7 +183,7 @@ export default function DraftsPage() {
                 to="/dashboard/mangaka/create-manuscript"
                 className="inline-block px-5 py-2.5 border-2 border-black bg-white font-bold text-xs uppercase shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:bg-gray-100"
               >
-                Gửi bản thảo cho trợ lý
+                Nộp bản thảo cho Tantou Editor
               </Link>
             </div>
           ) : (

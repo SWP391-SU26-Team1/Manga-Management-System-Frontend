@@ -7,7 +7,7 @@ import { rankingService } from '@/services/ranking.service'
 const mapType = (backendType: string): "Assistant" | "Editor" | "Board" | "Ranking" | "System" => {
   const t = (backendType || '').toLowerCase();
   if (t.includes('task') || t.includes('submission')) return 'Assistant';
-  if (t.includes('editor') || t.includes('feedback')) return 'Editor';
+  if (t.includes('editor') || t.includes('feedback') || t.includes('ms_fb')) return 'Editor';
   if (t.includes('review') || t.includes('vote') || t.includes('board') || t.includes('chapter_approved')) return 'Board';
   if (t.includes('ranking')) return 'Ranking';
   return 'System';
@@ -16,6 +16,7 @@ const mapType = (backendType: string): "Assistant" | "Editor" | "Board" | "Ranki
 const mapLink = (backendType: string): string => {
   const t = (backendType || '').toLowerCase();
   if (t.includes('task') || t.includes('submission')) return '/dashboard/mangaka/submission';
+  if (t.includes('ms_fb')) return '/dashboard/mangaka/manuscripts';
   if (t.includes('feedback') || t.includes('editor')) return '/dashboard/mangaka/feedback';
   if (t.includes('ranking')) return '/dashboard/mangaka/ranking';
   return '';
@@ -52,7 +53,7 @@ const translateNotification = (title: string, content: string, type: string) => 
   } else if (t === 'task_overdue' || lowerTitle.includes('task overdue') || lowerTitle.includes('quá hạn')) {
     viTitle = 'CẢNH BÁO QUÁ HẠN!';
     viContent = content || 'Nhiệm vụ của trợ lý đã quá hạn chót nộp bài.';
-  } else if (t === 'feedback_created' || lowerTitle.includes('feedback created') || lowerTitle.includes('nhận xét')) {
+  } else if (t === 'feedback_created' || t.startsWith('ms_fb') || lowerTitle.includes('feedback created') || lowerTitle.includes('nhận xét')) {
     viTitle = 'Phản hồi mới từ Editor';
     viContent = content || 'Editor đã gửi nhận xét mới cho bản thảo của bạn.';
   } else if (t === 'user_mentioned' || lowerTitle.includes('user mentioned') || lowerTitle.includes('nhắc đến')) {

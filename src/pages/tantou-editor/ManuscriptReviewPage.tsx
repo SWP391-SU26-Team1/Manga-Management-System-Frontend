@@ -83,21 +83,38 @@ export default function ManuscriptReviewPage() {
       const data = res.data || res
       const list: ApiManuscript[] = Array.isArray(data) ? data : (data.manuscripts || data.items || [])
 
-      const displayList: DisplayManuscript[] = list
-        .filter(m => ['submitted', 'in_review'].includes(m.status?.toLowerCase()))
-        .map(m => ({
-          id: m.manuscript_id,
-          seriesId: m.series_id || m.series?.series_id,
-          chapterId: m.chapter_id || m.chapter?.chapter_id,
-          series: m.series?.title || m.title || '—',
-          chapter: m.chapter?.title || `Ch.${m.chapter?.chapter_number || ''}`,
-          status: mapApiStatusToDisplay(m.status),
-          mangaka: m.mangaka?.name || m.mangaka?.username || '—',
-          mangakaId: m.mangaka?.user_id || m.mangaka_id,
-          pages: [],
-          annotations: {},
-          content: m.content
-        }))
+      const filteredList = list.filter(m => ['submitted', 'in_review'].includes(m.status?.toLowerCase()))
+
+      // Fetch full details for each filtered manuscript to get series, chapter, and mangaka info
+      const detailedList = await Promise.all(
+        filteredList.map(async (m) => {
+          try {
+            const rawDetail = await editorService.getManuscriptDetail(m.manuscript_id)
+            return rawDetail.data || rawDetail
+          } catch (e) {
+            console.error(`Failed to fetch detail for ${m.manuscript_id}:`, e)
+            return m
+          }
+        })
+      )
+
+      const displayList: DisplayManuscript[] = detailedList.map(m => ({
+        id: m.manuscript_id,
+        seriesId: m.series_id || m.series?.series_id,
+        chapterId: m.chapter_id || m.chapter?.chapter_id,
+        series: m.series?.title || m.title || '—',
+        chapter: m.chapter
+          ? (m.chapter.title
+              ? `Chương ${m.chapter.chapter_number}: ${m.chapter.title}`
+              : `Chương ${m.chapter.chapter_number}`)
+          : (m.title || '—'),
+        status: mapApiStatusToDisplay(m.status),
+        mangaka: m.mangaka?.name || m.mangaka?.username || '—',
+        mangakaId: m.mangaka?.user_id || m.mangaka_id,
+        pages: [],
+        annotations: {},
+        content: m.content
+      }))
 
       // Sort: SUBMITTED first, then IN_REVIEW, then others
       const statusOrder: Record<string, number> = { SUBMITTED: 0, IN_REVIEW: 1, APPROVED: 2, REJECTED: 3 }
@@ -107,7 +124,6 @@ export default function ManuscriptReviewPage() {
       if (displayList.length > 0) {
         const firstId = displayList[0].id
         setSelectedManuscriptId(firstId)
-        fetchManuscriptDetail(firstId, displayList)
       } else {
         setSelectedManuscriptId('')
       }
@@ -130,6 +146,14 @@ export default function ManuscriptReviewPage() {
             ...m,
             seriesId: detail.series_id || detail.series?.series_id || m.seriesId,
             chapterId: detail.chapter_id || detail.chapter?.chapter_id || m.chapterId,
+            series: detail.series?.title || detail.title || m.series,
+            chapter: detail.chapter
+              ? (detail.chapter.title
+                  ? `Chương ${detail.chapter.chapter_number}: ${detail.chapter.title}`
+                  : `Chương ${detail.chapter.chapter_number}`)
+              : (detail.title || m.chapter),
+            mangaka: detail.mangaka?.name || detail.mangaka?.username || m.mangaka,
+            mangakaId: detail.mangaka?.user_id || detail.mangaka_id || m.mangakaId,
             content: detail.content || m.content
           }
         }

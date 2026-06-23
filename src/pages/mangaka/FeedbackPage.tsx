@@ -7,6 +7,7 @@ import { feedbackService } from '@/services/feedback.service'
 import { seriesService } from '@/services/series.service'
 import { chapterService } from '@/services/chapter.service'
 import { manuscriptService } from '@/services/manuscript.service'
+import { rankingService } from '@/services/ranking.service'
 import api from '@/services/api'
 
 export default function FeedbackPage() {
@@ -45,6 +46,14 @@ export default function FeedbackPage() {
           }
         })
       )
+
+      // 2.5. Load notifications for current user to capture text manuscript rejections
+      let userNotifications: any[] = []
+      try {
+        userNotifications = await rankingService.getNotifications()
+      } catch (err) {
+        console.error('Failed to load notifications for feedback:', err)
+      }
 
       // 3. Load feedbacks
       const rawFeedbacks = await feedbackService.getAll()
@@ -94,7 +103,7 @@ export default function FeedbackPage() {
             // Severity heuristic if not provided
             let severity: 'Low' | 'Medium' | 'High' | 'Critical' = 'Medium'
             const lowerContent = fb.content.toLowerCase()
-            if (lowerContent.includes('critical') || lowerContent.includes('gấp') || lowerContent.includes('khẩn cấp') || lowerContent.includes('lỗi nặng')) {
+            if (lowerContent.includes('critical') || lowerContent.includes('gấp') || lowerContent.includes('khần cấp') || lowerContent.includes('lỗi nặng')) {
               severity = 'Critical'
             } else if (lowerContent.includes('high') || lowerContent.includes('quan trọng') || lowerContent.includes('sai lệch')) {
               severity = 'High'
@@ -145,6 +154,24 @@ export default function FeedbackPage() {
             await Promise.all(
               rejectedManuscripts.map(async (m) => {
                 try {
+                  // Check if there are matching overall rejection notifications
+                  const matchNotifs = userNotifications.filter(n => n.type === `ms_fb:${m._id}`)
+                  matchNotifs.forEach((n) => {
+                    manuscriptFeedbacks.push({
+                      id: n.notification_id,
+                      sender: 'Tantou Editor',
+                      seriesId: s._id,
+                      seriesTitle: s.title,
+                      chapterNumber: (m as any).chapter?.chapter_number || (m as any).chapter_number || 1,
+                      isAnnotation: false,
+                      isNotification: true,
+                      content: `[LÝ DO TỪ CHỐI TỔNG THỂ]: ${n.content}`,
+                      severity: 'Critical',
+                      status: n.is_read ? 'Resolved' : 'Open',
+                      createdAt: n.created_at || m.updated_at || m.created_at
+                    })
+                  })
+
                   const filesRes = await api.get<{ success: boolean; data: any[] }>('/api/manuscript-files', {
                     params: { manuscriptId: m._id }
                   })
@@ -215,6 +242,8 @@ export default function FeedbackPage() {
       const fb = feedbacks.find(f => f.id === id)
       if (fb?.isAnnotation) {
         await api.patch(`/api/annotations/${id}/status`, { status: 'resolved' })
+      } else if (fb?.isNotification) {
+        await rankingService.markAsRead(id)
       } else {
         await feedbackService.delete(id)
       }

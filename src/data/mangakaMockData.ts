@@ -109,6 +109,7 @@ export interface EditorFeedback {
   pageNumber?: number;
   pageId?: string;
   isAnnotation?: boolean;
+  isNotification?: boolean;
   content: string;
   severity: "Low" | "Medium" | "High" | "Critical";
   status: "Open" | "Resolved";

@@ -78,6 +78,8 @@ export interface ApiManuscript {
   chapter?: ApiChapter
   files?: ApiManuscriptFile[]
   mangaka?: { user_id: string; username: string; name?: string }
+  content?: string
+  mangaka_id?: string
 }
 
 // Manuscript File

@@ -17,8 +17,9 @@ const getChapterDisplayStatus = (ch: any, m?: any) => {
       case 'draft':
         return 'ĐANG SOẠN'
       case 'needs_revision':
-      case 'rejected':
         return 'NHẬN XÉT TỪ EDITOR'
+      case 'rejected':
+        return 'TỪ CHỐI'
       case 'submitted':
       case 'in_review':
         return 'CHỜ TANTOU DUYỆT'
@@ -46,7 +47,7 @@ const getChapterDisplayStatus = (ch: any, m?: any) => {
     case 'published':
       return 'ĐÃ XUẤT BẢN'
     case 'rejected':
-      return 'NHẬN XÉT TỪ EDITOR'
+      return 'TỪ CHỐI'
     default:
       return 'ĐANG VẼ LỚP'
   }
@@ -60,6 +61,8 @@ const getStatusDisplay = (displayStatus: string) => {
       return { label: 'GỢI Ý TỪ TRỢ LÝ', classes: 'bg-red-500 text-white border-2 border-black font-extrabold' }
     case 'NHẬN XÉT TỪ EDITOR':
       return { label: 'NHẬN XÉT TỪ EDITOR', classes: 'bg-red-500 text-white border-2 border-black font-extrabold' }
+    case 'TỪ CHỐI':
+      return { label: 'TỪ CHỐI', classes: 'bg-red-600 text-white border-2 border-black font-extrabold animate-pulse' }
     case 'CẦN CHỈNH SỬA':
       return { label: 'CẦN CHỈNH SỬA', classes: 'bg-red-500 text-white border-2 border-red-500 font-extrabold' }
     case 'ĐANG VẼ LỚP':
@@ -324,7 +327,7 @@ export default function ManuscriptsPage() {
       editorComment: editorComment,
       createdAt: ch.created_at
     }
-  }).filter(ch => ch.status !== 'approved' && ch.status !== 'published')
+  }).filter(ch => ch.status !== 'published')
 
   // Sort by created_at descending (newest first)
   const sortedChapters = enrichedChapters.sort((a, b) => {
@@ -334,13 +337,16 @@ export default function ManuscriptsPage() {
   // Filter based on active tab
   const filteredChapters = sortedChapters.filter(ch => {
     if (activeTab === 'TẤT CẢ') return true
+    if (activeTab === 'NHẬN XÉT TỪ EDITOR') {
+      return ch.displayStatus === 'NHẬN XÉT TỪ EDITOR' || ch.displayStatus === 'TỪ CHỐI'
+    }
     return ch.displayStatus === activeTab
   })
 
   // Calculate stats
   const totalChapters = enrichedChapters.length
   const drawingCount = enrichedChapters.filter(ch => ch.displayStatus === 'ĐANG VẼ LỚP').length
-  const needFixCount = enrichedChapters.filter(ch => ch.displayStatus === 'NHẬN XÉT TỪ EDITOR').length
+  const needFixCount = enrichedChapters.filter(ch => ch.displayStatus === 'NHẬN XÉT TỪ EDITOR' || ch.displayStatus === 'TỪ CHỐI').length
   const completedCount = enrichedChapters.filter(ch => ch.displayStatus === 'ĐÃ DUYỆT').length
 
   if (isLoading) {
@@ -442,7 +448,7 @@ export default function ManuscriptsPage() {
             <tbody>
               {filteredChapters.map((ch) => {
                 const statusDisplay = ch.statusDisplay
-                const isNeedFix = statusDisplay.label === 'NHẬN XÉT TỪ EDITOR'
+                const isNeedFix = statusDisplay.label === 'NHẬN XÉT TỪ EDITOR' || statusDisplay.label === 'TỪ CHỐI'
 
                 return (
                   <tr key={ch.id} className="border-b-2 border-black font-semibold text-xs text-black">
@@ -495,7 +501,7 @@ export default function ManuscriptsPage() {
                             XEM GỢI Ý TỪ TRỢ LÝ
                           </button>
                         )}
-                        {ch.displayStatus === 'NHẬN XÉT TỪ EDITOR' && ch.latestManuscript && (
+                        {(ch.displayStatus === 'NHẬN XÉT TỪ EDITOR' || ch.displayStatus === 'TỪ CHỐI') && ch.latestManuscript && (
                           <button
                             onClick={() => setViewingEditorComment(ch)}
                             className="flex items-center gap-1.5 text-[10px] font-black text-red-600 uppercase hover:underline text-left whitespace-nowrap cursor-pointer"

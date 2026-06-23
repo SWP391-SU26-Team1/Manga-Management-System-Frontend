@@ -19,8 +19,10 @@ interface DisplayManuscript {
   chapter: string
   status: 'SUBMITTED' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED'
   mangaka: string
+  mangakaId?: string
   pages: { pageId: string; pageNum: string; image: string }[]
   annotations: Record<string, DisplayAnnotation[]>
+  content?: string
 }
 
 interface DisplaySeries {
@@ -46,6 +48,7 @@ const mapApiStatusToDisplay = (s: string): DisplayManuscript['status'] => {
 
 export default function ManuscriptReviewPage() {
   const [activeTab, setActiveTab] = useState<'MANUSCRIPT' | 'SERIES'>('MANUSCRIPT')
+  const [viewerTab, setViewerTab] = useState<'SCRIPT' | 'PAGES'>('SCRIPT')
 
   // Manuscript state
   const [manuscripts, setManuscripts] = useState<DisplayManuscript[]>([])
@@ -125,12 +128,14 @@ export default function ManuscriptReviewPage() {
           chapter: m.chapter?.title || `Ch.${m.chapter?.chapter_number || ''}`,
           status: mapApiStatusToDisplay(m.status),
           mangaka: m.mangaka?.name || m.mangaka?.username || '—',
+          mangakaId: m.mangaka?.user_id || m.mangaka_id,
           pages: (m.files || []).map((f: ApiManuscriptFile, idx: number) => ({
             pageId: f.file_id,
             pageNum: `P.${String(idx + 1).padStart(2, '0')}`,
             image: f.file_url || `https://placehold.co/600x850/e0e0e0/808080?text=Page+${idx + 1}`
           })),
-          annotations: {}
+          annotations: {},
+          content: m.content
         }))
 
       // Sort: SUBMITTED first (cần duyệt gấp), then IN_REVIEW, then others
@@ -205,16 +210,29 @@ export default function ManuscriptReviewPage() {
             seriesId: detail.series_id || detail.series?.series_id || m.seriesId,
             chapterId: detail.chapter_id || detail.chapter?.chapter_id || m.chapterId,
             pages,
-            annotations: annotationsMap
+            annotations: annotationsMap,
+            content: detail.content || m.content
           }
         }
         return m
       })
 
       if (currentManuscripts) {
-        setManuscripts(updateList(currentManuscripts))
+        const updated = updateList(currentManuscripts)
+        setManuscripts(updated)
+        const activeM = updated.find(item => item.id === mId)
+        if (activeM) {
+          setViewerTab(activeM.content ? 'SCRIPT' : 'PAGES')
+        }
       } else {
-        setManuscripts(prev => updateList(prev))
+        setManuscripts(prev => {
+          const updated = updateList(prev)
+          const activeM = updated.find(item => item.id === mId)
+          if (activeM) {
+            setViewerTab(activeM.content ? 'SCRIPT' : 'PAGES')
+          }
+          return updated
+        })
       }
     } catch (err) {
       console.error('Failed to fetch manuscript detail:', err)
@@ -290,6 +308,7 @@ export default function ManuscriptReviewPage() {
         !ann.comment?.startsWith('LÝ DO TỪ CHỐI CHƯƠNG:')
       )
     : []
+  const isTextOnly = !activeManuscript?.pages || activeManuscript.pages.length === 0 || activeManuscript.pages[0].pageId.endsWith('-placeholder')
 
   // Page level review stats
   const activePageReviews = selectedManuscriptId ? (manuscriptPageReviews[selectedManuscriptId] || {}) : {}
@@ -319,6 +338,9 @@ export default function ManuscriptReviewPage() {
     setRejectionReason('')
 
     const m = manuscripts.find(item => item.id === id)
+    if (m) {
+      setViewerTab(m.content ? 'SCRIPT' : 'PAGES')
+    }
     const hasDetail = m && m.pages.length > 0 && !m.pages[0].pageId.endsWith('-placeholder')
     if (!hasDetail) {
       fetchManuscriptDetail(id)
@@ -462,13 +484,14 @@ export default function ManuscriptReviewPage() {
   }
 
   const handleRejectChapterFlow = async (mId: string) => {
+    if (!activeManuscript) return
     if (!rejectionReason.trim()) {
       alert('Vui lòng nhập lý do từ chối!')
       return
     }
     try {
       setLoading(true)
-      if (activePages.length > 0) {
+      if (activePages.length > 0 && !activePages[0].pageId.endsWith('-placeholder')) {
         const firstPageId = activePages[0].pageId
         await editorService.createAnnotation(firstPageId, {
           content: `LÝ DO TỪ CHỐI CHƯƠNG: ${rejectionReason}`,
@@ -476,6 +499,22 @@ export default function ManuscriptReviewPage() {
         })
       }
       await editorService.rejectManuscript(mId)
+      
+      // Reject chapter directly
+      if (activeManuscript.chapterId) {
+        await editorService.updateChapterStatus(activeManuscript.chapterId, 'rejected')
+      }
+
+      // Create notification with rejection reason for Mangaka
+      if (activeManuscript.mangakaId) {
+        await editorService.sendInternalNotification(
+          activeManuscript.mangakaId,
+          `Từ chối bản thảo ${activeManuscript.chapter}`,
+          rejectionReason.trim(),
+          `ms_fb:${mId}`
+        )
+      }
+
       removeManuscriptFromList(mId)
       setRejectionReason('')
       showToast(`Đã từ chối bản thảo với lý do gửi tới Mangaka!`)
@@ -493,17 +532,18 @@ export default function ManuscriptReviewPage() {
     try {
       setLoading(true)
       await editorService.approveManuscript(mId)
-      await editorService.createEditorReviewSession({
-        series_id: activeManuscript.seriesId,
-        chapter_id: activeManuscript.chapterId,
-        name: `Chapter Review - ${activeManuscript.chapter}`
-      })
+      
+      // Approve chapter directly
+      if (activeManuscript.chapterId) {
+        await editorService.updateChapterStatus(activeManuscript.chapterId, 'approved')
+      }
+
       removeManuscriptFromList(mId)
-      showToast(`Đã duyệt chương và nộp lên Hội Đồng Biên Tập!`)
+      showToast(`Đã phê duyệt bản thảo thành công!`)
     } catch (err: any) {
-      console.error('Failed to approve/submit to board:', err)
+      console.error('Failed to approve:', err)
       const msg = err?.response?.data?.message || ''
-      showToast(getFriendlyErrorMessage(msg, 'Lỗi khi phê duyệt & nộp lên Hội đồng!'))
+      showToast(getFriendlyErrorMessage(msg, 'Lỗi khi phê duyệt bản thảo!'))
     } finally {
       setLoading(false)
     }
@@ -1038,98 +1078,168 @@ export default function ManuscriptReviewPage() {
         {activeTab === 'MANUSCRIPT' ? (
           <>
             {activeManuscript && activePage ? (
-            <div className="flex-1 bg-gray-200 border-4 border-manga-ink flex flex-col overflow-hidden relative">
-              <div className="bg-gray-50 border-b-2 border-gray-200 py-2 px-4 text-center flex-shrink-0 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm text-manga-ink tracking-wide uppercase">{activeManuscript.series}</span>
-                  <span className="text-gray-400">|</span>
-                  <span className="font-bold text-sm text-manga-red">{activeManuscript.chapter} - {activePage.pageNum}</span>
-                </div>
-
-
-              </div>
-
-              {/* Viewer Toolbar */}
-              <div className="min-h-12 h-auto py-2 bg-white border-b-2 border-manga-ink flex items-center justify-between px-4 flex-shrink-0 flex-wrap gap-2">
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <button onClick={() => setZoomLevel(Math.max(50, zoomLevel - 10))} className="p-1.5 hover:bg-gray-100 rounded text-gray-600 transition-colors"><ZoomOut className="w-4 h-4" /></button>
-                  <span className="text-xs font-bold w-12 text-center">{zoomLevel}%</span>
-                  <button onClick={() => setZoomLevel(Math.min(200, zoomLevel + 10))} className="p-1.5 hover:bg-gray-100 rounded text-gray-600 transition-colors"><ZoomIn className="w-4 h-4" /></button>
-                </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  {!activePage.pageId.endsWith('-placeholder') && (
-                    <>
+              viewerTab === 'SCRIPT' ? (
+                /* Script Tab Content */
+                <div className="flex-1 bg-white border-4 border-manga-ink flex flex-col overflow-hidden relative">
+                  {/* Header */}
+                  <div className="bg-gray-50 border-b-2 border-manga-ink py-2 px-4 text-center flex-shrink-0 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm text-manga-ink tracking-wide uppercase">{activeManuscript.series}</span>
+                      <span className="text-gray-400">|</span>
+                      <span className="font-bold text-sm text-manga-red">{activeManuscript.chapter} - Kịch bản chữ</span>
+                    </div>
+                    {/* Tabs Switcher */}
+                    <div className="flex border-2 border-black bg-white rounded-sm overflow-hidden shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]">
                       <button
-                        onClick={() => handleSetPageReview(activeManuscript.id, activePage.pageId, 'pass')}
-                        className={`px-3 py-1.5 text-xs font-extrabold border-2 border-black transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer ${activePageReviews[activePage.pageId] === 'pass'
-                          ? 'bg-green-600 text-white'
-                          : 'bg-white text-green-700 hover:bg-green-50'
-                          }`}
+                        onClick={() => setViewerTab('SCRIPT')}
+                        className="px-3 py-1 text-xs font-bold transition-all bg-manga-ink text-white"
                       >
-                        Đạt ✅
+                        Kịch bản chữ
                       </button>
                       <button
-                        onClick={() => handleSetPageReview(activeManuscript.id, activePage.pageId, 'fail')}
-                        className={`px-3 py-1.5 text-xs font-extrabold border-2 border-black transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer ${activePageReviews[activePage.pageId] === 'fail'
-                          ? 'bg-red-600 text-white'
-                          : 'bg-white text-red-700 hover:bg-red-50'
-                          }`}
+                        onClick={() => setViewerTab('PAGES')}
+                        className="px-3 py-1 text-xs font-bold transition-all bg-white text-manga-ink hover:bg-gray-100"
                       >
-                        Không đạt ❌
+                        Bản vẽ
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Script Content Viewer Area */}
+                  <div className="flex-1 overflow-y-auto p-6 bg-[#FAF9F6] flex flex-col">
+                    {activeManuscript.content ? (
+                      <div className="max-w-3xl mx-auto w-full bg-white border-2 border-manga-ink p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] rounded-sm min-h-[400px]">
+                        <div className="border-b-2 border-dashed border-gray-200 pb-4 mb-4">
+                          <h1 className="text-xl font-extrabold text-manga-ink mb-1">{activeManuscript.chapter}</h1>
+                          <p className="text-xs text-gray-500 font-bold">Tác giả: {activeManuscript.mangaka}</p>
+                        </div>
+                        <div className="whitespace-pre-wrap text-sm text-gray-800 font-medium leading-relaxed font-sans">
+                          {activeManuscript.content}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+                        <AlertCircle className="w-12 h-12 text-gray-300 mb-3" />
+                        <p className="text-gray-500 font-bold text-sm">Bản thảo này không có nội dung kịch bản chữ.</p>
+                        <p className="text-xs text-gray-400 mt-1">Vui lòng chuyển sang tab "Bản vẽ" để xem các trang bản vẽ.</p>
+                        <button
+                          onClick={() => setViewerTab('PAGES')}
+                          className="mt-4 px-4 py-2 text-xs font-bold border-2 border-black bg-manga-red text-white hover:bg-red-700 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+                        >
+                          Chuyển sang Bản vẽ
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* Drawing Pages Tab Content */
+                <div className="flex-1 bg-gray-200 border-4 border-manga-ink flex flex-col overflow-hidden relative">
+                  <div className="bg-gray-50 border-b-2 border-gray-200 py-2 px-4 text-center flex-shrink-0 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm text-manga-ink tracking-wide uppercase">{activeManuscript.series}</span>
+                      <span className="text-gray-400">|</span>
+                      <span className="font-bold text-sm text-manga-red">{activeManuscript.chapter} - {activePage.pageNum}</span>
+                    </div>
+                    {/* Tabs Switcher */}
+                    <div className="flex border-2 border-black bg-white rounded-sm overflow-hidden shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]">
+                      <button
+                        onClick={() => setViewerTab('SCRIPT')}
+                        className="px-3 py-1 text-xs font-bold transition-all bg-white text-manga-ink hover:bg-gray-100"
+                      >
+                        Kịch bản chữ
                       </button>
                       <button
-                        onClick={() => setIsExpanded(true)}
-                        className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-extrabold border-2 border-black transition-all bg-manga-ink text-white hover:bg-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
+                        onClick={() => setViewerTab('PAGES')}
+                        className="px-3 py-1 text-xs font-bold transition-all bg-manga-ink text-white"
                       >
-                        <Maximize2 className="w-3.5 h-3.5 flex-shrink-0" /> Mở rộng 🔍
+                        Bản vẽ
                       </button>
-                    </>
-                  )}
-                </div>
-              </div>
+                    </div>
+                  </div>
 
-              {/* Canvas Area */}
-              <div className="flex-1 overflow-auto flex flex-col items-center justify-center p-6 bg-[#e8e8e8] relative">
-                <div className="relative bg-white shadow-xl border border-gray-300 transition-transform duration-150" style={{ transform: `scale(${zoomLevel / 100})` }}>
-                  <img src={activePage.image} alt={activePage.pageNum} className="max-w-full h-auto object-contain max-h-[600px] select-none" draggable={false} />
-                </div>
-              </div>
-
-              {/* Bottom Thumbnails & Nav */}
-              <div className="bg-white border-t-2 border-manga-ink flex flex-col flex-shrink-0">
-                <div className="h-16 px-4 py-2 border-b border-gray-100 flex items-center gap-2 overflow-x-auto bg-gray-50">
-                  {activeManuscript.pages.map((page, idx) => (
-                    <button key={page.pageId} onClick={() => { setCurrentPageIndex(idx); setActiveAnnotationId(null) }}
-                      className={`h-12 w-9 border-2 flex-shrink-0 flex flex-col items-center justify-center font-bold text-[10px] transition-all relative ${currentPageIndex === idx ? 'border-manga-red bg-manga-red text-white scale-105 shadow-sm' : 'border-gray-300 bg-white hover:border-manga-ink text-gray-600'
-                        }`}
-                    >
-                      <span>{page.pageNum}</span>
-                      {activePageReviews[page.pageId] === 'pass' && (
-                        <span className="absolute bottom-0.5 right-0.5 w-1.5 h-1.5 bg-green-500 rounded-full border border-white" />
+                  {/* Viewer Toolbar */}
+                  <div className="min-h-12 h-auto py-2 bg-white border-b-2 border-manga-ink flex items-center justify-between px-4 flex-shrink-0 flex-wrap gap-2">
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <button onClick={() => setZoomLevel(Math.max(50, zoomLevel - 10))} className="p-1.5 hover:bg-gray-100 rounded text-gray-600 transition-colors"><ZoomOut className="w-4 h-4" /></button>
+                      <span className="text-xs font-bold w-12 text-center">{zoomLevel}%</span>
+                      <button onClick={() => setZoomLevel(Math.min(200, zoomLevel + 10))} className="p-1.5 hover:bg-gray-100 rounded text-gray-600 transition-colors"><ZoomIn className="w-4 h-4" /></button>
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      {!activePage.pageId.endsWith('-placeholder') && (
+                        <>
+                          <button
+                            onClick={() => handleSetPageReview(activeManuscript.id, activePage.pageId, 'pass')}
+                            className={`px-3 py-1.5 text-xs font-extrabold border-2 border-black transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer ${activePageReviews[activePage.pageId] === 'pass'
+                              ? 'bg-green-600 text-white'
+                              : 'bg-white text-green-700 hover:bg-green-50'
+                              }`}
+                          >
+                            Đạt ✅
+                          </button>
+                          <button
+                            onClick={() => handleSetPageReview(activeManuscript.id, activePage.pageId, 'fail')}
+                            className={`px-3 py-1.5 text-xs font-extrabold border-2 border-black transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer ${activePageReviews[activePage.pageId] === 'fail'
+                              ? 'bg-red-600 text-white'
+                              : 'bg-white text-red-700 hover:bg-red-50'
+                              }`}
+                          >
+                            Không đạt ❌
+                          </button>
+                          <button
+                            onClick={() => setIsExpanded(true)}
+                            className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-extrabold border-2 border-black transition-all bg-manga-ink text-white hover:bg-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
+                          >
+                            <Maximize2 className="w-3.5 h-3.5 flex-shrink-0" /> Mở rộng 🔍
+                          </button>
+                        </>
                       )}
-                      {activePageReviews[page.pageId] === 'fail' && (
-                        <span className="absolute bottom-0.5 right-0.5 w-1.5 h-1.5 bg-red-500 rounded-full border border-white animate-pulse" />
-                      )}
-                    </button>
-                  ))}
+                    </div>
+                  </div>
+
+                  {/* Canvas Area */}
+                  <div className="flex-1 overflow-auto flex flex-col items-center justify-center p-6 bg-[#e8e8e8] relative">
+                    <div className="relative bg-white shadow-xl border border-gray-300 transition-transform duration-150" style={{ transform: `scale(${zoomLevel / 100})` }}>
+                      <img src={activePage.image} alt={activePage.pageNum} className="max-w-full h-auto object-contain max-h-[600px] select-none" draggable={false} />
+                    </div>
+                  </div>
+
+                  {/* Bottom Thumbnails & Nav */}
+                  <div className="bg-white border-t-2 border-manga-ink flex flex-col flex-shrink-0">
+                    <div className="h-16 px-4 py-2 border-b border-gray-100 flex items-center gap-2 overflow-x-auto bg-gray-50">
+                      {activeManuscript.pages.map((page, idx) => (
+                        <button key={page.pageId} onClick={() => { setCurrentPageIndex(idx); setActiveAnnotationId(null) }}
+                          className={`h-12 w-9 border-2 flex-shrink-0 flex flex-col items-center justify-center font-bold text-[10px] transition-all relative ${currentPageIndex === idx ? 'border-manga-red bg-manga-red text-white scale-105 shadow-sm' : 'border-gray-300 bg-white hover:border-manga-ink text-gray-600'
+                            }`}
+                        >
+                          <span>{page.pageNum}</span>
+                          {activePageReviews[page.pageId] === 'pass' && (
+                            <span className="absolute bottom-0.5 right-0.5 w-1.5 h-1.5 bg-green-500 rounded-full border border-white" />
+                          )}
+                          {activePageReviews[page.pageId] === 'fail' && (
+                            <span className="absolute bottom-0.5 right-0.5 w-1.5 h-1.5 bg-red-500 rounded-full border border-white animate-pulse" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="h-12 flex items-center justify-between px-4">
+                      <button onClick={handlePrevPage} disabled={currentPageIndex === 0}
+                        className={`flex items-center gap-1 text-xs font-bold transition-colors ${currentPageIndex === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:text-manga-ink'}`}
+                      ><ChevronLeft className="w-4 h-4" /> Trang trước</button>
+                      <span className="text-xs font-bold text-gray-500">Trang {currentPageIndex + 1} / {activeManuscript.pages.length}</span>
+                      <button onClick={handleNextPage} disabled={currentPageIndex === activeManuscript.pages.length - 1}
+                        className={`flex items-center gap-1 text-xs font-bold transition-colors ${currentPageIndex === activeManuscript.pages.length - 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:text-manga-ink'}`}
+                      >Trang tiếp <ChevronRight className="w-4 h-4" /></button>
+                    </div>
+                  </div>
                 </div>
-                <div className="h-12 flex items-center justify-between px-4">
-                  <button onClick={handlePrevPage} disabled={currentPageIndex === 0}
-                    className={`flex items-center gap-1 text-xs font-bold transition-colors ${currentPageIndex === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:text-manga-ink'}`}
-                  ><ChevronLeft className="w-4 h-4" /> Trang trước</button>
-                  <span className="text-xs font-bold text-gray-500">Trang {currentPageIndex + 1} / {activeManuscript.pages.length}</span>
-                  <button onClick={handleNextPage} disabled={currentPageIndex === activeManuscript.pages.length - 1}
-                    className={`flex items-center gap-1 text-xs font-bold transition-colors ${currentPageIndex === activeManuscript.pages.length - 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:text-manga-ink'}`}
-                  >Trang tiếp <ChevronRight className="w-4 h-4" /></button>
-                </div>
+              )
+            ) : (
+              <div className="flex-1 bg-gray-100 border-4 border-manga-ink flex flex-col items-center justify-center p-8">
+                <AlertCircle className="w-12 h-12 text-gray-300 mb-3" />
+                <p className="text-gray-400 font-bold text-base">Vui lòng chọn bản thảo ở cột bên trái để review.</p>
               </div>
-            </div>
-          ) : (
-            <div className="flex-1 bg-gray-100 border-4 border-manga-ink flex flex-col items-center justify-center p-8">
-              <AlertCircle className="w-12 h-12 text-gray-300 mb-3" />
-              <p className="text-gray-400 font-bold text-base">Vui lòng chọn bản thảo ở cột bên trái để review.</p>
-            </div>
-          )}
+            )}
       
           {activeManuscript ? (
           <div className="w-[340px] flex-shrink-0 flex flex-col bg-white border-4 border-manga-ink p-4 h-full min-h-0 overflow-y-auto gap-4">
@@ -1143,67 +1253,116 @@ export default function ManuscriptReviewPage() {
             <div className="flex flex-col gap-3">
               <h3 className="font-extrabold text-[11px] uppercase text-gray-500 tracking-wider">Trạng thái quyết định</h3>
 
-              {!allReviewed ? (
-                <div className="border-2 border-orange-500 bg-orange-50/30 p-3 shadow-[2px_2px_0px_0px_rgba(249,115,22,1)] flex flex-col gap-2 rounded-sm">
+              {isTextOnly || viewerTab === 'SCRIPT' ? (
+                <div className="border-2 border-manga-ink bg-gray-50 p-3 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] flex flex-col gap-3 rounded-sm">
                   <div className="flex items-start gap-2">
-                    <AlertCircle className="w-4.5 h-4.5 text-orange-600 flex-shrink-0 mt-0.5 animate-pulse" />
+                    <CheckCircle2 className="w-4.5 h-4.5 text-manga-ink flex-shrink-0 mt-0.5" />
                     <div className="flex flex-col gap-0.5">
-                      <span className="font-extrabold text-[11px] text-orange-950">ĐANG ĐÁNH GIÁ CHI TIẾT</span>
-                      <span className="text-[10px] text-orange-850 font-bold leading-normal">
-                        Cần cho điểm Đạt/Không đạt tất cả trang vẽ ({reviewedCount}/{activePages.length}) để quyết định.
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ) : hasFail ? (
-                <div className="border-2 border-red-500 bg-red-50/30 p-3 shadow-[2px_2px_0px_0px_rgba(239,68,68,1)] flex flex-col gap-2.5 rounded-sm">
-                  <div className="flex items-start gap-2">
-                    <XCircle className="w-4.5 h-4.5 text-red-600 flex-shrink-0 mt-0.5" />
-                    <div className="flex flex-col gap-0.5">
-                      <span className="font-extrabold text-[11px] text-red-950 font-manga uppercase tracking-wide">PHÁT HIỆN TRANG KHÔNG ĐẠT</span>
-                      <span className="text-[10px] text-red-800 font-bold leading-normal">
-                        Bản thảo sẽ bị từ chối. Nhập lý do từ chối chung bên dưới gửi cho Mangaka.
+                      <span className="font-manga text-[11px] font-bold text-manga-ink uppercase tracking-wide">PHÊ DUYỆT TRỰC TIẾP</span>
+                      <span className="text-[10px] text-gray-600 font-bold leading-normal">
+                        Quyết định trực tiếp cho bản thảo kịch bản chữ này.
                       </span>
                     </div>
                   </div>
 
-                  <textarea
-                    className="w-full h-20 border-2 border-red-500 p-2 text-xs font-semibold focus:outline-none focus:bg-white bg-white resize-none transition-all shadow-[1px_1px_0px_0px_rgba(239,68,68,1)] focus:shadow-[2px_2px_0px_0px_rgba(239,68,68,1)] leading-relaxed text-gray-800"
-                    placeholder="Nhập lý do từ chối chung gửi cho Mangaka..."
-                    value={rejectionReason}
-                    onChange={(e) => setRejectionReason(e.target.value)}
-                  />
+                  <div className="border-t border-dashed border-gray-300 my-1" />
 
-                  <button
-                    onClick={() => handleRejectChapterFlow(activeManuscript.id)}
-                    disabled={!rejectionReason.trim()}
-                    className={`w-full h-9 flex items-center justify-center gap-2 font-bold transition-all text-xs uppercase tracking-wider border-2 ${rejectionReason.trim()
-                        ? 'bg-red-600 hover:bg-red-700 text-white border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer'
-                        : 'bg-gray-150 text-gray-400 border-gray-300 cursor-not-allowed shadow-none'
+                  {/* Rejection input */}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase">Lý do từ chối (nếu từ chối)</span>
+                    <textarea
+                      className="w-full h-20 border-2 border-gray-300 focus:border-red-500 p-2 text-xs font-semibold focus:outline-none focus:bg-white bg-white resize-none transition-all shadow-[1px_1px_0px_0px_rgba(0,0,0,0.1)] focus:shadow-[2px_2px_0px_0px_rgba(239,68,68,1)] leading-relaxed text-gray-800"
+                      placeholder="Nhập lý do từ chối..."
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={() => handleApproveChapterFlow(activeManuscript.id)}
+                      className="w-full bg-green-500 hover:bg-green-600 border-2 border-black text-white h-9 flex items-center justify-center gap-2 font-bold transition-all text-xs uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
+                    >
+                      <Check className="w-4 h-4" /> Đồng ý Duyệt
+                    </button>
+                    <button
+                      onClick={() => handleRejectChapterFlow(activeManuscript.id)}
+                      disabled={!rejectionReason.trim()}
+                      className={`w-full h-9 flex items-center justify-center gap-2 font-bold transition-all text-xs uppercase tracking-wider border-2 ${
+                        rejectionReason.trim()
+                          ? 'bg-red-600 hover:bg-red-700 text-white border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer'
+                          : 'bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed shadow-none'
                       }`}
-                  >
-                    <XCircle className="w-4 h-4 animate-bounce-subtle" /> Từ chối bản thảo
-                  </button>
+                    >
+                      <XCircle className="w-4 h-4" /> Từ chối bản thảo
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <div className="border-2 border-green-500 bg-green-50/30 p-3 shadow-[2px_2px_0px_0px_rgba(34,197,94,1)] flex flex-col gap-2.5 rounded-sm">
-                  <div className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4.5 h-4.5 text-green-600 flex-shrink-0 mt-0.5" />
-                    <div className="flex flex-col gap-0.5">
-                      <span className="font-extrabold text-[11px] text-green-950 font-manga uppercase tracking-wide">TẤT CẢ TRANG ĐỀU ĐẠT</span>
-                      <span className="text-[10px] text-green-800 font-bold leading-normal">
-                        Bản thảo hoàn hảo. Bấm nút bên dưới để duyệt và gửi lên Hội Đồng.
-                      </span>
+                /* The original drawing page-by-page review flow */
+                !allReviewed ? (
+                  <div className="border-2 border-orange-500 bg-orange-50/30 p-3 shadow-[2px_2px_0px_0px_rgba(249,115,22,1)] flex flex-col gap-2 rounded-sm">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4.5 h-4.5 text-orange-600 flex-shrink-0 mt-0.5 animate-pulse" />
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-extrabold text-[11px] text-orange-950">ĐANG ĐÁNH GIÁ CHI TIẾT</span>
+                        <span className="text-[10px] text-orange-850 font-bold leading-normal">
+                          Cần cho điểm Đạt/Không đạt tất cả trang vẽ ({reviewedCount}/{activePages.length}) để quyết định.
+                        </span>
+                      </div>
                     </div>
                   </div>
+                ) : hasFail ? (
+                  <div className="border-2 border-red-500 bg-red-50/30 p-3 shadow-[2px_2px_0px_0px_rgba(239,68,68,1)] flex flex-col gap-2.5 rounded-sm">
+                    <div className="flex items-start gap-2">
+                      <XCircle className="w-4.5 h-4.5 text-red-600 flex-shrink-0 mt-0.5" />
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-extrabold text-[11px] text-red-950 font-manga uppercase tracking-wide">PHÁT HIỆN TRANG KHÔNG ĐẠT</span>
+                        <span className="text-[10px] text-red-800 font-bold leading-normal">
+                          Bản thảo sẽ bị từ chối. Nhập lý do từ chối chung bên dưới gửi cho Mangaka.
+                        </span>
+                      </div>
+                    </div>
 
-                  <button
-                    onClick={() => handleApproveChapterFlow(activeManuscript.id)}
-                    className="w-full bg-green-500 hover:bg-green-600 border-2 border-black text-white h-9 flex items-center justify-center gap-2 font-bold transition-all text-xs uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
-                  >
-                    <CheckCircle2 className="w-4 h-4 animate-bounce-subtle" /> Duyệt & Nộp lên Board
-                  </button>
-                </div>
+                    <textarea
+                      className="w-full h-20 border-2 border-red-500 p-2 text-xs font-semibold focus:outline-none focus:bg-white bg-white resize-none transition-all shadow-[1px_1px_0px_0px_rgba(239,68,68,1)] focus:shadow-[2px_2px_0px_0px_rgba(239,68,68,1)] leading-relaxed text-gray-800"
+                      placeholder="Nhập lý do từ chối chung gửi cho Mangaka..."
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
+                    />
+
+                    <button
+                      onClick={() => handleRejectChapterFlow(activeManuscript.id)}
+                      disabled={!rejectionReason.trim()}
+                      className={`w-full h-9 flex items-center justify-center gap-2 font-bold transition-all text-xs uppercase tracking-wider border-2 ${
+                        rejectionReason.trim()
+                          ? 'bg-red-600 hover:bg-red-700 text-white border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer'
+                          : 'bg-gray-150 text-gray-400 border-gray-300 cursor-not-allowed shadow-none'
+                      }`}
+                    >
+                      <XCircle className="w-4 h-4" /> Từ chối bản thảo
+                    </button>
+                  </div>
+                ) : (
+                  <div className="border-2 border-green-500 bg-green-50/30 p-3 shadow-[2px_2px_0px_0px_rgba(34,197,94,1)] flex flex-col gap-2.5 rounded-sm">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle2 className="w-4.5 h-4.5 text-green-600 flex-shrink-0 mt-0.5" />
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-extrabold text-[11px] text-green-950 font-manga uppercase tracking-wide">TẤT CẢ TRANG ĐỀU ĐẠT</span>
+                        <span className="text-[10px] text-green-800 font-bold leading-normal">
+                          Bản thảo hoàn hảo. Bấm nút bên dưới để duyệt.
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleApproveChapterFlow(activeManuscript.id)}
+                      className="w-full bg-green-500 hover:bg-green-600 border-2 border-black text-white h-9 flex items-center justify-center gap-2 font-bold transition-all text-xs uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-4 h-4" /> Duyệt Bản Thảo
+                    </button>
+                  </div>
+                )
               )}
 
               <button

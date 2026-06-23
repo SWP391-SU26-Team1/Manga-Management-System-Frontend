@@ -230,8 +230,11 @@ export const boardService = {
     return response.data.data || []
   },
 
+  // Only returns series that have been through Tantou review (have an active review_session)
+  // Uses getPendingProposals logic via proposals endpoint, not raw series status
   getReviewedSeries: async (): Promise<any[]> => {
-    const response = await api.get('/api/board/series/pending')
+    // Get series that already passed board vote (approved status)
+    const response = await api.get('/api/series?status=approved')
     return response.data.data || []
   },
 

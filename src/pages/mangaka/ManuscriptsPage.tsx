@@ -19,10 +19,13 @@ const getChapterDisplayStatus = (ch: any, m?: any) => {
       case 'in_review':
         return 'CHỜ BOARD DUYỆT'
       case 'approved':
-      case 'published':
-      case 'archived':
-      case 'hidden':
         return 'ĐÃ DUYỆT'
+      case 'published':
+        return 'ĐÃ XUẤT BẢN'
+      case 'archived':
+        return 'LƯU TRỮ'
+      case 'hidden':
+        return 'ẨN'
       default:
         return m.status.toUpperCase()
     }
@@ -35,8 +38,9 @@ const getChapterDisplayStatus = (ch: any, m?: any) => {
     case 'pending_review':
       return 'CHỜ BOARD DUYỆT'
     case 'approved':
-    case 'published':
       return 'ĐÃ DUYỆT'
+    case 'published':
+      return 'ĐÃ XUẤT BẢN'
     case 'rejected':
       return 'CẦN CHỈNH SỬA'
     default:
@@ -56,6 +60,8 @@ const getStatusDisplay = (displayStatus: string) => {
       return { label: 'CHỜ BOARD DUYỆT', classes: 'bg-yellow-400 text-black border-2 border-black' }
     case 'ĐÃ DUYỆT':
       return { label: 'ĐÃ DUYỆT', classes: 'bg-white text-black border-2 border-black' }
+    case 'ĐÃ XUẤT BẢN':
+      return { label: 'ĐÃ XUẤT BẢN', classes: 'bg-green-600 text-white border-2 border-green-600' }
     default:
       return { label: displayStatus, classes: 'bg-white text-black border-2 border-black' }
   }
@@ -75,7 +81,7 @@ export default function ManuscriptsPage() {
   const [newChapterTitle, setNewChapterTitle] = useState('')
   const [newChapterNum, setNewChapterNum] = useState('')
   const [newChapterPages, setNewChapterPages] = useState('20')
-  const [file, setFile] = useState<File | null>(null)
+  const [files, setFiles] = useState<File[]>([])
 
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -141,6 +147,17 @@ export default function ManuscriptsPage() {
     }
   }
 
+  const handlePublishChapter = async (seriesId: string, chapterId: string) => {
+    try {
+      await chapterService.publish(seriesId, chapterId)
+      alert('Xuất bản chapter thành công!')
+      await loadData()
+    } catch (err) {
+      console.error(err)
+      alert('Không thể xuất bản chapter.')
+    }
+  }
+
   const handleCreateSubmission = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMsg('')
@@ -178,9 +195,10 @@ export default function ManuscriptsPage() {
       }
 
       // 2. Nếu người dùng chọn file tải lên, tiến hành tạo và submit manuscript
-      if (file) {
-        // a. Upload file lên Cloudinary
-        const uploadRes = await uploadService.uploadSingle(file, 'manuscripts')
+      if (files.length > 0) {
+        // a. Upload files lên Cloudinary
+        const uploadPromises = files.map(f => uploadService.uploadSingle(f, 'manuscripts'))
+        const uploadResults = await Promise.all(uploadPromises)
 
         // b. Lấy mangaka_id từ localStorage
         const userStr = localStorage.getItem('mangaflow_user')
@@ -204,16 +222,21 @@ export default function ManuscriptsPage() {
           series_id: selectedSeriesId,
           chapter_id: chapterId,
           title: `Bản thảo Chương ${chapterNumberStr}: ${chapterTitle}`,
-          file_url: uploadRes.secure_url
+          file_url: uploadResults[0].secure_url
         })
 
         // d. Thêm file liên kết để backend/editor có thể đọc
-        await manuscriptService.addFile({
-          manuscript_id: manuscript._id,
-          file_url: uploadRes.secure_url,
-          file_name: file.name,
-          file_type: file.name.split('.').pop() || 'psd'
-        })
+        await Promise.all(
+          uploadResults.map((res, index) => {
+            const f = files[index]
+            return manuscriptService.addFile({
+              manuscript_id: manuscript._id,
+              file_url: res.secure_url,
+              file_name: f.name,
+              file_type: f.name.split('.').pop() || 'psd'
+            })
+          })
+        )
 
         // e. Submit manuscript lên Board
         await manuscriptService.submit(manuscript._id)
@@ -223,7 +246,7 @@ export default function ManuscriptsPage() {
       setShowSubmitModal(false)
       setNewChapterTitle('')
       setNewChapterNum('')
-      setFile(null)
+      setFiles([])
       setSelectedChapterId(null)
       
       // Reload page data
@@ -269,7 +292,7 @@ export default function ManuscriptsPage() {
       statusDisplay: statusDisplay,
       latestManuscript: latestManuscript
     }
-  })
+  }).filter(ch => ch.status !== 'approved' && ch.status !== 'published')
 
   // Filter based on active tab
   const filteredChapters = enrichedChapters.filter(ch => {
@@ -281,7 +304,6 @@ export default function ManuscriptsPage() {
   const totalChapters = enrichedChapters.length
   const drawingCount = enrichedChapters.filter(ch => ch.displayStatus === 'ĐANG VẼ LỚP').length
   const needFixCount = enrichedChapters.filter(ch => ch.displayStatus === 'CẦN CHỈNH SỬA').length
-  const completedCount = enrichedChapters.filter(ch => ch.displayStatus === 'ĐÃ DUYỆT').length
 
   if (isLoading) {
     return (
@@ -314,7 +336,7 @@ export default function ManuscriptsPage() {
               setSelectedChapterId(null)
               setNewChapterTitle('')
               setNewChapterNum('')
-              setFile(null)
+              setFiles([])
               if (seriesList.length > 0) {
                 setSelectedSeriesId(seriesList[0]._id)
               }
@@ -327,7 +349,7 @@ export default function ManuscriptsPage() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-4 gap-5 mb-8">
+        <div className="grid grid-cols-3 gap-5 mb-8">
           <div className="border-2 border-black bg-white p-5 flex flex-col items-center justify-center shadow-[4px_4px_0px_rgba(0,0,0,1)]">
             <FileText className="w-6 h-6 mb-2 text-black" />
             <span className="text-3xl font-black font-mono leading-none">{totalChapters}</span>
@@ -345,17 +367,11 @@ export default function ManuscriptsPage() {
             <span className="text-3xl font-black font-mono text-[#E63946] leading-none">{needFixCount}</span>
             <span className="text-[9px] font-extrabold text-[#E63946] mt-2 uppercase tracking-widest">CẦN CHỈNH SỬA</span>
           </div>
-
-          <div className="border-2 border-black bg-white p-5 flex flex-col items-center justify-center shadow-[4px_4px_0px_rgba(0,0,0,1)]">
-            <CheckCircle className="w-6 h-6 mb-2 text-black" />
-            <span className="text-3xl font-black font-mono leading-none">{completedCount}</span>
-            <span className="text-[9px] font-extrabold text-gray-400 mt-2 uppercase tracking-widest">ĐÃ HOÀN THÀNH</span>
-          </div>
         </div>
 
         {/* Filters Tabs */}
         <div className="flex gap-2 mb-6">
-          {['TẤT CẢ', 'ĐANG SOẠN', 'CẦN CHỈNH SỬA', 'ĐANG VẼ LỚP', 'CHỜ BOARD DUYỆT', 'ĐÃ DUYỆT'].map(tab => (
+          {['TẤT CẢ', 'ĐANG SOẠN', 'CẦN CHỈNH SỬA', 'ĐANG VẼ LỚP', 'CHỜ BOARD DUYỆT'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -422,7 +438,7 @@ export default function ManuscriptsPage() {
                             setSelectedChapterId(ch.id)
                             setNewChapterNum(String(ch.chapterNumber))
                             setNewChapterTitle(ch.title)
-                            setFile(null)
+                            setFiles([])
                             setShowSubmitModal(true)
                           }}
                           className="flex items-center gap-1.5 text-[10px] font-black text-black uppercase hover:underline text-left whitespace-nowrap"
@@ -580,20 +596,23 @@ export default function ManuscriptsPage() {
 
             <div className="mb-5">
               <label className="block text-[11px] font-black uppercase mb-1">
-                File đính kèm (PSD/ZIP) {!selectedChapterId && '(Tùy chọn)'}
+                File đính kèm (PSD/ZIP/Ảnh) {!selectedChapterId && '(Tùy chọn)'}
               </label>
               <label className="border-2 border-dashed border-gray-400 p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:border-black bg-gray-50 transition-all rounded-none block">
                 <Upload className="w-7 h-7 mb-2 text-gray-500 mx-auto" />
-                <p className="text-[10px] font-black text-gray-500 uppercase">
-                  {file ? file.name : 'Kéo thả file hoặc click để tải lên'}
+                <p className="text-[10px] font-black text-gray-500 uppercase max-w-xs mx-auto break-all">
+                  {files.length > 0 
+                    ? `Đã chọn ${files.length} file: ${files.map(f => f.name).join(', ')}`
+                    : 'Kéo thả file/ảnh hoặc click để tải lên'}
                 </p>
                 <input
                   type="file"
-                  accept=".psd,.zip,.rar,.pdf"
+                  multiple
+                  accept=".psd,.zip,.rar,.pdf,image/*"
                   className="hidden"
                   onChange={(e) => {
                     if (e.target.files && e.target.files.length > 0) {
-                      setFile(e.target.files[0])
+                      setFiles(Array.from(e.target.files))
                     }
                   }}
                   required={!!selectedChapterId}
@@ -608,7 +627,7 @@ export default function ManuscriptsPage() {
                   setShowSubmitModal(false)
                   setNewChapterTitle('')
                   setNewChapterNum('')
-                  setFile(null)
+                  setFiles([])
                   setSelectedChapterId(null)
                 }}
                 disabled={isSubmitting}

@@ -40,7 +40,7 @@ export function ProjectProgress({ seriesList = [], allChapters = [] }: ProjectPr
 
     // Lấy series đầu tiên đang active
     const activeSeries =
-      seriesList.find((s) => s.status === 'ongoing' || s.status === 'in_progress') ||
+      seriesList.find((s) => s.status === 'ongoing' || s.status === 'in_progress' || s.status === 'approved' || s.status === 'published') ||
       seriesList[0]
 
     if (!activeSeries) return

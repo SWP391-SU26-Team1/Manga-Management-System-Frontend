@@ -29,7 +29,7 @@ export default function BoardReviewPage() {
             let status: 'Waiting' | 'Approved' | 'Need Fix' = 'Waiting'
             if (m.status === 'submitted' || m.status === 'pending_review') status = 'Waiting'
             else if (m.status === 'approved' || m.status === 'published') status = 'Approved'
-            else if (m.status === 'rejected') status = 'Need Fix'
+            else if (m.status === 'rejected' || m.status === 'needs_revision') status = 'Need Fix'
 
             return {
               id: m._id,

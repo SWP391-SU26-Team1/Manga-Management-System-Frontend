@@ -186,33 +186,56 @@ export default function SeriesDetailPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [activeReaderChapter, readerCurrentPageIndex, readerPages.length])
 
-  useEffect(() => {
+  const fetchData = async () => {
     if (!seriesId) return
-    const fetchData = async () => {
-      setIsLoading(true)
-      setError('')
-      try {
-        const [s, chs, mems, asts] = await Promise.all([
-          seriesService.getById(seriesId),
-          chapterService.getBySeriesId(seriesId),
-          seriesService.getMembers(seriesId),
-          userService.listAssistants().catch(() => []),
-        ])
-        setSeries(s)
-        setChapters([...chs].sort((a, b) => b.chapter_number - a.chapter_number))
-        setMembers(mems)
-        setAvailableAssistants(asts)
-        if (asts.length > 0) {
-          setNewMemberUserId(asts[0].id)
-        }
-      } catch (err) {
-        setError(getErrorMessage(err))
-      } finally {
-        setIsLoading(false)
+    setIsLoading(true)
+    setError('')
+    try {
+      const [s, chs, mems, asts] = await Promise.all([
+        seriesService.getById(seriesId),
+        chapterService.getBySeriesId(seriesId),
+        seriesService.getMembers(seriesId),
+        userService.listAssistants().catch(() => []),
+      ])
+      setSeries(s)
+      setChapters([...chs].sort((a, b) => b.chapter_number - a.chapter_number))
+      setMembers(mems)
+      setAvailableAssistants(asts)
+      if (asts.length > 0) {
+        setNewMemberUserId(asts[0].id)
       }
+    } catch (err) {
+      setError(getErrorMessage(err))
+    } finally {
+      setIsLoading(false)
     }
+  }
+
+  useEffect(() => {
     fetchData()
   }, [seriesId])
+
+  const handlePublishSeries = async () => {
+    if (!seriesId) return
+    try {
+      await seriesService.publish(seriesId)
+      showAlert('Thành công', 'Xuất bản Series thành công!', 'success')
+      await fetchData()
+    } catch (err) {
+      showAlert('Lỗi', getErrorMessage(err), 'error')
+    }
+  }
+
+  const handlePublishChapter = async (chapterId: string) => {
+    if (!seriesId) return
+    try {
+      await chapterService.publish(seriesId, chapterId)
+      showAlert('Thành công', 'Xuất bản Chapter thành công!', 'success')
+      await fetchData()
+    } catch (err) {
+      showAlert('Lỗi', getErrorMessage(err), 'error')
+    }
+  }
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -262,6 +285,7 @@ export default function SeriesDetailPage() {
       case 'published': return 'bg-blue-100 text-blue-700 border-blue-300'
       case 'under_review': return 'bg-orange-100 text-orange-700 border-orange-300'
       case 'in_production': return 'bg-green-100 text-green-700 border-green-300'
+      case 'approved': return 'bg-green-100 text-green-700 border-green-300'
       case 'draft': return 'bg-gray-100 text-gray-500 border-gray-300'
       default: return 'bg-gray-100 text-gray-500 border-gray-300'
     }
@@ -272,6 +296,7 @@ export default function SeriesDetailPage() {
       draft: 'Bản nháp',
       in_production: 'Đang vẽ',
       under_review: 'Chờ duyệt',
+      approved: 'Đã duyệt',
       published: 'Đã xuất bản',
     }
     return map[status] ?? status
@@ -284,8 +309,23 @@ export default function SeriesDetailPage() {
       case 'in_progress': return 'bg-green-100 text-green-700 border-green-300'
       case 'draft': return 'bg-gray-100 text-gray-500 border-gray-300'
       case 'need_fix': return 'bg-red-100 text-red-700 border-red-300'
+      case 'approved': return 'bg-green-100 text-green-700 border-green-300'
+      case 'published': return 'bg-blue-100 text-blue-700 border-blue-300'
       default: return 'bg-gray-100 text-gray-500 border-gray-300'
     }
+  }
+
+  const getChapterStatusLabel = (status: string) => {
+    const map: Record<string, string> = {
+      draft: 'Bản nháp',
+      in_progress: 'Đang vẽ',
+      pending_review: 'Chờ duyệt',
+      under_review: 'Chờ duyệt',
+      approved: 'Đã duyệt',
+      published: 'Đã xuất bản',
+      need_fix: 'Cần sửa',
+    }
+    return map[status] ?? status.toUpperCase()
   }
 
   if (isLoading) {
@@ -451,7 +491,7 @@ export default function SeriesDetailPage() {
                         </div>
                         <div className="flex items-center gap-3">
                           <span className={`px-3 py-1 font-bold uppercase text-[10px] border-2 ${getChapterStatusClasses(chapter.status)}`}>
-                            {chapter.status}
+                            {getChapterStatusLabel(chapter.status)}
                           </span>
                           
                           <button
@@ -521,7 +561,7 @@ export default function SeriesDetailPage() {
                                     </button>
                                   </div>
                                 </div>
-                                {chapterPages[chapter._id].some(p => p.image_url) && (
+                                 {chapterPages[chapter._id].some(p => p.image_url) && (chapter.status === 'approved' || chapter.status === 'published') && (
                                   <button
                                     onClick={() => openReader(chapter)}
                                     className="flex items-center gap-1.5 px-3 py-1.5 bg-[#E63946] text-white border-2 border-black font-manga font-bold text-[10px] uppercase hover:bg-red-700 transition-colors shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 hover:shadow-none"
@@ -536,15 +576,20 @@ export default function SeriesDetailPage() {
                                 <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-4">
                                   {chapterPages[chapter._id].map((page) => {
                                     const hasImage = !!page.image_url
+                                    const isApproved = chapter.status === 'approved' || chapter.status === 'published'
                                     return (
                                       <div
                                         key={page._id}
-                                        onClick={() => openReader(chapter, page._id)}
-                                        className="bg-white border-2 border-black p-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_rgba(0,0,0,1)] transition-all cursor-pointer flex flex-col group"
+                                        onClick={() => isApproved && openReader(chapter, page._id)}
+                                        className={`bg-white border-2 border-black p-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] ${
+                                          isApproved 
+                                            ? 'hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_rgba(0,0,0,1)] cursor-pointer' 
+                                            : 'cursor-default'
+                                        } transition-all flex flex-col group`}
                                       >
                                         {/* Thumbnail Container */}
                                         <div className="aspect-[3/4] border border-gray-200 bg-gray-50 overflow-hidden relative mb-2 flex items-center justify-center">
-                                          {hasImage ? (
+                                          {hasImage && isApproved ? (
                                             <img
                                               src={page.image_url!}
                                               alt={`Trang ${page.page_number}`}
@@ -553,7 +598,9 @@ export default function SeriesDetailPage() {
                                           ) : (
                                             <div className="w-full h-full flex flex-col items-center justify-center text-center p-2 text-gray-400 bg-gray-50">
                                               <Layers className="w-5 h-5 mb-1 text-gray-300" />
-                                              <span className="text-[8px] font-black uppercase tracking-wider text-gray-400">Đang vẽ lớp</span>
+                                              <span className="text-[8px] font-black uppercase tracking-wider text-gray-400">
+                                                {hasImage ? 'Chờ duyệt' : 'Đang vẽ lớp'}
+                                              </span>
                                             </div>
                                           )}
                                           

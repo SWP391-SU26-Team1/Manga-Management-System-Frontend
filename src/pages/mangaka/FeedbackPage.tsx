@@ -6,6 +6,8 @@ import { FeedbackCard } from '@/components/mangaka/FeedbackCard'
 import { feedbackService } from '@/services/feedback.service'
 import { seriesService } from '@/services/series.service'
 import { chapterService } from '@/services/chapter.service'
+import { manuscriptService } from '@/services/manuscript.service'
+import api from '@/services/api'
 
 export default function FeedbackPage() {
   const [feedbacks, setFeedbacks] = useState<EditorFeedback[]>([])
@@ -109,7 +111,73 @@ export default function FeedbackPage() {
         })
       )
 
-      setFeedbacks(mappedFeedbacks)
+      // 4b. Load rejected manuscripts for all series of current Mangaka
+      const manuscriptFeedbacks: EditorFeedback[] = []
+      await Promise.all(
+        series.map(async (s) => {
+          try {
+            const mList = await manuscriptService.getBySeriesId(s._id)
+            const rejectedManuscripts = mList.filter(
+              (m) =>
+                m.status?.toLowerCase() === 'rejected' ||
+                m.status?.toLowerCase() === 'needs_revision'
+            )
+            
+            await Promise.all(
+              rejectedManuscripts.map(async (m) => {
+                try {
+                  const filesRes = await api.get<{ success: boolean; data: any[] }>('/api/manuscript-files', {
+                    params: { manuscriptId: m._id }
+                  })
+                  const files = filesRes.data.data || []
+                  
+                  await Promise.all(
+                    files.map(async (f, pageIdx) => {
+                      try {
+                        const annRes = await api.get<{ success: boolean; data: any[] }>(`/api/pages/${f.file_id}/annotations`)
+                        const annotations = annRes.data.data || []
+                        
+                        annotations.forEach((ann: any) => {
+                          const isRejectionReason = ann.content?.includes('LÝ DO TỪ CHỐI CHƯƠNG:')
+                          let cleanedContent = ann.content || ''
+                          if (isRejectionReason) {
+                            cleanedContent = (ann.content || '').replace('LÝ DO TỪ CHỐI CHƯƠNG:', '').trim()
+                          }
+                          
+                          manuscriptFeedbacks.push({
+                            id: ann.annotation_id || `ann-${Date.now()}-${Math.random()}`,
+                            sender: 'Tantou Editor',
+                            seriesId: s._id,
+                            seriesTitle: s.title,
+                            chapterNumber: (m as any).chapter?.chapter_number || (m as any).chapter_number || 1,
+                            pageNumber: pageIdx + 1,
+                            pageId: f.file_id,
+                            isAnnotation: true,
+                            content: isRejectionReason 
+                              ? `[LÝ DO TỪ CHỐI TỔNG THỂ]: ${cleanedContent}` 
+                              : `[Yêu cầu sửa đổi ở vùng hình vẽ]: ${cleanedContent}`,
+                            severity: isRejectionReason ? 'Critical' : 'High',
+                            status: ann.status === 'resolved' ? 'Resolved' : 'Open',
+                            createdAt: ann.created_at || m.updated_at || m.created_at
+                          })
+                        })
+                      } catch (err) {
+                        console.error(`Failed to load annotations for page ${f.file_id}:`, err)
+                      }
+                    })
+                  )
+                } catch (err) {
+                  console.error(`Failed to load details for rejected manuscript ${m._id}:`, err)
+                }
+              })
+            )
+          } catch (e) {
+            console.error('Failed to load manuscripts for series', s._id, e)
+          }
+        })
+      )
+
+      setFeedbacks([...mappedFeedbacks, ...manuscriptFeedbacks])
     } catch (err: any) {
       console.error(err)
       setError('Không thể tải nhận xét từ Editor. Vui lòng kiểm tra lại kết nối.')
@@ -125,7 +193,12 @@ export default function FeedbackPage() {
   // Handler to resolve feedback
   const handleResolveFeedback = async (id: string) => {
     try {
-      await feedbackService.delete(id)
+      const fb = feedbacks.find(f => f.id === id)
+      if (fb?.isAnnotation) {
+        await api.patch(`/api/annotations/${id}/status`, { status: 'resolved' })
+      } else {
+        await feedbackService.delete(id)
+      }
       await loadFeedbacks()
     } catch (err) {
       console.error(err)
@@ -139,8 +212,13 @@ export default function FeedbackPage() {
       const fb = feedbacks.find(f => f.id === id)
       if (!fb) return
       
-      const updatedContent = `${fb.content}\n\n[Mangaka Phản hồi]: ${replyContent}`
-      await feedbackService.reply(id, updatedContent)
+      if (fb.isAnnotation) {
+        const updatedContent = `${fb.content}\n\n[Mangaka Phản hồi]: ${replyContent}`
+        await api.patch(`/api/annotations/${id}`, { content: updatedContent })
+      } else {
+        const updatedContent = `${fb.content}\n\n[Mangaka Phản hồi]: ${replyContent}`
+        await feedbackService.reply(id, updatedContent)
+      }
       await loadFeedbacks()
     } catch (err) {
       console.error(err)

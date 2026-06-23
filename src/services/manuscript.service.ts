@@ -16,6 +16,11 @@ export interface ManuscriptAPI {
   status: string
   created_at: string
   updated_at?: string
+  chapter?: {
+    chapter_id: string
+    chapter_number: number
+    title?: string
+  }
 }
 
 export interface CreateManuscriptPayload {
@@ -49,6 +54,11 @@ const mapManuscript = (data: any): ManuscriptAPI => {
     status: data.status,
     created_at: data.created_at,
     updated_at: data.updated_at,
+    chapter: data.chapter ? {
+      chapter_id: data.chapter.chapter_id,
+      chapter_number: data.chapter.chapter_number,
+      title: data.chapter.title,
+    } : undefined,
   }
 }
 

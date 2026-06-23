@@ -107,6 +107,8 @@ export interface EditorFeedback {
   seriesTitle: string;
   chapterNumber?: number;
   pageNumber?: number;
+  pageId?: string;
+  isAnnotation?: boolean;
   content: string;
   severity: "Low" | "Medium" | "High" | "Critical";
   status: "Open" | "Resolved";

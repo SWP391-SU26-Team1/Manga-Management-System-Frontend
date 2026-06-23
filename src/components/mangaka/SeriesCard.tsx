@@ -1,16 +1,17 @@
 
 import React from "react";
 import { Link } from "react-router";
-import { BookOpen, Clock, Tag, PlusCircle, Eye } from "lucide-react";
+import { BookOpen, Clock, Tag, PlusCircle, Eye, CheckCircle } from "lucide-react";
 import { Series } from "@/data/mangakaMockData";
 
 interface SeriesCardProps {
   series: Series;
   chapterCount: number;
   onCreateChapter?: (seriesId: string) => void;
+  onPublish?: (seriesId: string) => void;
 }
 
-export function SeriesCard({ series, chapterCount, onCreateChapter }: SeriesCardProps) {
+export function SeriesCard({ series, chapterCount, onCreateChapter, onPublish }: SeriesCardProps) {
   const statusKey = (series.status || "").toLowerCase();
   
   const statusColors: Record<string, string> = {

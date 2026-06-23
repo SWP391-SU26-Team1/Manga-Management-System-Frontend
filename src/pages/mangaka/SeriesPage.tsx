@@ -23,45 +23,60 @@ export default function SeriesPage() {
     total: 0, active: 0, waiting: 0, published: 0,
   })
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true)
-      setError('')
-      try {
-        const list = await seriesService.getAll()
-        setSeriesList(list)
-        setCounts({
-          total: list.length,
-          active: list.filter(s => s.status === 'in_production').length,
-          waiting: list.filter(s => s.status === 'under_review').length,
-          published: list.filter(s => s.status === 'published').length,
-        })
+  const fetchData = async () => {
+    setIsLoading(true)
+    setError('')
+    try {
+      const list = await seriesService.getAll()
+      setSeriesList(list)
+      setCounts({
+        total: list.length,
+        active: list.filter(s => s.status === 'in_production' || s.status === 'approved').length,
+        waiting: list.filter(s => s.status === 'under_review' || s.status === 'pending_review').length,
+        published: list.filter(s => s.status === 'published').length,
+      })
 
-        // Load chapter counts for each series
-        const counts: Record<string, number> = {}
-        await Promise.all(
-          list.map(async (s) => {
-            try {
-              const chapters = await chapterService.getBySeriesId(s._id)
-              counts[s._id] = chapters.length
-            } catch {
-              counts[s._id] = 0
-            }
-          })
-        )
-        setChapterCounts(counts)
-      } catch (err) {
-        setError(getErrorMessage(err))
-      } finally {
-        setIsLoading(false)
-      }
+      // Load chapter counts for each series
+      const counts: Record<string, number> = {}
+      await Promise.all(
+        list.map(async (s) => {
+          try {
+            const chapters = await chapterService.getBySeriesId(s._id)
+            counts[s._id] = chapters.length
+          } catch {
+            counts[s._id] = 0
+          }
+        })
+      )
+      setChapterCounts(counts)
+    } catch (err) {
+      setError(getErrorMessage(err))
+    } finally {
+      setIsLoading(false)
     }
+  }
+
+  useEffect(() => {
     fetchData()
   }, [])
+
+  const handlePublishSeries = async (seriesId: string) => {
+    try {
+      await seriesService.publish(seriesId)
+      alert('Xuất bản Series thành công!')
+      await fetchData()
+    } catch (err) {
+      alert(getErrorMessage(err))
+    }
+  }
 
   const filtered =
     activeFilter === 'all'
       ? seriesList
+      : activeFilter === 'in_production'
+      ? seriesList.filter(s => s.status === 'in_production' || s.status === 'approved')
+      : activeFilter === 'under_review'
+      ? seriesList.filter(s => s.status === 'under_review' || s.status === 'pending_review')
       : seriesList.filter(s => s.status === activeFilter)
 
   return (
@@ -170,6 +185,7 @@ export default function SeriesPage() {
                 createdAt: s.created_at,
               }}
               chapterCount={chapterCounts[s._id] ?? 0}
+              onPublish={handlePublishSeries}
             />
 
           ))}

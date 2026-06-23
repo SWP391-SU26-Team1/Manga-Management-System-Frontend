@@ -931,7 +931,7 @@ export default function ManuscriptReviewPage() {
               : 'bg-white text-manga-ink hover:bg-red-50'
               }`}
           >
-            Duyệt Chapter
+            Duyệt Bản Thảo
           </button>
         </div>
 

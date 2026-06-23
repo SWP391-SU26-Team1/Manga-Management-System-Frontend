@@ -234,7 +234,7 @@ export default function TasksPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const res = await assistantService.listMyTasks()
+      const res = await assistantService.listMyTasks({ limit: 100 })
       if (res && res.success) {
         const mapped = res.data.map(mapBackendTaskToAssistantTask)
         setTasks(mapped)

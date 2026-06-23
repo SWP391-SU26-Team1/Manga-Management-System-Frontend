@@ -910,6 +910,20 @@ export const editorService = {
     const res = await api.patch('/api/auth/change-password', body)
     return res.data
   },
+
+  sendInternalNotification: async (userId: string, title: string, content: string, type: string): Promise<any> => {
+    const res = await api.post('/api/internal/notifications', {
+      user_id: userId,
+      title,
+      content,
+      type
+    }, {
+      headers: {
+        'x-internal-secret': 'change-me-to-a-strong-random-secret'
+      }
+    })
+    return res.data
+  }
 }
 
 export default editorService

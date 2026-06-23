@@ -467,6 +467,49 @@ export function VotePage() {
   const [comments, setComments] = useState<BoardComment[]>([])
   const [newComment, setNewComment] = useState('')
   const currentUser = getStoredUser()
+  const [pages, setPages] = useState<any[]>([])
+  const [page, setPage] = useState(1)
+  const [loadingFiles, setLoadingFiles] = useState(false)
+
+  // Manga mock images fallback
+  const fallbackPages = [
+    'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=600&auto=format&fit=crop'
+  ]
+
+  useEffect(() => {
+    const loadManuscripts = async () => {
+      if (!chapterId) return
+      try {
+        setLoadingFiles(true)
+        const chapterPages = await pageService.getByChapterId(chapterId)
+        if (chapterPages && chapterPages.length > 0) {
+          const sortedPages = chapterPages.sort((a: any, b: any) => a.page_number - b.page_number)
+          setPages(sortedPages)
+        }
+      } catch (err) {
+        console.error('Error loading manuscripts:', err)
+      } finally {
+        setLoadingFiles(false)
+      }
+    }
+    loadManuscripts()
+  }, [chapterId])
+
+  const displayPages = pages.length > 0 ? pages : fallbackPages
+  const totalPagesCount = displayPages.length
+
+  const handleNextPage = () => {
+    if (page < totalPagesCount) setPage(page + 1)
+  }
+
+  const handlePrevPage = () => {
+    if (page > 1) setPage(page - 1)
+  }
+
+  const targetPage = displayPages[(page - 1) % totalPagesCount]
+  const mockImage = typeof targetPage === 'string' 
+    ? targetPage 
+    : targetPage?.image_url || targetPage?.file_url || fallbackPages[0]
 
   const chapterTitleDisplay = chapterId === 'cyber-ronin' 
     ? 'CYBER RONIN: ZERO' 
@@ -503,7 +546,7 @@ export function VotePage() {
       }
     }
     loadVote()
-  }, [chapterId, urlSessionId, currentUser])
+  }, [chapterId, urlSessionId, currentUser?.id])
 
   const handleVoteSubmit = async () => {
     try {
@@ -595,11 +638,17 @@ export function VotePage() {
             
             {/* Draw draft display inside a mockup box */}
             <div className="border-4 border-manga-ink aspect-[3/4] max-w-sm mx-auto overflow-hidden shadow-[4px_4px_0px_rgba(0,0,0,1)] relative">
-              <img 
-                src="https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=600&auto=format&fit=crop"
-                alt="Draft Page"
-                className="w-full h-full object-cover select-none"
-              />
+              {loadingFiles ? (
+                <div className="w-full h-full flex items-center justify-center bg-zinc-200">
+                  <span className="font-bold text-gray-500 animate-pulse">Loading...</span>
+                </div>
+              ) : (
+                <img 
+                  src={mockImage}
+                  alt={`Trang ${page}`}
+                  className="w-full h-full object-cover select-none"
+                />
+              )}
               <div className="absolute top-2 left-2 bg-manga-red text-white text-[9px] font-black px-2 py-0.5 border-2 border-manga-ink shadow-sm">
                 BẢN XEM TRƯỚC
               </div>
@@ -607,8 +656,23 @@ export function VotePage() {
             
             {/* Footer Navigation */}
             <div className="flex justify-between items-center max-w-sm mx-auto mt-4 px-2">
-              <button disabled className="px-3 py-1 bg-white border-2 border-manga-ink text-[10px] font-bold uppercase opacity-50 cursor-not-allowed">TRANG TRƯỚC</button>
-              <button disabled className="px-3 py-1 bg-white border-2 border-manga-ink text-[10px] font-bold uppercase opacity-50 cursor-not-allowed">TRANG SAU</button>
+              <button 
+                onClick={handlePrevPage}
+                disabled={page <= 1}
+                className="px-3 py-1 bg-white border-2 border-manga-ink text-[10px] font-bold uppercase disabled:opacity-50 disabled:cursor-not-allowed hover:bg-zinc-50 cursor-pointer"
+              >
+                TRANG TRƯỚC
+              </button>
+              <span className="font-manga text-sm font-black">
+                {page} / {totalPagesCount}
+              </span>
+              <button 
+                onClick={handleNextPage}
+                disabled={page >= totalPagesCount}
+                className="px-3 py-1 bg-white border-2 border-manga-ink text-[10px] font-bold uppercase disabled:opacity-50 disabled:cursor-not-allowed hover:bg-zinc-50 cursor-pointer"
+              >
+                TRANG SAU
+              </button>
             </div>
           </div>
         </div>

@@ -78,8 +78,12 @@ export const boardService = {
 
   // --- 3. VOTES ---
   getVote: async (sessionId: string): Promise<any[]> => {
-    const response = await api.get(`/api/board/review-sessions/${sessionId}/votes`)
-    return response.data.data || []
+    const response = await api.get(`/api/review-sessions/${sessionId}/votes`)
+    const list = response.data.data || []
+    return list.map((v: any) => ({
+      ...v,
+      users: v.users || v.voter
+    }))
   },
 
   getVoteById: async (voteId: string): Promise<any> => {

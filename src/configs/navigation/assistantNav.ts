@@ -30,13 +30,13 @@ export const assistantNav = [
     icon: MessageSquare
   },
   {
-    label: "Bản Nháp",
+    label: "Bản thảo của tôi",
     path: "/dashboard/assistant/drafts",
     icon: FileEdit
   },
   {
     label: "Vẽ & Chỉnh Sửa",
-    path: "/dashboard/assistant/drawing",
+    path: "/dashboard/assistant/drawing-studio",
     icon: PenTool
   }
 ]

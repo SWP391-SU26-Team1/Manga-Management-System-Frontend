@@ -10,9 +10,6 @@ import { rankingService } from '@/services/ranking.service'
 
 const getChapterDisplayStatus = (ch: any, m?: any) => {
   if (m) {
-    if (m.title && m.title.includes('[GỢI Ý]')) {
-      return 'GỢI Ý TỪ TRỢ LÝ'
-    }
     if (m.title && m.title.includes('[ĐÃ DUYỆT]')) {
       return 'ĐÃ DUYỆT'
     }
@@ -24,7 +21,7 @@ const getChapterDisplayStatus = (ch: any, m?: any) => {
         return 'NHẬN XÉT TỪ EDITOR'
       case 'submitted':
       case 'in_review':
-        return 'CHỜ BOARD DUYỆT'
+        return 'CHỜ TANTOU DUYỆT'
       case 'approved':
         return 'ĐÃ DUYỆT'
       case 'published':
@@ -43,7 +40,7 @@ const getChapterDisplayStatus = (ch: any, m?: any) => {
     case 'draft':
       return 'ĐANG SOẠN'
     case 'pending_review':
-      return 'CHỜ BOARD DUYỆT'
+      return 'CHỜ TANTOU DUYỆT'
     case 'approved':
       return 'ĐÃ DUYỆT'
     case 'published':
@@ -60,13 +57,15 @@ const getStatusDisplay = (displayStatus: string) => {
     case 'ĐANG SOẠN':
       return { label: 'ĐANG SOẠN', classes: 'bg-orange-500 text-white border-2 border-black font-extrabold' }
     case 'GỢI Ý TỪ TRỢ LÝ':
-      return { label: 'GỢI Ý TỪ TRỢ LÝ', classes: 'bg-red-550 bg-red-500 text-white border-2 border-black font-extrabold' }
+      return { label: 'GỢI Ý TỪ TRỢ LÝ', classes: 'bg-red-500 text-white border-2 border-black font-extrabold' }
     case 'NHẬN XÉT TỪ EDITOR':
       return { label: 'NHẬN XÉT TỪ EDITOR', classes: 'bg-red-500 text-white border-2 border-black font-extrabold' }
+    case 'CẦN CHỈNH SỬA':
+      return { label: 'CẦN CHỈNH SỬA', classes: 'bg-red-500 text-white border-2 border-red-500 font-extrabold' }
     case 'ĐANG VẼ LỚP':
       return { label: 'ĐANG VẼ LỚP', classes: 'bg-black text-white border-2 border-black font-extrabold' }
-    case 'CHỜ BOARD DUYỆT':
-      return { label: 'CHỜ BOARD DUYỆT', classes: 'bg-yellow-400 text-black border-2 border-black font-extrabold' }
+    case 'CHỜ TANTOU DUYỆT':
+      return { label: 'CHỜ TANTOU DUYỆT', classes: 'bg-yellow-400 text-black border-2 border-black font-extrabold' }
     case 'ĐÃ DUYỆT':
       return { label: 'ĐÃ DUYỆT', classes: 'bg-green-600 text-white border-2 border-black font-extrabold' }
     case 'ĐÃ XUẤT BẢN':
@@ -367,17 +366,10 @@ export default function ManuscriptsPage() {
             {/* Retro Manga Underline */}
             <div className="w-28 h-2 bg-[#E63946] mt-2 mb-4"></div>
             <p className="text-[13px] text-gray-500 font-bold leading-normal">
-              Theo dõi danh sách các chương truyện đang thực hiện, tiến độ ghép file PSD và gửi bản thảo chính thức cho ban biên tập.
+              Theo dõi danh sách các chương truyện đang thực hiện, tiến độ ghép file PSD và gửi bản thảo chính thức cho Tantou Editor.
             </p>
           </div>
           <div className="flex gap-4">
-            <Link
-              to="/dashboard/mangaka/drafts"
-              className="bg-white text-black border-2 border-black font-bold uppercase py-2.5 px-5 shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none transition-all flex items-center gap-2 text-xs"
-            >
-              <FileText className="w-4 h-4 flex-shrink-0" />
-              Bản thảo nháp (Trợ lý)
-            </Link>
             <button
               onClick={() => {
                 setSelectedChapterId(null)
@@ -419,7 +411,7 @@ export default function ManuscriptsPage() {
 
         {/* Filters Tabs */}
         <div className="flex gap-2 mb-6 flex-wrap">
-          {['TẤT CẢ', 'ĐANG SOẠN', 'GỢI Ý TỪ TRỢ LÝ', 'NHẬN XÉT TỪ EDITOR', 'ĐANG VẼ LỚP', 'CHỜ BOARD DUYỆT', 'ĐÃ DUYỆT'].map(tab => (
+          {['TẤT CẢ', 'ĐANG SOẠN', 'GỢI Ý TỪ TRỢ LÝ', 'NHẬN XÉT TỪ EDITOR', 'CẦN CHỈNH SỬA', 'ĐANG VẼ LỚP', 'CHỜ TANTOU DUYỆT', 'ĐÃ DUYỆT'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -551,7 +543,7 @@ export default function ManuscriptsPage() {
                 1
               </div>
               <p className="text-xs font-bold leading-snug pt-0.5">
-                Mangaka chia khung & giao task
+                Mangaka phác thảo kịch bản
               </p>
             </div>
             <div className="flex gap-3.5 items-start">
@@ -559,7 +551,7 @@ export default function ManuscriptsPage() {
                 2
               </div>
               <p className="text-xs font-bold leading-snug pt-0.5">
-                Trợ lý vẽ và nộp lớp layer
+                Gửi kịch bản cho Tantou Editor duyệt
               </p>
             </div>
             <div className="flex gap-3.5 items-start">
@@ -567,7 +559,7 @@ export default function ManuscriptsPage() {
                 3
               </div>
               <p className="text-xs font-bold leading-snug pt-0.5">
-                Mangaka phê duyệt & ghép file
+                Mangaka vẽ và hoàn thiện bản thảo
               </p>
             </div>
             <div className="flex gap-3.5 items-start">
@@ -575,7 +567,7 @@ export default function ManuscriptsPage() {
                 4
               </div>
               <p className="text-xs font-bold leading-snug pt-0.5">
-                Nộp bản thảo tổng hợp lên Editor
+                Nộp bản thảo chính thức lên Tantou Editor
               </p>
             </div>
             <div className="flex gap-3.5 items-start">
@@ -583,7 +575,7 @@ export default function ManuscriptsPage() {
                 5
               </div>
               <p className="text-xs font-bold leading-snug pt-0.5">
-                Ban biên tập phê duyệt xuất bản
+                Tantou Editor phê duyệt xuất bản
               </p>
             </div>
           </div>
@@ -721,6 +713,7 @@ export default function ManuscriptsPage() {
           </form>
         </div>
       )}
+
       {/* Viewing Suggestion Modal */}
       {viewingSuggestion && viewingSuggestion.latestManuscript && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">

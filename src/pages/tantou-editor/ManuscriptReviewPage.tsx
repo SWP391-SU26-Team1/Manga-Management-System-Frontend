@@ -1106,12 +1106,14 @@ export default function ManuscriptReviewPage() {
                   </div>
 
                   {/* Script Content Viewer Area */}
-                  <div className="flex-1 overflow-y-auto p-6 bg-[#FAF9F6] flex flex-col">
+                  <div className="flex-1 overflow-y-auto p-8 bg-[#FAF9F6] flex flex-col select-text">
                     {activeManuscript.content ? (
-                      <div className="max-w-3xl mx-auto w-full bg-white border-2 border-manga-ink p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] rounded-sm min-h-[400px]">
-                        <div className="border-b-2 border-dashed border-gray-200 pb-4 mb-4">
-                          <h1 className="text-xl font-extrabold text-manga-ink mb-1">{activeManuscript.chapter}</h1>
-                          <p className="text-xs text-gray-500 font-bold">Tác giả: {activeManuscript.mangaka}</p>
+                      <div className="max-w-3xl mx-auto w-full">
+                        <div className="border-b-2 border-dashed border-manga-ink/20 pb-4 mb-6">
+                          <h1 className="text-2xl font-extrabold text-manga-ink mb-2">{activeManuscript.chapter}</h1>
+                          <p className="text-xs text-gray-500 font-extrabold uppercase tracking-wide">
+                            Tác giả: <span className="text-manga-red">{activeManuscript.mangaka}</span>
+                          </p>
                         </div>
                         <div className="whitespace-pre-wrap text-sm text-gray-800 font-medium leading-relaxed font-sans">
                           {activeManuscript.content}

@@ -916,22 +916,22 @@ export default function ManuscriptReviewPage() {
         {/* Neo-brutalist Tab Bar */}
         <div className="grid grid-cols-2 border-b-4 border-manga-ink bg-gray-100 flex-shrink-0">
           <button
-            onClick={() => setActiveTab('MANUSCRIPT')}
-            className={`py-2.5 px-3 text-xs font-bold uppercase tracking-wider transition-all border-r-2 border-manga-ink ${activeTab === 'MANUSCRIPT'
-              ? 'bg-manga-red text-white'
-              : 'bg-white text-manga-ink hover:bg-red-50'
-              }`}
-          >
-            Duyệt Chapter
-          </button>
-          <button
             onClick={() => setActiveTab('SERIES')}
-            className={`py-2.5 px-3 text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'SERIES'
+            className={`py-2.5 px-3 text-xs font-bold uppercase tracking-wider transition-all border-r-2 border-manga-ink ${activeTab === 'SERIES'
               ? 'bg-manga-red text-white'
               : 'bg-white text-manga-ink hover:bg-red-50'
               }`}
           >
             Duyệt Series Mới
+          </button>
+          <button
+            onClick={() => setActiveTab('MANUSCRIPT')}
+            className={`py-2.5 px-3 text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'MANUSCRIPT'
+              ? 'bg-manga-red text-white'
+              : 'bg-white text-manga-ink hover:bg-red-50'
+              }`}
+          >
+            Duyệt Chapter
           </button>
         </div>
 

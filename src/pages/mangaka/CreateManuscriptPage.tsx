@@ -109,11 +109,11 @@ export default function CreateManuscriptPage() {
         chapter_id: selectedChapterId || undefined,
         title: title.trim(),
         content: content.trim(),
-        status: 'draft' // Create as draft so assistant can see and collaborate
+        status: 'submitted' // Create as submitted directly to Tantou Editor
       })
 
-      setSuccessMsg('✅ Đã gửi bản thảo kịch bản cho Trợ lý thành công!')
-      setTimeout(() => navigate('/dashboard/mangaka/drafts'), 2000)
+      setSuccessMsg('✅ Đã gửi bản thảo kịch bản cho Tantou Editor thành công!')
+      setTimeout(() => navigate('/dashboard/mangaka/manuscripts'), 2000)
     } catch (err: any) {
       console.error(err)
       setErrorMsg(err.response?.data?.message || err.message || 'Lỗi không xác định khi tạo bản thảo.')
@@ -137,11 +137,11 @@ export default function CreateManuscriptPage() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="font-manga text-4xl font-bold uppercase text-manga-ink leading-none">
-            TẠO BẢN THẢO NHÁP
+            GỬI BẢN THẢO CHO TANTOU EDITOR
           </h1>
           <div className="h-1.5 w-24 bg-manga-red mt-3" />
           <p className="text-sm font-bold text-gray-500 mt-2">
-            Tạo bản thảo kịch bản chữ để Trợ lý (Assistant) vào xem, đóng góp lời thoại và cùng hoàn thiện
+            Tạo bản thảo kịch bản chữ để gửi cho Tantou Editor xem xét và duyệt
           </p>
         </div>
         <Link
@@ -173,10 +173,10 @@ export default function CreateManuscriptPage() {
         <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
         <div className="space-y-1">
           <h4 className="font-manga text-sm font-bold uppercase tracking-wider text-blue-700">
-            QUY TRÌNH HỢP TÁC KỊCH BẢN
+            QUY TRÌNH DUYỆT BẢN THẢO
           </h4>
           <p className="text-xs font-bold text-blue-800 leading-relaxed">
-            Bản thảo sau khi tạo sẽ mang trạng thái <strong>Nháp (Draft)</strong>. Trợ lý được thêm vào Series này sẽ thấy bản nháp kịch bản này trên trang làm việc của họ, có thể đóng góp viết lời thoại, phân cảnh chữ trước khi bạn nộp duyệt chính thức cho Biên tập viên.
+            Bản thảo sau khi tạo sẽ được gửi trực tiếp đến cho <strong>Tantou Editor (Biên tập viên phụ trách)</strong> dưới trạng thái Chờ duyệt. Biên tập viên sẽ xem xét, đánh giá và phản hồi ý kiến cho bạn.
           </p>
         </div>
       </div>
@@ -286,7 +286,7 @@ export default function CreateManuscriptPage() {
               ) : (
                 <>
                   <Save className="w-4 h-4" />
-                  Gửi bản thảo cho trợ lý
+                  Gửi bản thảo cho Tantou Editor
                 </>
               )}
             </button>

@@ -1,15 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react'
-import { FileImage, CheckCircle2, AlertCircle, XCircle, ChevronLeft, ChevronRight, MessageSquarePlus, ZoomIn, ZoomOut, Check, Edit3, Trash2, Shield, Play, Loader2, Maximize2 } from 'lucide-react'
-import { editorService, ApiManuscript, ApiManuscriptFile, ApiAnnotation, ApiReviewSession } from '@/services/editor.service'
-
-interface DisplayAnnotation {
-  id: string
-  x: number
-  y: number
-  w: number
-  h: number
-  comment: string
-}
+import React, { useState, useEffect } from 'react'
+import { CheckCircle2, AlertCircle, XCircle, Check, Edit3, Shield, Loader2 } from 'lucide-react'
+import { editorService, ApiManuscript, ApiReviewSession } from '@/services/editor.service'
 
 interface DisplayManuscript {
   id: string
@@ -20,8 +11,8 @@ interface DisplayManuscript {
   status: 'SUBMITTED' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED'
   mangaka: string
   mangakaId?: string
-  pages: { pageId: string; pageNum: string; image: string }[]
-  annotations: Record<string, DisplayAnnotation[]>
+  pages?: { pageId: string; pageNum: string; image: string }[]
+  annotations?: Record<string, any[]>
   content?: string
 }
 
@@ -48,7 +39,6 @@ const mapApiStatusToDisplay = (s: string): DisplayManuscript['status'] => {
 
 export default function ManuscriptReviewPage() {
   const [activeTab, setActiveTab] = useState<'MANUSCRIPT' | 'SERIES'>('MANUSCRIPT')
-  const [viewerTab, setViewerTab] = useState<'SCRIPT' | 'PAGES'>('SCRIPT')
 
   // Manuscript state
   const [manuscripts, setManuscripts] = useState<DisplayManuscript[]>([])
@@ -63,36 +53,11 @@ export default function ManuscriptReviewPage() {
   const [reviewSessions, setReviewSessions] = useState<ApiReviewSession[]>([])
   const [isSubmittingSeries, setIsSubmittingSeries] = useState(false)
 
-  // Current page indexes
-  const [currentPageIndex, setCurrentPageIndex] = useState(0)
-
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<string[]>([])
 
-  // Annotation list active focus state
-  const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null)
-
-  // Modal drawing states
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [annotationBox, setAnnotationBox] = useState({ x: 30, y: 30, w: 40, h: 30 })
-  const [editingAnnId, setEditingAnnId] = useState<string | null>(null)
-  const [annCommentInput, setAnnCommentInput] = useState('')
-
   // Feedback comment list input (general comment)
-  const [generalComment, setGeneralComment] = useState('')
-  const [pageComments, setPageComments] = useState<Record<string, string>>({})
   const [rejectionReason, setRejectionReason] = useState('')
-  const [manuscriptPageReviews, setManuscriptPageReviews] = useState<Record<string, Record<string, 'pass' | 'fail' | 'unreviewed'>>>({})
-
-  // Zoom state
-  const [zoomLevel, setZoomLevel] = useState(100)
-  const [isExpanded, setIsExpanded] = useState(false)
-
-  // Drag & Resize state in Modal Canvas
-  const imageRef = useRef<HTMLDivElement>(null)
-  const [dragMode, setDragMode] = useState<'NONE' | 'MOVE' | 'RESIZE'>('NONE')
-  const [startPos, setStartPos] = useState({ x: 0, y: 0 })
-  const [startAnnotation, setStartAnnotation] = useState(annotationBox)
 
   // Toast notification
   const [toastMessage, setToastMessage] = useState<string | null>(null)
@@ -129,16 +94,12 @@ export default function ManuscriptReviewPage() {
           status: mapApiStatusToDisplay(m.status),
           mangaka: m.mangaka?.name || m.mangaka?.username || '—',
           mangakaId: m.mangaka?.user_id || m.mangaka_id,
-          pages: (m.files || []).map((f: ApiManuscriptFile, idx: number) => ({
-            pageId: f.file_id,
-            pageNum: `P.${String(idx + 1).padStart(2, '0')}`,
-            image: f.file_url || `https://placehold.co/600x850/e0e0e0/808080?text=Page+${idx + 1}`
-          })),
+          pages: [],
           annotations: {},
           content: m.content
         }))
 
-      // Sort: SUBMITTED first (cần duyệt gấp), then IN_REVIEW, then others
+      // Sort: SUBMITTED first, then IN_REVIEW, then others
       const statusOrder: Record<string, number> = { SUBMITTED: 0, IN_REVIEW: 1, APPROVED: 2, REJECTED: 3 }
       displayList.sort((a, b) => (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9))
 
@@ -162,46 +123,6 @@ export default function ManuscriptReviewPage() {
     try {
       const rawDetail = await editorService.getManuscriptDetail(mId)
       const detail = rawDetail.data || rawDetail
-      const files = detail.files || []
-
-      const pages = files.map((f: ApiManuscriptFile, idx: number) => ({
-        pageId: f.file_id,
-        pageNum: `P.${String(idx + 1).padStart(2, '0')}`,
-        image: f.file_url || `https://placehold.co/600x850/e0e0e0/808080?text=Page+${idx + 1}`
-      }))
-
-      if (pages.length === 0) {
-        pages.push({ pageId: `${mId}-placeholder`, pageNum: 'P.01', image: 'https://placehold.co/600x850/e0e0e0/808080?text=No+Pages' })
-      }
-
-      // Fetch annotations for all pages in this manuscript
-      const annotationsMap: Record<string, DisplayAnnotation[]> = {}
-      const initialPageComments: Record<string, string> = {}
-      for (const p of pages) {
-        if (!p.pageId.endsWith('-placeholder')) {
-          try {
-            const annRes = await editorService.getAnnotationsByPage(p.pageId)
-            const annList = annRes.data || annRes || []
-            annotationsMap[p.pageId] = annList.map((a: any) => ({
-              id: a.annotation_id,
-              x: a.coordinates?.x || 30,
-              y: a.coordinates?.y || 30,
-              w: a.coordinates?.w || 40,
-              h: a.coordinates?.h || 30,
-              comment: a.content || ''
-            }))
-
-            const commentAnn = annList.find((a: any) => a.content && a.content.startsWith('NHẬN XÉT:'))
-            if (commentAnn) {
-              initialPageComments[p.pageId] = commentAnn.content.replace(/^NHẬN XÉT:\s*/, '')
-            }
-          } catch (err) {
-            console.error(`Failed to load annotations for page ${p.pageId}:`, err)
-            annotationsMap[p.pageId] = []
-          }
-        }
-      }
-      setPageComments(initialPageComments)
 
       const updateList = (prev: DisplayManuscript[]) => prev.map(m => {
         if (m.id === mId) {
@@ -209,8 +130,6 @@ export default function ManuscriptReviewPage() {
             ...m,
             seriesId: detail.series_id || detail.series?.series_id || m.seriesId,
             chapterId: detail.chapter_id || detail.chapter?.chapter_id || m.chapterId,
-            pages,
-            annotations: annotationsMap,
             content: detail.content || m.content
           }
         }
@@ -218,25 +137,13 @@ export default function ManuscriptReviewPage() {
       })
 
       if (currentManuscripts) {
-        const updated = updateList(currentManuscripts)
-        setManuscripts(updated)
-        const activeM = updated.find(item => item.id === mId)
-        if (activeM) {
-          setViewerTab(activeM.content ? 'SCRIPT' : 'PAGES')
-        }
+        setManuscripts(updateList(currentManuscripts))
       } else {
-        setManuscripts(prev => {
-          const updated = updateList(prev)
-          const activeM = updated.find(item => item.id === mId)
-          if (activeM) {
-            setViewerTab(activeM.content ? 'SCRIPT' : 'PAGES')
-          }
-          return updated
-        })
+        setManuscripts(prev => updateList(prev))
       }
     } catch (err) {
       console.error('Failed to fetch manuscript detail:', err)
-      showToast('Không thể tải chi tiết trang vẽ.')
+      showToast('Không thể tải chi tiết bản thảo.')
     }
   }
 
@@ -301,25 +208,6 @@ export default function ManuscriptReviewPage() {
 
   // Get active manuscript
   const activeManuscript = manuscripts.find(m => m.id === selectedManuscriptId)
-  const activePage = activeManuscript?.pages?.[currentPageIndex] || activeManuscript?.pages?.[0]
-  const activeAnnotations = activePage
-    ? (activeManuscript?.annotations?.[activePage.pageId] || []).filter(ann => 
-        !ann.comment?.startsWith('NHẬN XÉT:') && 
-        !ann.comment?.startsWith('LÝ DO TỪ CHỐI CHƯƠNG:')
-      )
-    : []
-  const isTextOnly = !activeManuscript?.pages || activeManuscript.pages.length === 0 || activeManuscript.pages[0].pageId.endsWith('-placeholder')
-
-  // Page level review stats
-  const activePageReviews = selectedManuscriptId ? (manuscriptPageReviews[selectedManuscriptId] || {}) : {}
-  const activePages = activeManuscript?.pages || []
-
-  const allReviewed = activePages.length > 0 && activePages.every(p => {
-    const status = activePageReviews[p.pageId]
-    return status === 'pass' || status === 'fail'
-  })
-
-  const hasFail = activePages.some(p => activePageReviews[p.pageId] === 'fail')
 
   // Get active series
   const activeSeries = seriesList.find(s => s.id === selectedSeriesId) || seriesList[0]
@@ -333,59 +221,14 @@ export default function ManuscriptReviewPage() {
   // Handle manuscript change
   const handleSelectManuscript = (id: string) => {
     setSelectedManuscriptId(id)
-    setCurrentPageIndex(0)
-    setActiveAnnotationId(null)
     setRejectionReason('')
 
     const m = manuscripts.find(item => item.id === id)
-    if (m) {
-      setViewerTab(m.content ? 'SCRIPT' : 'PAGES')
-    }
-    const hasDetail = m && m.pages.length > 0 && !m.pages[0].pageId.endsWith('-placeholder')
+    const hasDetail = m && m.content
     if (!hasDetail) {
       fetchManuscriptDetail(id)
-    } else {
-      const initialPageComments: Record<string, string> = {}
-      m.pages.forEach(p => {
-        const pageAnns = m.annotations[p.pageId] || []
-        const commentAnn = pageAnns.find(a => a.comment && a.comment.startsWith('NHẬN XÉT:'))
-        if (commentAnn) {
-          initialPageComments[p.pageId] = commentAnn.comment.replace(/^NHẬN XÉT:\s*/, '')
-        }
-      })
-      setPageComments(initialPageComments)
     }
   }
-
-  const handleSetPageReview = (mId: string, pageId: string, status: 'pass' | 'fail') => {
-    setManuscriptPageReviews(prev => {
-      const current = prev[mId] || {}
-      return {
-        ...prev,
-        [mId]: {
-          ...current,
-          [pageId]: status
-        }
-      }
-    })
-  }
-
-  // Next and Prev Page
-  const handlePrevPage = () => {
-    if (currentPageIndex > 0) {
-      setCurrentPageIndex(currentPageIndex - 1)
-      setActiveAnnotationId(null)
-    }
-  }
-
-  const handleNextPage = () => {
-    if (activeManuscript && currentPageIndex < activeManuscript.pages.length - 1) {
-      setCurrentPageIndex(currentPageIndex + 1)
-      setActiveAnnotationId(null)
-    }
-  }
-
-
 
   const getFriendlyErrorMessage = (errorMsg: string, defaultMsg: string) => {
     if (!errorMsg) return defaultMsg
@@ -434,7 +277,7 @@ export default function ManuscriptReviewPage() {
       if (filtered.length > 0) {
         const nextSelected = filtered[0]
         setSelectedManuscriptId(nextSelected.id)
-        const hasDetail = nextSelected.pages.length > 0 && !nextSelected.pages[0].pageId.endsWith('-placeholder')
+        const hasDetail = nextSelected.content
         if (!hasDetail) {
           fetchManuscriptDetail(nextSelected.id, filtered)
         }
@@ -445,44 +288,6 @@ export default function ManuscriptReviewPage() {
     })
   }
 
-  // Approve Chapter
-  const handleApproveChapter = async (mId: string) => {
-    try {
-      await editorService.approveManuscript(mId)
-      removeManuscriptFromList(mId)
-      showToast(`Đã PHÊ DUYỆT toàn bộ ${activeManuscript?.chapter} - ${activeManuscript?.series}!`)
-    } catch (err: any) {
-      console.error('Failed to approve:', err)
-      const msg = err?.response?.data?.message || ''
-      showToast(getFriendlyErrorMessage(msg, 'Lỗi khi phê duyệt bản thảo!'))
-    }
-  }
-
-  const handleRejectChapter = async (mId: string) => {
-    try {
-      await editorService.rejectManuscript(mId)
-      removeManuscriptFromList(mId)
-      showToast(`Đã TỪ CHỐI bản thảo ${activeManuscript?.chapter} - ${activeManuscript?.series}!`)
-    } catch (err: any) {
-      console.error('Failed to reject:', err)
-      const msg = err?.response?.data?.message || ''
-      showToast(getFriendlyErrorMessage(msg, 'Lỗi khi từ chối bản thảo!'))
-    }
-  }
-
-  const handleRequestRevision = async (mId: string) => {
-    try {
-      await editorService.requestManuscriptRevision(mId)
-      const annCount = activeAnnotations.length
-      removeManuscriptFromList(mId)
-      showToast(`Đã gửi yêu cầu chỉnh sửa cho ${activeManuscript?.chapter} với ${annCount} góp ý chi tiết!`)
-    } catch (err: any) {
-      console.error('Failed to request revision:', err)
-      const msg = err?.response?.data?.message || ''
-      showToast(getFriendlyErrorMessage(msg, 'Lỗi khi gửi yêu cầu chỉnh sửa!'))
-    }
-  }
-
   const handleRejectChapterFlow = async (mId: string) => {
     if (!activeManuscript) return
     if (!rejectionReason.trim()) {
@@ -491,13 +296,6 @@ export default function ManuscriptReviewPage() {
     }
     try {
       setLoading(true)
-      if (activePages.length > 0 && !activePages[0].pageId.endsWith('-placeholder')) {
-        const firstPageId = activePages[0].pageId
-        await editorService.createAnnotation(firstPageId, {
-          content: `LÝ DO TỪ CHỐI CHƯƠNG: ${rejectionReason}`,
-          coordinates: { x: 0, y: 0, w: 100, h: 12 }
-        })
-      }
       await editorService.rejectManuscript(mId)
       
       // Reject chapter directly
@@ -549,156 +347,6 @@ export default function ManuscriptReviewPage() {
     }
   }
 
-  // Annotation functions
-  const handleOpenAnnotationModal = (ann?: DisplayAnnotation) => {
-    if (ann) {
-      setEditingAnnId(ann.id)
-      setAnnotationBox({ x: ann.x, y: ann.y, w: ann.w, h: ann.h })
-      setAnnCommentInput(ann.comment)
-    } else {
-      setEditingAnnId(null)
-      setAnnotationBox({ x: 30, y: 30, w: 40, h: 30 })
-      setAnnCommentInput('')
-    }
-    setIsModalOpen(true)
-  }
-
-  const handleSaveAnnotation = async () => {
-    if (!annCommentInput) {
-      alert('Vui lòng điền nội dung góp ý!')
-      return
-    }
-
-    try {
-      if (editingAnnId) {
-        await editorService.updateAnnotation(editingAnnId, {
-          content: annCommentInput,
-          coordinates: annotationBox,
-        })
-      } else {
-        await editorService.createAnnotation(activePage?.pageId || '', {
-          content: annCommentInput,
-          coordinates: annotationBox,
-        })
-      }
-
-      // Update local state
-      setManuscripts(prev => prev.map(m => {
-        if (m.id === activeManuscript?.id && activePage) {
-          const pageAnns = m.annotations[activePage.pageId] || []
-          let updatedAnns: DisplayAnnotation[]
-          if (editingAnnId) {
-            updatedAnns = pageAnns.map(a => a.id === editingAnnId ? { ...a, ...annotationBox, comment: annCommentInput } : a)
-          } else {
-            const newAnn: DisplayAnnotation = {
-              id: 'ann-' + Date.now(),
-              ...annotationBox,
-              comment: annCommentInput
-            }
-            updatedAnns = [...pageAnns, newAnn]
-          }
-          return { ...m, annotations: { ...m.annotations, [activePage.pageId]: updatedAnns } }
-        }
-        return m
-      }))
-
-      setIsModalOpen(false)
-      showToast(editingAnnId ? 'Đã cập nhật góp ý!' : 'Đã thêm góp ý mới cho trang vẽ!')
-    } catch (err: any) {
-      console.error('Failed to save annotation:', err)
-      showToast('Lỗi khi lưu góp ý!')
-    }
-  }
-
-  const handleDeleteAnnotation = async (annId: string) => {
-    try {
-      await editorService.deleteAnnotation(annId)
-      setManuscripts(prev => prev.map(m => {
-        if (m.id === activeManuscript?.id && activePage) {
-          const pageAnns = m.annotations[activePage.pageId] || []
-          return { ...m, annotations: { ...m.annotations, [activePage.pageId]: pageAnns.filter(a => a.id !== annId) } }
-        }
-        return m
-      }))
-      setActiveAnnotationId(null)
-      showToast('Đã xóa góp ý thành công.')
-    } catch (err: any) {
-      console.error('Failed to delete annotation:', err)
-      showToast('Lỗi khi xóa góp ý!')
-    }
-  }
-
-  const handleSavePageComment = async (pageId: string, comment: string) => {
-    if (!activeManuscript) return
-    const trimmed = comment.trim()
-    
-    // Find if there is an existing page comment annotation for this page in the manuscript
-    const pageAnns = activeManuscript.annotations[pageId] || []
-    const existingAnn = pageAnns.find(a => a.comment && a.comment.startsWith('NHẬN XÉT:'))
-
-    try {
-      if (existingAnn) {
-        if (!trimmed) {
-          // Delete annotation if comment is cleared
-          await editorService.deleteAnnotation(existingAnn.id)
-          // Update local state annotations
-          setManuscripts(prev => prev.map(m => {
-            if (m.id === activeManuscript.id) {
-              const updated = (m.annotations[pageId] || []).filter(a => a.id !== existingAnn.id)
-              return { ...m, annotations: { ...m.annotations, [pageId]: updated } }
-            }
-            return m
-          }))
-          showToast('Đã xóa nhận xét trang.')
-        } else {
-          // Update annotation content
-          await editorService.updateAnnotation(existingAnn.id, {
-            content: `NHẬN XÉT: ${trimmed}`,
-            coordinates: { x: 0, y: 0, w: 100, h: 10 }
-          })
-          // Update local state annotations
-          setManuscripts(prev => prev.map(m => {
-            if (m.id === activeManuscript.id) {
-              const updated = (m.annotations[pageId] || []).map(a => a.id === existingAnn.id ? { ...a, comment: `NHẬN XÉT: ${trimmed}` } : a)
-              return { ...m, annotations: { ...m.annotations, [pageId]: updated } }
-            }
-            return m
-          }))
-          showToast('Đã tự động lưu nhận xét trang!')
-        }
-      } else {
-        if (trimmed) {
-          // Create new annotation
-          const res = await editorService.createAnnotation(pageId, {
-            content: `NHẬN XÉT: ${trimmed}`,
-            coordinates: { x: 0, y: 0, w: 100, h: 10 }
-          })
-          const createdAnn = res.data || res
-          const newAnn: DisplayAnnotation = {
-            id: createdAnn.annotation_id || 'ann-' + Date.now(),
-            x: 0,
-            y: 0,
-            w: 100,
-            h: 10,
-            comment: `NHẬN XÉT: ${trimmed}`
-          }
-          // Update local state annotations
-          setManuscripts(prev => prev.map(m => {
-            if (m.id === activeManuscript.id) {
-              const updated = [...(m.annotations[pageId] || []), newAnn]
-              return { ...m, annotations: { ...m.annotations, [pageId]: updated } }
-            }
-            return m
-          }))
-          showToast('Đã tự động lưu nhận xét trang!')
-        }
-      }
-    } catch (err) {
-      console.error('Failed to auto-save page comment:', err)
-      showToast('Lỗi khi lưu nhận xét trang!')
-    }
-  }
-
   // Bulk options
   const toggleSelectId = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
@@ -726,7 +374,7 @@ export default function ManuscriptReviewPage() {
         if (filtered.length > 0) {
           const nextSelected = filtered[0]
           setSelectedManuscriptId(nextSelected.id)
-          const hasDetail = nextSelected.pages.length > 0 && !nextSelected.pages[0].pageId.endsWith('-placeholder')
+          const hasDetail = nextSelected.content
           if (!hasDetail) {
             fetchManuscriptDetail(nextSelected.id, filtered)
           }
@@ -757,7 +405,7 @@ export default function ManuscriptReviewPage() {
         if (filtered.length > 0) {
           const nextSelected = filtered[0]
           setSelectedManuscriptId(nextSelected.id)
-          const hasDetail = nextSelected.pages.length > 0 && !nextSelected.pages[0].pageId.endsWith('-placeholder')
+          const hasDetail = nextSelected.content
           if (!hasDetail) {
             fetchManuscriptDetail(nextSelected.id, filtered)
           }
@@ -785,7 +433,7 @@ export default function ManuscriptReviewPage() {
         if (filtered.length > 0) {
           const nextSelected = filtered[0]
           setSelectedManuscriptId(nextSelected.id)
-          const hasDetail = nextSelected.pages.length > 0 && !nextSelected.pages[0].pageId.endsWith('-placeholder')
+          const hasDetail = nextSelected.content
           if (!hasDetail) {
             fetchManuscriptDetail(nextSelected.id, filtered)
           }
@@ -841,45 +489,6 @@ export default function ManuscriptReviewPage() {
     }
   }
 
-  // Mouse drag handles
-  const handleMouseDown = (e: React.MouseEvent, mode: 'MOVE' | 'RESIZE') => {
-    e.stopPropagation()
-    setDragMode(mode)
-    setStartPos({ x: e.clientX, y: e.clientY })
-    setStartAnnotation({ ...annotationBox })
-  }
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (dragMode === 'NONE' || !imageRef.current) return
-    const rect = imageRef.current.getBoundingClientRect()
-    const deltaX = e.clientX - startPos.x
-    const deltaY = e.clientY - startPos.y
-    const percentX = (deltaX / rect.width) * 100
-    const percentY = (deltaY / rect.height) * 100
-
-    if (dragMode === 'MOVE') {
-      let newX = startAnnotation.x + percentX
-      let newY = startAnnotation.y + percentY
-      if (newX < 0) newX = 0
-      if (newY < 0) newY = 0
-      if (newX + startAnnotation.w > 100) newX = 100 - startAnnotation.w
-      if (newY + startAnnotation.h > 100) newY = 100 - startAnnotation.h
-      setAnnotationBox(prev => ({ ...prev, x: newX, y: newY }))
-    } else if (dragMode === 'RESIZE') {
-      let newW = startAnnotation.w + percentX
-      let newH = startAnnotation.h + percentY
-      if (newW < 5) newW = 5
-      if (newH < 5) newH = 5
-      if (startAnnotation.x + newW > 100) newW = 100 - startAnnotation.x
-      if (startAnnotation.y + newH > 100) newH = 100 - startAnnotation.y
-      setAnnotationBox(prev => ({ ...prev, w: newW, h: newH }))
-    }
-  }
-
-  const handleMouseUp = () => {
-    setDragMode('NONE')
-  }
-
   const getStatusBadge = (status: DisplayManuscript['status']) => {
     switch (status) {
       case 'APPROVED': return <span className="bg-green-100 text-green-700 text-[10px] font-bold border border-green-700 px-2 py-0.5">ĐÃ PHÊ DUYỆT</span>
@@ -925,9 +534,6 @@ export default function ManuscriptReviewPage() {
       </div>
     )
   }
-
-  const reviewedCount = Object.values(activePageReviews).filter(v => v === 'pass' || v === 'fail').length
-  const progressPercentage = activePages.length > 0 ? (reviewedCount / activePages.length) * 100 : 0
 
   return (
     <div style={{ height: 'calc(100vh - 132px)' }} className="flex gap-6 pb-4 relative overflow-hidden">
@@ -978,284 +584,157 @@ export default function ManuscriptReviewPage() {
         {activeTab === 'MANUSCRIPT' ? (
           <>
             {/* Bulk Action Controls */}
-              <div className="p-2 border-b-2 border-manga-ink bg-gray-100 flex items-center justify-between flex-shrink-0">
-                <label className="flex items-center gap-2 text-xs font-bold text-manga-ink cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="w-4 h-4 border-2 border-manga-ink accent-manga-ink"
-                    checked={selectedIds.length === manuscripts.length && manuscripts.length > 0}
-                    onChange={toggleSelectAll}
-                  />
-                  Tất cả
-                </label>
-                {selectedIds.length > 0 && (
-                  <div className="flex gap-1 flex-wrap">
-                    <button onClick={handleBulkApprove} className="bg-green-600 hover:bg-green-700 text-white font-bold text-[10px] px-2 py-1 uppercase border border-black">
-                      Duyệt ({selectedIds.length})
-                    </button>
-                    <button onClick={handleBulkReject} className="bg-red-600 hover:bg-red-700 text-white font-bold text-[10px] px-2 py-1 uppercase border border-black">
-                      Từ chối ({selectedIds.length})
-                    </button>
-                    <button onClick={handleBulkArchive} className="bg-gray-600 hover:bg-gray-700 text-white font-bold text-[10px] px-2 py-1 uppercase border border-black">
-                      Lưu trữ ({selectedIds.length})
-                    </button>
-                  </div>
-                )}
-              </div>
+            <div className="p-2 border-b-2 border-manga-ink bg-gray-100 flex items-center justify-between flex-shrink-0">
+              <label className="flex items-center gap-2 text-xs font-bold text-manga-ink cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 border-2 border-manga-ink accent-manga-ink"
+                  checked={selectedIds.length === manuscripts.length && manuscripts.length > 0}
+                  onChange={toggleSelectAll}
+                />
+                Tất cả
+              </label>
+              {selectedIds.length > 0 && (
+                <div className="flex gap-1 flex-wrap">
+                  <button onClick={handleBulkApprove} className="bg-green-600 hover:bg-green-700 text-white font-bold text-[10px] px-2 py-1 uppercase border border-black">
+                    Duyệt ({selectedIds.length})
+                  </button>
+                  <button onClick={handleBulkReject} className="bg-red-600 hover:bg-red-700 text-white font-bold text-[10px] px-2 py-1 uppercase border border-black">
+                    Từ chối ({selectedIds.length})
+                  </button>
+                  <button onClick={handleBulkArchive} className="bg-gray-600 hover:bg-gray-700 text-white font-bold text-[10px] px-2 py-1 uppercase border border-black">
+                    Lưu trữ ({selectedIds.length})
+                  </button>
+                </div>
+              )}
+            </div>
 
-              {/* Manuscripts List */}
-              <div className="flex-1 overflow-y-auto p-2 space-y-2 bg-gray-50">
-                {manuscripts.length === 0 ? (
-                  <div className="p-4 text-center text-xs font-bold text-gray-400">Không có bản thảo nào cần duyệt</div>
-                ) : (
-                  manuscripts.map((m) => (
-                    <div
-                      key={m.id}
-                      onClick={() => handleSelectManuscript(m.id)}
-                      className={`p-3 border-2 cursor-pointer transition-all flex items-start gap-2 ${selectedManuscriptId === m.id
-                        ? 'border-manga-ink bg-red-50/50 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
-                        : 'border-gray-200 bg-white hover:border-gray-400'
-                        }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(m.id)}
-                        onChange={(e) => { e.stopPropagation(); toggleSelectId(m.id) }}
-                        className="mt-1 w-4 h-4 border-2 border-manga-ink accent-manga-ink"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-bold text-sm text-manga-ink truncate pr-2">{m.series}</span>
-                          {getStatusBadge(m.status)}
-                        </div>
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="font-bold text-manga-red">{m.chapter} · {m.pages.length} trang</span>
-                          <span className="text-gray-500 font-bold truncate max-w-[100px]">{m.mangaka}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </>
-            ) : (
-            /* Series List */
+            {/* Manuscripts List */}
             <div className="flex-1 overflow-y-auto p-2 space-y-2 bg-gray-50">
-              {seriesList.length === 0 ? (
-                <div className="p-4 text-center text-xs font-bold text-gray-400">Không có series mới nào cần duyệt</div>
+              {manuscripts.length === 0 ? (
+                <div className="p-4 text-center text-xs font-bold text-gray-400">Không có bản thảo nào cần duyệt</div>
               ) : (
-                seriesList.map((s) => (
+                manuscripts.map((m) => (
                   <div
-                    key={s.id}
-                    onClick={() => setSelectedSeriesId(s.id)}
-                    className={`p-3 border-2 cursor-pointer transition-all flex items-start gap-2 ${selectedSeriesId === s.id
+                    key={m.id}
+                    onClick={() => handleSelectManuscript(m.id)}
+                    className={`p-3 border-2 cursor-pointer transition-all flex items-start gap-2 ${selectedManuscriptId === m.id
                       ? 'border-manga-ink bg-red-50/50 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
                       : 'border-gray-200 bg-white hover:border-gray-400'
                       }`}
                   >
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(m.id)}
+                      onChange={(e) => { e.stopPropagation(); toggleSelectId(m.id) }}
+                      className="mt-1 w-4 h-4 border-2 border-manga-ink accent-manga-ink"
+                    />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-bold text-sm text-manga-ink truncate pr-2">{s.title}</span>
-                        {hasActiveSession(s.id) ? (
-                          <span className="bg-yellow-100 text-yellow-700 text-[10px] font-bold border border-yellow-700 px-2 py-0.5">CHỜ HỘI ĐỒNG</span>
-                        ) : (
-                          <span className="bg-orange-100 text-orange-700 text-[10px] font-bold border border-orange-700 px-2 py-0.5">ĐÃ NỘP</span>
-                        )}
+                        <span className="font-bold text-sm text-manga-ink truncate pr-2">{m.series}</span>
+                        {getStatusBadge(m.status)}
                       </div>
                       <div className="flex justify-between items-center text-xs">
-                        <span className="font-bold text-manga-red">{s.genre}</span>
-                        <span className="text-gray-500 font-bold truncate max-w-[120px]">{s.mangaka}</span>
+                        <span className="font-bold text-manga-red">{m.chapter}</span>
+                        <span className="text-gray-500 font-bold truncate max-w-[100px]">{m.mangaka}</span>
                       </div>
                     </div>
                   </div>
                 ))
               )}
             </div>
-        )}
-          </div>
-
-        {/* Middle Column: Viewer Canvas or Series Detail Card */}
-        {activeTab === 'MANUSCRIPT' ? (
-          <>
-            {activeManuscript && activePage ? (
-              viewerTab === 'SCRIPT' ? (
-                /* Script Tab Content */
-                <div className="flex-1 bg-white border-4 border-manga-ink flex flex-col overflow-hidden relative">
-                  {/* Header */}
-                  <div className="bg-gray-50 border-b-2 border-manga-ink py-2 px-4 text-center flex-shrink-0 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-sm text-manga-ink tracking-wide uppercase">{activeManuscript.series}</span>
-                      <span className="text-gray-400">|</span>
-                      <span className="font-bold text-sm text-manga-red">{activeManuscript.chapter} - Kịch bản chữ</span>
-                    </div>
-                    {/* Tabs Switcher */}
-                    <div className="flex border-2 border-black bg-white rounded-sm overflow-hidden shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]">
-                      <button
-                        onClick={() => setViewerTab('SCRIPT')}
-                        className="px-3 py-1 text-xs font-bold transition-all bg-manga-ink text-white"
-                      >
-                        Kịch bản chữ
-                      </button>
-                      <button
-                        onClick={() => setViewerTab('PAGES')}
-                        className="px-3 py-1 text-xs font-bold transition-all bg-white text-manga-ink hover:bg-gray-100"
-                      >
-                        Bản vẽ
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Script Content Viewer Area */}
-                  <div className="flex-1 overflow-y-auto p-8 bg-[#FAF9F6] flex flex-col select-text">
-                    {activeManuscript.content ? (
-                      <div className="max-w-3xl mx-auto w-full">
-                        <div className="border-b-2 border-dashed border-manga-ink/20 pb-4 mb-6">
-                          <h1 className="text-2xl font-extrabold text-manga-ink mb-2">{activeManuscript.chapter}</h1>
-                          <p className="text-xs text-gray-500 font-extrabold uppercase tracking-wide">
-                            Tác giả: <span className="text-manga-red">{activeManuscript.mangaka}</span>
-                          </p>
-                        </div>
-                        <div className="whitespace-pre-wrap text-sm text-gray-800 font-medium leading-relaxed font-sans">
-                          {activeManuscript.content}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-                        <AlertCircle className="w-12 h-12 text-gray-300 mb-3" />
-                        <p className="text-gray-500 font-bold text-sm">Bản thảo này không có nội dung kịch bản chữ.</p>
-                        <p className="text-xs text-gray-400 mt-1">Vui lòng chuyển sang tab "Bản vẽ" để xem các trang bản vẽ.</p>
-                        <button
-                          onClick={() => setViewerTab('PAGES')}
-                          className="mt-4 px-4 py-2 text-xs font-bold border-2 border-black bg-manga-red text-white hover:bg-red-700 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
-                        >
-                          Chuyển sang Bản vẽ
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                /* Drawing Pages Tab Content */
-                <div className="flex-1 bg-gray-200 border-4 border-manga-ink flex flex-col overflow-hidden relative">
-                  <div className="bg-gray-50 border-b-2 border-gray-200 py-2 px-4 text-center flex-shrink-0 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-sm text-manga-ink tracking-wide uppercase">{activeManuscript.series}</span>
-                      <span className="text-gray-400">|</span>
-                      <span className="font-bold text-sm text-manga-red">{activeManuscript.chapter} - {activePage.pageNum}</span>
-                    </div>
-                    {/* Tabs Switcher */}
-                    <div className="flex border-2 border-black bg-white rounded-sm overflow-hidden shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]">
-                      <button
-                        onClick={() => setViewerTab('SCRIPT')}
-                        className="px-3 py-1 text-xs font-bold transition-all bg-white text-manga-ink hover:bg-gray-100"
-                      >
-                        Kịch bản chữ
-                      </button>
-                      <button
-                        onClick={() => setViewerTab('PAGES')}
-                        className="px-3 py-1 text-xs font-bold transition-all bg-manga-ink text-white"
-                      >
-                        Bản vẽ
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Viewer Toolbar */}
-                  <div className="min-h-12 h-auto py-2 bg-white border-b-2 border-manga-ink flex items-center justify-between px-4 flex-shrink-0 flex-wrap gap-2">
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <button onClick={() => setZoomLevel(Math.max(50, zoomLevel - 10))} className="p-1.5 hover:bg-gray-100 rounded text-gray-600 transition-colors"><ZoomOut className="w-4 h-4" /></button>
-                      <span className="text-xs font-bold w-12 text-center">{zoomLevel}%</span>
-                      <button onClick={() => setZoomLevel(Math.min(200, zoomLevel + 10))} className="p-1.5 hover:bg-gray-100 rounded text-gray-600 transition-colors"><ZoomIn className="w-4 h-4" /></button>
-                    </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      {!activePage.pageId.endsWith('-placeholder') && (
-                        <>
-                          <button
-                            onClick={() => handleSetPageReview(activeManuscript.id, activePage.pageId, 'pass')}
-                            className={`px-3 py-1.5 text-xs font-extrabold border-2 border-black transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer ${activePageReviews[activePage.pageId] === 'pass'
-                              ? 'bg-green-600 text-white'
-                              : 'bg-white text-green-700 hover:bg-green-50'
-                              }`}
-                          >
-                            Đạt ✅
-                          </button>
-                          <button
-                            onClick={() => handleSetPageReview(activeManuscript.id, activePage.pageId, 'fail')}
-                            className={`px-3 py-1.5 text-xs font-extrabold border-2 border-black transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer ${activePageReviews[activePage.pageId] === 'fail'
-                              ? 'bg-red-600 text-white'
-                              : 'bg-white text-red-700 hover:bg-red-50'
-                              }`}
-                          >
-                            Không đạt ❌
-                          </button>
-                          <button
-                            onClick={() => setIsExpanded(true)}
-                            className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-extrabold border-2 border-black transition-all bg-manga-ink text-white hover:bg-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
-                          >
-                            <Maximize2 className="w-3.5 h-3.5 flex-shrink-0" /> Mở rộng 🔍
-                          </button>
-                        </>
+          </>
+        ) : (
+          /* Series List */
+          <div className="flex-1 overflow-y-auto p-2 space-y-2 bg-gray-50">
+            {seriesList.length === 0 ? (
+              <div className="p-4 text-center text-xs font-bold text-gray-400">Không có series mới nào cần duyệt</div>
+            ) : (
+              seriesList.map((s) => (
+                <div
+                  key={s.id}
+                  onClick={() => setSelectedSeriesId(s.id)}
+                  className={`p-3 border-2 cursor-pointer transition-all flex items-start gap-2 ${selectedSeriesId === s.id
+                    ? 'border-manga-ink bg-red-50/50 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
+                    : 'border-gray-200 bg-white hover:border-gray-400'
+                    }`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-bold text-sm text-manga-ink truncate pr-2">{s.title}</span>
+                      {hasActiveSession(s.id) ? (
+                        <span className="bg-yellow-100 text-yellow-700 text-[10px] font-bold border border-yellow-700 px-2 py-0.5">CHỜ HỘI ĐỒNG</span>
+                      ) : (
+                        <span className="bg-orange-100 text-orange-700 text-[10px] font-bold border border-orange-700 px-2 py-0.5">ĐÃ NỘP</span>
                       )}
                     </div>
-                  </div>
-
-                  {/* Canvas Area */}
-                  <div className="flex-1 overflow-auto flex flex-col items-center justify-center p-6 bg-[#e8e8e8] relative">
-                    <div className="relative bg-white shadow-xl border border-gray-300 transition-transform duration-150" style={{ transform: `scale(${zoomLevel / 100})` }}>
-                      <img src={activePage.image} alt={activePage.pageNum} className="max-w-full h-auto object-contain max-h-[600px] select-none" draggable={false} />
-                    </div>
-                  </div>
-
-                  {/* Bottom Thumbnails & Nav */}
-                  <div className="bg-white border-t-2 border-manga-ink flex flex-col flex-shrink-0">
-                    <div className="h-16 px-4 py-2 border-b border-gray-100 flex items-center gap-2 overflow-x-auto bg-gray-50">
-                      {activeManuscript.pages.map((page, idx) => (
-                        <button key={page.pageId} onClick={() => { setCurrentPageIndex(idx); setActiveAnnotationId(null) }}
-                          className={`h-12 w-9 border-2 flex-shrink-0 flex flex-col items-center justify-center font-bold text-[10px] transition-all relative ${currentPageIndex === idx ? 'border-manga-red bg-manga-red text-white scale-105 shadow-sm' : 'border-gray-300 bg-white hover:border-manga-ink text-gray-600'
-                            }`}
-                        >
-                          <span>{page.pageNum}</span>
-                          {activePageReviews[page.pageId] === 'pass' && (
-                            <span className="absolute bottom-0.5 right-0.5 w-1.5 h-1.5 bg-green-500 rounded-full border border-white" />
-                          )}
-                          {activePageReviews[page.pageId] === 'fail' && (
-                            <span className="absolute bottom-0.5 right-0.5 w-1.5 h-1.5 bg-red-500 rounded-full border border-white animate-pulse" />
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="h-12 flex items-center justify-between px-4">
-                      <button onClick={handlePrevPage} disabled={currentPageIndex === 0}
-                        className={`flex items-center gap-1 text-xs font-bold transition-colors ${currentPageIndex === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:text-manga-ink'}`}
-                      ><ChevronLeft className="w-4 h-4" /> Trang trước</button>
-                      <span className="text-xs font-bold text-gray-500">Trang {currentPageIndex + 1} / {activeManuscript.pages.length}</span>
-                      <button onClick={handleNextPage} disabled={currentPageIndex === activeManuscript.pages.length - 1}
-                        className={`flex items-center gap-1 text-xs font-bold transition-colors ${currentPageIndex === activeManuscript.pages.length - 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:text-manga-ink'}`}
-                      >Trang tiếp <ChevronRight className="w-4 h-4" /></button>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-bold text-manga-red">{s.genre}</span>
+                      <span className="text-gray-500 font-bold truncate max-w-[120px]">{s.mangaka}</span>
                     </div>
                   </div>
                 </div>
-              )
-            ) : (
-              <div className="flex-1 bg-gray-100 border-4 border-manga-ink flex flex-col items-center justify-center p-8">
-                <AlertCircle className="w-12 h-12 text-gray-300 mb-3" />
-                <p className="text-gray-400 font-bold text-base">Vui lòng chọn bản thảo ở cột bên trái để review.</p>
-              </div>
+              ))
             )}
-      
+          </div>
+        )}
+      </div>
+
+      {/* Middle Column: Viewer Canvas or Series Detail Card */}
+      {activeTab === 'MANUSCRIPT' ? (
+        <>
           {activeManuscript ? (
-          <div className="w-[340px] flex-shrink-0 flex flex-col bg-white border-4 border-manga-ink p-4 h-full min-h-0 overflow-y-auto gap-4">
-            {/* Header */}
-            <div className="border-b-4 border-manga-ink pb-3 mb-1 flex items-center justify-between">
-              <h2 className="font-manga text-base font-bold uppercase tracking-wider text-manga-ink">Bảng Điều Khiển</h2>
-              <span className="bg-manga-ink text-white font-bold text-[9px] px-2 py-0.5 uppercase tracking-wide border-2 border-black">Đánh giá</span>
+            <div className="flex-1 bg-white border-4 border-manga-ink flex flex-col overflow-hidden relative">
+              {/* Header */}
+              <div className="bg-gray-50 border-b-2 border-manga-ink py-2 px-4 text-center flex-shrink-0 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-sm text-manga-ink tracking-wide uppercase">{activeManuscript.series}</span>
+                  <span className="text-gray-400">|</span>
+                  <span className="font-bold text-sm text-manga-red">{activeManuscript.chapter} - Kịch bản chữ</span>
+                </div>
+              </div>
+
+              {/* Script Content Viewer Area */}
+              <div className="flex-1 overflow-y-auto p-8 bg-[#FAF9F6] flex flex-col select-text">
+                {activeManuscript.content ? (
+                  <div className="max-w-3xl mx-auto w-full">
+                    <div className="border-b-2 border-dashed border-manga-ink/20 pb-4 mb-6">
+                      <h1 className="text-2xl font-extrabold text-manga-ink mb-2">{activeManuscript.chapter}</h1>
+                      <p className="text-xs text-gray-500 font-extrabold uppercase tracking-wide">
+                        Tác giả: <span className="text-manga-red">{activeManuscript.mangaka}</span>
+                      </p>
+                    </div>
+                    <div className="whitespace-pre-wrap text-sm text-gray-800 font-medium leading-relaxed font-sans">
+                      {activeManuscript.content}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+                    <AlertCircle className="w-12 h-12 text-gray-300 mb-3" />
+                    <p className="text-gray-500 font-bold text-sm">Bản thảo này không có nội dung kịch bản chữ.</p>
+                  </div>
+                )}
+              </div>
             </div>
+          ) : (
+            <div className="flex-1 bg-gray-100 border-4 border-manga-ink flex flex-col items-center justify-center p-8">
+              <AlertCircle className="w-12 h-12 text-gray-300 mb-3" />
+              <p className="text-gray-400 font-bold text-base">Vui lòng chọn bản thảo ở cột bên trái để review.</p>
+            </div>
+          )}
+    
+          {activeManuscript ? (
+            <div className="w-[340px] flex-shrink-0 flex flex-col bg-white border-4 border-manga-ink p-4 h-full min-h-0 overflow-y-auto gap-4">
+              {/* Header */}
+              <div className="border-b-4 border-manga-ink pb-3 mb-1 flex items-center justify-between">
+                <h2 className="font-manga text-base font-bold uppercase tracking-wider text-manga-ink">Bảng Điều Khiển</h2>
+                <span className="bg-manga-ink text-white font-bold text-[9px] px-2 py-0.5 uppercase tracking-wide border-2 border-black">Đánh giá</span>
+              </div>
 
-            {/* Quyết Định Chương */}
-            <div className="flex flex-col gap-3">
-              <h3 className="font-extrabold text-[11px] uppercase text-gray-500 tracking-wider">Trạng thái quyết định</h3>
+              {/* Quyết Định Chương */}
+              <div className="flex flex-col gap-3">
+                <h3 className="font-extrabold text-[11px] uppercase text-gray-500 tracking-wider">Trạng thái quyết định</h3>
 
-              {isTextOnly || viewerTab === 'SCRIPT' ? (
                 <div className="border-2 border-manga-ink bg-gray-50 p-3 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] flex flex-col gap-3 rounded-sm">
                   <div className="flex items-start gap-2">
                     <CheckCircle2 className="w-4.5 h-4.5 text-manga-ink flex-shrink-0 mt-0.5" />
@@ -1293,296 +772,155 @@ export default function ManuscriptReviewPage() {
                       className={`w-full h-9 flex items-center justify-center gap-2 font-bold transition-all text-xs uppercase tracking-wider border-2 ${
                         rejectionReason.trim()
                           ? 'bg-red-600 hover:bg-red-700 text-white border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer'
-                          : 'bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed shadow-none'
-                      }`}
-                    >
-                      <XCircle className="w-4 h-4" /> Từ chối bản thảo
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                /* The original drawing page-by-page review flow */
-                !allReviewed ? (
-                  <div className="border-2 border-orange-500 bg-orange-50/30 p-3 shadow-[2px_2px_0px_0px_rgba(249,115,22,1)] flex flex-col gap-2 rounded-sm">
-                    <div className="flex items-start gap-2">
-                      <AlertCircle className="w-4.5 h-4.5 text-orange-600 flex-shrink-0 mt-0.5 animate-pulse" />
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-extrabold text-[11px] text-orange-950">ĐANG ĐÁNH GIÁ CHI TIẾT</span>
-                        <span className="text-[10px] text-orange-850 font-bold leading-normal">
-                          Cần cho điểm Đạt/Không đạt tất cả trang vẽ ({reviewedCount}/{activePages.length}) để quyết định.
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ) : hasFail ? (
-                  <div className="border-2 border-red-500 bg-red-50/30 p-3 shadow-[2px_2px_0px_0px_rgba(239,68,68,1)] flex flex-col gap-2.5 rounded-sm">
-                    <div className="flex items-start gap-2">
-                      <XCircle className="w-4.5 h-4.5 text-red-600 flex-shrink-0 mt-0.5" />
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-extrabold text-[11px] text-red-950 font-manga uppercase tracking-wide">PHÁT HIỆN TRANG KHÔNG ĐẠT</span>
-                        <span className="text-[10px] text-red-800 font-bold leading-normal">
-                          Bản thảo sẽ bị từ chối. Nhập lý do từ chối chung bên dưới gửi cho Mangaka.
-                        </span>
-                      </div>
-                    </div>
-
-                    <textarea
-                      className="w-full h-20 border-2 border-red-500 p-2 text-xs font-semibold focus:outline-none focus:bg-white bg-white resize-none transition-all shadow-[1px_1px_0px_0px_rgba(239,68,68,1)] focus:shadow-[2px_2px_0px_0px_rgba(239,68,68,1)] leading-relaxed text-gray-800"
-                      placeholder="Nhập lý do từ chối chung gửi cho Mangaka..."
-                      value={rejectionReason}
-                      onChange={(e) => setRejectionReason(e.target.value)}
-                    />
-
-                    <button
-                      onClick={() => handleRejectChapterFlow(activeManuscript.id)}
-                      disabled={!rejectionReason.trim()}
-                      className={`w-full h-9 flex items-center justify-center gap-2 font-bold transition-all text-xs uppercase tracking-wider border-2 ${
-                        rejectionReason.trim()
-                          ? 'bg-red-600 hover:bg-red-700 text-white border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer'
                           : 'bg-gray-150 text-gray-400 border-gray-300 cursor-not-allowed shadow-none'
                       }`}
                     >
                       <XCircle className="w-4 h-4" /> Từ chối bản thảo
                     </button>
                   </div>
-                ) : (
-                  <div className="border-2 border-green-500 bg-green-50/30 p-3 shadow-[2px_2px_0px_0px_rgba(34,197,94,1)] flex flex-col gap-2.5 rounded-sm">
-                    <div className="flex items-start gap-2">
-                      <CheckCircle2 className="w-4.5 h-4.5 text-green-600 flex-shrink-0 mt-0.5" />
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-extrabold text-[11px] text-green-950 font-manga uppercase tracking-wide">TẤT CẢ TRANG ĐỀU ĐẠT</span>
-                        <span className="text-[10px] text-green-800 font-bold leading-normal">
-                          Bản thảo hoàn hảo. Bấm nút bên dưới để duyệt.
-                        </span>
-                      </div>
-                    </div>
+                </div>
 
-                    <button
-                      onClick={() => handleApproveChapterFlow(activeManuscript.id)}
-                      className="w-full bg-green-500 hover:bg-green-600 border-2 border-black text-white h-9 flex items-center justify-center gap-2 font-bold transition-all text-xs uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
-                    >
-                      <CheckCircle2 className="w-4 h-4" /> Duyệt Bản Thảo
-                    </button>
-                  </div>
-                )
-              )}
-
-              <button
-                onClick={async () => {
-                  try {
-                    await editorService.archiveManuscript(activeManuscript.id);
-                    removeManuscriptFromList(activeManuscript.id);
-                    showToast(`Đã LƯU TRỮ bản thảo ${activeManuscript.chapter}!`);
-                  } catch (e) {
-                    showToast('Lỗi khi lưu trữ bản thảo!');
-                  }
-                }}
-                className="w-full bg-white hover:bg-gray-50 border-4 border-gray-400 hover:border-gray-500 text-gray-600 h-10 flex items-center justify-center gap-2 font-bold transition-all text-[11px] uppercase tracking-wider shadow-[3px_3px_0px_0px_rgba(156,163,175,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
-              >
-                LƯU TRỮ BẢN THẢO
-              </button>
-            </div>
-
-            <div className="border-t-2 border-dashed border-gray-200 my-1" />
-
-            {/* Annotations List */}
-            <div className="flex flex-col min-h-0 flex-shrink">
-              <div className="flex items-center justify-between pb-2 mb-3 border-b-2 border-dashed border-gray-200">
-                <span className="font-extrabold text-[11px] uppercase tracking-wider text-gray-500">Góp ý trang ({activePage?.pageNum || 'P.01'})</span>
-                <span className="bg-manga-red text-white text-[10px] font-black h-5 min-w-[20px] px-1 flex items-center justify-center rounded-full border border-black shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)]">{activeAnnotations.length}</span>
+                <button
+                  onClick={async () => {
+                    try {
+                      await editorService.archiveManuscript(activeManuscript.id);
+                      removeManuscriptFromList(activeManuscript.id);
+                      showToast(`Đã LƯU TRỮ bản thảo ${activeManuscript.chapter}!`);
+                    } catch (e) {
+                      showToast('Lỗi khi lưu trữ bản thảo!');
+                    }
+                  }}
+                  className="w-full bg-white hover:bg-gray-50 border-4 border-gray-400 hover:border-gray-500 text-gray-600 h-10 flex items-center justify-center gap-2 font-bold transition-all text-[11px] uppercase tracking-wider shadow-[3px_3px_0px_0px_rgba(156,163,175,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+                >
+                  LƯU TRỮ BẢN THẢO
+                </button>
               </div>
-
-              {activeAnnotations.length > 0 && (
-                <div className="overflow-y-auto mb-3 space-y-3 pr-1 max-h-[220px]">
-                  {activeAnnotations.map((ann, idx) => (
-                    <div key={ann.id} onClick={() => setActiveAnnotationId(ann.id)}
-                      className={`p-3 border-2 cursor-pointer relative group transition-all rounded-sm ${activeAnnotationId === ann.id
-                        ? 'border-red-500 bg-red-50/50 shadow-[2px_2px_0px_0px_rgba(239,68,68,1)]'
-                        : 'border-orange-300 bg-amber-50/20 hover:border-orange-400 hover:bg-amber-50/40'
-                        }`}
-                    >
-                      <span className="absolute -top-2.5 -left-2.5 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-black shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)]">{idx + 1}</span>
-                      <p className="text-xs font-bold text-gray-800 mt-1 pl-1 leading-relaxed">{ann.comment}</p>
-                      {!activePage?.pageId.endsWith('-placeholder') && (
-                        <div className="mt-2 flex justify-end gap-1.5 border-t border-dashed border-orange-200 pt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={(e) => { e.stopPropagation(); handleDeleteAnnotation(ann.id) }} className="p-1 hover:bg-red-100 text-red-500 rounded border border-transparent hover:border-red-200 transition-colors" title="Xóa"><Trash2 className="w-3 h-3" /></button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {activePage && !activePage.pageId.endsWith('-placeholder') && activeManuscript.status !== 'APPROVED' && activeManuscript.status !== 'REJECTED' && (
-                <div className="flex flex-col gap-2.5">
-                  <textarea
-                    className="w-full h-20 border-2 border-gray-300 p-2.5 text-xs focus:outline-none focus:border-manga-ink resize-none font-bold bg-gray-50 focus:bg-white transition-all shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)] focus:shadow-[2.5px_2.5px_0px_0px_rgba(22,163,74,1)] leading-relaxed"
-                    placeholder={`Nhập góp ý hoặc nhận xét cho trang ${activePage?.pageNum}... (Tự động lưu khi nhấn chuột ra ngoài)`}
-                    value={pageComments[activePage?.pageId || ''] || ''}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setPageComments(prev => ({
-                        ...prev,
-                        [activePage?.pageId || '']: val
-                      }));
-                    }}
-                    onBlur={(e) => handleSavePageComment(activePage.pageId, e.target.value)}
-                  />
-                </div>
-              )}
-            </div>
-            {/* Bottom Spacer to prevent scrolling cut-offs */}
-            <div className="h-6 flex-shrink-0" />
-          </div>
-        ) : (
-          <div className="w-80 bg-white border-4 border-manga-ink p-4 flex items-center justify-center text-center">
-            <p className="text-xs font-bold text-gray-400">Chọn bản thảo ở danh sách bên để quyết định.</p>
-          </div>
-        )}
-        </>
-      ) : (
-      /* Series Details & Decisions Panel (Unified Container) */
-      activeSeries ? (
-      <div className="flex-1 bg-[#e8e8e8] border-4 border-manga-ink flex flex-col overflow-y-auto p-4 items-center justify-center">
-        <div className="bg-white border-4 border-manga-ink p-6 w-full max-w-2xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] my-auto animate-in zoom-in-95 duration-200 flex flex-col gap-4 overflow-y-auto max-h-full">
-          {/* Header Badge */}
-          <div className="flex justify-between items-center text-[10px] font-bold text-gray-400 flex-shrink-0">
-            <span className="px-2 py-0.5 bg-orange-100 text-orange-700 border border-orange-700 uppercase">Series Chờ Duyệt</span>
-            <span>{activeSeries.createdAt}</span>
-          </div>
-
-          {/* Series Content: Cover & Information */}
-          <div className="flex gap-6 items-start flex-shrink-0">
-            {/* Cover Image */}
-            <div className="w-28 h-40 border-2 border-manga-ink shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] overflow-hidden bg-gray-100 flex-shrink-0">
-              <img
-                src={activeSeries.coverImageUrl}
-                alt={activeSeries.title}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = 'https://placehold.co/300x450/e0e0e0/808080?text=No+Cover'
-                }}
-              />
-            </div>
-
-            {/* Info Text */}
-            <div className="flex-1 min-w-0 flex flex-col gap-3">
-              <h2 className="font-manga text-xl font-bold text-manga-ink uppercase leading-tight border-b-2 border-dashed border-gray-200 pb-1.5 truncate" title={activeSeries.title}>
-                {activeSeries.title}
-              </h2>
-
-              <div className="grid grid-cols-2 gap-2 text-[11px] font-bold text-manga-ink">
-                <div className="bg-gray-50 p-1.5 border border-gray-200 min-w-0">
-                  <p className="text-gray-400 uppercase text-[8px] font-bold">Tác giả</p>
-                  <p className="text-manga-red truncate" title={activeSeries.mangaka}>{activeSeries.mangaka}</p>
-                </div>
-                <div className="bg-gray-50 p-1.5 border border-gray-200 min-w-0">
-                  <p className="text-gray-400 uppercase text-[8px] font-bold">Thể loại</p>
-                  <p className="text-manga-ink truncate" title={activeSeries.genre}>{activeSeries.genre}</p>
-                </div>
-              </div>
-
-              <div className="min-w-0">
-                <h4 className="text-[10px] uppercase font-extrabold text-manga-ink mb-1">Tóm tắt nội dung</h4>
-                <div className="bg-gray-50 p-2 border border-gray-200 max-h-24 overflow-y-auto text-[11px] text-gray-600 leading-normal font-medium whitespace-pre-wrap">
-                  {activeSeries.description}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Warnings / Guidelines (Thông tin lưu ý) */}
-          <div className="border-t-2 border-dashed border-gray-200 pt-3 flex-shrink-0">
-            <h4 className="font-bold text-xs uppercase text-manga-ink mb-1.5">Thông tin lưu ý</h4>
-            <div className="bg-blue-50 border-2 border-blue-600 p-3 text-[10px] text-blue-700 font-bold leading-normal">
-              <ul className="space-y-1 list-disc pl-4">
-                <li>Vui lòng kiểm tra kỹ nội dung, thuyết minh, thể loại và hình ảnh bìa của Series.</li>
-                <li>Hành động <span className="font-bold text-manga-red">"Nộp lên Hội Đồng"</span> sẽ tạo một phiên duyệt mới trên Hội Đồng Biên Tập.</li>
-                <li>Bạn có thể trao đổi trực tiếp với Mangaka nếu hồ sơ chưa đạt yêu cầu trước khi quyết định từ chối.</li>
-              </ul>
-            </div>
-          </div>
-
-          {/* Decisions / Action buttons at the bottom */}
-          {hasActiveSession(activeSeries.id) ? (
-            <div className="border-t-2 border-manga-ink pt-3 flex flex-col gap-2 flex-shrink-0">
-              <div className="bg-yellow-50 border-4 border-yellow-500 p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-3">
-                <Shield className="w-8 h-8 text-yellow-600 flex-shrink-0 animate-pulse" />
-                <div>
-                  <h4 className="font-extrabold text-sm text-manga-ink uppercase">HỒ SƠ ĐÃ ĐƯỢC NỘP LÊN HỘI ĐỒNG</h4>
-                  <p className="text-xs text-gray-600 font-bold mt-1">Đang chờ Hội Đồng Biên Tập bỏ phiếu duyệt. Bạn không thể thực hiện thêm thao tác lúc này.</p>
-                </div>
-              </div>
+              <div className="h-6 flex-shrink-0" />
             </div>
           ) : (
-            <div className="border-t-2 border-manga-ink pt-3 flex flex-col gap-2 flex-shrink-0">
-              <h3 className="font-bold text-xs uppercase text-manga-ink mb-1">Quyết Định Duyệt Series</h3>
-              <div className="grid grid-cols-3 gap-3">
-                <button
-                  onClick={() => handleApproveSeries(activeSeries.id)}
-                  disabled={isSubmittingSeries}
-                  className={`bg-manga-red hover:bg-red-700 text-white py-2.5 flex items-center justify-center gap-1.5 font-bold transition-all text-[11px] uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 active:shadow-none ${isSubmittingSeries ? 'opacity-50 cursor-not-allowed' : ''
-                    }`}
-                >
-                  {isSubmittingSeries ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> ĐANG NỘP...
-                    </>
-                  ) : (
-                    '🚀 NỘP LÊN HỘI ĐỒNG'
-                  )}
-                </button>
-
-                <button
-                  onClick={() => handleRequestRevisionSeries(activeSeries.id)}
-                  className="bg-orange-50 hover:bg-orange-100 border-2 border-orange-500 text-orange-600 py-2.5 flex items-center justify-center gap-1.5 font-bold transition-all text-[11px] uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(249,115,22,1)] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
-                >
-                  <Edit3 className="w-3.5 h-3.5" /> Yêu cầu sửa đổi
-                </button>
-
-                <button
-                  onClick={() => handleRejectSeries(activeSeries.id)}
-                  className="bg-red-50 hover:bg-red-100 border-2 border-red-600 text-red-700 py-2.5 flex items-center justify-center gap-1.5 font-bold transition-all text-[11px] uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(220,38,38,1)] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
-                >
-                  <XCircle className="w-3.5 h-3.5" /> Từ chối
-                </button>
-              </div>
+            <div className="w-80 bg-white border-4 border-manga-ink p-4 flex items-center justify-center text-center">
+              <p className="text-xs font-bold text-gray-400">Chọn bản thảo ở danh sách bên để quyết định.</p>
             </div>
           )}
-            </div>
-      </div>
+        </>
       ) : (
-      <div className="flex-1 bg-gray-100 border-4 border-manga-ink flex flex-col items-center justify-center p-8">
-        <AlertCircle className="w-12 h-12 text-gray-300 mb-3" />
-        <p className="text-gray-400 font-bold text-base">Vui lòng chọn đề xuất ở cột bên trái để duyệt.</p>
-      </div>
-      )
-      )}
+        /* Series Details & Decisions Panel (Unified Container) */
+        activeSeries ? (
+          <div className="flex-1 bg-[#e8e8e8] border-4 border-manga-ink flex flex-col overflow-y-auto p-4 items-center justify-center">
+            <div className="bg-white border-4 border-manga-ink p-6 w-full max-w-2xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] my-auto animate-in zoom-in-95 duration-200 flex flex-col gap-4 overflow-y-auto max-h-full">
+              {/* Header Badge */}
+              <div className="flex justify-between items-center text-[10px] font-bold text-gray-400 flex-shrink-0">
+                <span className="px-2 py-0.5 bg-orange-100 text-orange-700 border border-orange-700 uppercase">Series Chờ Duyệt</span>
+                <span>{activeSeries.createdAt}</span>
+              </div>
 
-      {/* Fullscreen Expanded Image Viewer */}
-      {isExpanded && activePage && (
-        <div className="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center p-8 animate-in fade-in duration-200">
-          <button
-            onClick={() => setIsExpanded(false)}
-            className="absolute top-6 right-6 bg-white text-manga-ink hover:bg-red-600 hover:text-white border-4 border-black px-5 py-2 font-extrabold text-sm uppercase tracking-wider transition-all shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1.5px] active:translate-y-[1.5px] active:shadow-none cursor-pointer"
-          >
-            Đóng ✕
-          </button>
-          <div className="w-full h-full max-w-5xl max-h-[85vh] flex items-center justify-center relative select-none">
-            <img
-              src={activePage.image}
-              alt={activePage.pageNum}
-              className="max-w-full max-h-full object-contain border-4 border-black bg-white shadow-2xl cursor-zoom-out"
-              onClick={() => setIsExpanded(false)}
-            />
-          </div>
-          <div className="absolute bottom-6 bg-white border-2 border-black px-4 py-1.5 text-xs font-extrabold uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-            Trang {activePage.pageNum}
-          </div>
-        </div>
-      )}
+              {/* Series Content: Cover & Information */}
+              <div className="flex gap-6 items-start flex-shrink-0">
+                {/* Cover Image */}
+                <div className="w-28 h-40 border-2 border-manga-ink shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] overflow-hidden bg-gray-100 flex-shrink-0">
+                  <img
+                    src={activeSeries.coverImageUrl}
+                    alt={activeSeries.title}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://placehold.co/300x450/e0e0e0/808080?text=No+Cover'
+                    }}
+                  />
+                </div>
 
+                {/* Info Text */}
+                <div className="flex-1 min-w-0 flex flex-col gap-3">
+                  <h2 className="font-manga text-xl font-bold text-manga-ink uppercase leading-tight border-b-2 border-dashed border-gray-200 pb-1.5 truncate" title={activeSeries.title}>
+                    {activeSeries.title}
+                  </h2>
+
+                  <div className="grid grid-cols-2 gap-2 text-[11px] font-bold text-manga-ink">
+                    <div className="bg-gray-50 p-1.5 border border-gray-200 min-w-0">
+                      <p className="text-gray-400 uppercase text-[8px] font-bold">Tác giả</p>
+                      <p className="text-manga-red truncate" title={activeSeries.mangaka}>{activeSeries.mangaka}</p>
+                    </div>
+                    <div className="bg-gray-50 p-1.5 border border-gray-200 min-w-0">
+                      <p className="text-gray-400 uppercase text-[8px] font-bold">Thể loại</p>
+                      <p className="text-manga-ink truncate" title={activeSeries.genre}>{activeSeries.genre}</p>
+                    </div>
+                  </div>
+
+                  <div className="min-w-0">
+                    <h4 className="text-[10px] uppercase font-extrabold text-manga-ink mb-1">Tóm tắt nội dung</h4>
+                    <div className="bg-gray-50 p-2 border border-gray-200 max-h-24 overflow-y-auto text-[11px] text-gray-600 leading-normal font-medium whitespace-pre-wrap">
+                      {activeSeries.description}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Warnings / Guidelines (Thông tin lưu ý) */}
+              <div className="border-t-2 border-dashed border-gray-200 pt-3 flex-shrink-0">
+                <h4 className="font-bold text-xs uppercase text-manga-ink mb-1.5">Thông tin lưu ý</h4>
+                <div className="bg-blue-50 border-2 border-blue-600 p-3 text-[10px] text-blue-700 font-bold leading-normal">
+                  <ul className="space-y-1 list-disc pl-4">
+                    <li>Vui lòng kiểm tra kỹ nội dung, thuyết minh, thể loại và hình ảnh bìa của Series.</li>
+                    <li>Hành động <span className="font-bold text-manga-red">"Nộp lên Hội Đồng"</span> sẽ tạo một phiên duyệt mới trên Hội Đồng Biên Tập.</li>
+                    <li>Bạn có thể trao đổi trực tiếp với Mangaka nếu hồ sơ chưa đạt yêu cầu trước khi quyết định từ chối.</li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Decisions / Action buttons at the bottom */}
+              {hasActiveSession(activeSeries.id) ? (
+                <div className="border-t-2 border-manga-ink pt-3 flex flex-col gap-2 flex-shrink-0">
+                  <div className="bg-yellow-50 border-4 border-yellow-500 p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-3">
+                    <Shield className="w-8 h-8 text-yellow-600 flex-shrink-0 animate-pulse" />
+                    <div>
+                      <h4 className="font-extrabold text-sm text-manga-ink uppercase">HỒ SƠ ĐÃ ĐƯỢC NỘP LÊN HỘI ĐỒNG</h4>
+                      <p className="text-xs text-gray-600 font-bold mt-1">Đang chờ Hội Đồng Biên Tập bỏ phiếu duyệt. Bạn không thể thực hiện thêm thao tác lúc này.</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="border-t-2 border-manga-ink pt-3 flex flex-col gap-2 flex-shrink-0">
+                  <h3 className="font-bold text-xs uppercase text-manga-ink mb-1">Quyết Định Duyệt Series</h3>
+                  <div className="grid grid-cols-3 gap-3">
+                    <button
+                      onClick={() => handleApproveSeries(activeSeries.id)}
+                      disabled={isSubmittingSeries}
+                      className={`bg-manga-red hover:bg-red-700 text-white py-2.5 flex items-center justify-center gap-1.5 font-bold transition-all text-[11px] uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 active:shadow-none ${isSubmittingSeries ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                    >
+                      {isSubmittingSeries ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> ĐANG NỘP...
+                        </>
+                      ) : (
+                        '🚀 NỘP LÊN HỘI ĐỒNG'
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => handleRequestRevisionSeries(activeSeries.id)}
+                      className="bg-orange-50 hover:bg-orange-100 border-2 border-orange-500 text-orange-600 py-2.5 flex items-center justify-center gap-1.5 font-bold transition-all text-[11px] uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(249,115,22,1)] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" /> Yêu cầu sửa đổi
+                    </button>
+
+                    <button
+                      onClick={() => handleRejectSeries(activeSeries.id)}
+                      className="bg-red-50 hover:bg-red-100 border-2 border-red-600 text-red-700 py-2.5 flex items-center justify-center gap-1.5 font-bold transition-all text-[11px] uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(220,38,38,1)] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+                    >
+                      <XCircle className="w-3.5 h-3.5" /> Từ chối
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 bg-gray-100 border-4 border-manga-ink flex flex-col items-center justify-center p-8">
+            <AlertCircle className="w-12 h-12 text-gray-300 mb-3" />
+            <p className="text-gray-400 font-bold text-base">Vui lòng chọn đề xuất ở cột bên trái để duyệt.</p>
+          </div>
+        )
+      )}
     </div>
   )
 }
-

@@ -724,7 +724,7 @@ export default function ManuscriptReviewPage() {
           )}
     
           {activeManuscript ? (
-            <div className="w-[340px] flex-shrink-0 flex flex-col bg-white border-4 border-manga-ink p-4 h-full min-h-0 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden gap-4">
+            <div className="w-[340px] flex-shrink-0 flex flex-col bg-white border-4 border-manga-ink p-4 h-full min-h-0 overflow-hidden gap-4">
               {/* Header */}
               <div className="border-b-4 border-manga-ink pb-3 mb-1 flex items-center justify-between">
                 <h2 className="font-manga text-base font-bold uppercase tracking-wider text-manga-ink">Bảng Điều Khiển</h2>

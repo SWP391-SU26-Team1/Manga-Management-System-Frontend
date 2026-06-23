@@ -70,7 +70,8 @@ export const manuscriptService = {
     const res = await api.get<{ success: boolean; data: any[] }>(`/api/manuscripts`, {
       params: { seriesId }
     })
-    return (res.data.data ?? []).map(mapManuscript)
+    const list = (res.data.data ?? []).map(mapManuscript)
+    return list.filter(m => m.series_id === seriesId)
   },
 
   /** POST /api/manuscripts - Tạo manuscript mới */

@@ -412,9 +412,6 @@ export function Header() {
           )}
         </div>
 
-        <Link to="/dashboard/mangaka/submission" className="bg-manga-red text-white font-manga font-bold text-sm uppercase px-5 py-2 border-2 border-manga-ink manga-shadow-sm hover:translate-y-0.5 hover:shadow-none transition-all whitespace-nowrap ml-2">
-          NỘP BẢN THẢO
-        </Link>
 
         {/* Vertical divider */}
         <div className="h-6 w-px bg-gray-200 ml-2" />

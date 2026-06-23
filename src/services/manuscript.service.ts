@@ -87,6 +87,17 @@ export const manuscriptService = {
       `/api/mangaka/series/${seriesId}/manuscripts/${manuscriptId}/revise`
     )
     return mapManuscript(res.data.data)
+  },
+
+  /** PATCH /api/manuscripts/:manuscriptId - Cập nhật bản thảo */
+  update: async (manuscriptId: string, payload: { title?: string; content?: string; file_url?: string }): Promise<ManuscriptAPI> => {
+    const res = await api.patch<{ success: boolean; data: any }>(`/api/manuscripts/${manuscriptId}`, payload)
+    return mapManuscript(res.data.data)
+  },
+
+  /** DELETE /api/manuscripts/:manuscriptId - Xóa bản thảo */
+  delete: async (manuscriptId: string): Promise<void> => {
+    await api.delete(`/api/manuscripts/${manuscriptId}`)
   }
 }
 

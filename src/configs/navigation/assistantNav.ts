@@ -30,7 +30,7 @@ export const assistantNav = [
     icon: MessageSquare
   },
   {
-    label: "Bản Nháp",
+    label: "Bản thảo của tôi",
     path: "/dashboard/assistant/drafts",
     icon: FileEdit
   },

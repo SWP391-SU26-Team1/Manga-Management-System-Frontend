@@ -72,6 +72,8 @@ export interface AssistantSubmission {
   note: string;
   status: "Pending" | "Need Fix" | "Approved";
   originalImageUrl?: string;
+  submissionNotes?: string;
+  versionNumber?: number | string;
 }
 
 export interface AssetItem {

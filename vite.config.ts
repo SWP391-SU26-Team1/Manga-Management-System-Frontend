@@ -8,6 +8,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  envPrefix: ['VITE_', 'GOOGLE_'],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

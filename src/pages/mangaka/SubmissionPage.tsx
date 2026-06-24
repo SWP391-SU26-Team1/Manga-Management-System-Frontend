@@ -10,7 +10,22 @@ import {
   Maximize2,
   X,
 } from 'lucide-react'
-import { AssistantSubmission } from '@/data/mangakaMockData'
+export interface AssistantSubmission {
+  id: string
+  submissionId?: string
+  assistantName: string
+  chapterTitle: string
+  pageNumber: number
+  layerType: string
+  submittedAt: string
+  fileName: string
+  previewUrl: string
+  originalImageUrl: string
+  note: string
+  status: 'Pending' | 'Need Fix' | 'Approved'
+  submissionNotes?: string
+  versionNumber?: number | string
+}
 import taskService from '@/services/task.service'
 import seriesService from '@/services/series.service'
 import chapterService from '@/services/chapter.service'
@@ -94,10 +109,14 @@ export default function SubmissionPage() {
 
       const subMap: Record<string, string> = {}
       const subIdMap: Record<string, string> = {}
+      const subNotesMap: Record<string, string> = {}
+      const subVersionMap: Record<string, any> = {}
       pendingSubs.forEach((sub: any) => {
         if (sub.task_id) {
           subMap[sub.task_id] = sub.file_url
           subIdMap[sub.task_id] = sub.submission_id
+          subNotesMap[sub.task_id] = sub.submission_notes || ''
+          subVersionMap[sub.task_id] = sub.version_number
         }
       })
 
@@ -145,6 +164,8 @@ export default function SubmissionPage() {
             originalImageUrl: getImageUrl(originalDraftUrl),
             note: t.content || '',
             status: displayStatus,
+            submissionNotes: subNotesMap[t.task_id] || '',
+            versionNumber: subVersionMap[t.task_id] !== undefined ? `v${subVersionMap[t.task_id]}` : '',
           }
         })
 
@@ -676,6 +697,17 @@ export default function SubmissionPage() {
                   </div>
                 ))}
 
+                {selected.submissionNotes && (
+                  <div className="mt-2 bg-[#FFFDF0] border-2 border-[#D69E2E] p-3 text-left">
+                    <span className="text-[10px] font-bold uppercase text-[#D69E2E] block mb-1">
+                      Ghi chú chỉnh sửa của Trợ lý ({selected.versionNumber || 'v1.0'})
+                    </span>
+                    <p className="text-xs text-gray-800 font-bold whitespace-pre-wrap leading-relaxed">
+                      {selected.submissionNotes}
+                    </p>
+                  </div>
+                )}
+
                 {selected.status === 'Pending' && (
                   <div className="mt-2">
                     <span className="text-[10px] font-bold uppercase text-gray-400 block mb-1">
@@ -839,6 +871,17 @@ export default function SubmissionPage() {
                       className="w-full border-2 border-manga-ink px-2 py-1 text-xs font-bold resize-none focus:outline-none focus:border-manga-red bg-white"
                     />
                   </div>
+
+                  {selected?.submissionNotes && (
+                    <div className="bg-[#FFFDF0] border-2 border-[#D69E2E] p-3 text-left">
+                      <label className="text-[10px] font-bold uppercase text-[#D69E2E] block mb-1">
+                        Ghi chú chỉnh sửa của Trợ lý ({selected.versionNumber || 'v1.0'})
+                      </label>
+                      <p className="text-xs text-gray-800 font-bold whitespace-pre-wrap leading-relaxed">
+                        {selected.submissionNotes}
+                      </p>
+                    </div>
+                  )}
 
 
                   <div className="flex flex-col gap-2 mt-auto">

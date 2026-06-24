@@ -71,15 +71,7 @@ export default function BoardHeader() {
       )
     }
     
-    if (path.startsWith('/dashboard/editorial-board/disputes')) {
-      return (
-        <div className="flex items-center gap-2 text-sm font-sans font-semibold text-gray-500">
-          <span className="uppercase text-xs font-bold tracking-wider text-gray-400">MANGAFLOW</span>
-          <span className="text-gray-300">/</span>
-          <span className="text-gray-900 font-bold">Báo cáo tranh cãi</span>
-        </div>
-      )
-    }
+
 
     if (path.startsWith('/dashboard/editorial-board/recovery')) {
       return (
@@ -244,8 +236,6 @@ export default function BoardHeader() {
                         setShowNotifications(false);
                         if (notif.type === 'REVIEW' || notif.type === 'RATING' || notif.type === 'VOTE') {
                           navigate('/dashboard/editorial-board/review/cyber-ronin/draft');
-                        } else if (notif.type === 'RISK' || notif.type === 'RESUBMIT' || notif.type === 'OVERDUE') {
-                          navigate('/dashboard/editorial-board/disputes/MF-8492');
                         } else {
                           navigate('/dashboard/editorial-board');
                         }

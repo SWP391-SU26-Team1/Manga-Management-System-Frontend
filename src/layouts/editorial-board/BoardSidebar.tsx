@@ -15,28 +15,18 @@ import {
 // Main panel menu items
 const mainMenuItems = [
   {
-    label: "Tổng quan (Dashboard)",
-    path: "/dashboard/editorial-board",
-    icon: LayoutDashboard,
-    exact: true
-  },
-  {
-    label: "Hộp thư công việc (Proposals)",
+    label: "Review Session",
     path: "/dashboard/editorial-board/proposals",
     icon: FileText
   },
-  {
-    label: "Báo cáo tranh cãi",
-    path: "/dashboard/editorial-board/disputes",
-    icon: AlertTriangle
-  },
+
   {
     label: "Bảng Xếp Hạng",
     path: "/dashboard/editorial-board/rankings",
     icon: Award
   },
   {
-    label: "Lịch sử Phán quyết",
+    label: "Lịch sử",
     path: "/dashboard/editorial-board/history",
     icon: History
   }

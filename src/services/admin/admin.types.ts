@@ -227,6 +227,8 @@ export type ReviewSessionProcessResult = {
   avg_score: number
   decision_count: Record<string, number>
   dominant_decision: string
+  recommendation?: string
+  recommendation_reason?: string
 }
 
 export type Notification = {

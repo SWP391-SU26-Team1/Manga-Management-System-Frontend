@@ -21,16 +21,14 @@ const workflowByStatus: Record<string, Array<{ action: WorkflowAction; label: st
   ],
   in_progress: [
     { action: 'pause', label: 'Pause', icon: Pause, className: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100' },
-    { action: 'complete', label: 'Complete', icon: CheckCircle2, className: 'border-green-600 bg-green-600 text-white hover:bg-green-700' },
+    { action: 'finalize', label: 'Finalize', icon: CheckCircle2, className: 'border-green-600 bg-green-600 text-white hover:bg-green-700' },
     { action: 'cancel', label: 'Cancel', icon: XCircle, className: 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100' },
   ],
   paused: [
     { action: 'start', label: 'Start', icon: Play, className: 'border-blue-600 bg-blue-600 text-white hover:bg-blue-700' },
     { action: 'cancel', label: 'Cancel', icon: XCircle, className: 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100' },
   ],
-  completed: [
-    { action: 'finish', label: 'Finish', icon: Square, className: 'border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700' },
-  ],
+  completed: [],
   finished: [],
   cancelled: [],
 }

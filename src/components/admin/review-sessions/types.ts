@@ -11,7 +11,7 @@ import type {
 
 export type StatusFilter = 'all' | ReviewSessionStatus
 export type VoteStatusFilter = 'all' | VoteStatus
-export type WorkflowAction = 'start' | 'pause' | 'complete' | 'finish' | 'cancel'
+export type WorkflowAction = 'start' | 'pause' | 'complete' | 'finish' | 'cancel' | 'finalize'
 export type DetailTab = 'overview' | 'votes'
 export type ToastState = { type: 'success' | 'error'; message: string } | null
 

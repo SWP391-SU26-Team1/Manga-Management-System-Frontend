@@ -57,7 +57,7 @@ export function ReadDraftPage() {
           const detail = await boardService.getProposalById(urlSessionId)
           const votes = await boardService.getVote(urlSessionId)
           
-          if (detail) setChapterInfo(prev => ({ ...prev, sessionDetail: detail }))
+          if (detail) setChapterInfo((prev: any) => ({ ...prev, sessionDetail: detail }))
           
           if (votes && votes.length > 0) {
             const mappedComments: BoardComment[] = votes.map((v: any) => ({

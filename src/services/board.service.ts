@@ -71,14 +71,14 @@ export const boardService = {
   },
 
   applyManuscriptDecision: async (manuscriptId: string, status: string, note?: string): Promise<any> => {
-    const action = status.toLowerCase() === 'approved' || status.toLowerCase() === 'approve' ? 'approve' : 'reject'
-    const response = await api.patch(`/api/board/manuscripts/${manuscriptId}/${action}`, { note })
+    const finalStatus = status.toLowerCase() === 'approved' || status.toLowerCase() === 'approve' ? 'approved' : 'rejected'
+    const response = await api.patch(`/api/board/manuscripts/${manuscriptId}/apply-decision`, { status: finalStatus, note })
     return response.data
   },
 
   // --- 3. VOTES ---
   getVote: async (sessionId: string): Promise<any[]> => {
-    const response = await api.get(`/api/review-sessions/${sessionId}/votes`)
+    const response = await api.get(`/api/board/review-sessions/${sessionId}/votes`)
     const list = response.data.data || []
     return list.map((v: any) => ({
       ...v,

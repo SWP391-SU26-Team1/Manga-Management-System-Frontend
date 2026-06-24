@@ -50,6 +50,31 @@ export function ReadDraftPage() {
         const sortedPages = chapterPages.sort((a, b) => a.page_number - b.page_number)
         setPages(sortedPages)
       }
+
+      // Load session info & votes
+      if (urlSessionId) {
+        try {
+          const detail = await boardService.getProposalById(urlSessionId)
+          const votes = await boardService.getVote(urlSessionId)
+          
+          if (detail) setChapterInfo(prev => ({ ...prev, sessionDetail: detail }))
+          
+          if (votes && votes.length > 0) {
+            const mappedComments: BoardComment[] = votes.map((v: any) => ({
+              id: v.vote_id || Date.now().toString() + Math.random(),
+              author: v.users?.username || 'Unknown',
+              role: 'BOARD',
+              isChief: false,
+              time: new Date(v.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              content: v.note ? `${v.decision}: ${v.note}` : v.decision
+            }))
+            setComments(mappedComments)
+          }
+        } catch (e) {
+          console.error('Failed to load session details', e)
+        }
+      }
+
     } catch (err) {
       console.error('Error loading manuscripts or chapter info:', err)
     } finally {
@@ -59,7 +84,7 @@ export function ReadDraftPage() {
 
   useEffect(() => {
     loadManuscriptsAndFiles()
-  }, [chapterId])
+  }, [chapterId, urlSessionId])
 
   const displayPages = pages.length > 0 ? pages : fallbackPages
   const totalPagesCount = displayPages.length
@@ -102,10 +127,10 @@ export function ReadDraftPage() {
       <div className="mb-4 flex items-center justify-between">
         <div className="flex gap-2">
           <span className="bg-manga-red text-white font-bold text-[10px] px-2 py-0.5 border-2 border-manga-ink uppercase">
-            THUỘC DIỆN XÉT DUYỆT
+            {chapterInfo?.sessionDetail?.status === 'in_progress' ? 'ĐANG DUYỆT' : chapterInfo?.sessionDetail?.status || 'THUỘC DIỆN XÉT DUYỆT'}
           </span>
           <span className="bg-manga-ink text-white font-bold text-[10px] px-2 py-0.5 border-2 border-manga-ink uppercase">
-            DEADLINE: 24H
+            DEADLINE: {chapterInfo?.sessionDetail?.ended_at ? new Date(chapterInfo.sessionDetail.ended_at).toLocaleDateString() : '24H'}
           </span>
         </div>
         <button 

@@ -1,20 +1,20 @@
 import React, { useState, useEffect } from 'react'
-import { History, Search, ArrowRight, User, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
+import { History, Search, ArrowRight, User, CheckCircle, XCircle, AlertCircle, Calendar, Clock, Book } from 'lucide-react'
 import { boardService } from '@/services/board.service'
 
 export default function HistoryPage() {
   const [proposals, setProposals] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
-  const [sessionHistory, setSessionHistory] = useState<any[]>([])
+  
+  const [sessionDetail, setSessionDetail] = useState<any>(null)
+  const [sessionVotes, setSessionVotes] = useState<any[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
 
   useEffect(() => {
     const fetchProposals = async () => {
       try {
         const res = await boardService.getProposals(1, 100)
-        // Filter only those that are not 'PENDING' to act as history
-        // If API doesn't filter, we just show all.
         let data = res?.data || res
         if (!Array.isArray(data)) data = []
         setProposals(data)
@@ -30,16 +30,38 @@ export default function HistoryPage() {
   const handleSelectSession = async (sessionId: string) => {
     if (activeSessionId === sessionId) {
       setActiveSessionId(null)
+      setSessionDetail(null)
+      setSessionVotes([])
       return
     }
     setActiveSessionId(sessionId)
     setLoadingHistory(true)
     try {
-      const history = await boardService.getReviewSessionHistory(sessionId)
-      setSessionHistory(history || [])
+      const [detail, votes] = await Promise.all([
+        boardService.getProposalById(sessionId).catch(() => null),
+        boardService.getVote(sessionId).catch(() => [])
+      ])
+      
+      // Lấy thêm thông tin series từ API thật để đảm bảo có ảnh bìa (cover)
+      const seriesId = detail?.series_id || detail?.series?.series_id || detail?.series?.id;
+      if (seriesId) {
+        try {
+          const realSeriesDetail = await boardService.getSeriesById(seriesId);
+          if (realSeriesDetail) {
+            if (!detail.series) detail.series = {};
+            detail.series = { ...detail.series, ...realSeriesDetail };
+          }
+        } catch (e) {
+          console.error('Lỗi khi tải series_id', e);
+        }
+      }
+
+      setSessionDetail(detail)
+      setSessionVotes(votes || [])
     } catch (err) {
       console.error('Failed to load history', err)
-      setSessionHistory([])
+      setSessionDetail(null)
+      setSessionVotes([])
     } finally {
       setLoadingHistory(false)
     }
@@ -50,7 +72,7 @@ export default function HistoryPage() {
       <div className="mb-8">
         <h1 className="font-manga text-4xl md:text-5xl font-black uppercase tracking-tight text-manga-ink flex items-center gap-3">
           <History className="w-10 h-10 text-manga-red" />
-          LỊCH SỬ PHÁN QUYẾT
+          LỊCH SỬ
         </h1>
         <p className="text-sm font-bold text-gray-500 uppercase mt-2">
           Theo dõi tiến trình và lịch sử biểu quyết của tất cả các Phiên duyệt
@@ -117,52 +139,98 @@ export default function HistoryPage() {
           ) : (
             <div>
               <h2 className="font-manga text-2xl font-black uppercase text-manga-ink mb-6 border-b-4 border-manga-ink pb-3 flex justify-between items-end">
-                <span>TIMELINE SỰ KIỆN</span>
+                <span>CHI TIẾT PHIÊN DUYỆT</span>
                 <span className="text-[10px] bg-manga-red text-white px-2 py-1 font-bold">SESSION ID: {activeSessionId.substring(0, 8)}</span>
               </h2>
 
-              {sessionHistory.length === 0 ? (
+              {/* Session Info Section */}
+              {sessionDetail && (
+                <div className="flex gap-4 mb-8 bg-zinc-50 p-4 border-2 border-manga-ink shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+                  <div className="w-24 h-32 bg-gray-200 border-2 border-manga-ink shrink-0 overflow-hidden relative flex items-center justify-center">
+                    {(() => {
+                      const coverUrl = sessionDetail.series?.cover_image_url || sessionDetail.series?.coverImageUrl || sessionDetail.series?.coverUrl || sessionDetail.cover_image_url || sessionDetail.coverImageUrl || sessionDetail.coverUrl || 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=300&auto=format&fit=crop';
+                      return <img src={coverUrl} alt="Cover" className="w-full h-full object-cover" />;
+                    })()}
+                  </div>
+                  <div className="flex flex-col justify-between py-1">
+                    <div>
+                      <h3 className="font-manga text-xl font-black uppercase text-manga-red mb-1">
+                        {sessionDetail.series?.title || sessionDetail.title || 'Chưa rõ tên tác phẩm'}
+                      </h3>
+                      <p className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1 mb-1">
+                        Loại phiên: {sessionDetail.chapter_id ? 'Duyệt Bản Thảo (Chapter)' : 'Duyệt Dự Án (Series)'}
+                      </p>
+                    </div>
+                    <div className="text-xs font-bold text-gray-600 space-y-1">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="w-3 h-3 text-gray-400" /> Bắt đầu: {sessionDetail.started_at ? new Date(sessionDetail.started_at).toLocaleString() : 'Chưa xác định'}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-gray-400" /> Kết thúc: {sessionDetail.ended_at ? new Date(sessionDetail.ended_at).toLocaleString() : 'Đang diễn ra'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <h3 className="font-manga text-xl font-black uppercase text-manga-ink mb-6 border-b-2 border-dashed border-gray-300 pb-2">
+                LỊCH SỬ PHÁN QUYẾT (VOTES)
+              </h3>
+
+              {sessionVotes.length === 0 ? (
                 <div className="text-center py-10 text-gray-500 font-bold text-sm uppercase">
-                  Phiên duyệt này chưa có sự kiện nào được ghi nhận trong lịch sử.
+                  Phiên duyệt này chưa có lượt bỏ phiếu nào được ghi nhận.
                 </div>
               ) : (
                 <div className="relative pl-6 space-y-8 before:absolute before:inset-0 before:ml-[11px] before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-1 before:bg-gradient-to-b before:from-transparent before:via-gray-300 before:to-transparent">
-                  {sessionHistory.map((event, idx) => {
-                    // event.action determines the icon and color
+                  {sessionVotes.map((vote, idx) => {
                     let Icon = User
                     let iconBg = 'bg-gray-200'
                     let iconColor = 'text-gray-600'
                     
-                    const action = (event.action || '').toUpperCase()
-                    if (action.includes('APPROVE') || action.includes('APPROVED')) {
+                    const action = (vote.decision || '').toUpperCase()
+                    if (action === 'APPROVE') {
                       Icon = CheckCircle
                       iconBg = 'bg-emerald-100'
                       iconColor = 'text-emerald-600'
-                    } else if (action.includes('REJECT') || action.includes('REJECTED')) {
+                    } else if (action === 'REJECT') {
                       Icon = XCircle
                       iconBg = 'bg-red-100'
                       iconColor = 'text-red-600'
-                    } else if (action.includes('REVISE')) {
+                    } else if (action === 'REVISE') {
                       Icon = AlertCircle
                       iconBg = 'bg-yellow-100'
                       iconColor = 'text-yellow-600'
                     }
 
+                    const voterName = vote.users?.fullName || vote.users?.username || vote.users?.name || 'Hội đồng'
+                    const voterAvatar = vote.users?.avatar_url || vote.users?.avatarUrl
+
                     return (
-                      <div key={event.history_id || idx} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+                      <div key={vote.vote_id || idx} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
                         {/* Icon */}
-                        <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 border-white ${iconBg} ${iconColor} shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 absolute left-[-32px] md:static`}>
-                          <Icon className="w-4 h-4" />
+                        <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 border-manga-ink ${iconBg} ${iconColor} shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 absolute left-[-32px] md:static overflow-hidden`}>
+                          {voterAvatar ? (
+                             <img src={voterAvatar} alt={voterName} className="w-full h-full object-cover rounded-full" />
+                          ) : (
+                             <Icon className="w-4 h-4" />
+                          )}
                         </div>
                         
                         {/* Card */}
                         <div className="w-[calc(100%-2.5rem)] md:w-[calc(50%-2.5rem)] bg-white border-2 border-manga-ink p-4 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
                           <div className="flex items-center justify-between mb-1">
-                            <span className="font-manga font-bold text-sm uppercase text-manga-red">{event.action || 'Unknown Action'}</span>
-                            <time className="text-[9px] font-black text-gray-400">{new Date(event.created_at).toLocaleString()}</time>
+                            <span className={`font-manga font-bold text-sm uppercase ${action === 'APPROVE' ? 'text-emerald-600' : action === 'REJECT' ? 'text-red-600' : action === 'REVISE' ? 'text-yellow-600' : 'text-manga-red'}`}>
+                              {action || 'Đã Vote'}
+                            </span>
+                            <time className="text-[9px] font-black text-gray-400">{vote.created_at ? new Date(vote.created_at).toLocaleString() : ''}</time>
                           </div>
-                          <div className="text-xs font-bold text-manga-ink mb-2">Người thực hiện: <span className="text-manga-red">{event.performed_by || 'Hệ thống'}</span></div>
-                          <p className="text-[11px] font-medium text-gray-600 border-t-2 border-dashed border-gray-200 pt-2">{event.note || 'Không có ghi chú'}</p>
+                          <div className="text-xs font-bold text-manga-ink mb-2">
+                            Thành viên: <span className="text-manga-red">{voterName}</span>
+                          </div>
+                          <p className="text-[11px] font-medium text-gray-600 border-t-2 border-dashed border-gray-200 pt-2">
+                            {vote.note || 'Không có ghi chú'}
+                          </p>
                         </div>
                       </div>
                     )

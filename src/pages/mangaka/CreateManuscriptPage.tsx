@@ -176,7 +176,7 @@ export default function CreateManuscriptPage() {
             QUY TRÌNH NỘP BẢN THẢO
           </h4>
           <p className="text-xs font-bold text-blue-800 leading-relaxed">
-            Bản thảo sau khi nộp sẽ mang trạng thái <strong>Chờ duyệt (Submitted)</strong>. Biên tập viên phụ trách (Tantou Editor) của Series này sẽ xem xét, đóng góp ý kiến nhận xét và duyệt sơ khảo trước khi trình lên Hội đồng biên tập phê duyệt xuất bản.
+            Bản thảo sau khi nộp sẽ mang trạng thái <strong>Chờ duyệt (Submitted)</strong>. Biên tập viên phụ trách (Tantou Editor) của Series này sẽ xem xét, đóng góp ý kiến nhận xét và trực tiếp phê duyệt bản thảo.
           </p>
         </div>
       </div>

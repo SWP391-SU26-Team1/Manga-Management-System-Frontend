@@ -202,7 +202,7 @@ export default function SubmissionsPage() {
                 <div className="absolute top-2 right-2 flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider bg-white border-2 border-manga-ink shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
                   {getStatusIcon(sub.status)}
                   <span className={sub.status === 'Approved' ? 'text-green-600' : sub.status === 'Need Fix' ? 'text-red-600' : 'text-yellow-600'}>
-                    {sub.status}
+                    {sub.status === 'Approved' ? 'Đã duyệt' : sub.status === 'Need Fix' ? 'Cần sửa' : 'Chờ duyệt'}
                   </span>
                 </div>
               </div>

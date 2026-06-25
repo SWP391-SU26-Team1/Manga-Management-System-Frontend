@@ -117,7 +117,7 @@ export default function TantouDashboardPage() {
           {atRiskSeries.total > 0 && (
             <button onClick={() => navigate('/dashboard/tantou-editor/alerts')} className="bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded text-xs font-bold flex items-center gap-2 hover:bg-red-100 transition-colors">
               <AlertTriangle className="w-3.5 h-3.5" />
-              {atRiskSeries.total} SERIES AT RISK
+              {atRiskSeries.total} SERIES CÓ NGUY CƠ TRỄ
             </button>
           )}
         </div>
@@ -130,7 +130,7 @@ export default function TantouDashboardPage() {
             </div>
             <div className="text-4xl font-black text-manga-ink leading-none mb-2">{managingSeries.total}</div>
             <div className="text-xs text-gray-500 font-medium">
-              {managingSeries.publishing} Publishing · {managingSeries.atRisk} At Risk · {managingSeries.paused} Paused
+              {managingSeries.publishing} Đang xuất bản · {managingSeries.atRisk} Nguy cơ trễ · {managingSeries.paused} Tạm ngưng
             </div>
           </div>
 

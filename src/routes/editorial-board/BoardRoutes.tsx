@@ -17,6 +17,7 @@ import { DisputesListPage, DisputeDetailsPage } from '@/pages/editorial-board/me
 
 // Chief Editor Pages
 import ChiefDashboardPage from '@/pages/editorial-board/chief-editor/ChiefDashboardPage'
+import { ChiefDisputesListPage, ChiefDisputeDetailsPage } from '@/pages/editorial-board/chief-editor/ChiefDisputesPage'
 import VoteSummaryPage from '@/pages/editorial-board/chief-editor/VoteSummaryPage'
 import SendNotificationPage from '@/pages/editorial-board/chief-editor/SendNotificationPage'
 import RecoveryPage from '@/pages/editorial-board/chief-editor/RecoveryPage'

@@ -209,7 +209,7 @@ export default function AssistantsPage() {
           <div className="h-1 w-20 bg-manga-red mt-3 mb-2" />
           <p className="text-sm font-bold text-gray-500">Quản lý Assistant, theo dõi task đang làm, hiệu suất và submission.</p>
         </div>
-        <button 
+        <button
           onClick={() => setShowAddModal(true)}
           className="flex items-center gap-2 bg-manga-red text-white font-manga font-bold text-sm uppercase px-5 py-3 border-2 border-manga-ink manga-shadow-sm hover:translate-y-0.5 transition-all mt-2 flex-shrink-0"
         >
@@ -238,76 +238,77 @@ export default function AssistantsPage() {
         {!loading && assistants.map((a: any) => {
           const workload = Math.min(100, (a.currentTasksCount * 20) + (a.pendingSubmissionsCount * 10))
           return (
-          <div key={a.id} className={`bg-white border-2 border-manga-ink manga-shadow flex flex-col ${a.status === 'Nghỉ ngơi' ? 'opacity-70' : ''}`}>
-            <div className="bg-manga-ink text-white p-4 flex items-center gap-4 relative">
-              <div className="w-14 h-14 border-2 border-white overflow-hidden flex-shrink-0 bg-gray-300 flex items-center justify-center">
-                {a.avatarUrl
-                  ? <img src={a.avatarUrl} alt={a.name} className="w-full h-full object-cover grayscale" />
-                  : <span className="font-manga text-2xl font-bold text-gray-500">{a.name[0]}</span>}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-manga text-xl font-bold truncate pr-6">{a.name}</h3>
-                  {statusIcon[a.status]}
+            <div key={a.id} className={`bg-white border-2 border-manga-ink manga-shadow flex flex-col ${a.status === 'Nghỉ ngơi' ? 'opacity-70' : ''}`}>
+              <div className="bg-manga-ink text-white p-4 flex items-center gap-4 relative">
+                <div className="w-14 h-14 border-2 border-white overflow-hidden flex-shrink-0 bg-gray-300 flex items-center justify-center">
+                  {a.avatarUrl
+                    ? <img src={a.avatarUrl} alt={a.name} className="w-full h-full object-cover grayscale" />
+                    : <span className="font-manga text-2xl font-bold text-gray-500">{a.name[0]}</span>}
                 </div>
-                <p className="text-[10px] font-bold text-manga-red truncate mt-0.5 uppercase">Series: {a.seriesTitle}</p>
-                <button 
-                  onClick={() => handleRemoveAssistant(a.seriesId, a.id, a.name)}
-                  className="absolute top-4 right-4 text-gray-400 hover:text-manga-red transition-colors"
-                  title="Xóa trợ lý khỏi dự án"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-                <p className="text-xs font-bold text-gray-300 uppercase tracking-widest">{a.role}</p>
-                <span className={`inline-block mt-1 text-[9px] font-bold uppercase px-2 py-0.5 border ${a.status === 'Đang làm' ? 'bg-manga-red border-red-400 text-white' : a.status === 'Chờ duyệt' ? 'bg-white text-manga-ink border-white' : 'bg-gray-600 text-gray-300 border-gray-500'}`}>
-                  {a.status}
-                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-manga text-xl font-bold truncate pr-6">{a.name}</h3>
+                    {statusIcon[a.status]}
+                  </div>
+                  <p className="text-[10px] font-bold text-manga-red truncate mt-0.5 uppercase">Series: {a.seriesTitle}</p>
+                  <button
+                    onClick={() => handleRemoveAssistant(a.seriesId, a.id, a.name)}
+                    className="absolute top-4 right-4 text-gray-400 hover:text-manga-red transition-colors"
+                    title="Xóa trợ lý khỏi dự án"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                  <p className="text-xs font-bold text-gray-300 uppercase tracking-widest">{a.role}</p>
+                  <span className={`inline-block mt-1 text-[9px] font-bold uppercase px-2 py-0.5 border ${a.status === 'Đang làm' ? 'bg-manga-red border-red-400 text-white' : a.status === 'Chờ duyệt' ? 'bg-white text-manga-ink border-white' : 'bg-gray-600 text-gray-300 border-gray-500'}`}>
+                    {a.status}
+                  </span>
+                </div>
               </div>
-            </div>
 
-            <div className="p-4 flex flex-col gap-3">
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="border-r-2 border-dashed border-gray-200 pr-2">
-                  <p className="font-manga text-2xl font-bold text-manga-red">{a.currentTasksCount}</p>
-                  <p className="text-[9px] font-bold uppercase text-gray-500">Đang làm</p>
+              <div className="p-4 flex flex-col gap-3">
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="border-r-2 border-dashed border-gray-200 pr-2">
+                    <p className="font-manga text-2xl font-bold text-manga-red">{a.currentTasksCount}</p>
+                    <p className="text-[9px] font-bold uppercase text-gray-500">Đang làm</p>
+                  </div>
+                  <div className="border-r-2 border-dashed border-gray-200 pr-2">
+                    <p className="font-manga text-2xl font-bold text-manga-ink">{a.pendingSubmissionsCount}</p>
+                    <p className="text-[9px] font-bold uppercase text-gray-500">Chờ duyệt</p>
+                  </div>
+                  <div>
+                    <p className="font-manga text-2xl font-bold text-manga-ink">95%</p>
+                    <p className="text-[9px] font-bold uppercase text-gray-500">Tỷ lệ duyệt</p>
+                  </div>
                 </div>
-                <div className="border-r-2 border-dashed border-gray-200 pr-2">
-                  <p className="font-manga text-2xl font-bold text-manga-ink">{a.pendingSubmissionsCount}</p>
-                  <p className="text-[9px] font-bold uppercase text-gray-500">Chờ duyệt</p>
-                </div>
+
                 <div>
-                  <p className="font-manga text-2xl font-bold text-manga-ink">95%</p>
-                  <p className="text-[9px] font-bold uppercase text-gray-500">Tỷ lệ duyệt</p>
+                  <div className="flex justify-between text-[10px] font-bold text-gray-500 mb-1">
+                    <span className="uppercase">Khối lượng công việc</span>
+                    <span>{workload}%</span>
+                  </div>
+                  <div className="h-3 bg-gray-100 border-2 border-manga-ink">
+                    <div className={`h-full ${workload > 70 ? 'bg-manga-red' : 'bg-manga-ink'}`} style={{ width: `${workload}%` }} />
+                  </div>
                 </div>
-              </div>
 
-              <div>
-                <div className="flex justify-between text-[10px] font-bold text-gray-500 mb-1">
-                  <span className="uppercase">Khối lượng công việc</span>
-                  <span>{workload}%</span>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <Link to={`/dashboard/mangaka/assign-task`} className="flex items-center justify-center gap-1 text-[10px] font-bold uppercase py-2 bg-manga-red text-white border-2 border-manga-ink manga-shadow-sm hover:translate-y-0.5 transition-all text-center">
+                    <ClipboardList className="w-3 h-3" /> Giao task mới
+                  </Link>
+                  <Link to={`/dashboard/mangaka/submission`} className="flex items-center justify-center gap-1 text-[10px] font-bold uppercase py-2 border-2 border-manga-ink hover:bg-gray-100 transition-colors text-center text-manga-ink bg-white">
+                    <CheckCircle className="w-3 h-3" /> Xem submission
+                  </Link>
+                  <button
+                    onClick={() => setShowStatsModal(a)}
+                    className="col-span-2 flex items-center justify-center gap-1 text-[10px] font-bold uppercase py-2 border-2 border-manga-ink hover:bg-gray-100 transition-colors bg-white text-manga-ink"
+                  >
+                    <BarChart2 className="w-3 h-3" /> Hiệu suất chi tiết
+                  </button>
                 </div>
-                <div className="h-3 bg-gray-100 border-2 border-manga-ink">
-                  <div className={`h-full ${workload > 70 ? 'bg-manga-red' : 'bg-manga-ink'}`} style={{ width: `${workload}%` }} />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                <Link to={`/dashboard/mangaka/assign-task`} className="flex items-center justify-center gap-1 text-[10px] font-bold uppercase py-2 bg-manga-red text-white border-2 border-manga-ink manga-shadow-sm hover:translate-y-0.5 transition-all text-center">
-                  <ClipboardList className="w-3 h-3" /> Giao task mới
-                </Link>
-                <Link to={`/dashboard/mangaka/submission`} className="flex items-center justify-center gap-1 text-[10px] font-bold uppercase py-2 border-2 border-manga-ink hover:bg-gray-100 transition-colors text-center text-manga-ink bg-white">
-                  <CheckCircle className="w-3 h-3" /> Xem submission
-                </Link>
-                <button 
-                  onClick={() => setShowStatsModal(a)}
-                  className="col-span-2 flex items-center justify-center gap-1 text-[10px] font-bold uppercase py-2 border-2 border-manga-ink hover:bg-gray-100 transition-colors bg-white text-manga-ink"
-                >
-                  <BarChart2 className="w-3 h-3" /> Hiệu suất chi tiết
-                </button>
               </div>
             </div>
-          </div>
-        )})}
+          )
+        })}
       </div>
 
       {/* Current Tasks Table */}
@@ -328,25 +329,25 @@ export default function AssistantsPage() {
             {tasks.slice(0, 10).map((t, i) => {
               const isOverdue = new Date(t.deadline) < new Date() && t.status !== 'Approved'
               return (
-              <tr key={t.id} className={`border-t-2 border-gray-200 ${i % 2 === 1 ? 'bg-gray-50' : 'bg-white'} hover:bg-red-50 transition-colors`}>
-                <td className="px-4 py-3 font-bold text-sm border-r-2 border-gray-200">{t.assignedTo}</td>
-                <td className="px-4 py-3 font-bold text-sm border-r-2 border-gray-200">{t.layerType}</td>
-                <td className="px-4 py-3 font-bold text-sm border-r-2 border-gray-200">{t.pageId.split('_').slice(-2).join(' ')}</td>
-                <td className="px-4 py-3 text-xs font-bold border-r-2 border-gray-200">
-                  <span className={isOverdue ? 'text-manga-red' : 'text-gray-600'}>{t.deadline}</span>
-                </td>
-                <td className="px-4 py-3 border-r-2 border-gray-200">
-                  <span className={`inline-block border font-bold text-[10px] px-2 py-0.5 uppercase ${
-                    t.status === 'Doing' ? 'bg-manga-red text-white border-manga-ink' : 
-                    t.status === 'Submitted' ? 'bg-blue-100 text-blue-800 border-blue-300' :
-                    t.status === 'Need Fix' ? 'bg-red-100 text-red-800 border-red-300' :
-                    'bg-gray-100 text-gray-600 border-gray-300'
-                  }`}>
-                    {t.status}
-                  </span>
-                </td>
-              </tr>
-            )})}
+                <tr key={t.id} className={`border-t-2 border-gray-200 ${i % 2 === 1 ? 'bg-gray-50' : 'bg-white'} hover:bg-red-50 transition-colors`}>
+                  <td className="px-4 py-3 font-bold text-sm border-r-2 border-gray-200">{t.assignedTo}</td>
+                  <td className="px-4 py-3 font-bold text-sm border-r-2 border-gray-200">{t.layerType}</td>
+                  <td className="px-4 py-3 font-bold text-sm border-r-2 border-gray-200">{t.pageId.split('_').slice(-2).join(' ')}</td>
+                  <td className="px-4 py-3 text-xs font-bold border-r-2 border-gray-200">
+                    <span className={isOverdue ? 'text-manga-red' : 'text-gray-600'}>{t.deadline}</span>
+                  </td>
+                  <td className="px-4 py-3 border-r-2 border-gray-200">
+                    <span className={`inline-block border font-bold text-[10px] px-2 py-0.5 uppercase ${t.status === 'Doing' ? 'bg-manga-red text-white border-manga-ink' :
+                        t.status === 'Submitted' ? 'bg-blue-100 text-blue-800 border-blue-300' :
+                          t.status === 'Need Fix' ? 'bg-red-100 text-red-800 border-red-300' :
+                            'bg-gray-100 text-gray-600 border-gray-300'
+                      }`}>
+                      {t.status}
+                    </span>
+                  </td>
+                </tr>
+              )
+            })}
             {tasks.length === 0 && (
               <tr>
                 <td colSpan={5} className="p-8 text-center font-bold text-gray-500">Chưa có task nào được giao.</td>
@@ -369,8 +370,8 @@ export default function AssistantsPage() {
             <form onSubmit={handleAddAssistant} className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Chọn Series</label>
-                <select 
-                  value={selectedSeriesId} 
+                <select
+                  value={selectedSeriesId}
                   onChange={e => setSelectedSeriesId(e.target.value)}
                   className="w-full border-2 border-manga-ink p-2 font-bold focus:ring-2 focus:ring-manga-red bg-white"
                   required
@@ -382,8 +383,8 @@ export default function AssistantsPage() {
               </div>
               <div>
                 <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Chọn Trợ Lý</label>
-                <select 
-                  value={newAssistantUserId} 
+                <select
+                  value={newAssistantUserId}
                   onChange={e => setNewAssistantUserId(e.target.value)}
                   className="w-full border-2 border-manga-ink p-2 font-bold focus:ring-2 focus:ring-manga-red bg-white"
                   required
@@ -396,8 +397,8 @@ export default function AssistantsPage() {
               </div>
               <div>
                 <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Chuyên môn (Layer Role)</label>
-                <select 
-                  value={newRole} 
+                <select
+                  value={newRole}
                   onChange={e => setNewRole(e.target.value)}
                   className="w-full border-2 border-manga-ink p-2 font-bold uppercase text-sm focus:ring-2 focus:ring-manga-red bg-white"
                 >
@@ -474,11 +475,11 @@ export default function AssistantsPage() {
               <h2 className="font-manga font-bold text-xl uppercase flex items-center gap-2 text-manga-red">
                 Xác nhận xóa trợ lý
               </h2>
-              <button 
+              <button
                 onClick={() => {
                   setShowDeleteConfirm(false)
                   setAssistantToDelete(null)
-                }} 
+                }}
                 className="hover:text-red-500 cursor-pointer"
               >
                 <X className="w-6 h-6" />
@@ -520,13 +521,12 @@ export default function AssistantsPage() {
         <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
           <div className="bg-white border-4 border-manga-ink manga-shadow max-w-sm w-full animate-in fade-in zoom-in-95 duration-150 text-black text-left">
             <div className="p-4 border-b-4 border-manga-ink bg-gray-50 flex justify-between items-center">
-              <h2 className={`font-manga font-bold text-xl uppercase flex items-center gap-2 ${
-                alertModal.type === 'success' ? 'text-green-600' : 'text-manga-red'
-              }`}>
+              <h2 className={`font-manga font-bold text-xl uppercase flex items-center gap-2 ${alertModal.type === 'success' ? 'text-green-600' : 'text-manga-red'
+                }`}>
                 {alertModal.title}
               </h2>
-              <button 
-                onClick={() => setAlertModal(prev => ({ ...prev, show: false }))} 
+              <button
+                onClick={() => setAlertModal(prev => ({ ...prev, show: false }))}
                 className="hover:text-red-500 cursor-pointer"
               >
                 <X className="w-6 h-6" />
@@ -540,9 +540,8 @@ export default function AssistantsPage() {
                 <button
                   type="button"
                   onClick={() => setAlertModal(prev => ({ ...prev, show: false }))}
-                  className={`px-6 py-2 border-2 border-manga-ink text-white font-bold uppercase text-xs hover:bg-opacity-90 transition-colors cursor-pointer ${
-                    alertModal.type === 'success' ? 'bg-green-600' : 'bg-manga-red'
-                  }`}
+                  className={`px-6 py-2 border-2 border-manga-ink text-white font-bold uppercase text-xs hover:bg-opacity-90 transition-colors cursor-pointer ${alertModal.type === 'success' ? 'bg-green-600' : 'bg-manga-red'
+                    }`}
                 >
                   OK
                 </button>

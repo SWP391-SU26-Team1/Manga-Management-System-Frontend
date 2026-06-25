@@ -185,6 +185,7 @@ export default function BoardDashboardPage() {
                     {rank.trend === 'up' ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                     <span>{rank.trend === 'up' ? '+' : '-'}{rank.changePercent}%</span>
                   </div>
+
                 </div>
               </div>
             ))}

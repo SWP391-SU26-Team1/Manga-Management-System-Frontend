@@ -479,13 +479,13 @@ export default function ManuscriptReviewPage() {
     if (isSubmittingSeries) return
     try {
       setIsSubmittingSeries(true)
-      await editorService.submitSeriesToBoard(sId)
-      showToast(`Đã nộp đề xuất duyệt Series lên Hội Đồng Biên Tập!`)
+      await editorService.updateSeriesStatus(sId, 'approved')
+      showToast(`Đã phê duyệt Series thành công!`)
       await fetchSeriesToReview()
     } catch (err: any) {
-      console.error('Failed to submit series:', err)
+      console.error('Failed to approve series:', err)
       const msg = err?.response?.data?.message || ''
-      showToast(msg || 'Lỗi khi nộp lên Hội Đồng!')
+      showToast(msg || 'Lỗi khi phê duyệt Series!')
     } finally {
       setIsSubmittingSeries(false)
     }
@@ -504,8 +504,8 @@ export default function ManuscriptReviewPage() {
 
   const handleRejectSeries = async (sId: string) => {
     try {
-      await editorService.updateSeriesStatus(sId, 'rejected')
-      showToast(`Đã từ chối duyệt hồ sơ Series.`)
+      await editorService.updateSeriesStatus(sId, 'draft')
+      showToast(`Đã từ chối duyệt hồ sơ Series (đã chuyển về bản nháp).`)
       fetchSeriesToReview()
     } catch (err: any) {
       console.error('Failed to reject series:', err)
@@ -884,7 +884,7 @@ export default function ManuscriptReviewPage() {
                 <div className="bg-blue-50 border-2 border-blue-600 p-3 text-[10px] text-blue-700 font-bold leading-normal">
                   <ul className="space-y-1 list-disc pl-4">
                     <li>Vui lòng kiểm tra kỹ nội dung, thuyết minh, thể loại và hình ảnh bìa của Series.</li>
-                    <li>Hành động <span className="font-bold text-manga-red">"Nộp lên Hội Đồng"</span> sẽ tạo một phiên duyệt mới trên Hội Đồng Biên Tập.</li>
+                    <li>Hành động <span className="font-bold text-manga-red">"Phê duyệt"</span> sẽ chính thức duyệt Series hoạt động trên hệ thống.</li>
                     <li>Bạn có thể trao đổi trực tiếp với Mangaka nếu hồ sơ chưa đạt yêu cầu trước khi quyết định từ chối.</li>
                   </ul>
                 </div>
@@ -913,10 +913,12 @@ export default function ManuscriptReviewPage() {
                     >
                       {isSubmittingSeries ? (
                         <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> ĐANG NỘP...
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> ĐANG DUYỆT...
                         </>
                       ) : (
-                        '🚀 NỘP LÊN HỘI ĐỒNG'
+                        <>
+                          <Check className="w-3.5 h-3.5" /> PHÊ DUYỆT SERIES
+                        </>
                       )}
                     </button>
 

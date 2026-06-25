@@ -89,11 +89,12 @@ export default function BoardSidebar() {
 
   const activeMenuItems = isReviewMode ? reviewMenuItems : mainMenuItems
 
-  const checkIsActive = (path: string, exact?: boolean) => {
+  const checkIsActive = (itemPath: string, exact?: boolean) => {
+    const basePath = itemPath.split('?')[0]
     if (exact) {
-      return location.pathname === path
+      return location.pathname === basePath
     }
-    return location.pathname.startsWith(path)
+    return location.pathname.startsWith(basePath)
   }
 
 

@@ -94,6 +94,15 @@ export const authService = {
       user: mapBackendUser(user)
     }
   },
+
+  loginWithGoogle: async (idToken: string): Promise<AuthResponse> => {
+    const response = await api.post<BackendAuthResponse>('/api/auth/login-google', { idToken })
+    const { token, user } = response.data.data
+    return {
+      token,
+      user: mapBackendUser(user)
+    }
+  },
 }
 
 export default authService

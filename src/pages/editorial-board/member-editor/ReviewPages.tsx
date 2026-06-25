@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react'
-import { useParams, useNavigate, useSearchParams, Link } from 'react-router'
-import { ZoomIn, Maximize2, Send, Save, ArrowRight, ArrowLeft, Star, StarOff, CheckCircle } from 'lucide-react'
+import React, { useState, useEffect, useRef } from 'react'
+import { useParams, useNavigate, useSearchParams, Link, useLocation } from 'react-router'
+import { ZoomIn, Maximize2, Send, Save, ArrowRight, ArrowLeft, Star, StarOff, CheckCircle, X } from 'lucide-react'
 import { BoardComment, ChapterGrade, ChapterVote } from '@/types/board.types'
 import { useNotifications } from '@/contexts/NotificationContext'
 import { boardService } from '@/services/board.service'
@@ -26,9 +26,55 @@ export function ReadDraftPage() {
   const [newComment, setNewComment] = useState('')
   const currentUser = getStoredUser()
 
+  const [isZoomed, setIsZoomed] = useState(false)
+  const [zoomScale, setZoomScale] = useState(1)
+  const [transformOrigin, setTransformOrigin] = useState('50% 50%')
+
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const imageContainerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+    }
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }, [])
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      imageContainerRef.current?.requestFullscreen().catch(err => console.error(err))
+    } else {
+      document.exitFullscreen()
+    }
+  }
+
+  const toggleZoom = () => {
+    setIsZoomed(true)
+    setZoomScale(1)
+    setTransformOrigin('50% 50%')
+  }
+
+  const closeZoom = () => {
+    setIsZoomed(false)
+  }
+
+  const handleLightboxImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
+    if (zoomScale === 1) {
+      const rect = e.currentTarget.getBoundingClientRect()
+      const x = ((e.clientX - rect.left) / rect.width) * 100
+      const y = ((e.clientY - rect.top) / rect.height) * 100
+      setTransformOrigin(`${x}% ${y}%`)
+      setZoomScale(2.5) // Magnify
+    } else {
+      setZoomScale(1) // Reset
+    }
+  }
+
   const [pages, setPages] = useState<any[]>([])
   const [loadingFiles, setLoadingFiles] = useState(false)
   const [chapterInfo, setChapterInfo] = useState<any>(null)
+  const [sessionInfo, setSessionInfo] = useState<any>(null)
 
   // Manga mock images fallback
   const fallbackPages = [
@@ -42,6 +88,15 @@ export function ReadDraftPage() {
       // Load true chapter info
       const chapterData = await chapterService.getById(chapterId)
       if (chapterData) setChapterInfo(chapterData)
+
+      if (urlSessionId) {
+        try {
+          const sessionData = await boardService.getProposalDetail(urlSessionId)
+          if (sessionData) setSessionInfo(sessionData)
+        } catch (e) {
+          console.error('Error loading session detail:', e)
+        }
+      }
 
       // Load true draft pages
       const chapterPages = await pageService.getByChapterId(chapterId)
@@ -73,8 +128,8 @@ export function ReadDraftPage() {
   }
 
   const targetPage = displayPages[(page - 1) % totalPagesCount]
-  const mockImage = typeof targetPage === 'string' 
-    ? targetPage 
+  const mockImage = typeof targetPage === 'string'
+    ? targetPage
     : targetPage?.image_url || targetPage?.file_url || fallbackPages[0]
 
   const handleSendComment = async (e: React.FormEvent) => {
@@ -108,7 +163,7 @@ export function ReadDraftPage() {
             DEADLINE: 24H
           </span>
         </div>
-        <button 
+        <button
           onClick={() => alert('Đang tải lịch sử chỉnh sửa bản thảo...')}
           className="text-xs font-bold bg-white border-2 border-manga-ink px-4 py-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:bg-zinc-50 active:translate-y-[1px] cursor-pointer"
         >
@@ -122,7 +177,7 @@ export function ReadDraftPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         {/* Left Col: Manga viewer + Ghi chú đính kèm */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-8">
           {/* Main Viewer Card */}
           <div className="bg-white border-4 border-manga-ink p-6 shadow-[6px_6px_0px_rgba(15,15,15,1)]">
             <div className="flex justify-between items-center border-b-2 border-manga-ink pb-3 mb-4">
@@ -135,35 +190,53 @@ export function ReadDraftPage() {
                 </p>
               </div>
               <div className="flex gap-2 text-manga-ink">
-                <button className="p-1.5 border-2 border-manga-ink hover:bg-zinc-100 cursor-pointer"><ZoomIn className="w-4 h-4" /></button>
-                <button className="p-1.5 border-2 border-manga-ink hover:bg-zinc-100 cursor-pointer"><Maximize2 className="w-4 h-4" /></button>
+                <button
+                  onClick={toggleZoom}
+                  className={`p-1.5 border-2 border-manga-ink hover:bg-zinc-100 cursor-pointer`}
+                  title="Thu phóng ảnh"
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={toggleFullscreen}
+                  className={`p-1.5 border-2 border-manga-ink hover:bg-zinc-100 cursor-pointer ${isFullscreen ? 'bg-manga-red text-white hover:bg-red-700' : ''}`}
+                  title="Toàn màn hình"
+                >
+                  <Maximize2 className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
             {/* Image display */}
-            <div className="border-4 border-manga-ink bg-zinc-200 aspect-[3/4] max-w-lg mx-auto relative overflow-hidden shadow-[4px_4px_0px_rgba(0,0,0,1)] mb-4">
-              <img 
-                src={mockImage} 
-                alt={`Trang ${page}`} 
-                className="w-full h-full object-cover select-none"
-              />
+            <div
+              ref={imageContainerRef}
+              className={`border-4 border-manga-ink bg-zinc-200 relative overflow-hidden shadow-[4px_4px_0px_rgba(0,0,0,1)] mb-4 flex items-center justify-center ${isFullscreen ? 'w-full h-full max-w-none bg-black border-none' : 'aspect-[3/4] max-w-2xl mx-auto'
+                }`}
+            >
+              <div className={`w-full h-full flex items-center justify-center overflow-hidden`}>
+                <img
+                  src={mockImage}
+                  alt={`Trang ${page}`}
+                  className={`transition-all duration-300 select-none w-full h-full ${isFullscreen ? 'object-contain' : 'object-cover'}`}
+                />
+              </div>
             </div>
 
             {/* Pagination footer */}
-            <div className="flex items-center justify-between border-t-2 border-dashed border-gray-300 pt-4 px-2">
-              <button 
+            <div className="flex items-center justify-between border-t-2 border-dashed border-gray-300 pt-4 px-2 max-w-2xl mx-auto">
+              <button
                 onClick={handlePrevPage}
                 disabled={page <= 1}
                 className="px-4 py-1.5 bg-white border-2 border-manga-ink font-bold text-xs uppercase shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:bg-zinc-50 disabled:opacity-40 disabled:shadow-none disabled:translate-y-0 cursor-pointer"
               >
                 ← TRANG TRƯỚC
               </button>
-              
-              <span className="font-manga text-xl font-black">
+
+              <span className="font-manga text-xl font-black text-manga-ink">
                 {page} / {totalPagesCount}
               </span>
 
-              <button 
+              <button
                 onClick={handleNextPage}
                 disabled={page >= totalPagesCount}
                 className="px-4 py-1.5 bg-white border-2 border-manga-ink font-bold text-xs uppercase shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:bg-zinc-50 disabled:opacity-40 disabled:shadow-none disabled:translate-y-0 cursor-pointer"
@@ -181,76 +254,107 @@ export function ReadDraftPage() {
             <h3 className="font-manga text-lg font-bold uppercase text-manga-ink mb-2">
               LÝ GIẢI CỦA EDITOR/MANGAKA
             </h3>
-            <p className="text-gray-700 italic font-medium text-xs leading-relaxed border-l-4 border-manga-red pl-4 py-1 mb-4 bg-zinc-50/50">
-              "Ở phân cảnh này, chúng tôi quyết định đẩy mạnh shading bằng nét gạch chéo (cross-hatching) thay vì dùng screentone thông thường. Mục đích là để lột tả sự căng thẳng tột độ của nhân vật chính khi đối mặt với quyết định sinh tử. Nhịp độ khung tranh cũng được bẻ gãy bất đối xứng để tạo cảm giác chông chênh."
+            <p className="text-gray-700 italic font-medium text-xs leading-relaxed border-l-4 border-manga-red pl-4 py-1 mb-4 bg-zinc-50/50 whitespace-pre-wrap">
+              {sessionInfo?.description || chapterInfo?.description || 'Không có ghi chú nào đính kèm cho bản thảo này.'}
             </p>
             <div className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1.5">
-              <span>✍ TRẦN VĂN A - LEAD MANGAKA</span>
+              <span>✍ {sessionInfo?.created_by?.username || sessionInfo?.created_by?.fullName || chapterInfo?.author_name || 'LEAD MANGAKA / EDITOR'}</span>
             </div>
           </div>
         </div>
 
-        {/* Right Col: Feedback feed + Next step link */}
-        <div className="space-y-6">
-          {/* Feedback feed card */}
-          <div className="bg-white border-4 border-manga-ink p-5 shadow-[6px_6px_0px_rgba(15,15,15,1)] flex flex-col h-[520px]">
-            <h3 className="font-manga text-lg font-black uppercase border-b-4 border-manga-ink pb-2 mb-4 flex items-center justify-between">
-              <span>FEEDBACK</span>
-              <span className="bg-manga-red text-white font-bold text-xs px-2 py-0.5 border-2 border-manga-ink shadow-sm">
-                {comments.length}
-              </span>
+        {/* Right Col: Editor Panel */}
+        <div className="space-y-6 lg:sticky lg:top-6">
+          {/* Box 1: Thông tin nhanh */}
+          <div className="bg-white border-4 border-manga-ink p-5 shadow-[6px_6px_0px_rgba(15,15,15,1)]">
+            <h3 className="font-manga font-black text-lg border-b-4 border-manga-ink pb-2 mb-4 uppercase">
+              THÔNG TIN CHUNG
             </h3>
+            <ul className="space-y-3 text-[11px] font-bold text-gray-700">
+              <li className="flex justify-between border-b-2 border-dashed border-gray-200 pb-2">
+                <span className="uppercase text-gray-400">Dự án</span>
+                <span className="text-manga-ink">{chapterTitleDisplay}</span>
+              </li>
+              <li className="flex justify-between border-b-2 border-dashed border-gray-200 pb-2">
+                <span className="uppercase text-gray-400">Tiến độ</span>
+                <span className="text-manga-ink">BƯỚC 1/3 (ĐỌC)</span>
+              </li>
+              <li className="flex justify-between border-b-2 border-dashed border-gray-200 pb-2">
+                <span className="uppercase text-gray-400">Tác giả</span>
+                <span className="text-manga-ink uppercase">{chapterInfo?.author_name || 'MangaFlow Studio'}</span>
+              </li>
+              <li className="flex flex-col gap-1">
+                <span className="uppercase text-gray-400">Deadline biểu quyết</span>
+                <span className="text-manga-red font-black text-sm">CÒN LẠI 24H 00M</span>
+              </li>
+            </ul>
+          </div>
 
-            {/* Scrollable feed list */}
-            <div className="flex-1 overflow-y-auto space-y-4 pr-1 mb-4">
-              {comments.map((comment) => (
-                <div 
-                  key={comment.id}
-                  className={`p-3 border-2 border-manga-ink shadow-[2px_2px_0px_rgba(0,0,0,1)] ${
-                    comment.isChief ? 'bg-[#fff5f5] border-manga-red' : 'bg-zinc-50'
-                  }`}
-                >
-                  <div className="flex justify-between items-baseline mb-1">
-                    <span className={`text-[10px] font-black uppercase tracking-wider ${comment.isChief ? 'text-manga-red' : 'text-gray-800'}`}>
-                      {comment.isChief ? '★ ' : ''}{comment.author}
-                    </span>
-                    <span className="text-[8px] text-gray-400 font-bold uppercase">{comment.time}</span>
-                  </div>
-                  <p className="text-xs font-bold text-gray-700 leading-normal break-words">
-                    {comment.content}
-                  </p>
-                </div>
-              ))}
+          {/* Box 2: Tiêu chí Đánh giá */}
+          <div className="bg-zinc-900 text-white border-4 border-manga-ink p-5 shadow-[6px_6px_0px_rgba(15,15,15,1)]">
+            <h3 className="font-manga font-black text-lg border-b-4 border-white pb-2 mb-4 uppercase text-manga-red">
+              HƯỚNG DẪN REVIEW
+            </h3>
+            <div className="space-y-4 text-[11px] font-bold leading-relaxed">
+              <div>
+                <strong className="text-manga-red uppercase block mb-1">1. Mỹ thuật (Art)</strong>
+                <p className="text-zinc-300">Nét vẽ, đổ bóng, background, cảm xúc nhân vật và tính nhất quán.</p>
+              </div>
+              <div>
+                <strong className="text-manga-red uppercase block mb-1">2. Nhịp độ (Pacing)</strong>
+                <p className="text-zinc-300">Phân bổ khung tranh, dòng chảy thị giác, các đoạn chuyển cảnh có mượt không.</p>
+              </div>
+              <div>
+                <strong className="text-manga-red uppercase block mb-1">3. Bố cục (Layout)</strong>
+                <p className="text-zinc-300">Độ dễ đọc của thoại, bong bóng thoại có đè lên nhân vật hay chi tiết quan trọng không.</p>
+              </div>
+              <div>
+                <strong className="text-manga-red uppercase block mb-1">4. Cốt truyện (Story)</strong>
+                <p className="text-zinc-300">Sự phát triển của nhân vật, hội thoại, mức độ thu hút của diễn biến trong chương.</p>
+              </div>
             </div>
-
-            {/* Feedback write form */}
-            <form onSubmit={handleSendComment} className="border-t-2 border-manga-ink pt-3 flex gap-2">
-              <input
-                type="text"
-                value={newComment}
-                onChange={e => setNewComment(e.target.value)}
-                placeholder="Thêm feedback..."
-                className="flex-1 border-2 border-manga-ink px-3 py-2 text-xs font-bold outline-none focus:border-manga-red bg-zinc-50"
-              />
-              <button 
-                type="submit"
-                className="bg-manga-ink text-white border-2 border-manga-ink p-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:bg-manga-red hover:border-manga-red hover:shadow-[1px_1px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] cursor-pointer focus:outline-none"
-              >
-                <Send className="w-4 h-4" />
-              </button>
-            </form>
           </div>
 
           {/* Next Flow Step Button */}
           <Link
             to={`/dashboard/editorial-board/review/${chapterId}/score${urlSessionId ? `?sessionId=${urlSessionId}` : ''}`}
-            className="flex items-center justify-center gap-2 w-full py-4 bg-manga-ink text-white font-manga font-bold text-sm uppercase tracking-wider border-4 border-manga-ink shadow-[6px_6px_0px_rgba(0,0,0,1)] hover:bg-manga-red hover:translate-y-[2px] hover:shadow-[4px_4px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none transition-all text-center block"
+            className="flex items-center justify-center gap-2 w-full py-4 bg-manga-ink text-white font-manga font-bold text-sm uppercase tracking-wider border-4 border-manga-ink shadow-[6px_6px_0px_rgba(0,0,0,1)] hover:bg-manga-red hover:translate-y-[2px] hover:shadow-[4px_4px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none transition-all text-center"
           >
             <span>Đến bước chấm điểm</span>
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </div>
+
+      {/* Lightbox Zoom Modal */}
+      {isZoomed && (
+        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center animate-fade-in p-4 md:p-12">
+          {/* Close button */}
+          <button
+            onClick={closeZoom}
+            className="absolute top-6 right-6 text-white hover:text-manga-red bg-zinc-800 hover:bg-zinc-700 rounded-full p-2 transition-colors z-50 cursor-pointer"
+          >
+            <X className="w-6 h-6" />
+          </button>
+
+          <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+            <img
+              src={mockImage}
+              alt="Zoomed Manga Page"
+              onClick={handleLightboxImageClick}
+              style={{
+                transform: `scale(${zoomScale})`,
+                transformOrigin: transformOrigin
+              }}
+              className={`h-[95vh] w-auto max-w-[95vw] object-contain transition-transform duration-300 ${zoomScale === 1 ? 'cursor-zoom-in' : 'cursor-zoom-out'}`}
+            />
+          </div>
+
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/60 text-white px-4 py-2 rounded-full text-xs font-bold pointer-events-none">
+            {zoomScale === 1 ? 'Bấm vào vùng bất kỳ để phóng to' : 'Bấm lại để thu nhỏ'}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -275,13 +379,13 @@ export function ScorePage() {
   })
   const [success, setSuccess] = useState(false)
 
-  const chapterTitleDisplay = chapterId === 'cyber-ronin' 
-    ? 'CYBER RONIN: ZERO' 
-    : chapterId === 'crimson-petal' 
-    ? 'CRIMSON PETAL' 
-    : chapterId === 'pitch-black' 
-    ? 'PITCH BLACK' 
-    : 'WHISPERS OF MANA'
+  const chapterTitleDisplay = chapterId === 'cyber-ronin'
+    ? 'CYBER RONIN: ZERO'
+    : chapterId === 'crimson-petal'
+      ? 'CRIMSON PETAL'
+      : chapterId === 'pitch-black'
+        ? 'PITCH BLACK'
+        : 'WHISPERS OF MANA'
 
   const chapterNumberDisplay = chapterId === 'cyber-ronin' ? 65 : chapterId === 'pitch-black' ? 12 : chapterId === 'whispers-of-mana' ? 45 : 1
 
@@ -319,7 +423,8 @@ export function ScorePage() {
         'RATING',
         'rating_success'
       )
-      navigate(`/dashboard/editorial-board/review/${chapterId}/vote${urlSessionId ? '?sessionId=' + urlSessionId : ''}`)
+      const currentAvgScore = (grade.drawing + grade.pacing + grade.layout + grade.dialogue + grade.finish) / 5
+      navigate(`/dashboard/editorial-board/review/${chapterId}/vote${urlSessionId ? '?sessionId=' + urlSessionId : ''}`, { state: { avgScore: currentAvgScore } })
     } catch (err) {
       console.error('API error saving grade:', err)
       addNotification(
@@ -344,7 +449,7 @@ export function ScorePage() {
   return (
     <div className="max-w-4xl mx-auto pb-12 font-sans">
       <div className="mb-4 flex items-center justify-between">
-        <Link 
+        <Link
           to={`/dashboard/editorial-board/review/${chapterId}/draft${urlSessionId ? `?sessionId=${urlSessionId}` : ''}`}
           className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-manga-ink hover:text-manga-red transition-colors"
         >
@@ -402,18 +507,6 @@ export function ScorePage() {
           ))}
         </div>
 
-        {/* Grade note textarea */}
-        <div>
-          <label className="block text-xs font-black uppercase text-manga-ink mb-2">
-            FEEDBACK ĐÁNH GIÁ CHUYÊN MÔN
-          </label>
-          <textarea
-            value={grade.note}
-            onChange={e => setGrade(prev => ({ ...prev, note: e.target.value }))}
-            placeholder="Nhập nhận xét chi tiết về bản thảo này để làm cơ sở biểu quyết..."
-            className="w-full border-2 border-manga-ink p-3 text-xs font-bold outline-none focus:border-manga-red bg-zinc-50 h-28"
-          />
-        </div>
 
         {/* Submitting Actions */}
         <div className="flex justify-between items-center border-t-4 border-manga-ink pt-6">
@@ -425,7 +518,7 @@ export function ScorePage() {
               </span>
             )}
           </div>
-          
+
           <button
             onClick={handleSaveScore}
             className="flex items-center gap-2 bg-manga-ink text-white font-manga font-bold text-xs uppercase px-6 py-3 border-2 border-manga-ink shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:bg-manga-red hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer font-bold"
@@ -439,6 +532,7 @@ export function ScorePage() {
       {/* Next Step Link */}
       <Link
         to={`/dashboard/editorial-board/review/${chapterId}/vote${urlSessionId ? `?sessionId=${urlSessionId}` : ''}`}
+        state={{ avgScore: (grade.drawing + grade.pacing + grade.layout + grade.dialogue + grade.finish) / 5 }}
         className="flex items-center justify-center gap-2 w-full py-4 bg-manga-red text-white font-manga font-bold text-sm uppercase tracking-wider border-4 border-manga-ink shadow-[6px_6px_0px_rgba(15,15,15,1)] hover:bg-red-700 hover:translate-y-[2px] hover:shadow-[4px_4px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none transition-all text-center block"
       >
         <span>Tiến hành biểu quyết xuất bản</span>
@@ -454,6 +548,7 @@ export function ScorePage() {
 export function VotePage() {
   const { chapterId } = useParams<{ chapterId: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const urlSessionId = searchParams.get('sessionId')
   const { addNotification } = useNotifications()
@@ -467,69 +562,62 @@ export function VotePage() {
   const [comments, setComments] = useState<BoardComment[]>([])
   const [newComment, setNewComment] = useState('')
   const currentUser = getStoredUser()
-  const [pages, setPages] = useState<any[]>([])
-  const [page, setPage] = useState(1)
-  const [loadingFiles, setLoadingFiles] = useState(false)
 
-  // Manga mock images fallback
-  const fallbackPages = [
-    'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=600&auto=format&fit=crop'
-  ]
+  const chapterTitleDisplay = chapterId === 'cyber-ronin'
+    ? 'CYBER RONIN: ZERO'
+    : chapterId === 'crimson-petal'
+      ? 'CRIMSON PETAL'
+      : chapterId === 'pitch-black'
+        ? 'PITCH BLACK'
+        : 'WHISPERS OF MANA'
+
+  const chapterNumberDisplay = chapterId === 'cyber-ronin' ? 65 : chapterId === 'pitch-black' ? 12 : chapterId === 'whispers-of-mana' ? 45 : 1
+
+  const [pages, setPages] = useState<any[]>([])
+  const [pageIndex, setPageIndex] = useState(1)
 
   useEffect(() => {
-    const loadManuscripts = async () => {
+    const loadPages = async () => {
       if (!chapterId) return
       try {
-        setLoadingFiles(true)
         const chapterPages = await pageService.getByChapterId(chapterId)
         if (chapterPages && chapterPages.length > 0) {
           const sortedPages = chapterPages.sort((a: any, b: any) => a.page_number - b.page_number)
           setPages(sortedPages)
         }
       } catch (err) {
-        console.error('Error loading manuscripts:', err)
-      } finally {
-        setLoadingFiles(false)
+        console.error('Error loading pages:', err)
       }
     }
-    loadManuscripts()
+    loadPages()
   }, [chapterId])
 
-  const displayPages = pages.length > 0 ? pages : fallbackPages
-  const totalPagesCount = displayPages.length
-
-  const handleNextPage = () => {
-    if (page < totalPagesCount) setPage(page + 1)
-  }
-
-  const handlePrevPage = () => {
-    if (page > 1) setPage(page - 1)
-  }
-
-  const targetPage = displayPages[(page - 1) % totalPagesCount]
-  const mockImage = typeof targetPage === 'string' 
-    ? targetPage 
-    : targetPage?.image_url || targetPage?.file_url || fallbackPages[0]
-
-  const chapterTitleDisplay = chapterId === 'cyber-ronin' 
-    ? 'CYBER RONIN: ZERO' 
-    : chapterId === 'crimson-petal' 
-    ? 'CRIMSON PETAL' 
-    : chapterId === 'pitch-black' 
-    ? 'PITCH BLACK' 
-    : 'WHISPERS OF MANA'
-
-  const chapterNumberDisplay = chapterId === 'cyber-ronin' ? 65 : chapterId === 'pitch-black' ? 12 : chapterId === 'whispers-of-mana' ? 45 : 1
+  const [totalMembers, setTotalMembers] = useState(3)
+  const [votedMembersCount, setVotedMembersCount] = useState(0)
 
   useEffect(() => {
     const loadVote = async () => {
       if (!chapterId) return
       try {
         const sessionId = urlSessionId || chapterId
-        const resList = await boardService.getVote(sessionId)
         
+        if (urlSessionId) {
+          try {
+            const sessionData = await boardService.getProposalDetail(urlSessionId)
+            // if API provides required_votes or members length, use it. Otherwise default to 3
+            if (sessionData && sessionData.required_votes) {
+               setTotalMembers(sessionData.required_votes)
+            }
+          } catch(e) {}
+        }
+
+        const resList = await boardService.getVote(sessionId)
+        if (resList) {
+          setVotedMembersCount(resList.length)
+        }
+
         // Find if this user already voted
-        const res = resList && resList.length > 0 ? resList.find(v => v.voter_id === currentUser.id || v.users?.username === currentUser.fullName) : null
+        const res = resList && resList.length > 0 ? resList.find((v: any) => v.voter_id === currentUser.id || v.users?.username === currentUser.fullName) : null
         if (res) {
           setExistingVoteId(res.vote_id)
           setVote({
@@ -548,14 +636,33 @@ export function VotePage() {
     loadVote()
   }, [chapterId, urlSessionId, currentUser?.id])
 
+  const fallbackPages = ['https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=600&auto=format&fit=crop']
+  const displayPages = pages.length > 0 ? pages : fallbackPages
+  const totalPagesCount = displayPages.length
+  const targetPage = displayPages[(pageIndex - 1) % totalPagesCount]
+  const currentImage = typeof targetPage === 'string' ? targetPage : targetPage?.image_url || targetPage?.file_url || fallbackPages[0]
+
+  const handleNextPage = () => {
+    if (pageIndex < totalPagesCount) setPageIndex(pageIndex + 1)
+  }
+
+  const handlePrevPage = () => {
+    if (pageIndex > 1) setPageIndex(pageIndex - 1)
+  }
+
   const handleVoteSubmit = async () => {
     try {
       const sessionId = urlSessionId || vote.chapterId
+      const tempAvgScore = location.state?.avgScore || 0
+      
+      const payload = {
+        decision: vote.decision,
+        note: vote.note,
+        score: tempAvgScore > 0 ? Math.round(tempAvgScore) : undefined
+      }
+      
       if (existingVoteId) {
-        await boardService.updateVote(existingVoteId, {
-          decision: vote.decision,
-          note: vote.note
-        })
+        await boardService.updateVote(existingVoteId, payload)
         addNotification(
           'UPDATE SUCCESSFUL',
           `Phiếu bầu của bạn cho '${chapterTitleDisplay}' đã được CẬP NHẬT thành công!`,
@@ -563,10 +670,7 @@ export function VotePage() {
           'voting_success'
         )
       } else {
-        await boardService.saveVote(sessionId, {
-          decision: vote.decision,
-          note: vote.note
-        })
+        await boardService.saveVote(sessionId, payload)
         addNotification(
           'VOTING SUCCESSFUL',
           `Phiếu bầu của bạn cho '${chapterTitleDisplay}' đã được ghi nhận vào hệ thống.`,
@@ -577,9 +681,9 @@ export function VotePage() {
     } catch (err) {
       console.error('API error saving vote:', err)
       addNotification(
-        'VOTING FAILED', 
-        'Hệ thống đang bảo trì hoặc API lỗi, không thể lưu phiếu bầu lúc này.', 
-        'VOTE', 
+        'VOTING FAILED',
+        'Hệ thống đang bảo trì hoặc API lỗi, không thể lưu phiếu bầu lúc này.',
+        'VOTE',
         'voting_failed'
       )
       return
@@ -608,7 +712,7 @@ export function VotePage() {
   return (
     <div className="max-w-6xl mx-auto pb-12 font-sans">
       <div className="mb-4 flex items-center justify-between">
-        <Link 
+        <Link
           to={`/dashboard/editorial-board/review/${chapterId}/score${urlSessionId ? `?sessionId=${urlSessionId}` : ''}`}
           className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-manga-ink hover:text-manga-red transition-colors"
         >
@@ -635,41 +739,34 @@ export function VotePage() {
             <h3 className="font-manga text-md font-bold text-manga-ink uppercase mb-3 border-b-2 border-manga-ink pb-2">
               BẢN XEM TRƯỚC HỒ SƠ BIỂU QUYẾT
             </h3>
-            
+
             {/* Draw draft display inside a mockup box */}
-            <div className="border-4 border-manga-ink aspect-[3/4] max-w-sm mx-auto overflow-hidden shadow-[4px_4px_0px_rgba(0,0,0,1)] relative">
-              {loadingFiles ? (
-                <div className="w-full h-full flex items-center justify-center bg-zinc-200">
-                  <span className="font-bold text-gray-500 animate-pulse">Loading...</span>
-                </div>
-              ) : (
-                <img 
-                  src={mockImage}
-                  alt={`Trang ${page}`}
-                  className="w-full h-full object-cover select-none"
-                />
-              )}
-              <div className="absolute top-2 left-2 bg-manga-red text-white text-[9px] font-black px-2 py-0.5 border-2 border-manga-ink shadow-sm">
-                BẢN XEM TRƯỚC
-              </div>
+            <div className="border-4 border-manga-ink aspect-[3/4] max-w-sm mx-auto overflow-hidden shadow-[4px_4px_0px_rgba(0,0,0,1)] relative bg-zinc-900 flex items-center justify-center">
+              <img
+                src={currentImage}
+                alt={`Draft Page ${pageIndex}`}
+                className="w-full h-full object-contain select-none"
+              />
             </div>
-            
+
             {/* Footer Navigation */}
             <div className="flex justify-between items-center max-w-sm mx-auto mt-4 px-2">
-              <button 
+              <button
                 onClick={handlePrevPage}
-                disabled={page <= 1}
-                className="px-3 py-1 bg-white border-2 border-manga-ink text-[10px] font-bold uppercase disabled:opacity-50 disabled:cursor-not-allowed hover:bg-zinc-50 cursor-pointer"
+                disabled={pageIndex <= 1}
+                className="px-3 py-1 bg-white border-2 border-manga-ink text-[10px] font-bold uppercase hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[1px] disabled:shadow-none"
               >
                 TRANG TRƯỚC
               </button>
-              <span className="font-manga text-sm font-black">
-                {page} / {totalPagesCount}
+
+              <span className="font-manga text-sm font-bold text-manga-ink uppercase">
+                {pageIndex} / {totalPagesCount}
               </span>
-              <button 
+
+              <button
                 onClick={handleNextPage}
-                disabled={page >= totalPagesCount}
-                className="px-3 py-1 bg-white border-2 border-manga-ink text-[10px] font-bold uppercase disabled:opacity-50 disabled:cursor-not-allowed hover:bg-zinc-50 cursor-pointer"
+                disabled={pageIndex >= totalPagesCount}
+                className="px-3 py-1 bg-white border-2 border-manga-ink text-[10px] font-bold uppercase hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[1px] disabled:shadow-none"
               >
                 TRANG SAU
               </button>
@@ -684,15 +781,15 @@ export function VotePage() {
             <h3 className="font-manga text-lg font-black uppercase border-b-4 border-manga-ink pb-2 mb-4">
               PHIẾU BẦU CỦA BẠN
             </h3>
-            
+
             {/* Progress bar */}
             <div className="bg-zinc-50 border-2 border-manga-ink p-3 mb-6 shadow-sm">
               <div className="flex justify-between items-center text-xs font-bold mb-1">
                 <span>TIẾN ĐỘ PHÊ DUYỆT</span>
-                <span className="text-manga-red font-black">2 / 3 THÀNH VIÊN</span>
+                <span className="text-manga-red font-black">{votedMembersCount} / X THÀNH VIÊN</span>
               </div>
               <div className="w-full h-3 bg-gray-200 border-2 border-manga-ink rounded-none overflow-hidden">
-                <div className="h-full bg-manga-red" style={{ width: '66%' }} />
+                <div className="h-full bg-manga-red transition-all duration-500" style={{ width: `${Math.min(100, (votedMembersCount / 3) * 100)}%` }} />
               </div>
             </div>
 
@@ -700,31 +797,28 @@ export function VotePage() {
             <div className="space-y-3 mb-6">
               <button
                 onClick={() => setVote(prev => ({ ...prev, decision: 'APPROVE' }))}
-                className={`w-full py-3 border-3 font-manga font-bold uppercase text-xs tracking-wider transition-all cursor-pointer ${
-                  vote.decision === 'APPROVE'
-                    ? 'bg-manga-red text-white border-manga-ink shadow-[2px_2px_0px_rgba(0,0,0,1)]'
-                    : 'bg-white text-manga-ink border-gray-300 hover:bg-red-50/30'
-                }`}
+                className={`w-full py-3 border-3 font-manga font-bold uppercase text-xs tracking-wider transition-all cursor-pointer ${vote.decision === 'APPROVE'
+                  ? 'bg-manga-red text-white border-manga-ink shadow-[2px_2px_0px_rgba(0,0,0,1)]'
+                  : 'bg-white text-manga-ink border-gray-300 hover:bg-red-50/30'
+                  }`}
               >
                 ✔ ĐỒNG Ý XUẤT BẢN
               </button>
               <button
                 onClick={() => setVote(prev => ({ ...prev, decision: 'REJECT' }))}
-                className={`w-full py-3 border-3 font-manga font-bold uppercase text-xs tracking-wider transition-all cursor-pointer ${
-                  vote.decision === 'REJECT'
-                    ? 'bg-manga-ink text-white border-manga-ink shadow-[2px_2px_0px_rgba(0,0,0,1)]'
-                    : 'bg-white text-manga-ink border-gray-300 hover:bg-zinc-50'
-                }`}
+                className={`w-full py-3 border-3 font-manga font-bold uppercase text-xs tracking-wider transition-all cursor-pointer ${vote.decision === 'REJECT'
+                  ? 'bg-manga-ink text-white border-manga-ink shadow-[2px_2px_0px_rgba(0,0,0,1)]'
+                  : 'bg-white text-manga-ink border-gray-300 hover:bg-zinc-50'
+                  }`}
               >
                 ✖ HỦY BẢN THẢO
               </button>
               <button
                 onClick={() => setVote(prev => ({ ...prev, decision: 'REVISE' }))}
-                className={`w-full py-3 border-3 font-manga font-bold uppercase text-xs tracking-wider transition-all cursor-pointer ${
-                  vote.decision === 'REVISE'
-                    ? 'bg-[#fef9c3] text-manga-ink border-manga-ink shadow-[2px_2px_0px_rgba(0,0,0,1)]'
-                    : 'bg-white text-manga-ink border-gray-300 hover:bg-yellow-50/50'
-                }`}
+                className={`w-full py-3 border-3 font-manga font-bold uppercase text-xs tracking-wider transition-all cursor-pointer ${vote.decision === 'REVISE'
+                  ? 'bg-[#fef9c3] text-manga-ink border-manga-ink shadow-[2px_2px_0px_rgba(0,0,0,1)]'
+                  : 'bg-white text-manga-ink border-gray-300 hover:bg-yellow-50/50'
+                  }`}
               >
                 📅 CẦN CHỈNH SỬA
               </button>
@@ -754,35 +848,6 @@ export function VotePage() {
                 GỬI Ý KIẾN BIỂU QUYẾT
               </button>
             )}
-          </div>
-
-          {/* Board Feedback widget */}
-          <div className="bg-white border-4 border-manga-ink p-5 shadow-[6px_6px_0px_rgba(15,15,15,1)]">
-            <h3 className="font-manga text-md font-black uppercase border-b-2 border-manga-ink pb-2 mb-3">
-              FEEDBACK HỘI ĐỒNG
-            </h3>
-            
-            <div className="space-y-3 max-h-48 overflow-y-auto mb-4 pr-1">
-              {comments.slice(0, 3).map((cmt) => (
-                <div key={cmt.id} className="border-l-4 border-manga-ink pl-3 py-0.5">
-                  <span className="block text-[9px] font-black text-gray-500 uppercase">{cmt.author}</span>
-                  <p className="text-xs font-bold text-zinc-700 leading-tight mt-0.5">{cmt.content}</p>
-                </div>
-              ))}
-            </div>
-
-            <form onSubmit={handleSendComment} className="flex gap-2">
-              <input
-                type="text"
-                value={newComment}
-                onChange={e => setNewComment(e.target.value)}
-                placeholder="Thêm feedback..."
-                className="flex-1 border-2 border-manga-ink px-2.5 py-1.5 text-xs font-bold outline-none focus:border-manga-red bg-zinc-50"
-              />
-              <button type="submit" className="bg-manga-ink text-white border-2 border-manga-ink p-1.5 cursor-pointer">
-                <Send className="w-3.5 h-3.5" />
-              </button>
-            </form>
           </div>
         </div>
       </div>

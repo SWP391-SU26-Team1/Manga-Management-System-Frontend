@@ -101,6 +101,16 @@ export default function PageViewerPage() {
     { name: "Reference Asset", status: page.assetStatus },
   ]
 
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'Approved': return 'ĐÃ DUYỆT'
+      case 'Need Fix': return 'CẦN SỬA'
+      case 'Submitted': return 'CHỜ DUYỆT'
+      case 'Doing': return 'ĐANG LÀM'
+      default: return 'CHƯA BẮT ĐẦU'
+    }
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Approved': return 'bg-green-100 text-green-700 border-green-300'
@@ -163,7 +173,7 @@ export default function PageViewerPage() {
               <div key={layer.name} className="border-2 border-gray-200 p-3">
                 <p className="font-bold text-sm uppercase text-gray-800 mb-2">{layer.name}</p>
                 <div className={`px-3 py-1 font-bold text-xs uppercase border-2 text-center ${getStatusColor(layer.status)}`}>
-                  {layer.status}
+                  {getStatusLabel(layer.status)}
                 </div>
               </div>
             ))}
@@ -171,7 +181,7 @@ export default function PageViewerPage() {
           <div className="p-4 border-t-4 border-manga-ink bg-gray-50 text-center">
             <p className="text-sm font-bold text-gray-500 uppercase">Trạng thái chung</p>
             <div className={`mt-2 p-2 font-bold uppercase text-lg border-2 ${getStatusColor(page.overallStatus)}`}>
-              {page.overallStatus}
+              {getStatusLabel(page.overallStatus)}
             </div>
           </div>
         </div>

@@ -23,6 +23,7 @@ interface FeedbackComment {
   author: string;
   role: string;
   avatar: string;
+  avatarUrl?: string;
   timeAgo: string;
   content: string;
   isUrgent?: boolean;
@@ -69,6 +70,8 @@ const mapBackendTaskToAssistantTask = (task: PageTask): AssistantTask => {
     priority: task.priority || 'Medium',
     note: task.description || '',
     referenceUrl: task.page?.image_url || undefined,
+    assignedById: task.users?.user_id || '',
+    assignedByAvatar: (task.users as any)?.avatar_url || '',
   }
 }
 
@@ -289,10 +292,14 @@ export default function FeedbackPage() {
         const feedbacksList = await assistantService.listSubmissionFeedbacks(latestSub.submission_id)
         const mappedComments: FeedbackComment[] = feedbacksList.map(fb => {
           const isMangaka = !!fb.mangaka_id
+          const userObj = isMangaka ? (fb as any).mangaka : (fb as any).assistant
+          const authorName = userObj?.name || userObj?.username || (isMangaka ? 'Akira Tanaka' : 'Trợ lý Kenji')
+          const initials = authorName.substring(0, 2).toUpperCase()
           return {
-            author: isMangaka ? 'Akira Tanaka' : 'Trợ lý Kenji',
+            author: authorName,
             role: isMangaka ? 'Mangaka' : 'Trợ lý',
-            avatar: isMangaka ? 'AT' : 'KT',
+            avatar: initials,
+            avatarUrl: userObj?.avatar_url || undefined,
             timeAgo: timeAgo(fb.created_at),
             content: fb.content,
             isUrgent: fb.status === 'urgent',
@@ -341,13 +348,13 @@ export default function FeedbackPage() {
   const getStatusConfig = (status: AssistantTask['status']) => {
     switch (status) {
       case 'Need Fix':
-        return { label: 'REVISION', bg: 'bg-[#FFF5F5]', text: 'text-[#E63946]', border: 'border-[#E63946]' }
+        return { label: 'CẦN SỬA', bg: 'bg-[#FFF5F5]', text: 'text-[#E63946]', border: 'border-[#E63946]' }
       case 'Submitted':
-        return { label: 'REVIEW', bg: 'bg-[#FAF5FF]', text: 'text-[#9F7AEA]', border: 'border-[#9F7AEA]' }
+        return { label: 'CHỜ DUYỆT', bg: 'bg-[#FAF5FF]', text: 'text-[#9F7AEA]', border: 'border-[#9F7AEA]' }
       case 'Approved':
-        return { label: 'APPROVED', bg: 'bg-[#E6FFFA]', text: 'text-[#38B2AC]', border: 'border-[#38B2AC]' }
+        return { label: 'ĐÃ DUYỆT', bg: 'bg-[#E6FFFA]', text: 'text-[#38B2AC]', border: 'border-[#38B2AC]' }
       default:
-        return { label: 'PENDING', bg: 'bg-[#FFFDF0]', text: 'text-[#D69E2E]', border: 'border-[#D69E2E]' }
+        return { label: 'ĐANG LÀM', bg: 'bg-[#FFFDF0]', text: 'text-[#D69E2E]', border: 'border-[#D69E2E]' }
     }
   }
 
@@ -541,11 +548,7 @@ export default function FeedbackPage() {
                           : 'border-manga-ink hover:border-[#E63946] hover:translate-y-[-1px] shadow-[2px_2px_0px_0px_rgba(15,15,15,1)] hover:shadow-[3px_3px_0px_0px_rgba(15,15,15,1)]'
                       }`}
                     >
-                      {/* Card Header Info */}
-                      <div className="flex items-center justify-between w-full gap-2 mb-2">
-                        <span className="font-manga text-xs font-extrabold text-[#E63946]">
-                          #{task.id}
-                        </span>
+                      <div className="flex items-center justify-end w-full gap-2 mb-2">
                         <span className={`text-[9px] font-black px-1.5 py-0.5 border ${status.text} ${status.bg} ${status.border} tracking-wide rounded-none`}>
                           {status.label}
                         </span>
@@ -596,7 +599,6 @@ export default function FeedbackPage() {
               <>
                 {/* Task Title Header Card */}
                 <div className="bg-[#1C1C1F] text-white border-2 border-manga-ink p-4 shadow-[3px_3px_0px_rgba(15,15,15,1)]">
-                  <p className="text-[10px] font-black text-red-400 tracking-wider">TASK #{activeTask.id}</p>
                   <h2 className="font-manga text-lg font-black mt-1 leading-tight tracking-wide">{activeTask.layerType}</h2>
                   <p className="text-xs font-semibold text-zinc-400 mt-1 truncate">{activeTask.seriesTitle} - Ch.{activeTask.chapterNumber}</p>
                 </div>
@@ -742,9 +744,6 @@ export default function FeedbackPage() {
                         {getCommentsCountText(activeTask.id)}
                       </span>
                     </div>
-                    <span className="bg-[#E63946] text-white font-manga text-[9px] font-black px-2 py-0.5 shadow-sm">
-                      TASK #{activeTask.id}
-                    </span>
                   </div>
 
                   {/* Comment list */}
@@ -752,9 +751,17 @@ export default function FeedbackPage() {
                     {activeFeedbacks.map((comment, idx) => (
                       <div key={idx} className={`pt-4 first:pt-0 flex gap-3.5 items-start`}>
                         {/* Avatar initials with neo style */}
-                        <div className="w-9 h-9 rounded-full bg-zinc-950 text-white font-black text-xs flex items-center justify-center shrink-0 border border-black shadow-sm bg-[#E63946]">
-                          {comment.avatar}
-                        </div>
+                        {comment.avatarUrl ? (
+                          <img
+                            src={getImageUrl(comment.avatarUrl)}
+                            alt={comment.author}
+                            className="w-9 h-9 rounded-full object-cover shrink-0 border border-black shadow-sm"
+                          />
+                        ) : (
+                          <div className="w-9 h-9 rounded-full bg-zinc-950 text-white font-black text-xs flex items-center justify-center shrink-0 border border-black shadow-sm bg-[#E63946]">
+                            {comment.avatar}
+                          </div>
+                        )}
 
                         {/* Comment body */}
                         <div className="flex-1">
@@ -766,10 +773,10 @@ export default function FeedbackPage() {
                             <div className="flex items-center gap-1.5 shrink-0">
                               <span className="text-[9px] text-gray-400 font-bold">{comment.timeAgo}</span>
                               {comment.isUrgent && (
-                                <span className="bg-[#FFF5F5] text-[#E63946] border border-[#FFF5F5] px-1 py-0.5 text-[8px] font-black tracking-wider uppercase leading-none">URGENT</span>
+                                <span className="bg-[#FFF5F5] text-[#E63946] border border-[#FFF5F5] px-1 py-0.5 text-[8px] font-black tracking-wider uppercase leading-none">KHẨN CẤP</span>
                               )}
                               {comment.isApproved && (
-                                <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-1 py-0.5 text-[8px] font-black tracking-wider uppercase leading-none">APPROVED</span>
+                                <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-1 py-0.5 text-[8px] font-black tracking-wider uppercase leading-none">ĐÃ DUYỆT</span>
                               )}
                             </div>
                           </div>
@@ -785,120 +792,146 @@ export default function FeedbackPage() {
                 </div>
 
                 {/* NỘP BẢN SỬA ĐỔI FORM */}
-                <div className="bg-white border-2 border-manga-ink p-5 shadow-[4px_4px_0px_rgba(15,15,15,1)]">
-                  <h3 className="font-manga text-[15px] font-black uppercase tracking-wider text-manga-ink border-b-2 border-manga-ink pb-2 mb-4 flex items-center gap-2">
-                    <Upload className="w-4.5 h-4.5 text-[#E63946]" /> NỘP BẢN SỬA ĐỔI – TASK #{activeTask.id}
-                  </h3>
+                {activeTask.status === 'Submitted' ? (
+                  <div className="bg-purple-50 border-2 border-[#9F7AEA] p-5 shadow-[4px_4px_0px_rgba(15,15,15,1)] text-center">
+                    <Clock className="w-10 h-10 text-[#9F7AEA] mx-auto mb-3" />
+                    <h4 className="font-manga text-sm font-black uppercase text-manga-ink">Bản nộp đang chờ duyệt</h4>
+                    <p className="text-xs text-gray-600 font-bold mt-2 leading-relaxed">
+                      Nhiệm vụ này đã được nộp lên tác giả và đang chờ phản hồi/phê duyệt. Bạn chỉ có thể gửi bản sửa đổi khi tác giả yêu cầu chỉnh sửa (Cần sửa).
+                    </p>
+                  </div>
+                ) : activeTask.status === 'Approved' ? (
+                  <div className="bg-green-50 border-2 border-[#38B2AC] p-5 shadow-[4px_4px_0px_rgba(15,15,15,1)] text-center">
+                    <CheckCircle2 className="w-10 h-10 text-[#38B2AC] mx-auto mb-3" />
+                    <h4 className="font-manga text-sm font-black uppercase text-manga-ink">Nhiệm vụ đã hoàn thành</h4>
+                    <p className="text-xs text-gray-600 font-bold mt-2 leading-relaxed">
+                      Bản vẽ của nhiệm vụ này đã được tác giả phê duyệt chính thức. Không cần nộp thêm bản sửa đổi.
+                    </p>
+                  </div>
+                ) : activeTask.status === 'Not Started' ? (
+                  <div className="bg-yellow-50 border-2 border-[#D69E2E] p-5 shadow-[4px_4px_0px_rgba(15,15,15,1)] text-center">
+                    <AlertCircle className="w-10 h-10 text-[#D69E2E] mx-auto mb-3" />
+                    <h4 className="font-manga text-sm font-black uppercase text-manga-ink">Chưa nhận nhiệm vụ</h4>
+                    <p className="text-xs text-gray-600 font-bold mt-2 leading-relaxed">
+                      Bạn cần nhận nhiệm vụ này ở trang "Nhiệm vụ" trước khi bắt đầu vẽ và nộp bài.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-white border-2 border-manga-ink p-5 shadow-[4px_4px_0px_rgba(15,15,15,1)]">
+                    <h3 className="font-manga text-[15px] font-black uppercase tracking-wider text-manga-ink border-b-2 border-manga-ink pb-2 mb-4 flex items-center gap-2">
+                      <Upload className="w-4.5 h-4.5 text-[#E63946]" /> NỘP BẢN SỬA ĐỔI
+                    </h3>
 
-                  <form onSubmit={handleResubmit} className="flex flex-col gap-4">
-                    {/* Note Textarea */}
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-black uppercase tracking-wider text-gray-500">
-                        Ghi chú chỉnh sửa theo phản hồi <span className="text-[#E63946]">*</span>
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={noteContent}
-                        onChange={(e) => setNoteContent(e.target.value)}
-                        placeholder="Ghi chú các chi tiết bạn đã sửa theo đóng góp ý kiến (ví dụ: đã sửa biểu cảm Hiroshi ở panel 3...)"
-                        className="w-full text-xs p-3 font-semibold text-gray-700 bg-zinc-50/50 border border-zinc-300 focus:outline-none focus:border-[#E63946] focus:bg-white resize-none transition-all placeholder:text-gray-400 font-sans"
-                        required
-                      />
-                    </div>
+                    <form onSubmit={handleResubmit} className="flex flex-col gap-4">
+                      {/* Note Textarea */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-black uppercase tracking-wider text-gray-500">
+                          Ghi chú chỉnh sửa theo phản hồi <span className="text-[#E63946]">*</span>
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={noteContent}
+                          onChange={(e) => setNoteContent(e.target.value)}
+                          placeholder="Ghi chú các chi tiết bạn đã sửa theo đóng góp ý kiến (ví dụ: đã sửa biểu cảm Hiroshi ở panel 3...)"
+                          className="w-full text-xs p-3 font-semibold text-gray-700 bg-zinc-50/50 border border-zinc-300 focus:outline-none focus:border-[#E63946] focus:bg-white resize-none transition-all placeholder:text-gray-400 font-sans"
+                          required
+                        />
+                      </div>
 
-                    {/* Info row: version */}
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-black uppercase tracking-wider text-gray-500">
-                        Phiên bản nộp <span className="text-[#E63946]">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        disabled
-                        value={`${getNextVersionText()} (Đề xuất dựa trên lịch sử nộp)`}
-                        className="w-full text-xs px-3 py-2 font-bold text-gray-400 bg-zinc-100 border border-zinc-300 cursor-not-allowed"
-                      />
-                    </div>
+                      {/* Info row: version */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-black uppercase tracking-wider text-gray-500">
+                          Phiên bản nộp <span className="text-[#E63946]">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          disabled
+                          value={`${getNextVersionText()} (Đề xuất dựa trên lịch sử nộp)`}
+                          className="w-full text-xs px-3 py-2 font-bold text-gray-400 bg-zinc-100 border border-zinc-300 cursor-not-allowed"
+                        />
+                      </div>
 
-                    {/* Drag and Drop Zone */}
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-black uppercase tracking-wider text-gray-500">
-                        Đính kèm tệp bản sửa đổi <span className="text-[#E63946]">*</span>
-                      </label>
+                      {/* Drag and Drop Zone */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-black uppercase tracking-wider text-gray-500">
+                          Đính kèm tệp bản sửa đổi <span className="text-[#E63946]">*</span>
+                        </label>
 
-                      <input 
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleFileChange}
-                        accept=".psd,.ai,.png,.jpg,.jpeg,.zip"
-                        className="hidden"
-                      />
+                        <input 
+                          type="file"
+                          ref={fileInputRef}
+                          onChange={handleFileChange}
+                          accept=".psd,.ai,.png,.jpg,.jpeg,.zip"
+                          className="hidden"
+                        />
 
-                      <div 
-                        onDragOver={handleDragOver}
-                        onDrop={handleDrop}
-                        onClick={() => fileInputRef.current?.click()}
-                        className={`border-2 border-dashed border-zinc-300 hover:border-[#E63946] bg-zinc-50/30 hover:bg-red-50/5 p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 ${
-                          uploadedFile ? 'border-emerald-500 bg-emerald-50/10' : ''
-                        }`}
-                      >
-                        {isUploading ? (
-                          <div className="flex flex-col items-center justify-center gap-1.5">
-                            <Loader2 className="w-8 h-8 animate-spin text-[#E63946]" />
-                            <p className="text-xs font-bold text-[#E63946]">Đang tải tệp lên Cloudinary...</p>
-                          </div>
-                        ) : uploadedFile ? (
-                          <>
-                            <FileText className="w-10 h-10 text-emerald-500 shrink-0" />
-                            <div>
-                              <p className="text-xs font-bold text-emerald-700 truncate max-w-[250px]">{uploadedFile.name}</p>
-                              <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">
-                                {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
-                              </p>
+                        <div 
+                          onDragOver={handleDragOver}
+                          onDrop={handleDrop}
+                          onClick={() => fileInputRef.current?.click()}
+                          className={`border-2 border-dashed border-zinc-300 hover:border-[#E63946] bg-zinc-50/30 hover:bg-red-50/5 p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 ${
+                            uploadedFile ? 'border-emerald-500 bg-emerald-50/10' : ''
+                          }`}
+                        >
+                          {isUploading ? (
+                            <div className="flex flex-col items-center justify-center gap-1.5">
+                              <Loader2 className="w-8 h-8 animate-spin text-[#E63946]" />
+                              <p className="text-xs font-bold text-[#E63946]">Đang tải tệp lên Cloudinary...</p>
                             </div>
-                            <button 
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setUploadedFile(null)
-                                setUploadedFileUrl('')
-                              }}
-                              className="bg-red-100 text-[#E63946] hover:bg-[#E63946] hover:text-white px-2 py-1 text-[9px] font-black mt-1 uppercase transition-colors shrink-0 cursor-pointer border-none"
-                            >
-                              Xóa tệp
-                            </button>
+                          ) : uploadedFile ? (
+                            <>
+                              <FileText className="w-10 h-10 text-emerald-500 shrink-0" />
+                              <div>
+                                <p className="text-xs font-bold text-emerald-700 truncate max-w-[250px]">{uploadedFile.name}</p>
+                                <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">
+                                  {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
+                                </p>
+                              </div>
+                              <button 
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setUploadedFile(null)
+                                  setUploadedFileUrl('')
+                                }}
+                                className="bg-red-100 text-[#E63946] hover:bg-[#E63946] hover:text-white px-2 py-1 text-[9px] font-black mt-1 uppercase transition-colors shrink-0 cursor-pointer border-none"
+                              >
+                                Xóa tệp
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-8 h-8 text-gray-400 shrink-0 group-hover:scale-105 transition-transform" />
+                              <p className="text-xs font-bold text-gray-700">Kéo thả hoặc click để đính kèm *</p>
+                              <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">
+                                Hỗ trợ tệp: .psd · .ai · .png · .jpg · .zip
+                              </p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Form Submit Button */}
+                      <button
+                        type="submit"
+                        disabled={isSubmitting || isUploading}
+                        className="w-full bg-[#E63946] hover:bg-white text-white hover:text-[#E63946] border-2 border-[#E63946] py-3 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-[3px_3px_0px_rgba(15,15,15,1)] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_rgba(15,15,15,1)] transition-all mt-2 active:scale-[0.98] disabled:opacity-65"
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin text-white" />
+                            <span>ĐANG GỬI...</span>
                           </>
                         ) : (
                           <>
-                            <Upload className="w-8 h-8 text-gray-400 shrink-0 group-hover:scale-105 transition-transform" />
-                            <p className="text-xs font-bold text-gray-700">Kéo thả hoặc click để đính kèm *</p>
-                            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">
-                              Hỗ trợ tệp: .psd · .ai · .png · .jpg · .zip
-                            </p>
+                            <Send className="w-4 h-4 shrink-0" />
+                            <span>GỬI BẢN SỬA ĐỔI</span>
                           </>
                         )}
-                      </div>
-                    </div>
-
-                    {/* Form Submit Button */}
-                    <button
-                      type="submit"
-                      disabled={isSubmitting || isUploading}
-                      className="w-full bg-[#E63946] hover:bg-white text-white hover:text-[#E63946] border-2 border-[#E63946] py-3 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-[3px_3px_0px_rgba(15,15,15,1)] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_rgba(15,15,15,1)] transition-all mt-2 active:scale-[0.98] disabled:opacity-65"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin text-white" />
-                          <span>ĐANG GỬI...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Send className="w-4 h-4 shrink-0" />
-                          <span>GỬI BẢN SỬA ĐỔI</span>
-                        </>
-                      )}
-                    </button>
-                  </form>
-                </div>
+                      </button>
+                    </form>
+                  </div>
+                )}
               </>
             ) : null}
           </div>

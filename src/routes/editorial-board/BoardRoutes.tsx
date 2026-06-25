@@ -5,7 +5,7 @@ import BoardLayout from '@/layouts/editorial-board/BoardLayout'
 // Member Editor Pages
 import BoardDashboardPage from '@/pages/editorial-board/member-editor/BoardDashboardPage'
 import { ReadDraftPage, ScorePage, VotePage } from '@/pages/editorial-board/member-editor/ReviewPages'
-import { DisputesListPage, DisputeDetailsPage } from '@/pages/editorial-board/member-editor/DisputesPage'
+
 import SeriesApprovalPage from '@/pages/editorial-board/member-editor/SeriesApprovalPage'
 import SeriesReviewDetailPage from '@/pages/editorial-board/member-editor/SeriesReviewDetailPage'
 import ProfilePage from '@/pages/editorial-board/member-editor/ProfilePage'
@@ -13,9 +13,11 @@ import SettingsPage from '@/pages/editorial-board/member-editor/SettingsPage'
 import RankingsPage from '@/pages/editorial-board/member-editor/RankingsPage'
 import HistoryPage from '@/pages/editorial-board/member-editor/HistoryPage'
 import ProposalsListPage from '@/pages/editorial-board/member-editor/ProposalsListPage'
+import { DisputesListPage, DisputeDetailsPage } from '@/pages/editorial-board/member-editor/DisputesPage'
 
 // Chief Editor Pages
 import ChiefDashboardPage from '@/pages/editorial-board/chief-editor/ChiefDashboardPage'
+import { ChiefDisputesListPage, ChiefDisputeDetailsPage } from '@/pages/editorial-board/chief-editor/ChiefDisputesPage'
 import VoteSummaryPage from '@/pages/editorial-board/chief-editor/VoteSummaryPage'
 import SendNotificationPage from '@/pages/editorial-board/chief-editor/SendNotificationPage'
 import RecoveryPage from '@/pages/editorial-board/chief-editor/RecoveryPage'
@@ -35,32 +37,32 @@ export default function BoardRoutes() {
         {/* Proposals / Tasks inbox */}
         <Route path="proposals" element={<ProposalsListPage />} />
 
-        {/* Disputes listing and details */}
+  {/* Disputes listing and details */ }
         <Route path="disputes" element={<DisputesListPage />} />
         <Route path="disputes/:caseId" element={<DisputeDetailsPage />} />
 
-        {/* Series review and voting flow */}
+  {/* Series review and voting flow */ }
         <Route path="series-approval" element={<SeriesApprovalPage />} />
         <Route path="series-approval/:seriesId" element={<SeriesReviewDetailPage />} />
 
-        {/* Chapter review multi-step flow */}
+  {/* Chapter review multi-step flow */ }
         <Route path="review/:chapterId/draft" element={<ReadDraftPage />} />
         <Route path="review/:chapterId/score" element={<ScorePage />} />
         <Route path="review/:chapterId/vote" element={<VotePage />} />
         <Route path="review/:chapterId/analysis" element={<VoteSummaryPage />} />
         <Route path="review/:chapterId/decision" element={<SendNotificationPage />} />
 
-        {/* Chief Strategic Decisions */}
+  {/* Chief Strategic Decisions */ }
         <Route path="recovery" element={<RecoveryPage />} />
         <Route path="send-notification" element={<SendNotificationPage />} />
         <Route path="series/:seriesId/decision" element={<SeriesDecisionPage />} />
 
-        {/* Global info pages */}
+  {/* Global info pages */ }
         <Route path="rankings" element={<RankingsPage />} />
         <Route path="history" element={<HistoryPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="settings" element={<SettingsPage />} />
-      </Route>
-    </Routes>
+      </Route >
+    </Routes >
   )
 }

@@ -15,6 +15,7 @@ export interface AssistantTask {
   regionId?: string; // Bounding box region ID
   createdAt?: string;
   assignedById?: string;
+  assignedByAvatar?: string;
 }
 
 export interface AssistantSubmission {

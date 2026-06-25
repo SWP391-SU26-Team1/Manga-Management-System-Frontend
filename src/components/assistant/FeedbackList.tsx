@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { MessageSquare, Send, User, Loader2, AlertCircle, Clock } from 'lucide-react'
+import { MessageSquare, User, AlertCircle, Clock, Loader2 } from 'lucide-react'
 import assistantService, { PageTaskFeedback } from '@/services/assistant.service'
 
 interface FeedbackListProps {
@@ -8,11 +8,9 @@ interface FeedbackListProps {
   onFeedbackAdded?: () => void
 }
 
-export default function FeedbackList({ submissionId, initialFeedbacks, onFeedbackAdded }: FeedbackListProps) {
+export default function FeedbackList({ submissionId, initialFeedbacks }: FeedbackListProps) {
   const [feedbacks, setFeedbacks] = useState<PageTaskFeedback[]>(initialFeedbacks || [])
-  const [newComment, setNewComment] = useState<string>('')
   const [isLoading, setIsLoading] = useState<boolean>(!initialFeedbacks)
-  const [isSending, setIsSending] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -34,25 +32,6 @@ export default function FeedbackList({ submissionId, initialFeedbacks, onFeedbac
       setError('Không thể tải danh sách phản hồi.')
     } finally {
       setIsLoading(false)
-    }
-  }
-
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newComment.trim()) return
-
-    setIsSending(true)
-    setError(null)
-    try {
-      const feedback = await assistantService.createSubmissionFeedback(submissionId, newComment.trim())
-      setFeedbacks((prev) => [...prev, feedback])
-      setNewComment('')
-      if (onFeedbackAdded) onFeedbackAdded()
-    } catch (err: any) {
-      console.error('Lỗi gửi feedback:', err)
-      setError('Gửi phản hồi thất bại. Vui lòng thử lại.')
-    } finally {
-      setIsSending(false)
     }
   }
 
@@ -111,6 +90,18 @@ export default function FeedbackList({ submissionId, initialFeedbacks, onFeedbac
         ) : (
           feedbacks.map((item) => {
             const isMe = !item.mangaka_id
+            const authorUser = isMe ? (item as any).assistant : (item as any).mangaka
+            const authorName = authorUser?.name || authorUser?.username || (isMe ? 'Tôi (Trợ lý)' : 'Họa sĩ / Biên tập viên')
+            const initials = authorName.substring(0, 2).toUpperCase()
+            const avatarUrl = authorUser?.avatar_url
+            
+            const getImageUrl = (url?: string | null) => {
+              if (!url) return ''
+              if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url
+              const apiURL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+              return `${apiURL}${url.startsWith('/') ? '' : '/'}${url}`
+            }
+
             return (
               <div
                 key={item.feedback_id}
@@ -120,13 +111,19 @@ export default function FeedbackList({ submissionId, initialFeedbacks, onFeedbac
               >
                 {/* Author tag */}
                 <div className="flex items-center gap-1.5 mb-1">
-                  {!isMe && (
-                    <div className="w-5 h-5 rounded-full bg-black flex items-center justify-center text-white text-[9px] font-black">
-                      MK
+                  {avatarUrl ? (
+                    <img
+                      src={getImageUrl(avatarUrl)}
+                      alt={authorName}
+                      className="w-5 h-5 rounded-full object-cover shrink-0 border border-zinc-350"
+                    />
+                  ) : (
+                    <div className="w-5 h-5 rounded-full bg-black flex items-center justify-center text-white text-[9px] font-black uppercase">
+                      {initials}
                     </div>
                   )}
                   <span className="text-[10px] font-black uppercase text-black">
-                    {isMe ? 'Tôi (Trợ lý)' : 'Họa sĩ / Biên tập viên'}
+                    {authorName}
                   </span>
                   <span className="text-[9px] text-gray-400 font-bold">
                     {formatTime(item.created_at)}
@@ -149,35 +146,6 @@ export default function FeedbackList({ submissionId, initialFeedbacks, onFeedbac
         )}
       </div>
 
-      {/* Reply input footer */}
-      <form onSubmit={handleSend} className="p-3 bg-white border-t-4 border-black flex items-center gap-3">
-        <input
-          type="text"
-          value={newComment}
-          onChange={(e) => setNewComment(e.target.value)}
-          placeholder="Nhập ý kiến phản hồi hoặc câu hỏi..."
-          className="flex-1 border-2 border-black px-4 py-2.5 text-xs focus:outline-none focus:bg-gray-50/50 placeholder-gray-400 font-sans"
-          disabled={isSending || isLoading}
-        />
-        <button
-          type="submit"
-          disabled={isSending || !newComment.trim() || isLoading}
-          className={`h-[38px] px-4 border-2 border-black flex items-center justify-center gap-1.5 font-bold text-xs uppercase transition-colors shadow-[3px_3px_0px_rgba(0,0,0,1)] active:translate-y-[1px] active:translate-x-[1px] active:shadow-[2px_2px_0px_rgba(0,0,0,1)] cursor-pointer ${
-            isSending || !newComment.trim() || isLoading
-              ? 'bg-gray-100 text-gray-400 border-gray-300 shadow-none cursor-not-allowed'
-              : 'bg-[#E63946] text-white hover:bg-white hover:text-[#E63946]'
-          }`}
-        >
-          {isSending ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <>
-              <Send className="w-3.5 h-3.5" />
-              <span>GỬI</span>
-            </>
-          )}
-        </button>
-      </form>
     </div>
   )
 }

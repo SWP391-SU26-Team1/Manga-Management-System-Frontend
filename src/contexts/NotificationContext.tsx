@@ -164,11 +164,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       }
     } catch (err) {
       console.error('Failed to load notifications from API', err)
-      // Fallback local storage
-      const stored = localStorage.getItem('mf_notifications')
-      if (stored) {
-        setNotifications(JSON.parse(stored))
-      }
+      // Completely removed mock data fallback as requested
+      setNotifications([])
     }
   }
 

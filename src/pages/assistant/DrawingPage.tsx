@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router'
-import { PenTool, Layers, Clock, Eye, AlertTriangle, Loader2, BookOpen, ChevronRight } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router'
+import { PenTool, Layers, Clock, Eye, AlertTriangle, Loader2, BookOpen, ChevronRight, Trash2, X } from 'lucide-react'
 import assistantService from '@/services/assistant.service'
 
 interface DrawingPageAPI {
@@ -36,10 +36,15 @@ interface DrawingPageAPI {
 
 export default function DrawingPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const filterParam = searchParams.get('filter')
+
   const [pages, setPages] = useState<DrawingPageAPI[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [statusFilter, setStatusFilter] = useState<string>('ALL')
+  const [statusFilter, setStatusFilter] = useState<string>(() => {
+    return filterParam === 'local_drafts' ? 'local_drafts' : 'ALL'
+  })
 
   // Selector lists states
   const [selectorSeriesList, setSelectorSeriesList] = useState<any[]>([])
@@ -56,17 +61,93 @@ export default function DrawingPage() {
   const [filterSeriesId, setFilterSeriesId] = useState<string>('ALL')
   const [filterTaskType, setFilterTaskType] = useState<string>('ALL')
 
-  useEffect(() => {
+  const [localDraftPageIds, setLocalDraftPageIds] = useState<string[]>([])
+
+  // Toast state
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const showToast = (msg: string) => {
+    setToastMessage(msg)
+    setTimeout(() => setToastMessage(null), 3000)
+  }
+
+  // Delete draft modal states
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteTargetPageId, setDeleteTargetPageId] = useState<string | null>(null)
+
+  const handleDeleteDraftClick = (pageId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setDeleteTargetPageId(pageId)
+    setShowDeleteConfirm(true)
+  }
+
+  const confirmDeleteDraft = () => {
+    if (!deleteTargetPageId) return
+    localStorage.removeItem(`mangaflow_drawing_draft_${deleteTargetPageId}`)
+    showToast('Đã xóa bản nháp nét vẽ thành công!')
+    
+    // Refresh page list
     loadDrawingPages()
-    loadSelectorsData()
-  }, [])
+    
+    // Close modal
+    setShowDeleteConfirm(false)
+    setDeleteTargetPageId(null)
+  }
+
+  const getLocalDraftPageIds = (): string[] => {
+    const draftIds: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith('mangaflow_drawing_draft_')) {
+        const pageId = key.replace('mangaflow_drawing_draft_', '')
+        try {
+          const raw = localStorage.getItem(key)
+          if (raw) {
+            const parsed = JSON.parse(raw)
+            if (parsed.strokes && parsed.strokes.length > 0) {
+              draftIds.push(pageId)
+            }
+          }
+        } catch (e) {
+          console.error(e)
+        }
+      }
+    }
+    return draftIds
+  }
 
   const loadDrawingPages = async () => {
     setLoading(true)
     setError(null)
     try {
+      const draftIds = getLocalDraftPageIds()
+      setLocalDraftPageIds(draftIds)
+
       const data = await assistantService.listDrawingPages()
-      setPages(data)
+      const merged = [...data]
+
+      // Identify missing pages that have local drafts but aren't returned in the active drawing pages list
+      const existingPageIds = new Set(data.map(p => p.page_id))
+      const missingDraftIds = draftIds.filter(id => !existingPageIds.has(id))
+
+      if (missingDraftIds.length > 0) {
+        const promises = missingDraftIds.map(async (pageId) => {
+          try {
+            const detail = await assistantService.getDrawingPageDetail(pageId)
+            return detail
+          } catch (e) {
+            console.warn(`Error fetching drawing page detail for draft ${pageId}:`, e)
+            return null
+          }
+        })
+        const details = await Promise.all(promises)
+        details.forEach(detail => {
+          if (detail) {
+            merged.push(detail)
+          }
+        })
+      }
+
+      setPages(merged)
     } catch (err: any) {
       console.error(err)
       setError('Không thể kết nối máy chủ để tải danh sách trang đang vẽ.')
@@ -74,6 +155,19 @@ export default function DrawingPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    loadDrawingPages()
+    loadSelectorsData()
+  }, [])
+
+  useEffect(() => {
+    if (filterParam === 'local_drafts') {
+      setStatusFilter('local_drafts')
+    } else {
+      setStatusFilter('ALL')
+    }
+  }, [filterParam])
 
   const loadSelectorsData = async () => {
     try {
@@ -199,7 +293,11 @@ export default function DrawingPage() {
   // Filter pages using multiple criteria
   const filteredPages = pages.filter(page => {
     // 1. Status Filter Tab
-    if (statusFilter !== 'ALL' && page.status !== statusFilter) return false
+    if (statusFilter === 'local_drafts') {
+      if (!localDraftPageIds.includes(page.page_id)) return false
+    } else if (statusFilter !== 'ALL' && page.status !== statusFilter) {
+      return false
+    }
     
     // 2. Series Filter Dropdown
     if (filterSeriesId !== 'ALL' && page.chapter?.series_id !== filterSeriesId) return false
@@ -304,6 +402,14 @@ export default function DrawingPage() {
             Đang thực hiện ({pages.filter(p => p.status === 'in_progress').length})
           </button>
           <button
+            onClick={() => setStatusFilter('local_drafts')}
+            className={`px-4 py-2 text-xs font-bold uppercase border-2 transition-colors cursor-pointer ${
+              statusFilter === 'local_drafts' ? 'bg-manga-ink text-white border-manga-ink' : 'bg-white text-gray-500 border-gray-200 hover:border-manga-ink'
+            }`}
+          >
+            Nháp nét vẽ ({localDraftPageIds.length})
+          </button>
+          <button
             onClick={() => setStatusFilter('review')}
             className={`px-4 py-2 text-xs font-bold uppercase border-2 transition-colors cursor-pointer ${
               statusFilter === 'review' ? 'bg-manga-ink text-white border-manga-ink' : 'bg-white text-gray-500 border-gray-200 hover:border-manga-ink'
@@ -392,7 +498,12 @@ export default function DrawingPage() {
             
             const isWaitingReview = page.status === 'review'
             const isRevision = myTasksOnPage.some(t => t.status === 'needs_revision' || t.status === 'rejected')
-            const buttonText = isWaitingReview ? 'Xem chi tiết' : (isRevision ? 'Sửa ngay' : 'Vẽ ngay')
+            const hasLocalDraft = localDraftPageIds.includes(page.page_id)
+            const buttonText = isWaitingReview 
+              ? 'Xem chi tiết' 
+              : (hasLocalDraft 
+                  ? 'Vẽ Tiếp (Bản Nháp)' 
+                  : (isRevision ? 'Sửa ngay' : 'Vẽ ngay'))
             const buttonBgClass = isWaitingReview 
               ? 'bg-zinc-500 border-zinc-500 hover:bg-zinc-600 hover:border-black text-white' 
               : 'bg-manga-ink hover:bg-[#E63946] text-white'
@@ -428,15 +539,30 @@ export default function DrawingPage() {
                     Trang {page.page_number}
                   </div>
 
+                  {hasLocalDraft && (
+                    <div className="absolute bottom-3 left-3 bg-[#FFEEDB] text-[#E65C00] border-2 border-black px-2 py-0.5 text-[9px] font-black uppercase shadow-[2px_2px_0px_rgba(0,0,0,1)] flex items-center gap-1 z-10">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#E65C00] animate-ping" />
+                      Nháp nét vẽ chưa nộp
+                    </div>
+                  )}
+
                   <div className="absolute top-3 right-3">
                     <span className={`px-2 py-0.5 border text-[9px] font-black uppercase shadow-[2px_2px_0px_rgba(0,0,0,1)] ${
                       page.status === 'in_progress'
                         ? 'bg-blue-100 text-blue-700 border-blue-400'
                         : page.status === 'review'
                         ? 'bg-purple-100 text-purple-700 border-purple-400'
+                        : page.status === 'draft'
+                        ? 'bg-zinc-100 text-zinc-700 border-zinc-400'
                         : 'bg-amber-100 text-amber-700 border-amber-400'
                     }`}>
-                      {page.status === 'in_progress' ? 'Đang vẽ' : page.status === 'review' ? 'Chờ duyệt' : 'Cần sửa'}
+                      {page.status === 'in_progress' 
+                        ? 'Đang vẽ' 
+                        : page.status === 'review' 
+                        ? 'Chờ duyệt' 
+                        : page.status === 'draft' 
+                        ? 'Chưa vẽ' 
+                        : 'Cần sửa'}
                     </span>
                   </div>
                 </div>
@@ -495,17 +621,86 @@ export default function DrawingPage() {
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => navigate(`/dashboard/assistant/drawing-studio?pageId=${page.page_id}`)}
-                    className={`w-full mt-2 py-2.5 font-bold text-xs uppercase border-2 border-black transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${buttonBgClass}`}
-                  >
-                    <span>{buttonText}</span>
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
+                  {hasLocalDraft ? (
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={() => navigate(`/dashboard/assistant/drawing-studio?pageId=${page.page_id}`)}
+                        className={`flex-1 py-2.5 font-bold text-xs uppercase border-2 border-black transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${buttonBgClass}`}
+                      >
+                        <span>{buttonText}</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => handleDeleteDraftClick(page.page_id, e)}
+                        title="Xóa bản nháp nét vẽ"
+                        className="px-3 bg-red-50 text-red-600 hover:bg-[#E63946] hover:text-white border-2 border-black transition-colors flex items-center justify-center cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_rgba(0,0,0,1)]"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => navigate(`/dashboard/assistant/drawing-studio?pageId=${page.page_id}`)}
+                      className={`w-full mt-2 py-2.5 font-bold text-xs uppercase border-2 border-black transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${buttonBgClass}`}
+                    >
+                      <span>{buttonText}</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Delete Draft Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/60 z-[999] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white border-4 border-black w-full max-w-md shadow-[8px_8px_0px_0px_rgba(230,57,70,1)] animate-zoom-in text-manga-ink font-bold font-sans">
+            <div className="bg-manga-ink p-4 text-white flex justify-between items-center">
+              <h3 className="font-manga text-xl uppercase font-bold tracking-wide">Xác nhận xóa bản nháp</h3>
+              <button 
+                onClick={() => {
+                  setShowDeleteConfirm(false)
+                  setDeleteTargetPageId(null)
+                }} 
+                className="hover:text-[#E63946] transition cursor-pointer bg-transparent border-none text-white"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="mb-4 text-gray-800 font-semibold">
+                Hành động này sẽ xóa hoàn toàn các nét vẽ chưa nộp (bản vẽ dở) lưu trên máy của bạn cho trang này.
+              </p>
+              <p className="mb-6 text-manga-red font-black">Bạn có chắc chắn muốn xóa không?</p>
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => {
+                    setShowDeleteConfirm(false)
+                    setDeleteTargetPageId(null)
+                  }} 
+                  className="flex-1 py-3 border-2 border-black font-bold text-xs uppercase hover:bg-gray-150 transition cursor-pointer bg-white text-black"
+                >
+                  Hủy / Giữ lại
+                </button>
+                <button 
+                  onClick={confirmDeleteDraft}
+                  className="flex-1 py-3 bg-[#E63946] text-white border-2 border-black font-black uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-red-600 transition cursor-pointer flex items-center justify-center"
+                >
+                  Đồng ý xóa
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Alert */}
+      {toastMessage && (
+        <div className="fixed bottom-5 right-5 bg-manga-ink text-white border-4 border-black px-4 py-3 font-bold uppercase text-xs z-[1000] shadow-[4px_4px_0px_rgba(0,0,0,1)] font-sans">
+          {toastMessage}
         </div>
       )}
     </div>

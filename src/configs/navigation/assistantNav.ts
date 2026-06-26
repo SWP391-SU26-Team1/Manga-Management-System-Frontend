@@ -30,8 +30,8 @@ export const assistantNav = [
     icon: MessageSquare
   },
   {
-    label: "Bản thảo của tôi",
-    path: "/dashboard/assistant/drafts",
+    label: "Bản nháp vẽ",
+    path: "/dashboard/assistant/drawing?filter=local_drafts",
     icon: FileEdit
   },
   {

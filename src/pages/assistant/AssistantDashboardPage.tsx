@@ -56,6 +56,8 @@ export default function AssistantDashboardPage() {
       // Dynamically detect overdue tasks and create red warning notifications
       const overdueTasks = allTasks.filter(task => {
         if (!task.deadline || task.status === 'completed' || task.status === 'approved') return false
+        // Skip tasks whose overdue warnings have been read/dismissed locally by the assistant
+        if (localStorage.getItem(`mangaflow_read_local_notification_${task.task_id}`) === 'true') return false
         return new Date().getTime() > new Date(task.deadline).getTime()
       })
 
@@ -80,6 +82,8 @@ export default function AssistantDashboardPage() {
 
   useEffect(() => {
     loadData()
+    window.addEventListener('mangaflow_notifications_updated', loadData)
+    return () => window.removeEventListener('mangaflow_notifications_updated', loadData)
   }, [])
 
   useEffect(() => {
@@ -97,9 +101,21 @@ export default function AssistantDashboardPage() {
   const handleMarkRead = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
     try {
+      if (id.startsWith('local_overdue_')) {
+        const taskId = id.replace('local_overdue_', '')
+        localStorage.setItem(`mangaflow_read_local_notification_${taskId}`, 'true')
+        setNotifications(prev => prev.filter(n => n.notification_id !== id))
+        window.dispatchEvent(new Event('mangaflow_notifications_updated'))
+        return
+      }
+
       await assistantService.markRead(id)
       const notifsRes = await assistantService.listNotifications({ limit: 6 })
-      setNotifications(notifsRes?.data || [])
+      setNotifications(prev => {
+        const locals = prev.filter(n => n.notification_id.startsWith('local_overdue_'))
+        return [...locals, ...(notifsRes?.data || [])].slice(0, 6)
+      })
+      window.dispatchEvent(new Event('mangaflow_notifications_updated'))
     } catch (err) {
       console.error('Failed to mark notification as read:', err)
     }
@@ -109,9 +125,21 @@ export default function AssistantDashboardPage() {
     e.stopPropagation()
     if (!confirm('Bạn có chắc chắn muốn xóa thông báo này?')) return
     try {
+      if (id.startsWith('local_overdue_')) {
+        const taskId = id.replace('local_overdue_', '')
+        localStorage.setItem(`mangaflow_read_local_notification_${taskId}`, 'true')
+        setNotifications(prev => prev.filter(n => n.notification_id !== id))
+        window.dispatchEvent(new Event('mangaflow_notifications_updated'))
+        return
+      }
+
       await assistantService.deleteNotification(id)
       const notifsRes = await assistantService.listNotifications({ limit: 6 })
-      setNotifications(notifsRes?.data || [])
+      setNotifications(prev => {
+        const locals = prev.filter(n => n.notification_id.startsWith('local_overdue_'))
+        return [...locals, ...(notifsRes?.data || [])].slice(0, 6)
+      })
+      window.dispatchEvent(new Event('mangaflow_notifications_updated'))
     } catch (err) {
       console.error('Failed to delete notification:', err)
     }
@@ -171,6 +199,59 @@ export default function AssistantDashboardPage() {
       textColor: 'text-gray-600',
       icon: Bell
     }
+  }
+
+  const translateNotification = (title: string, content: string) => {
+    let t = title || ''
+    let c = content || ''
+
+    const titleLower = t.toLowerCase()
+    if (titleLower.includes('submission approved')) {
+      t = 'Bản nộp đã được duyệt'
+    } else if (titleLower.includes('new task assigned')) {
+      t = 'Nhiệm vụ mới được giao'
+    } else if (titleLower.includes('series approved')) {
+      t = 'Bộ truyện đã được duyệt'
+    } else if (titleLower.includes('revision requested')) {
+      t = 'Yêu cầu chỉnh sửa'
+    } else if (titleLower.includes('task completed')) {
+      t = 'Nhiệm vụ đã hoàn thành'
+    } else if (titleLower.includes('task rejected')) {
+      t = 'Nhiệm vụ bị từ chối'
+    } else if (titleLower.includes('manuscript submitted')) {
+      t = 'Bản thảo đã được nộp'
+    } else if (titleLower.includes('task submitted')) {
+      t = 'Nhiệm vụ đã nộp'
+    }
+
+    const contentLower = c.toLowerCase()
+    if (contentLower.includes('your page version') && contentLower.includes('has been approved')) {
+      const match = c.match(/version\s+(\d+)/i)
+      const versionNum = match ? match[1] : '1'
+      c = `Phiên bản trang ${versionNum} của bạn đã được phê duyệt.`
+    } else if (contentLower.includes('you have been assigned a new')) {
+      let taskType = ''
+      if (contentLower.includes('inking')) taskType = 'vẽ nét (Inking)'
+      else if (contentLower.includes('coloring')) taskType = 'tô màu (Coloring)'
+      else if (contentLower.includes('lettering')) taskType = 'đi chữ (Lettering)'
+      else if (contentLower.includes('cleaning')) taskType = 'làm sạch (Cleaning)'
+      else if (contentLower.includes('sfx')) taskType = 'hiệu ứng (SFX)'
+      else if (contentLower.includes('background')) taskType = 'vẽ nền (Background)'
+      
+      c = `Bạn vừa được phân công một nhiệm vụ ${taskType || 'vẽ'} mới.`
+    } else if (contentLower.includes('series decision: approved')) {
+      c = 'Quyết định cho bộ truyện: Đã duyệt thành công.'
+    } else if (contentLower.includes('please revise your submission')) {
+      c = 'Vui lòng kiểm tra và chỉnh sửa lại bản vẽ của bạn.'
+    } else if (contentLower.includes('your task has been completed')) {
+      c = 'Nhiệm vụ của bạn đã được ghi nhận hoàn thành.'
+    } else if (contentLower.includes('your task has been rejected')) {
+      c = 'Bản nộp nhiệm vụ của bạn không được phê duyệt và bị từ chối.'
+    } else if (contentLower.includes('a task has been submitted for review')) {
+      c = 'Nhiệm vụ đã được nộp và đang chờ tác giả phê duyệt.'
+    }
+
+    return { title: t, content: c }
   }
 
   if (isLoading) {
@@ -326,6 +407,7 @@ export default function AssistantDashboardPage() {
               notifications.map((notif) => {
                 const style = getNotificationStyle(notif.type, notif.content)
                 const Icon = style.icon
+                const translated = translateNotification(notif.title, notif.content)
                 return (
                   <div key={notif.notification_id} className={style.bg}>
                     <div className="flex justify-between items-start mb-2">
@@ -338,9 +420,9 @@ export default function AssistantDashboardPage() {
                         <span className="text-[11px] font-semibold text-gray-400">{formatTimeAgo(notif.created_at)}</span>
                       </div>
                     </div>
-                    <h4 className="font-bold text-sm text-manga-ink mb-1">{notif.title}</h4>
+                    <h4 className="font-bold text-sm text-manga-ink mb-1">{translated.title}</h4>
                     <p className="text-[13px] font-medium text-gray-800 leading-relaxed">
-                      {notif.content}
+                      {translated.content}
                     </p>
                     <div className="flex justify-end gap-3 mt-3 pt-2 border-t border-gray-100">
                       {!notif.is_read && (

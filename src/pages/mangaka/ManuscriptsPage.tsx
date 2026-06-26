@@ -581,7 +581,7 @@ export default function ManuscriptsPage() {
                 5
               </div>
               <p className="text-xs font-bold leading-snug pt-0.5">
-                Tantou Editor phê duyệt xuất bản
+                Hội đồng phê duyệt xuất bản
               </p>
             </div>
           </div>

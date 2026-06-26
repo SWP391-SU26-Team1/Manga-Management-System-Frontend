@@ -315,7 +315,7 @@ export default function NotificationsPage() {
         </div>
 
         {/* Notifications List */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 min-w-0 flex flex-col">
           <div className="divide-y-2 divide-gray-100">
             {loading ? (
               <div className="p-12 text-center text-gray-400 font-bold uppercase text-sm">

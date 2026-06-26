@@ -99,6 +99,8 @@ export default function DrawingStudioPage() {
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showLeaveConfirmModal, setShowLeaveConfirmModal] = useState(false);
+  const [pendingPageId, setPendingPageId] = useState<string | null>(null);
   
   // Feedbacks
   const [feedbacks, setFeedbacks] = useState<MappedFeedback[]>([]);
@@ -222,18 +224,28 @@ export default function DrawingStudioPage() {
     if (!newPageId || newPageId === pageId) return;
     
     if (checkUnsavedStrokes()) {
-      const confirmLeave = window.confirm(
-        'Bạn có nét vẽ chưa lưu trên Canvas của trang hiện tại. Nếu chuyển trang, các thay đổi chưa lưu này sẽ bị mất.\n\nBạn có chắc chắn muốn chuyển trang không?'
-      );
-      if (!confirmLeave) {
-        setSelPageId(pageId);
-        return;
-      }
+      setPendingPageId(newPageId);
+      setShowLeaveConfirmModal(true);
+      return;
     }
     
+    executePageSwitch(newPageId);
+  };
+
+  const executePageSwitch = (newPageId: string) => {
     setStrokes([]);
     setHistory([]);
     navigate(`/dashboard/assistant/drawing-studio?pageId=${newPageId}`);
+  };
+
+  const handleCancelLeave = () => {
+    setShowLeaveConfirmModal(false);
+    setPendingPageId(null);
+    if (pageDetail) {
+      setSelSeriesId(pageDetail.chapter?.series_id || '');
+      setSelChapterId(pageDetail.chapter_id || '');
+      setSelPageId(pageDetail.page_id || '');
+    }
   };
 
   const handleSeriesChange = (seriesId: string) => {
@@ -1593,6 +1605,49 @@ export default function DrawingStudioPage() {
                   className="flex-1 py-3 bg-[#E63946] text-white border-2 border-black font-black uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-red-600 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   {isSubmitting ? 'Đang gửi...' : 'Xác nhận nộp'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Leave Confirmation Modal */}
+      {showLeaveConfirmModal && (
+        <div className="fixed inset-0 bg-black/60 z-[999] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white border-4 border-black w-full max-w-md shadow-[8px_8px_0px_0px_rgba(230,57,70,1)] animate-zoom-in text-manga-ink font-bold">
+            <div className="bg-manga-ink p-4 text-white flex justify-between items-center">
+              <h3 className="font-manga text-xl uppercase font-bold tracking-wide">Xác nhận chuyển trang</h3>
+              <button 
+                onClick={handleCancelLeave} 
+                className="hover:text-[#E63946] transition cursor-pointer bg-transparent border-none text-white"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="mb-4 text-gray-800 font-semibold">
+                Bạn có nét vẽ chưa lưu trên Canvas của trang hiện tại. Nếu chuyển trang, các thay đổi chưa lưu này sẽ bị mất.
+              </p>
+              <p className="mb-6 text-manga-red font-black">Bạn có chắc chắn muốn chuyển trang không?</p>
+              <div className="flex gap-4">
+                <button 
+                  onClick={handleCancelLeave} 
+                  className="flex-1 py-3 border-2 border-black font-bold text-xs uppercase hover:bg-gray-150 transition cursor-pointer"
+                >
+                  Hủy / Ở lại
+                </button>
+                <button 
+                  onClick={() => {
+                    handleSaveDraft();
+                    setShowLeaveConfirmModal(false);
+                    if (pendingPageId) {
+                      executePageSwitch(pendingPageId);
+                    }
+                  }}
+                  className="flex-1 py-3 bg-[#E63946] text-white border-2 border-black font-black uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-red-600 transition cursor-pointer flex items-center justify-center"
+                >
+                  Đồng ý chuyển
                 </button>
               </div>
             </div>

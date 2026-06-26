@@ -732,7 +732,6 @@ export default function TasksPage() {
                     <th className="py-3 px-4 font-bold border-r border-gray-700">LOẠI NHIỆM VỤ</th>
                     <th className="py-3 px-4 font-bold border-r border-gray-700">DEADLINE</th>
                     <th className="py-3 px-4 font-bold border-r border-gray-700 text-center">TRẠNG THÁI</th>
-                    <th className="py-3 px-4 font-bold border-r border-gray-700 text-center">ƯU TIÊN</th>
                     <th className="py-3 px-4 font-bold border-r border-gray-700 text-center">TÀI NGUYÊN</th>
                     <th className="py-3 px-4 font-bold text-center">HÀNH ĐỘNG</th>
                   </tr>
@@ -750,12 +749,6 @@ export default function TasksPage() {
                       </td>
                       <td className="py-4 px-4 text-center">
                         {getStatusBadge(task.status)}
-                      </td>
-                      <td className="py-4 px-4">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <span className={`text-[12px] leading-none ${getPriorityColor(task.priority)}`}>●</span>
-                          <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider">{getPriorityText(task.priority)}</span>
-                        </div>
                       </td>
                       <td className="py-4 px-4 text-center">
                         <button 
@@ -1094,10 +1087,6 @@ export default function TasksPage() {
                       <div className="flex items-center gap-2 mt-2">
                         <span className="bg-[#E63946] text-white text-[9px] font-black tracking-wider uppercase py-0.5 px-2.5">
                           ART TASK
-                        </span>
-                        <span className="text-[10px] font-bold text-gray-500 flex items-center gap-1.5">
-                          <span className={`w-2 h-2 rounded-full ${getPriorityDotColor(task.priority)}`} />
-                          {getPriorityText(task.priority)}
                         </span>
                       </div>
                     </div>

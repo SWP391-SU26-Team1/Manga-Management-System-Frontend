@@ -9,7 +9,6 @@ import SubmissionsPage from '@/pages/assistant/SubmissionsPage'
 import IncomePage from '@/pages/assistant/IncomePage'
 import ReportsPage from '@/pages/assistant/ReportsPage'
 import AssistantFeedbackPage from '@/pages/assistant/FeedbackPage'
-import DraftsPage from '@/pages/assistant/DraftsPage'
 import DrawingPage from '@/pages/assistant/DrawingPage'
 import DrawingStudioPage from '@/pages/assistant/DrawingStudioPage'
 import ProfilePage from '@/pages/assistant/ProfilePage'
@@ -26,7 +25,6 @@ export default function AssistantRoutes() {
         <Route path="income" element={<IncomePage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="feedback" element={<AssistantFeedbackPage />} />
-        <Route path="drafts" element={<DraftsPage />} />
         <Route path="drawing" element={<DrawingPage />} />
         <Route path="drawing-studio" element={<DrawingStudioPage />} />
         <Route path="profile" element={<ProfilePage />} />

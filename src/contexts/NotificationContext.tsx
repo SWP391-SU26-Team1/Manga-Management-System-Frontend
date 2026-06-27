@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react'
 import { io, Socket } from 'socket.io-client'
 import { Bell, AlertTriangle, RefreshCw, FileText, Star, Vote, AlertCircle, X } from 'lucide-react'
 import { boardService } from '@/services/board.service'
+import { editorService } from '@/services/editor.service'
 import api from '@/services/api'
 
 export interface Notification {
@@ -41,6 +42,17 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [toasts, setToasts] = useState<ToastAlert[]>([])
   const [socket, setSocket] = useState<Socket | null>(null)
+  const [readNotifIds, setReadNotifIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('read_notifications_editor')
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  })
+
+  const seenIdsRef = useRef<Set<string>>(new Set())
+  const isFirstLoadRef = useRef(true)
 
   useEffect(() => {
     let activeSocket: Socket | null = null
@@ -150,27 +162,121 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       }
 
       // Map API data to Notification interface
-      if (data && Array.isArray(data)) {
-        const mapped = data.map((item: any) => ({
-          id: item.id || item.notification_id || Math.random().toString(),
-          title: item.title || 'THÔNG BÁO',
-          message: item.message || item.content,
-          time: new Date(item.created_at || Date.now()).toLocaleDateString(),
-          type: item.type || 'REVIEW',
-          category: 'standard' as const,
-          unread: !item.is_read
-        }))
+      const mapped = data && Array.isArray(data) ? data.map((item: any) => ({
+        id: item.id || item.notification_id || Math.random().toString(),
+        title: item.title || 'THÔNG BÁO',
+        message: item.message || item.content,
+        time: new Date(item.created_at || Date.now()).toLocaleDateString('vi-VN'),
+        type: item.type || 'REVIEW',
+        category: 'standard' as const,
+        unread: !item.is_read
+      })) : []
+
+      if (role === 'EDITOR' || role === 'editor') {
+        try {
+          const savedRead = localStorage.getItem('read_notifications_editor')
+          const currentReadIds = savedRead ? JSON.parse(savedRead) : []
+
+          const [seriesRes, manuscriptsRes] = await Promise.all([
+            editorService.getSeries({ status: 'pending_review' }),
+            editorService.getManuscripts()
+          ])
+
+          const seriesList = seriesRes?.data || seriesRes || []
+          const manuscriptsList = manuscriptsRes?.data || manuscriptsRes || []
+
+          const currentPendingIds = new Set<string>()
+
+          const seriesNotifications = seriesList.map((s: any) => {
+            const id = `series_${s.series_id || s.id}`
+            currentPendingIds.add(id)
+            const isUnread = !currentReadIds.includes(id)
+            return {
+              id,
+              title: 'Series mới cần duyệt',
+              message: `Series "${s.title}" đã được gửi và đang chờ bạn duyệt.`,
+              time: new Date(s.created_at || Date.now()).toLocaleDateString('vi-VN'),
+              type: 'REVIEW' as const,
+              category: 'standard' as const,
+              unread: isUnread
+            }
+          })
+
+          const manuscriptNotifications = manuscriptsList
+            .filter((m: any) => ['submitted', 'in_review'].includes(m.status?.toLowerCase()))
+            .map((m: any) => {
+              const id = `manuscript_${m.manuscript_id || m.id}`
+              currentPendingIds.add(id)
+              const isUnread = !currentReadIds.includes(id)
+              return {
+                id,
+                title: 'Bản thảo mới cần duyệt',
+                message: `Bản thảo "${m.title}" đã được gửi và đang chờ bạn duyệt.`,
+                time: new Date(m.created_at || Date.now()).toLocaleDateString('vi-VN'),
+                type: 'REVIEW' as const,
+                category: 'standard' as const,
+                unread: isUnread
+              }
+            })
+
+          // Detect new items for Toast notification
+          if (isFirstLoadRef.current) {
+            seenIdsRef.current = currentPendingIds
+            isFirstLoadRef.current = false
+          } else {
+            currentPendingIds.forEach(id => {
+              if (!seenIdsRef.current.has(id)) {
+                seenIdsRef.current.add(id)
+                if (id.startsWith('series_')) {
+                  const s = seriesList.find((x: any) => `series_${x.series_id || x.id}` === id)
+                  if (s) {
+                    addNotification(
+                      'Series mới cần duyệt',
+                      `Series "${s.title}" đã được gửi và đang chờ bạn duyệt.`,
+                      'REVIEW',
+                      'voting_success'
+                    )
+                  }
+                } else if (id.startsWith('manuscript_')) {
+                  const m = manuscriptsList.find((x: any) => `manuscript_${x.manuscript_id || x.id}` === id)
+                  if (m) {
+                    addNotification(
+                      'Bản thảo mới cần duyệt',
+                      `Bản thảo "${m.title}" đã được gửi và đang chờ bạn duyệt.`,
+                      'REVIEW',
+                      'voting_success'
+                    )
+                  }
+                }
+              }
+            })
+
+            // Clean up items that are no longer pending
+            seenIdsRef.current.forEach(id => {
+              if (!currentPendingIds.has(id)) {
+                seenIdsRef.current.delete(id)
+              }
+            })
+          }
+
+          setNotifications([...seriesNotifications, ...manuscriptNotifications, ...mapped])
+        } catch (e) {
+          console.error('Failed to load pending series/manuscripts for editor notifications:', e)
+          setNotifications(mapped)
+        }
+      } else {
         setNotifications(mapped)
       }
     } catch (err) {
       console.error('Failed to load notifications from API', err)
-      // Completely removed mock data fallback as requested
       setNotifications([])
     }
   }
 
   useEffect(() => {
     fetchNotifications()
+    const interval = setInterval(fetchNotifications, 5000)
+    return () => clearInterval(interval)
   }, [])
 
   useEffect(() => {
@@ -219,12 +325,14 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const markAllAsRead = async () => {
     try {
       await boardService.markAllNotificationsRead()
-      setNotifications(prev => prev.map(n => ({ ...n, unread: false })))
     } catch (err) {
       console.error('API failed to mark all notifications as read', err)
-      // Optimistic update
-      setNotifications(prev => prev.map(n => ({ ...n, unread: false })))
     }
+    // Optimistic update for both DB and local notifications
+    const allIds = notifications.map(n => n.id)
+    localStorage.setItem('read_notifications_editor', JSON.stringify(allIds))
+    setReadNotifIds(allIds)
+    setNotifications(prev => prev.map(n => ({ ...n, unread: false })))
   }
 
   const dismissToast = (id: string) => {

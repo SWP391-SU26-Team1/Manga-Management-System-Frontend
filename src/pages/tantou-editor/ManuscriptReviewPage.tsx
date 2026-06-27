@@ -40,15 +40,15 @@ const mapApiStatusToDisplay = (s: string): DisplayManuscript['status'] => {
 
 export default function ManuscriptReviewPage() {
   const [searchParams] = useSearchParams()
-  const initialTab = searchParams.get('tab') === 'series' ? 'SERIES' : 'MANUSCRIPT'
+  const initialTab = searchParams.get('tab') === 'manuscript' ? 'MANUSCRIPT' : 'SERIES'
   const [activeTab, setActiveTab] = useState<'MANUSCRIPT' | 'SERIES'>(initialTab)
 
   useEffect(() => {
     const tabParam = searchParams.get('tab')
-    if (tabParam === 'series') {
-      setActiveTab('SERIES')
-    } else if (tabParam === 'manuscript') {
+    if (tabParam === 'manuscript') {
       setActiveTab('MANUSCRIPT')
+    } else {
+      setActiveTab('SERIES')
     }
   }, [searchParams])
 

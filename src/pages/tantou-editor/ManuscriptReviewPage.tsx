@@ -43,24 +43,35 @@ export default function ManuscriptReviewPage() {
   const initialTab = searchParams.get('tab') === 'manuscript' ? 'MANUSCRIPT' : 'SERIES'
   const [activeTab, setActiveTab] = useState<'MANUSCRIPT' | 'SERIES'>(initialTab)
 
-  useEffect(() => {
-    const tabParam = searchParams.get('tab')
-    if (tabParam === 'manuscript') {
-      setActiveTab('MANUSCRIPT')
-    } else {
-      setActiveTab('SERIES')
-    }
-  }, [searchParams])
+  const targetId = searchParams.get('id') || ''
 
   // Manuscript state
   const [manuscripts, setManuscripts] = useState<DisplayManuscript[]>([])
-  const [selectedManuscriptId, setSelectedManuscriptId] = useState<string>('')
+  const [selectedManuscriptId, setSelectedManuscriptId] = useState<string>(
+    initialTab === 'MANUSCRIPT' ? targetId : ''
+  )
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   // Series state
   const [seriesList, setSeriesList] = useState<DisplaySeries[]>([])
-  const [selectedSeriesId, setSelectedSeriesId] = useState<string>('')
+  const [selectedSeriesId, setSelectedSeriesId] = useState<string>(
+    initialTab === 'SERIES' ? targetId : ''
+  )
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab')
+    const currentId = searchParams.get('id') || ''
+    if (tabParam === 'manuscript') {
+      setActiveTab('MANUSCRIPT')
+      setSelectedManuscriptId(currentId)
+      setSelectedSeriesId('')
+    } else {
+      setActiveTab('SERIES')
+      setSelectedSeriesId(currentId)
+      setSelectedManuscriptId('')
+    }
+  }, [searchParams])
   const [loadingSeries, setLoadingSeries] = useState(false)
   const [reviewSessions, setReviewSessions] = useState<ApiReviewSession[]>([])
 
@@ -164,9 +175,9 @@ export default function ManuscriptReviewPage() {
       displayList.sort((a, b) => (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9))
 
       setManuscripts(displayList)
-      if (displayList.length > 0) {
-        const firstId = displayList[0].id
-        setSelectedManuscriptId(firstId)
+      const queryId = searchParams.get('id')
+      if (queryId && displayList.some(item => item.id === queryId)) {
+        setSelectedManuscriptId(queryId)
       } else {
         setSelectedManuscriptId('')
       }
@@ -261,8 +272,9 @@ export default function ManuscriptReviewPage() {
       )
 
       setSeriesList(filteredList)
-      if (filteredList.length > 0) {
-        setSelectedSeriesId(filteredList[0].id)
+      const queryId = searchParams.get('id')
+      if (queryId && filteredList.some(item => item.id === queryId)) {
+        setSelectedSeriesId(queryId)
       } else {
         setSelectedSeriesId('')
       }
@@ -277,7 +289,7 @@ export default function ManuscriptReviewPage() {
   const activeManuscript = manuscripts.find(m => m.id === selectedManuscriptId)
 
   // Get active series
-  const activeSeries = seriesList.find(s => s.id === selectedSeriesId) || seriesList[0]
+  const activeSeries = selectedSeriesId ? seriesList.find(s => s.id === selectedSeriesId) : undefined
 
   const hasActiveSession = (seriesId: string) => {
     return reviewSessions.some(

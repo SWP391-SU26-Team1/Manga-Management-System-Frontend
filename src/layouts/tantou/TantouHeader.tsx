@@ -73,7 +73,7 @@ export default function TantouHeader() {
 
   const displayName = user?.fullName || user?.name || user?.user?.fullName || user?.user?.name || 'Editor'
   const userInitials = displayName.split(' ').pop()?.slice(0, 2).toUpperCase() || 'ED'
-  const currentAvatar = user?.avatarUrl || user?.user?.avatarUrl
+  const currentAvatar = user?.avatarUrl || user?.user?.avatarUrl || user?.avatar_url || user?.user?.avatar_url
 
   return (
     <header className="h-16 bg-white border-b-4 border-manga-ink flex items-center justify-between px-8 sticky top-0 z-30">

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { CheckCircle2, AlertCircle, XCircle, Check, Edit3, Shield, Loader2 } from 'lucide-react'
+import { useSearchParams } from 'react-router'
 import { editorService, ApiManuscript, ApiReviewSession } from '@/services/editor.service'
 
 interface DisplayManuscript {
@@ -38,19 +39,72 @@ const mapApiStatusToDisplay = (s: string): DisplayManuscript['status'] => {
 }
 
 export default function ManuscriptReviewPage() {
-  const [activeTab, setActiveTab] = useState<'MANUSCRIPT' | 'SERIES'>('MANUSCRIPT')
+  const [searchParams] = useSearchParams()
+  const initialTab = searchParams.get('tab') === 'manuscript' ? 'MANUSCRIPT' : 'SERIES'
+  const [activeTab, setActiveTab] = useState<'MANUSCRIPT' | 'SERIES'>(initialTab)
+
+  const targetId = searchParams.get('id') || ''
 
   // Manuscript state
   const [manuscripts, setManuscripts] = useState<DisplayManuscript[]>([])
-  const [selectedManuscriptId, setSelectedManuscriptId] = useState<string>('')
+  const [selectedManuscriptId, setSelectedManuscriptId] = useState<string>(
+    initialTab === 'MANUSCRIPT' ? targetId : ''
+  )
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   // Series state
   const [seriesList, setSeriesList] = useState<DisplaySeries[]>([])
-  const [selectedSeriesId, setSelectedSeriesId] = useState<string>('')
+  const [selectedSeriesId, setSelectedSeriesId] = useState<string>(
+    initialTab === 'SERIES' ? targetId : ''
+  )
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab')
+    const currentId = searchParams.get('id') || ''
+    if (tabParam === 'manuscript') {
+      setActiveTab('MANUSCRIPT')
+      setSelectedManuscriptId(currentId)
+      setSelectedSeriesId('')
+    } else {
+      setActiveTab('SERIES')
+      setSelectedSeriesId(currentId)
+      setSelectedManuscriptId('')
+    }
+  }, [searchParams])
   const [loadingSeries, setLoadingSeries] = useState(false)
   const [reviewSessions, setReviewSessions] = useState<ApiReviewSession[]>([])
+
+  // viewedIds state to track read/unread series and manuscripts
+  const [viewedIds, setViewedIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('viewed_review_items')
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  })
+
+  const markAsViewed = (id: string) => {
+    setViewedIds((prev) => {
+      if (prev.includes(id)) return prev
+      const updated = [...prev, id]
+      localStorage.setItem('viewed_review_items', JSON.stringify(updated))
+      return updated
+    })
+  }
+
+  useEffect(() => {
+    if (selectedManuscriptId) {
+      markAsViewed(selectedManuscriptId)
+    }
+  }, [selectedManuscriptId])
+
+  useEffect(() => {
+    if (selectedSeriesId) {
+      markAsViewed(selectedSeriesId)
+    }
+  }, [selectedSeriesId])
   const [isSubmittingSeries, setIsSubmittingSeries] = useState(false)
 
   // Bulk selection state
@@ -121,9 +175,9 @@ export default function ManuscriptReviewPage() {
       displayList.sort((a, b) => (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9))
 
       setManuscripts(displayList)
-      if (displayList.length > 0) {
-        const firstId = displayList[0].id
-        setSelectedManuscriptId(firstId)
+      const queryId = searchParams.get('id')
+      if (queryId && displayList.some(item => item.id === queryId)) {
+        setSelectedManuscriptId(queryId)
       } else {
         setSelectedManuscriptId('')
       }
@@ -218,8 +272,9 @@ export default function ManuscriptReviewPage() {
       )
 
       setSeriesList(filteredList)
-      if (filteredList.length > 0) {
-        setSelectedSeriesId(filteredList[0].id)
+      const queryId = searchParams.get('id')
+      if (queryId && filteredList.some(item => item.id === queryId)) {
+        setSelectedSeriesId(queryId)
       } else {
         setSelectedSeriesId('')
       }
@@ -234,7 +289,7 @@ export default function ManuscriptReviewPage() {
   const activeManuscript = manuscripts.find(m => m.id === selectedManuscriptId)
 
   // Get active series
-  const activeSeries = seriesList.find(s => s.id === selectedSeriesId) || seriesList[0]
+  const activeSeries = selectedSeriesId ? seriesList.find(s => s.id === selectedSeriesId) : undefined
 
   const hasActiveSession = (seriesId: string) => {
     return reviewSessions.some(
@@ -479,13 +534,13 @@ export default function ManuscriptReviewPage() {
     if (isSubmittingSeries) return
     try {
       setIsSubmittingSeries(true)
-      await editorService.submitSeriesToBoard(sId)
-      showToast(`Đã nộp đề xuất duyệt Series lên Hội Đồng Biên Tập!`)
+      await editorService.updateSeriesStatus(sId, 'approved')
+      showToast(`Đã phê duyệt Series thành công!`)
       await fetchSeriesToReview()
     } catch (err: any) {
-      console.error('Failed to submit series:', err)
+      console.error('Failed to approve series:', err)
       const msg = err?.response?.data?.message || ''
-      showToast(msg || 'Lỗi khi nộp lên Hội Đồng!')
+      showToast(msg || 'Lỗi khi phê duyệt Series!')
     } finally {
       setIsSubmittingSeries(false)
     }
@@ -504,8 +559,8 @@ export default function ManuscriptReviewPage() {
 
   const handleRejectSeries = async (sId: string) => {
     try {
-      await editorService.updateSeriesStatus(sId, 'rejected')
-      showToast(`Đã từ chối duyệt hồ sơ Series.`)
+      await editorService.updateSeriesStatus(sId, 'draft')
+      showToast(`Đã từ chối duyệt hồ sơ Series (đã chuyển về bản nháp).`)
       fetchSeriesToReview()
     } catch (err: any) {
       console.error('Failed to reject series:', err)
@@ -644,7 +699,9 @@ export default function ManuscriptReviewPage() {
                     onClick={() => handleSelectManuscript(m.id)}
                     className={`p-3 border-2 cursor-pointer transition-all flex items-start gap-2 ${selectedManuscriptId === m.id
                       ? 'border-manga-ink bg-red-50/50 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
-                      : 'border-gray-200 bg-white hover:border-gray-400'
+                      : viewedIds.includes(m.id)
+                        ? 'border-gray-200 bg-zinc-50/50 opacity-70 hover:opacity-100 hover:border-gray-300'
+                        : 'border-manga-ink bg-white hover:border-black font-extrabold shadow-sm'
                       }`}
                   >
                     <input
@@ -655,12 +712,12 @@ export default function ManuscriptReviewPage() {
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-bold text-sm text-manga-ink truncate pr-2">{m.series}</span>
+                        <span className={`text-sm truncate pr-2 ${viewedIds.includes(m.id) ? 'font-semibold text-gray-500' : 'font-extrabold text-gray-900'}`}>{m.series}</span>
                         {getStatusBadge(m.status)}
                       </div>
                       <div className="flex justify-between items-center text-xs">
-                        <span className="font-bold text-manga-red">{m.chapter}</span>
-                        <span className="text-gray-500 font-bold truncate max-w-[100px]">{m.mangaka}</span>
+                        <span className={`font-bold ${viewedIds.includes(m.id) ? 'text-manga-red/70' : 'text-manga-red'}`}>{m.chapter}</span>
+                        <span className={`font-bold truncate max-w-[100px] ${viewedIds.includes(m.id) ? 'text-gray-400' : 'text-gray-600'}`}>{m.mangaka}</span>
                       </div>
                     </div>
                   </div>
@@ -680,12 +737,14 @@ export default function ManuscriptReviewPage() {
                   onClick={() => setSelectedSeriesId(s.id)}
                   className={`p-3 border-2 cursor-pointer transition-all flex items-start gap-2 ${selectedSeriesId === s.id
                     ? 'border-manga-ink bg-red-50/50 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
-                    : 'border-gray-200 bg-white hover:border-gray-400'
+                    : viewedIds.includes(s.id)
+                      ? 'border-gray-200 bg-zinc-50/50 opacity-70 hover:opacity-100 hover:border-gray-300'
+                      : 'border-manga-ink bg-white hover:border-black font-extrabold shadow-sm'
                     }`}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-bold text-sm text-manga-ink truncate pr-2">{s.title}</span>
+                      <span className={`text-sm truncate pr-2 ${viewedIds.includes(s.id) ? 'font-semibold text-gray-500' : 'font-extrabold text-gray-900'}`}>{s.title}</span>
                       {hasActiveSession(s.id) ? (
                         <span className="bg-yellow-100 text-yellow-700 text-[10px] font-bold border border-yellow-700 px-2 py-0.5">CHỜ HỘI ĐỒNG</span>
                       ) : (
@@ -693,8 +752,8 @@ export default function ManuscriptReviewPage() {
                       )}
                     </div>
                     <div className="flex justify-between items-center text-xs">
-                      <span className="font-bold text-manga-red">{s.genre}</span>
-                      <span className="text-gray-500 font-bold truncate max-w-[120px]">{s.mangaka}</span>
+                      <span className={`font-bold ${viewedIds.includes(s.id) ? 'text-manga-red/70' : 'text-manga-red'}`}>{s.genre}</span>
+                      <span className={`font-bold truncate max-w-[120px] ${viewedIds.includes(s.id) ? 'text-gray-400' : 'text-gray-600'}`}>{s.mangaka}</span>
                     </div>
                   </div>
                 </div>
@@ -884,7 +943,7 @@ export default function ManuscriptReviewPage() {
                 <div className="bg-blue-50 border-2 border-blue-600 p-3 text-[10px] text-blue-700 font-bold leading-normal">
                   <ul className="space-y-1 list-disc pl-4">
                     <li>Vui lòng kiểm tra kỹ nội dung, thuyết minh, thể loại và hình ảnh bìa của Series.</li>
-                    <li>Hành động <span className="font-bold text-manga-red">"Nộp lên Hội Đồng"</span> sẽ tạo một phiên duyệt mới trên Hội Đồng Biên Tập.</li>
+                    <li>Hành động <span className="font-bold text-manga-red">"Phê duyệt"</span> sẽ chính thức duyệt Series hoạt động trên hệ thống.</li>
                     <li>Bạn có thể trao đổi trực tiếp với Mangaka nếu hồ sơ chưa đạt yêu cầu trước khi quyết định từ chối.</li>
                   </ul>
                 </div>
@@ -913,10 +972,12 @@ export default function ManuscriptReviewPage() {
                     >
                       {isSubmittingSeries ? (
                         <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> ĐANG NỘP...
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> ĐANG DUYỆT...
                         </>
                       ) : (
-                        '🚀 NỘP LÊN HỘI ĐỒNG'
+                        <>
+                          <Check className="w-3.5 h-3.5" /> PHÊ DUYỆT SERIES
+                        </>
                       )}
                     </button>
 

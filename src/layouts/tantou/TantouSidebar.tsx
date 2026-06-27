@@ -46,6 +46,7 @@ export default function TantouSidebar() {
   const user = storedUser ? JSON.parse(storedUser) : null
   const userName = user?.fullName || user?.name || user?.user?.fullName || user?.user?.name || 'Tanaka Keiko'
   const userRole = (user?.role === 'EDITOR' || user?.user?.role === 'EDITOR') ? 'Tantou Editor' : 'Unknown Role'
+  const currentAvatar = user?.avatarUrl || user?.user?.avatarUrl || user?.avatar_url || user?.user?.avatar_url
 
   return (
     <aside className="w-64 h-screen bg-white border-r-4 border-manga-ink flex flex-col fixed top-0 left-0 z-40">
@@ -111,7 +112,11 @@ export default function TantouSidebar() {
         {/* Profile info with neo-brutalist styling */}
         <div className="flex items-center gap-2 p-2 border-2 border-manga-ink bg-white rounded-none">
           <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-manga-ink flex items-center justify-center font-extrabold text-xs shadow-sm flex-shrink-0 bg-red-500 text-white">
-            {userName.charAt(0)}
+            {currentAvatar ? (
+              <img src={currentAvatar} alt={userName} className="w-full h-full object-cover" />
+            ) : (
+              userName.charAt(0)
+            )}
           </div>
           <div className="min-w-0">
             <p className="text-xs font-bold text-manga-ink truncate max-w-[150px] leading-tight">

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useLocation, Link, useNavigate } from 'react-router'
 import { Search, Bell, ChevronRight, User, Settings, LogOut } from 'lucide-react'
+import { useNotifications } from '@/contexts/NotificationContext'
 
 const BASE = '/dashboard/tantou-editor'
 
@@ -21,11 +22,7 @@ const routeLabels: Record<string, string> = {
   [`${BASE}/profile`]: 'Hồ Sơ Cá Nhân',
 }
 
-const MOCK_NOTIFICATIONS = [
-  { id: 1, text: 'Có 3 trang bản thảo mới từ Yamamoto Ren cần duyệt.', time: '10 phút trước', isNew: true },
-  { id: 2, text: 'Neon City Runners tụt xuống hạng #18.', time: '1 giờ trước', isNew: true },
-  { id: 3, text: 'Hội đồng biên tập đã phản hồi báo cáo của bạn.', time: '3 giờ trước', isNew: false },
-]
+// Removed static mock notifications in favor of live NotificationContext
 
 export default function TantouHeader() {
   const location = useLocation()
@@ -73,7 +70,21 @@ export default function TantouHeader() {
 
   const displayName = user?.fullName || user?.name || user?.user?.fullName || user?.user?.name || 'Editor'
   const userInitials = displayName.split(' ').pop()?.slice(0, 2).toUpperCase() || 'ED'
-  const currentAvatar = user?.avatarUrl || user?.user?.avatarUrl
+  const currentAvatar = user?.avatarUrl || user?.user?.avatarUrl || user?.avatar_url || user?.user?.avatar_url
+  
+  const { notifications, unreadCount, markAllAsRead, markAsRead } = useNotifications()
+
+  const handleNotificationClick = (notif: any) => {
+    markAsRead(notif.id)
+    setShowNotifications(false)
+    if (notif.id.startsWith('series_')) {
+      navigate('/dashboard/tantou-editor/manuscript-review?tab=series')
+    } else if (notif.id.startsWith('manuscript_')) {
+      navigate('/dashboard/tantou-editor/manuscript-review?tab=manuscript')
+    } else {
+      navigate('/dashboard/tantou-editor/alerts')
+    }
+  }
 
   return (
     <header className="h-16 bg-white border-b-4 border-manga-ink flex items-center justify-between px-8 sticky top-0 z-30">
@@ -110,9 +121,9 @@ export default function TantouHeader() {
             className="relative cursor-pointer hover:text-[#E63946] transition-colors focus:outline-none bg-transparent border-0 p-1 flex items-center"
           >
             <Bell className="w-5 h-5 text-gray-600 hover:text-gray-900 transition-colors" />
-            {MOCK_NOTIFICATIONS.some(n => n.isNew) && (
+            {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#E63946] text-white text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-white">
-                3
+                {unreadCount}
               </span>
             )}
           </button>
@@ -122,25 +133,40 @@ export default function TantouHeader() {
             <div id="notification-dropdown" className="absolute right-0 mt-2 w-80 bg-white border-2 border-black rounded-none shadow-md z-50 overflow-hidden font-sans text-gray-900 animate-fade-in">
               <div className="bg-[#1c1c1f] text-white px-4 py-2.5 flex items-center justify-between border-b-2 border-black">
                 <span className="text-xs font-black uppercase tracking-wider">THÔNG BÁO</span>
-                <span className="text-[10px] text-zinc-400 font-bold hover:text-white hover:underline cursor-pointer bg-transparent border-0">Đánh dấu đã đọc</span>
+                <button 
+                  onClick={markAllAsRead}
+                  className="text-[10px] text-zinc-400 font-bold hover:text-white hover:underline cursor-pointer bg-transparent border-0"
+                >
+                  Đánh dấu đã đọc
+                </button>
               </div>
               <div className="max-h-[300px] overflow-y-auto divide-y divide-gray-100">
-                {MOCK_NOTIFICATIONS.map(notif => (
-                  <div key={notif.id} className="p-3.5 hover:bg-zinc-50 transition-colors flex gap-3 items-start cursor-pointer group">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-baseline gap-2">
-                        <h4 className={`text-xs font-extrabold text-gray-900 truncate leading-tight group-hover:text-[#E63946] transition-colors ${notif.isNew ? 'text-red-600' : ''}`}>
-                          {notif.isNew ? 'Cập nhật mới' : 'Tin nhắn'}
-                        </h4>
-                        <span className="text-[9px] text-gray-400 font-bold flex-shrink-0">{notif.time}</span>
-                      </div>
-                      <p className="text-[10px] text-gray-500 font-semibold leading-normal mt-1 break-words">{notif.text}</p>
-                    </div>
-                    {notif.isNew && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#E63946] mt-2 flex-shrink-0" />
-                    )}
+                {notifications.length === 0 ? (
+                  <div className="p-4 text-center text-xs font-bold text-gray-400 font-sans">
+                    Không có thông báo mới
                   </div>
-                ))}
+                ) : (
+                  notifications.map(notif => (
+                    <div 
+                      key={notif.id} 
+                      onClick={() => handleNotificationClick(notif)}
+                      className="p-3.5 hover:bg-zinc-50 transition-colors flex gap-3 items-start cursor-pointer group"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-baseline gap-2">
+                          <h4 className={`text-xs font-extrabold text-gray-900 truncate leading-tight group-hover:text-[#E63946] transition-colors ${notif.unread ? 'text-red-600' : ''}`}>
+                            {notif.title}
+                          </h4>
+                          <span className="text-[9px] text-gray-400 font-bold flex-shrink-0">{notif.time}</span>
+                        </div>
+                        <p className="text-[10px] text-gray-500 font-semibold leading-normal mt-1 break-words">{notif.message}</p>
+                      </div>
+                      {notif.unread && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#E63946] mt-2 flex-shrink-0" />
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
               <Link to={`${BASE}/alerts`} className="w-full py-3 bg-white border-t-2 border-black text-center flex items-center justify-center gap-1.5 font-extrabold text-[10px] text-[#E63946] hover:bg-red-50/30 transition-colors uppercase tracking-wider cursor-pointer border-0 block">
                 Xem tất cả thông báo

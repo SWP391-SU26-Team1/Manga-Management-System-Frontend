@@ -10,7 +10,7 @@ const mapApiStatusToDisplay = (apiStatus: string): DisplayStatus => {
   switch (apiStatus) {
     case 'published': return 'PUBLISHING'
     case 'pending_review': return 'IN REVIEW'
-    case 'approved': return 'IN REVIEW'
+    case 'approved': return 'PUBLISHING'
     case 'draft': return 'DRAFT'
     case 'hidden':
     case 'archived':
@@ -230,10 +230,10 @@ export default function SeriesManagementPage() {
   const handleSubmitToBoard = async () => {
     if (!selectedSeries) return
     try {
-      await editorService.submitSeriesToBoard(selectedSeries.id)
-      showToast(`✅ Đã nộp '${selectedSeries.title}' lên Hội Đồng Biên Tập thành công!`)
+      await editorService.updateSeriesStatus(selectedSeries.id, 'approved')
+      showToast(`✅ Đã phê duyệt '${selectedSeries.title}' thành công!`)
     } catch (err: any) {
-      const msg = err?.response?.data?.message || 'Lỗi khi nộp lên Hội Đồng!'
+      const msg = err?.response?.data?.message || 'Lỗi khi phê duyệt Series!'
       showToast(`❌ ${msg}`)
     }
   }
@@ -458,7 +458,7 @@ export default function SeriesManagementPage() {
                 {/* If series is IN REVIEW, highlight the review manuscript button */}
                 {selectedSeries.status === 'IN REVIEW' && (
                   <div className="mb-3 p-3 bg-blue-50 border-2 border-blue-400 text-xs font-bold text-blue-700">
-                    📋 Series này đang chờ Tantou duyệt bản thảo. Hãy vào <span className="underline">Review Bản Thảo</span> để xem xét rồi nộp lên Hội Đồng.
+                    📋 Series này đang chờ Tantou duyệt bản thảo. Hãy vào <span className="underline">Review Bản Thảo</span> để xem xét và phê duyệt.
                   </div>
                 )}
                 <div className="grid grid-cols-3 gap-3 mb-3">

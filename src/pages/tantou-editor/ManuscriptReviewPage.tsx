@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { CheckCircle2, AlertCircle, XCircle, Check, Edit3, Shield, Loader2 } from 'lucide-react'
+import { useSearchParams } from 'react-router'
 import { editorService, ApiManuscript, ApiReviewSession } from '@/services/editor.service'
 
 interface DisplayManuscript {
@@ -38,7 +39,18 @@ const mapApiStatusToDisplay = (s: string): DisplayManuscript['status'] => {
 }
 
 export default function ManuscriptReviewPage() {
-  const [activeTab, setActiveTab] = useState<'MANUSCRIPT' | 'SERIES'>('MANUSCRIPT')
+  const [searchParams] = useSearchParams()
+  const initialTab = searchParams.get('tab') === 'series' ? 'SERIES' : 'MANUSCRIPT'
+  const [activeTab, setActiveTab] = useState<'MANUSCRIPT' | 'SERIES'>(initialTab)
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab')
+    if (tabParam === 'series') {
+      setActiveTab('SERIES')
+    } else if (tabParam === 'manuscript') {
+      setActiveTab('MANUSCRIPT')
+    }
+  }, [searchParams])
 
   // Manuscript state
   const [manuscripts, setManuscripts] = useState<DisplayManuscript[]>([])

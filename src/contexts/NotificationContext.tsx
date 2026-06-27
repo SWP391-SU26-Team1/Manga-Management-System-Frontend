@@ -33,6 +33,7 @@ interface NotificationContextType {
     category: ToastAlert['category']
   ) => void
   markAllAsRead: () => void
+  markAsRead: (id: string) => void
   dismissToast: (id: string) => void
 }
 
@@ -335,12 +336,33 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setNotifications(prev => prev.map(n => ({ ...n, unread: false })))
   }
 
+  const markAsRead = async (id: string) => {
+    if (id.startsWith('series_') || id.startsWith('manuscript_')) {
+      const savedRead = localStorage.getItem('read_notifications_editor')
+      const currentReadIds = savedRead ? JSON.parse(savedRead) : []
+      if (!currentReadIds.includes(id)) {
+        currentReadIds.push(id)
+        localStorage.setItem('read_notifications_editor', JSON.stringify(currentReadIds))
+        setReadNotifIds(currentReadIds)
+        setNotifications(prev => prev.map(n => n.id === id ? { ...n, unread: false } : n))
+      }
+    } else {
+      try {
+        await api.patch(`/api/notifications/${id}/read`)
+        setNotifications(prev => prev.map(n => n.id === id ? { ...n, unread: false } : n))
+      } catch (err) {
+        console.error('Failed to mark notification as read in API', err)
+        setNotifications(prev => prev.map(n => n.id === id ? { ...n, unread: false } : n))
+      }
+    }
+  }
+
   const dismissToast = (id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id))
   }
 
   return (
-    <NotificationContext.Provider value={{ notifications, unreadCount, toasts, addNotification, markAllAsRead, dismissToast }}>
+    <NotificationContext.Provider value={{ notifications, unreadCount, toasts, addNotification, markAllAsRead, markAsRead, dismissToast }}>
       {children}
 
       {/* Toast Alert Popups Overlay (Top-Right of screen) */}

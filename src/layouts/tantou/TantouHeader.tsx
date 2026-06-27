@@ -72,7 +72,19 @@ export default function TantouHeader() {
   const userInitials = displayName.split(' ').pop()?.slice(0, 2).toUpperCase() || 'ED'
   const currentAvatar = user?.avatarUrl || user?.user?.avatarUrl || user?.avatar_url || user?.user?.avatar_url
   
-  const { notifications, unreadCount, markAllAsRead } = useNotifications()
+  const { notifications, unreadCount, markAllAsRead, markAsRead } = useNotifications()
+
+  const handleNotificationClick = (notif: any) => {
+    markAsRead(notif.id)
+    setShowNotifications(false)
+    if (notif.id.startsWith('series_')) {
+      navigate('/dashboard/tantou-editor/manuscript-review?tab=series')
+    } else if (notif.id.startsWith('manuscript_')) {
+      navigate('/dashboard/tantou-editor/manuscript-review?tab=manuscript')
+    } else {
+      navigate('/dashboard/tantou-editor/alerts')
+    }
+  }
 
   return (
     <header className="h-16 bg-white border-b-4 border-manga-ink flex items-center justify-between px-8 sticky top-0 z-30">
@@ -135,7 +147,11 @@ export default function TantouHeader() {
                   </div>
                 ) : (
                   notifications.map(notif => (
-                    <div key={notif.id} className="p-3.5 hover:bg-zinc-50 transition-colors flex gap-3 items-start cursor-pointer group">
+                    <div 
+                      key={notif.id} 
+                      onClick={() => handleNotificationClick(notif)}
+                      className="p-3.5 hover:bg-zinc-50 transition-colors flex gap-3 items-start cursor-pointer group"
+                    >
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-baseline gap-2">
                           <h4 className={`text-xs font-extrabold text-gray-900 truncate leading-tight group-hover:text-[#E63946] transition-colors ${notif.unread ? 'text-red-600' : ''}`}>

@@ -1,21 +1,129 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
-import { Bell, Search, AlertTriangle, CheckCircle2, MessageSquare, ExternalLink, User, Settings, LogOut } from 'lucide-react'
-import { assistantStore } from '@/data/assistantMockData'
-import { MOCK_USERS } from '@/data/mockUsers'
+import { Bell, Search, AlertTriangle, CheckCircle2, MessageSquare, ExternalLink, User, Settings, LogOut, X } from 'lucide-react'
+import assistantService from '@/services/assistant.service'
 
 export function Header() {
   const location = useLocation()
   const navigate = useNavigate()
-  const [unreadCount, setUnreadCount] = useState(4) // Matches the 4 mockup items
+  const [unreadCount, setUnreadCount] = useState(0)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
   const profileRef = useRef<HTMLDivElement>(null)
+  const [notifications, setNotifications] = useState<any[]>([])
 
   const [user, setUser] = useState<any>(() => {
     const storedUser = localStorage.getItem('mangaflow_user')
     return storedUser ? JSON.parse(storedUser) : null
   })
+
+  const getTaskTypeName = (type?: string) => {
+    if (!type) return 'Vẽ'
+    const t = type.toLowerCase()
+    if (t === 'inking') return 'Vẽ Nét'
+    if (t === 'coloring') return 'Tô Màu'
+    if (t === 'lettering') return 'Đi Chữ'
+    if (t === 'cleaning') return 'Làm Sạch'
+    if (t === 'sfx') return 'Hiệu Ứng'
+    if (t === 'background') return 'Phông Nền'
+    return type
+  }
+
+  const formatTimeAgo = (dateStr: string) => {
+    if (!dateStr) return ''
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return 'Vừa xong'
+    if (diffMins < 60) return `${diffMins} phút trước`
+    if (diffHours < 24) return `${diffHours} giờ trước`
+    if (diffDays === 1) return 'Hôm qua'
+    return date.toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    })
+  }
+
+  const loadNotifications = async () => {
+    try {
+      const [notifsRes, tasksRes] = await Promise.all([
+        assistantService.listNotifications({ limit: 6 }),
+        assistantService.listMyTasks({ limit: 100 })
+      ])
+      
+      const allTasks = tasksRes?.data || []
+      
+      // Calculate local overdue warnings
+      const overdueTasks = allTasks.filter(task => {
+        if (!task.deadline || task.status === 'completed' || task.status === 'approved') return false
+        if (localStorage.getItem(`mangaflow_read_local_notification_${task.task_id}`) === 'true') return false
+        return new Date().getTime() > new Date(task.deadline).getTime()
+      })
+
+      const localOverdueNotifs = overdueTasks.map((task: any) => ({
+        notification_id: `local_overdue_${task.task_id}`,
+        user_id: '',
+        title: 'CẢNH BÁO QUÁ HẠN!',
+        content: `Nhiệm vụ [${getTaskTypeName(task.task_type)}] của Ch.${task.page?.chapter?.title ? parseInt(task.page.chapter.title.replace(/\D/g, '')) || 1 : 1} - Trang ${task.page?.page_number || 1} (${task.page?.chapter?.series?.title || ''}) đã quá hạn chót nộp bài. Hãy khẩn trương hoàn thành!`,
+        type: 'URGENT',
+        is_read: false,
+        created_at: new Date().toISOString()
+      }))
+
+      const combined = [...localOverdueNotifs, ...(notifsRes?.data || [])].slice(0, 6)
+      setNotifications(combined)
+
+      // Calculate unread count (unread database notifs + local overdue notifs)
+      const dbUnreadCount = notifsRes?.data?.filter((n: any) => !n.is_read).length || 0
+      setUnreadCount(dbUnreadCount + localOverdueNotifs.length)
+    } catch (e) {
+      console.error('Error loading header notifications:', e)
+    }
+  }
+
+  const handleMarkSingleRead = async (id: string) => {
+    try {
+      if (id.startsWith('local_overdue_')) {
+        const taskId = id.replace('local_overdue_', '')
+        localStorage.setItem(`mangaflow_read_local_notification_${taskId}`, 'true')
+      } else {
+        await assistantService.markRead(id)
+      }
+      loadNotifications()
+      window.dispatchEvent(new Event('mangaflow_notifications_updated'))
+    } catch (e) {
+      console.error('Failed to mark read:', e)
+    }
+  }
+
+  const handleMarkAllRead = async () => {
+    try {
+      await assistantService.markAllRead()
+      notifications.forEach(n => {
+        if (n.notification_id.startsWith('local_overdue_')) {
+          const taskId = n.notification_id.replace('local_overdue_', '')
+          localStorage.setItem(`mangaflow_read_local_notification_${taskId}`, 'true')
+        }
+      })
+      loadNotifications()
+      window.dispatchEvent(new Event('mangaflow_notifications_updated'))
+    } catch (e) {
+      console.error('Failed to mark all read:', e)
+    }
+  }
+
+  useEffect(() => {
+    loadNotifications()
+    window.addEventListener('mangaflow_notifications_updated', loadNotifications)
+    return () => {
+      window.removeEventListener('mangaflow_notifications_updated', loadNotifications)
+    }
+  }, [location.pathname])
 
   useEffect(() => {
     const handleProfileUpdate = () => {
@@ -36,40 +144,58 @@ export function Header() {
     navigate('/login')
   }
 
-  const dropdownNotifications = [
-    {
-      id: 1,
-      type: 'URGENT',
-      title: 'Hạn chót sắp đến',
-      message: 'Task #1038 - Dark Rising Chronicles hết hạn trong 2 ngày...',
-      time: '30 phút trước',
-      unread: true,
-    },
-    {
-      id: 2,
-      type: 'URGENT',
-      title: 'Hạn chót sắp đến',
-      message: 'Task #1046 - Cyber Ronin đã quá deadline 23/05/2026...',
-      time: '1 giờ trước',
-      unread: true,
-    },
-    {
-      id: 3,
-      type: 'APPROVED',
-      title: 'Nhiệm vụ được duyệt',
-      message: 'Task #1035 - Steel Warriors Lineart đã được Mangaka Akira Tanaka duyệt...',
-      time: '3 giờ trước',
-      unread: true,
-    },
-    {
-      id: 4,
-      type: 'FEEDBACK',
-      title: 'Phản hồi mới',
-      message: 'Akira Tanaka gửi phản hồi cho Task #1042',
-      time: '5 giờ trước',
-      unread: true,
+  const translateNotification = (title: string, content: string) => {
+    let t = title || ''
+    let c = content || ''
+
+    const titleLower = t.toLowerCase()
+    if (titleLower.includes('submission approved')) {
+      t = 'Bản nộp đã được duyệt'
+    } else if (titleLower.includes('new task assigned')) {
+      t = 'Nhiệm vụ mới được giao'
+    } else if (titleLower.includes('series approved')) {
+      t = 'Bộ truyện đã được duyệt'
+    } else if (titleLower.includes('revision requested')) {
+      t = 'Yêu cầu chỉnh sửa'
+    } else if (titleLower.includes('task completed')) {
+      t = 'Nhiệm vụ đã hoàn thành'
+    } else if (titleLower.includes('task rejected')) {
+      t = 'Nhiệm vụ bị từ chối'
+    } else if (titleLower.includes('manuscript submitted')) {
+      t = 'Bản thảo đã được nộp'
+    } else if (titleLower.includes('task submitted')) {
+      t = 'Nhiệm vụ đã nộp'
     }
-  ]
+
+    const contentLower = c.toLowerCase()
+    if (contentLower.includes('your page version') && contentLower.includes('has been approved')) {
+      const match = c.match(/version\s+(\d+)/i)
+      const versionNum = match ? match[1] : '1'
+      c = `Phiên bản trang ${versionNum} của bạn đã được phê duyệt.`
+    } else if (contentLower.includes('you have been assigned a new')) {
+      let taskType = ''
+      if (contentLower.includes('inking')) taskType = 'vẽ nét (Inking)'
+      else if (contentLower.includes('coloring')) taskType = 'tô màu (Coloring)'
+      else if (contentLower.includes('lettering')) taskType = 'đi chữ (Lettering)'
+      else if (contentLower.includes('cleaning')) taskType = 'làm sạch (Cleaning)'
+      else if (contentLower.includes('sfx')) taskType = 'hiệu ứng (SFX)'
+      else if (contentLower.includes('background')) taskType = 'vẽ nền (Background)'
+      
+      c = `Bạn vừa được phân công một nhiệm vụ ${taskType || 'vẽ'} mới.`
+    } else if (contentLower.includes('series decision: approved')) {
+      c = 'Quyết định cho bộ truyện: Đã duyệt thành công.'
+    } else if (contentLower.includes('please revise your submission')) {
+      c = 'Vui lòng kiểm tra và chỉnh sửa lại bản vẽ của bạn.'
+    } else if (contentLower.includes('your task has been completed')) {
+      c = 'Nhiệm vụ của bạn đã được ghi nhận hoàn thành.'
+    } else if (contentLower.includes('your task has been rejected')) {
+      c = 'Bản nộp nhiệm vụ của bạn không được phê duyệt và bị từ chối.'
+    } else if (contentLower.includes('a task has been submitted for review')) {
+      c = 'Nhiệm vụ đã được nộp và đang chờ tác giả phê duyệt.'
+    }
+
+    return { title: t, content: c }
+  }
 
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
@@ -140,12 +266,7 @@ export function Header() {
     )
   }
 
-  // Load state or simulate count
-  useEffect(() => {
-    const tasks = assistantStore.getTasks()
-    const needFixCount = tasks.filter((t: any) => t.status === 'Need Fix' || t.priority === 'Urgent').length
-    setUnreadCount(needFixCount || 4)
-  }, [location.pathname])
+  // Notifications automatically loaded in path change useEffect
 
   return (
     <header className="h-16 bg-white border-b-4 border-manga-ink flex items-center justify-between px-8 sticky top-0 z-30">
@@ -191,7 +312,7 @@ export function Header() {
               <div className="bg-[#1c1c1f] text-white px-4 py-2.5 flex items-center justify-between border-b-2 border-black">
                 <span className="text-xs font-black uppercase tracking-wider">THÔNG BÁO</span>
                 <button
-                  onClick={() => setUnreadCount(0)}
+                  onClick={handleMarkAllRead}
                   className="text-[10px] text-zinc-400 font-bold hover:text-white hover:underline cursor-pointer bg-transparent border-0"
                 >
                   Đánh dấu đã đọc
@@ -200,37 +321,48 @@ export function Header() {
 
               {/* Body */}
               <div className="max-h-[300px] overflow-y-auto divide-y divide-gray-100">
-                {dropdownNotifications.map((notif) => {
-                  const Icon = notif.type === 'URGENT' ? AlertTriangle : notif.type === 'APPROVED' ? CheckCircle2 : MessageSquare
-                  const iconColor = notif.type === 'URGENT' ? 'text-[#E63946]' : notif.type === 'APPROVED' ? 'text-emerald-500' : 'text-blue-500'
+                {notifications.length === 0 ? (
+                  <div className="p-8 text-center text-gray-400 font-semibold text-xs uppercase tracking-wider">
+                    Không có thông báo mới
+                  </div>
+                ) : (
+                  notifications.map((notif) => {
+                    const isUrgent = notif.type === 'URGENT' || notif.type?.toLowerCase().includes('risk') || notif.type?.toLowerCase().includes('overdue')
+                    const isApproved = notif.type === 'APPROVED' || notif.type?.toLowerCase().includes('approve') || notif.type?.toLowerCase().includes('success')
+                    
+                    const Icon = isUrgent ? AlertTriangle : isApproved ? CheckCircle2 : MessageSquare
+                    const iconColor = isUrgent ? 'text-[#E63946]' : isApproved ? 'text-emerald-500' : 'text-blue-500'
+                    const translated = translateNotification(notif.title, notif.content)
 
-                  return (
-                    <div
-                      key={notif.id}
-                      className="p-3.5 hover:bg-zinc-50 transition-colors flex gap-3 items-start cursor-pointer group"
-                    >
-                      <Icon className={`w-4 h-4 flex-shrink-0 mt-0.5 ${iconColor}`} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-baseline gap-2">
-                          <h4 className="text-xs font-extrabold text-gray-900 truncate leading-tight group-hover:text-[#E63946] transition-colors">
-                            {notif.title}
-                          </h4>
-                          <span className="text-[9px] text-gray-400 font-bold flex-shrink-0">
-                            {notif.time}
-                          </span>
+                    return (
+                      <div
+                        key={notif.notification_id}
+                        onClick={() => handleMarkSingleRead(notif.notification_id)}
+                        className="p-3.5 hover:bg-zinc-50 transition-colors flex gap-3 items-start cursor-pointer group"
+                      >
+                        <Icon className={`w-4 h-4 flex-shrink-0 mt-0.5 ${iconColor}`} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-baseline gap-2">
+                            <h4 className="text-xs font-extrabold text-gray-900 truncate leading-tight group-hover:text-[#E63946] transition-colors">
+                              {translated.title}
+                            </h4>
+                            <span className="text-[9px] text-gray-400 font-bold flex-shrink-0">
+                              {formatTimeAgo(notif.created_at)}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-gray-500 font-semibold leading-normal mt-1 break-words">
+                            {translated.content}
+                          </p>
                         </div>
-                        <p className="text-[10px] text-gray-500 font-semibold leading-normal mt-1 break-words">
-                          {notif.message}
-                        </p>
-                      </div>
 
-                      {/* Unread indicator red dot */}
-                      {notif.unread && unreadCount > 0 && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#E63946] mt-2 flex-shrink-0" />
-                      )}
-                    </div>
-                  )
-                })}
+                        {/* Unread indicator red dot */}
+                        {!notif.is_read && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#E63946] mt-2 flex-shrink-0" />
+                        )}
+                      </div>
+                    )
+                  })
+                )}
               </div>
 
               {/* Footer Button link */}

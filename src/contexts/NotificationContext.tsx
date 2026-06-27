@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { io, Socket } from 'socket.io-client'
 import { Bell, AlertTriangle, RefreshCw, FileText, Star, Vote, AlertCircle, X } from 'lucide-react'
 import { boardService } from '@/services/board.service'
 import api from '@/services/api'
@@ -39,6 +40,91 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [toasts, setToasts] = useState<ToastAlert[]>([])
+  const [socket, setSocket] = useState<Socket | null>(null)
+
+  useEffect(() => {
+    let activeSocket: Socket | null = null
+
+    const checkAndConnect = () => {
+      const userStr = localStorage.getItem('mangaflow_user')
+      if (!userStr) {
+        if (activeSocket) {
+          activeSocket.disconnect()
+          activeSocket = null
+          setSocket(null)
+        }
+        return
+      }
+
+      try {
+        const parsed = JSON.parse(userStr)
+        const token = parsed.token
+        if (!token) return
+
+        if (activeSocket && activeSocket.connected) return
+
+        const apiURL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+        activeSocket = io(apiURL, {
+          auth: { token: token }
+        })
+
+        activeSocket.on('connect', () => {
+          console.log('Socket.io connected successfully to notifications server')
+        })
+
+        activeSocket.on('notification:new', (newNotification: any) => {
+          console.log('Received real-time notification:', newNotification)
+
+          const mappedNotif: Notification = {
+            id: newNotification.id || newNotification.notification_id || Math.random().toString(),
+            title: newNotification.title || 'THÔNG BÁO MỚI',
+            message: newNotification.message || newNotification.content || '',
+            time: new Date(newNotification.created_at || Date.now()).toLocaleDateString('vi-VN'),
+            type: newNotification.type || 'REVIEW',
+            category: 'standard' as const,
+            unread: true
+          }
+
+          setNotifications(prev => {
+            if (prev.some(n => n.id === mappedNotif.id)) return prev
+            return [mappedNotif, ...prev]
+          })
+
+          let category: ToastAlert['category'] = 'rating_success'
+          if (newNotification.type === 'RISK' || newNotification.type === 'OVERDUE') {
+            category = 'rating_failed'
+          }
+
+          setToasts(prev => {
+            const newToast: ToastAlert = {
+              id: mappedNotif.id,
+              title: mappedNotif.title,
+              message: mappedNotif.message,
+              category
+            }
+            setTimeout(() => {
+              setToasts(p => p.filter(t => t.id !== mappedNotif.id))
+            }, 3500)
+            return [...prev, newToast]
+          })
+        })
+
+        setSocket(activeSocket)
+      } catch (err) {
+        console.error('Failed to parse mangaflow_user token for socket connection:', err)
+      }
+    }
+
+    checkAndConnect()
+    const interval = setInterval(checkAndConnect, 3000)
+
+    return () => {
+      clearInterval(interval)
+      if (activeSocket) {
+        activeSocket.disconnect()
+      }
+    }
+  }, [])
 
   const fetchNotifications = async () => {
     // Only fetch if user is logged in

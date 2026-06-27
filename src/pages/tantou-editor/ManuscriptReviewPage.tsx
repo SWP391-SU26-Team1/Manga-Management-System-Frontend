@@ -63,6 +63,37 @@ export default function ManuscriptReviewPage() {
   const [selectedSeriesId, setSelectedSeriesId] = useState<string>('')
   const [loadingSeries, setLoadingSeries] = useState(false)
   const [reviewSessions, setReviewSessions] = useState<ApiReviewSession[]>([])
+
+  // viewedIds state to track read/unread series and manuscripts
+  const [viewedIds, setViewedIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('viewed_review_items')
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  })
+
+  const markAsViewed = (id: string) => {
+    setViewedIds((prev) => {
+      if (prev.includes(id)) return prev
+      const updated = [...prev, id]
+      localStorage.setItem('viewed_review_items', JSON.stringify(updated))
+      return updated
+    })
+  }
+
+  useEffect(() => {
+    if (selectedManuscriptId) {
+      markAsViewed(selectedManuscriptId)
+    }
+  }, [selectedManuscriptId])
+
+  useEffect(() => {
+    if (selectedSeriesId) {
+      markAsViewed(selectedSeriesId)
+    }
+  }, [selectedSeriesId])
   const [isSubmittingSeries, setIsSubmittingSeries] = useState(false)
 
   // Bulk selection state
@@ -656,7 +687,9 @@ export default function ManuscriptReviewPage() {
                     onClick={() => handleSelectManuscript(m.id)}
                     className={`p-3 border-2 cursor-pointer transition-all flex items-start gap-2 ${selectedManuscriptId === m.id
                       ? 'border-manga-ink bg-red-50/50 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
-                      : 'border-gray-200 bg-white hover:border-gray-400'
+                      : viewedIds.includes(m.id)
+                        ? 'border-gray-200 bg-zinc-50/50 opacity-70 hover:opacity-100 hover:border-gray-300'
+                        : 'border-manga-ink bg-white hover:border-black font-extrabold shadow-sm'
                       }`}
                   >
                     <input
@@ -667,12 +700,12 @@ export default function ManuscriptReviewPage() {
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-bold text-sm text-manga-ink truncate pr-2">{m.series}</span>
+                        <span className={`text-sm truncate pr-2 ${viewedIds.includes(m.id) ? 'font-semibold text-gray-500' : 'font-extrabold text-gray-900'}`}>{m.series}</span>
                         {getStatusBadge(m.status)}
                       </div>
                       <div className="flex justify-between items-center text-xs">
-                        <span className="font-bold text-manga-red">{m.chapter}</span>
-                        <span className="text-gray-500 font-bold truncate max-w-[100px]">{m.mangaka}</span>
+                        <span className={`font-bold ${viewedIds.includes(m.id) ? 'text-manga-red/70' : 'text-manga-red'}`}>{m.chapter}</span>
+                        <span className={`font-bold truncate max-w-[100px] ${viewedIds.includes(m.id) ? 'text-gray-400' : 'text-gray-600'}`}>{m.mangaka}</span>
                       </div>
                     </div>
                   </div>
@@ -692,12 +725,14 @@ export default function ManuscriptReviewPage() {
                   onClick={() => setSelectedSeriesId(s.id)}
                   className={`p-3 border-2 cursor-pointer transition-all flex items-start gap-2 ${selectedSeriesId === s.id
                     ? 'border-manga-ink bg-red-50/50 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
-                    : 'border-gray-200 bg-white hover:border-gray-400'
+                    : viewedIds.includes(s.id)
+                      ? 'border-gray-200 bg-zinc-50/50 opacity-70 hover:opacity-100 hover:border-gray-300'
+                      : 'border-manga-ink bg-white hover:border-black font-extrabold shadow-sm'
                     }`}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-bold text-sm text-manga-ink truncate pr-2">{s.title}</span>
+                      <span className={`text-sm truncate pr-2 ${viewedIds.includes(s.id) ? 'font-semibold text-gray-500' : 'font-extrabold text-gray-900'}`}>{s.title}</span>
                       {hasActiveSession(s.id) ? (
                         <span className="bg-yellow-100 text-yellow-700 text-[10px] font-bold border border-yellow-700 px-2 py-0.5">CHỜ HỘI ĐỒNG</span>
                       ) : (
@@ -705,8 +740,8 @@ export default function ManuscriptReviewPage() {
                       )}
                     </div>
                     <div className="flex justify-between items-center text-xs">
-                      <span className="font-bold text-manga-red">{s.genre}</span>
-                      <span className="text-gray-500 font-bold truncate max-w-[120px]">{s.mangaka}</span>
+                      <span className={`font-bold ${viewedIds.includes(s.id) ? 'text-manga-red/70' : 'text-manga-red'}`}>{s.genre}</span>
+                      <span className={`font-bold truncate max-w-[120px] ${viewedIds.includes(s.id) ? 'text-gray-400' : 'text-gray-600'}`}>{s.mangaka}</span>
                     </div>
                   </div>
                 </div>

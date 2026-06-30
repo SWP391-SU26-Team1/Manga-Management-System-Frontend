@@ -14,11 +14,13 @@ import {
   ShieldAlert,
   Users,
   Settings,
-  LogOut
+  LogOut,
+  Bell
 } from 'lucide-react'
 
 const MENU_ITEMS = [
   { path: '/dashboard/tantou-editor', icon: LayoutDashboard, label: 'Trang Chủ', exact: true },
+  { path: '/dashboard/tantou-editor/notifications', icon: Bell, label: 'Thông Báo' },
   { path: '/dashboard/tantou-editor/series', icon: BookOpen, label: 'Series Phụ Trách' },
   { path: '/dashboard/tantou-editor/chapters', icon: FileText, label: 'Chapter / Page' },
   { path: '/dashboard/tantou-editor/studio-progress', icon: Clock, label: 'Giám Sát Chương' },

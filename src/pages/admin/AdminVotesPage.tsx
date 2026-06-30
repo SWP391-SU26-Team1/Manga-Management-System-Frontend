@@ -1,5 +1,5 @@
 import React, { FormEvent, useCallback, useEffect, useState } from 'react'
-import { AlertCircle, CheckCircle2, Edit3, RefreshCw, Save, Trash2, Vote as VoteIcon, X } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Edit3, RefreshCw, Save, Search, Trash2, Vote as VoteIcon, X } from 'lucide-react'
 import { AdminButton } from '@/components/admin/AdminButton'
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader'
 import { AdminPagination } from '@/components/admin/AdminPagination'
@@ -55,6 +55,8 @@ export default function AdminVotesPage() {
   const [pagination, setPagination] = useState(emptyPagination)
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState<'all' | VoteStatus>('all')
+  const [keywordInput, setKeywordInput] = useState('')
+  const [keyword, setKeyword] = useState('')
   const [loading, setLoading] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [editing, setEditing] = useState<Vote | null>(null)
@@ -65,7 +67,7 @@ export default function AdminVotesPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await adminVotesService.list({ page, limit: 10, status: status === 'all' ? undefined : status })
+      const response = await adminVotesService.list({ page, limit: 10, status: status === 'all' ? undefined : status, keyword: keyword || undefined })
       setVotes(response.data)
       setPagination(response.pagination)
     } catch (error) {
@@ -73,9 +75,16 @@ export default function AdminVotesPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, status])
+  }, [page, status, keyword])
 
   useEffect(() => { load() }, [load])
+
+  const resetFilters = () => {
+    setKeywordInput('')
+    setKeyword('')
+    setStatus('all')
+    setPage(1)
+  }
 
   const openEdit = (vote: Vote) => {
     setEditing(vote)
@@ -136,13 +145,38 @@ export default function AdminVotesPage() {
         <AdminStatCard label="Điểm trung bình" value={average.toFixed(1)} helper="Các phiếu đang hiển thị" dark />
       </div>
       <AdminTableFrame>
-        <div className="flex items-end justify-between border-b-2 border-manga-ink p-6">
-          <label className="w-56"><span className={labelClass}>Trạng thái</span><select value={status} onChange={(e) => { setStatus(e.target.value as 'all' | VoteStatus); setPage(1) }} className={inputClass}><option value="all">Tất cả</option><option value="submitted">Đã gửi</option><option value="verified">Đã xác minh</option></select></label>
-          <button type="button" onClick={load} className={iconClass}><RefreshCw className={loading ? 'animate-spin' : ''} /></button>
+        <div className="flex flex-col gap-4 border-b-2 border-manga-ink p-6 md:flex-row md:items-end md:justify-between">
+          <form onSubmit={(e) => { e.preventDefault(); setKeyword(keywordInput.trim()); setPage(1) }} className="flex-1 max-w-lg">
+            <span className={labelClass}>Tìm kiếm</span>
+            <div className="flex gap-2">
+              <input value={keywordInput} onChange={(e) => setKeywordInput(e.target.value)} className={inputClass} placeholder="Tìm quyết định, ghi chú..." />
+              <button type="submit" className={iconClass}><Search className="h-5 w-5" /></button>
+            </div>
+          </form>
+          <div className="flex gap-2">
+            <button type="button" onClick={load} className={iconClass} title="Tải lại"><RefreshCw className={loading ? 'animate-spin' : ''} /></button>
+            <button type="button" onClick={resetFilters} className={iconClass} title="Xóa bộ lọc"><X className="h-5 w-5" /></button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[950px] text-left">
-            <thead className="bg-[#282828] text-xs font-black uppercase text-white"><tr><th className="px-6 py-4">Người bỏ phiếu</th><th className="px-5 py-4">Phiên</th><th className="px-5 py-4">Quyết định</th><th className="px-5 py-4">Điểm</th><th className="px-5 py-4">Trạng thái</th><th className="px-5 py-4 text-right">Thao tác</th></tr></thead>
+            <thead className="bg-[#282828] text-xs font-black uppercase text-white"><tr>
+              <th className="px-6 py-4">Người bỏ phiếu</th>
+              <th className="px-5 py-4">Phiên</th>
+              <th className="px-5 py-4">Quyết định</th>
+              <th className="px-5 py-4">Điểm</th>
+              <th className="px-5 py-4 min-w-[165px]">
+                <div className="flex flex-col gap-1">
+                  <span>Trạng thái</span>
+                  <select value={status} onChange={(e) => { setStatus(e.target.value as 'all' | VoteStatus); setPage(1) }} className="block w-full border border-gray-600 bg-[#3a3a3a] text-white px-2 py-1 text-xs font-bold outline-none focus:border-white">
+                    <option value="all">Tất cả</option>
+                    <option value="submitted">Đã gửi</option>
+                    <option value="verified">Đã xác minh</option>
+                  </select>
+                </div>
+              </th>
+              <th className="px-5 py-4 text-right">Thao tác</th>
+            </tr></thead>
             <tbody>
               {loading ? <tr><td colSpan={6} className="p-12 text-center font-black">Đang tải...</td></tr> : votes.length === 0 ? <tr><td colSpan={6} className="p-12 text-center font-black text-gray-500">Không có phiếu.</td></tr> : votes.map((vote) => (
                 <tr key={vote.vote_id} className="border-b-2 border-manga-ink">

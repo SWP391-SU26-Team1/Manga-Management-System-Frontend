@@ -603,17 +603,9 @@ export default function AdminSeriesPage() {
 
       <AdminTableFrame>
         <div className="space-y-5 border-b-2 border-manga-ink p-6">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <AdminFilters
-              tabs={STATUS_TABS}
-              activeTab={activeTab}
-              onTabChange={(tab) => {
-                setStatusFilter(statusTabMap[tab] || 'all')
-                setPage(1)
-              }}
-            />
-            <form onSubmit={handleSearch} className="flex flex-col gap-3 sm:flex-row">
-              <div className="relative min-w-0 sm:w-80">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <form onSubmit={handleSearch} className="flex-1 max-w-lg">
+              <div className="relative">
                 <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500" />
                 <input
                   value={keywordInput}
@@ -622,47 +614,45 @@ export default function AdminSeriesPage() {
                   className={`${inputClass} pl-12`}
                 />
               </div>
-              <AdminButton type="submit" icon={Search} disabled={loading}>Tìm kiếm</AdminButton>
             </form>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1fr_220px_180px_auto] xl:items-end">
-            <label>
-              <span className={labelClass}>Thể loại chứa</span>
-              <input
-                value={genre}
-                onChange={(event) => {
-                  setGenre(event.target.value)
-                  setPage(1)
-                }}
-                placeholder="Ví dụ: Fantasy"
-                className={inputClass}
-              />
-            </label>
-            <label>
-              <span className={labelClass}>Sắp xếp theo</span>
-              <select value={sort} onChange={(event) => { setSort(event.target.value); setPage(1) }} className={inputClass}>
-                <option value="created_at">Ngày tạo</option>
-                <option value="updated_at">Ngày cập nhật</option>
-                <option value="title">Tên series</option>
-                <option value="view_count">Lượt xem</option>
-                <option value="status">Trạng thái</option>
-              </select>
-            </label>
-            <label>
-              <span className={labelClass}>Thứ tự</span>
-              <select value={order} onChange={(event) => { setOrder(event.target.value as 'asc' | 'desc'); setPage(1) }} className={inputClass}>
-                <option value="desc">Giảm dần</option>
-                <option value="asc">Tăng dần</option>
-              </select>
-            </label>
-            <div className="flex gap-3">
-              <button type="button" onClick={() => loadSeries()} disabled={loading} className={iconButtonClass} title="Tải lại">
-                <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
-              </button>
-              <button type="button" onClick={resetFilters} className={iconButtonClass} title="Xóa bộ lọc">
-                <X className="h-5 w-5" />
-              </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="min-w-44">
+                <span className={labelClass}>Thể loại chứa</span>
+                <input
+                  value={genre}
+                  onChange={(event) => {
+                    setGenre(event.target.value)
+                    setPage(1)
+                  }}
+                  placeholder="Ví dụ: Fantasy"
+                  className={`${inputClass} !py-2`}
+                />
+              </label>
+              <label className="min-w-44">
+                <span className={labelClass}>Sắp xếp theo</span>
+                <select value={sort} onChange={(event) => { setSort(event.target.value); setPage(1) }} className={`${inputClass} !py-2`}>
+                  <option value="created_at">Ngày tạo</option>
+                  <option value="updated_at">Ngày cập nhật</option>
+                  <option value="title">Tên series</option>
+                  <option value="view_count">Lượt xem</option>
+                  <option value="status">Trạng thái</option>
+                </select>
+              </label>
+              <label className="min-w-32">
+                <span className={labelClass}>Thứ tự</span>
+                <select value={order} onChange={(event) => { setOrder(event.target.value as 'asc' | 'desc'); setPage(1) }} className={`${inputClass} !py-2`}>
+                  <option value="desc">Giảm dần</option>
+                  <option value="asc">Tăng dần</option>
+                </select>
+              </label>
+              <div className="flex gap-2 self-end">
+                <button type="button" onClick={() => loadSeries()} disabled={loading} className={iconButtonClass} title="Tải lại">
+                  <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+                </button>
+                <button type="button" onClick={resetFilters} className={iconButtonClass} title="Xóa bộ lọc">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -675,7 +665,26 @@ export default function AdminSeriesPage() {
                 <th className="px-5 py-4">Thể loại</th>
                 <th className="px-5 py-4">Lượt xem</th>
                 <th className="px-5 py-4">Ngày tạo</th>
-                <th className="px-5 py-4">Trạng thái</th>
+                <th className="px-5 py-4 min-w-[165px]">
+                  <div className="flex flex-col gap-1">
+                    <span>Trạng thái</span>
+                    <select
+                      value={statusFilter}
+                      onChange={(event) => {
+                        setStatusFilter(event.target.value as StatusFilter)
+                        setPage(1)
+                      }}
+                      className="block w-full border border-gray-600 bg-[#3a3a3a] text-white px-2 py-1 text-xs font-bold outline-none focus:border-white"
+                    >
+                      <option value="all">Tất cả</option>
+                      {SERIES_STATUSES.map((status) => (
+                        <option key={status} value={status}>
+                          {statusLabel[status]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </th>
                 <th className="px-5 py-4 text-right">Thao tác</th>
               </tr>
             </thead>

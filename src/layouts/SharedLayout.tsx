@@ -38,11 +38,15 @@ export function SharedLayout({ header }: SharedLayoutProps) {
   if (path.startsWith('/dashboard/editorial-board') && role !== 'BOARD' && role !== 'ADMIN') {
     return <Navigate to="/login" replace />
   }
+  if (path.startsWith('/dashboard/admin') && role !== 'ADMIN') {
+    return <Navigate to="/login" replace />
+  }
 
   const isDashboardRoot = location.pathname === '/dashboard/mangaka' || 
                           location.pathname === '/dashboard/assistant' ||
                           location.pathname === '/dashboard/board' ||
-                          location.pathname === '/dashboard/tantou';
+                          location.pathname === '/dashboard/tantou' ||
+                          location.pathname === '/dashboard/admin';
 
   return (
     <div className="flex h-screen bg-[#fafafa] font-sans text-manga-ink overflow-hidden">

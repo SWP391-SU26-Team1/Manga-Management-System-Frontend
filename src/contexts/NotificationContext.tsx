@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { Bell, AlertTriangle, RefreshCw, FileText, Star, Vote, AlertCircle, X } from 'lucide-react'
 import { boardService } from '@/services/board.service'
+import { io, Socket } from 'socket.io-client'
 
 export interface Notification {
   id: string
@@ -38,6 +39,17 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [toasts, setToasts] = useState<ToastAlert[]>([])
+  const [token, setToken] = useState<string | null>(() => {
+    const userStr = localStorage.getItem('mangaflow_user')
+    if (userStr) {
+      try {
+        return JSON.parse(userStr).token || null
+      } catch {
+        return null
+      }
+    }
+    return null
+  })
 
   const fetchNotifications = async () => {
     // Only fetch if user is logged in
@@ -69,9 +81,92 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // Fetch notifications once and listen to authentication changes
   useEffect(() => {
     fetchNotifications()
+
+    const handleAuthChange = () => {
+      const userStr = localStorage.getItem('mangaflow_user')
+      if (userStr) {
+        try {
+          const parsed = JSON.parse(userStr)
+          setToken(parsed.token || null)
+          fetchNotifications()
+        } catch {
+          setToken(null)
+        }
+      } else {
+        setToken(null)
+        setNotifications([])
+      }
+    }
+
+    window.addEventListener('mangaflow_profile_updated', handleAuthChange)
+    window.addEventListener('storage', handleAuthChange)
+    return () => {
+      window.removeEventListener('mangaflow_profile_updated', handleAuthChange)
+      window.removeEventListener('storage', handleAuthChange)
+    }
   }, [])
+
+  // Setup Real-time WebSockets connection
+  useEffect(() => {
+    if (!token) return
+
+    let socket: Socket | null = null
+
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      socket = io(baseUrl, {
+        auth: { token }
+      })
+
+      socket.on('connect', () => {
+        console.log('Real-time notifications WebSocket connected')
+      })
+
+      socket.on('notification:new', (newNotif: any) => {
+        console.log('Received real-time notification:', newNotif)
+        
+        const mapped: Notification = {
+          id: newNotif.id || newNotif.notification_id || Math.random().toString(),
+          title: newNotif.title || 'THÔNG BÁO MỚI',
+          message: newNotif.message || newNotif.content,
+          time: 'Vừa xong',
+          type: newNotif.type || 'REVIEW',
+          category: 'standard',
+          unread: true
+        }
+
+        setNotifications(prev => [mapped, ...prev])
+        
+        // Trigger toast overlay
+        const newToast: ToastAlert = {
+          id: mapped.id,
+          title: mapped.title,
+          message: mapped.message,
+          category: 'voting_success'
+        }
+        setToasts(prev => [...prev, newToast])
+        
+        setTimeout(() => {
+          setToasts(prev => prev.filter(t => t.id !== mapped.id))
+        }, 3500)
+      })
+
+      socket.on('connect_error', (err) => {
+        console.error('WebSocket connection error:', err.message)
+      })
+    } catch (e) {
+      console.error('Error initializing WebSocket:', e)
+    }
+
+    return () => {
+      if (socket) {
+        socket.disconnect()
+      }
+    }
+  }, [token])
 
   useEffect(() => {
     if (notifications.length > 0) {

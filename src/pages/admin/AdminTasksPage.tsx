@@ -1,5 +1,5 @@
 import React, { FormEvent, useCallback, useEffect, useState } from 'react'
-import { AlertCircle, CalendarClock, CheckCircle2, ClipboardList, Edit3, Eye, Plus, RefreshCw, Save, Trash2, UserRound, X } from 'lucide-react'
+import { AlertCircle, CalendarClock, CheckCircle2, ClipboardList, Edit3, Eye, Plus, RefreshCw, Save, Search, Trash2, UserRound, X } from 'lucide-react'
 import { AdminButton } from '@/components/admin/AdminButton'
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader'
 import { AdminPagination } from '@/components/admin/AdminPagination'
@@ -35,6 +35,8 @@ export default function AdminTasksPage() {
   const [pagination, setPagination] = useState(emptyPagination)
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState<'all' | PageTaskStatus>('all')
+  const [keywordInput, setKeywordInput] = useState('')
+  const [keyword, setKeyword] = useState('')
   const [loading, setLoading] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
@@ -45,10 +47,27 @@ export default function AdminTasksPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    try { const [list, summary] = await Promise.all([adminPageTasksService.list({ page, limit: 10, status: status === 'all' ? undefined : status, sort: 'created_at', order: 'desc' }), adminDashboardService.getTaskStats()]); setTasks(list.data); setPagination(list.pagination); setStats(summary) }
+    try {
+      const [list, summary] = await Promise.all([
+        adminPageTasksService.list({ page, limit: 10, status: status === 'all' ? undefined : status, keyword: keyword || undefined, sort: 'created_at', order: 'desc' }),
+        adminDashboardService.getTaskStats()
+      ])
+      setTasks(list.data)
+      setPagination(list.pagination)
+      setStats(summary)
+    }
     catch (error) { setFeedback({ type: 'error', message: errorMessage(error) }) } finally { setLoading(false) }
-  }, [page, status])
+  }, [keyword, page, status])
+
   useEffect(() => { load() }, [load])
+
+  const resetFilters = () => {
+    setKeywordInput('')
+    setKeyword('')
+    setStatus('all')
+    setPage(1)
+  }
+
   const openEdit = (task: PageTask) => { setEditing(task); setForm({ task_type: task.task_type, assistant_id: task.assistant_id || '', deadline: task.deadline ? new Date(task.deadline).toISOString().slice(0, 16) : '', content: task.content || '', status: task.status }) }
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); if (!editing) return; setSaving(true)
@@ -63,8 +82,36 @@ export default function AdminTasksPage() {
     <AdminPageHeader eyebrow="Page task trực tiếp" title="Quản lý công việc" description="Theo dõi phân công, deadline và trạng thái sản xuất." />
     {feedback && <div className={`flex gap-3 border-2 border-manga-ink p-4 font-black ${feedback.type === 'success' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-manga-red'}`}>{feedback.type === 'success' ? <CheckCircle2 /> : <AlertCircle />}{feedback.message}</div>}
     <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4"><AdminStatCard label="Tổng công việc" value={stats?.total || 0} helper="Tất cả page task" icon={ClipboardList} /><AdminStatCard label="Đang thực hiện" value={(stats?.by_status.in_progress || 0) + (stats?.by_status.assigned || 0)} helper="Đã gán hoặc đang làm" icon={UserRound} /><AdminStatCard label="Hoàn tất" value={(stats?.by_status.completed || 0) + (stats?.by_status.approved || 0)} helper="Đã hoàn thành hoặc duyệt" icon={CheckCircle2} accent="green" /><AdminStatCard label="Quá hạn" value={stats?.overdue || 0} helper="Cần xử lý ngay" icon={CalendarClock} dark /></div>
-    <AdminTableFrame><div className="flex flex-col gap-4 border-b-2 border-manga-ink p-6 sm:flex-row sm:items-end sm:justify-between"><label className="w-full max-w-xs"><span className={labelClass}>Trạng thái</span><select value={status} onChange={(e) => { setStatus(e.target.value as 'all' | PageTaskStatus); setPage(1) }} className={inputClass}><option value="all">Tất cả</option>{STATUSES.map((value) => <option key={value} value={value}>{value.replace(/_/g, ' ')}</option>)}</select></label><button onClick={load} className={iconClass}><RefreshCw className={loading ? 'animate-spin' : ''} /></button></div>
-      <div className="overflow-x-auto"><table className="w-full min-w-[1050px] text-left"><thead className="bg-[#282828] text-xs font-black uppercase text-white"><tr><th className="px-6 py-4">Công việc</th><th className="px-5 py-4">Trang</th><th className="px-5 py-4">Assistant</th><th className="px-5 py-4">Deadline</th><th className="px-5 py-4">Trạng thái</th><th className="px-5 py-4 text-right">Thao tác</th></tr></thead><tbody>{loading ? <tr><td colSpan={6} className="p-12 text-center font-black">Đang tải...</td></tr> : tasks.length === 0 ? <tr><td colSpan={6} className="p-12 text-center font-black text-gray-500">Không có công việc.</td></tr> : tasks.map((task) => <tr key={task.task_id} className="border-b-2 border-manga-ink"><td className="px-6 py-5"><p className="font-black">{task.task_type}</p><p className="mt-1 max-w-xs truncate text-xs text-gray-500">{task.content || 'Không có mô tả'}</p></td><td className="px-5 py-5 font-bold">Trang {task.page?.page_number || '?'}<p className="text-xs text-gray-400">{task.page_id.slice(0, 8)}</p></td><td className="px-5 py-5 font-bold">{task.assistant?.name || task.assistant?.username || 'Chưa gán'}</td><td className={`px-5 py-5 font-semibold ${task.deadline && new Date(task.deadline) < new Date() && !['completed','approved','cancelled','rejected'].includes(task.status) ? 'text-manga-red' : 'text-gray-600'}`}>{formatDate(task.deadline)}</td><td className="px-5 py-5"><div className="space-y-2"><AdminStatusBadge status={task.status} /><select value={task.status} disabled={busyId === task.task_id} onChange={(e) => changeStatus(task, e.target.value as PageTaskStatus)} className="block border-2 border-manga-ink px-2 py-2 text-xs font-black">{STATUSES.map((value) => <option key={value} value={value}>{value.replace(/_/g, ' ')}</option>)}</select></div></td><td className="px-5 py-5"><div className="flex justify-end gap-2"><button onClick={() => setDetail(task)} className={`${iconClass} bg-[#282828] text-white`}><Eye /></button><button onClick={() => openEdit(task)} className={iconClass}><Edit3 /></button><button disabled={busyId === task.task_id} onClick={() => remove(task)} className={`${iconClass} bg-manga-red text-white`}><Trash2 /></button></div></td></tr>)}</tbody></table></div>
+    <AdminTableFrame>
+      <div className="flex flex-col gap-4 border-b-2 border-manga-ink p-6 md:flex-row md:items-end md:justify-between">
+        <form onSubmit={(e) => { e.preventDefault(); setKeyword(keywordInput.trim()); setPage(1) }} className="flex-1 max-w-lg">
+          <span className={labelClass}>Tìm kiếm</span>
+          <div className="flex gap-2">
+            <input value={keywordInput} onChange={(e) => setKeywordInput(e.target.value)} className={inputClass} placeholder="Tìm loại công việc, nội dung..." />
+            <button type="submit" className={iconClass}><Search className="h-5 w-5" /></button>
+          </div>
+        </form>
+        <div className="flex gap-2">
+          <button onClick={load} className={iconClass} title="Tải lại"><RefreshCw className={loading ? 'animate-spin' : ''} /></button>
+          <button onClick={resetFilters} className={iconClass} title="Xóa bộ lọc"><X className="h-5 w-5" /></button>
+        </div>
+      </div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[1050px] text-left"><thead className="bg-[#282828] text-xs font-black uppercase text-white"><tr>
+        <th className="px-6 py-4">Công việc</th>
+        <th className="px-5 py-4">Trang</th>
+        <th className="px-5 py-4">Assistant</th>
+        <th className="px-5 py-4">Deadline</th>
+        <th className="px-5 py-4 min-w-[165px]">
+          <div className="flex flex-col gap-1">
+            <span>Trạng thái</span>
+            <select value={status} onChange={(e) => { setStatus(e.target.value as 'all' | PageTaskStatus); setPage(1) }} className="block w-full border border-gray-600 bg-[#3a3a3a] text-white px-2 py-1 text-xs font-bold outline-none focus:border-white">
+              <option value="all">Tất cả</option>
+              {STATUSES.map((value) => <option key={value} value={value}>{value.replace(/_/g, ' ')}</option>)}
+            </select>
+          </div>
+        </th>
+        <th className="px-5 py-4 text-right">Thao tác</th>
+      </tr></thead><tbody>{loading ? <tr><td colSpan={6} className="p-12 text-center font-black">Đang tải...</td></tr> : tasks.length === 0 ? <tr><td colSpan={6} className="p-12 text-center font-black text-gray-500">Không có công việc.</td></tr> : tasks.map((task) => <tr key={task.task_id} className="border-b-2 border-manga-ink"><td className="px-6 py-5"><p className="font-black">{task.task_type}</p><p className="mt-1 max-w-xs truncate text-xs text-gray-500">{task.content || 'Không có mô tả'}</p></td><td className="px-5 py-5 font-bold">Trang {task.page?.page_number || '?'}<p className="text-xs text-gray-400">{task.page_id.slice(0, 8)}</p></td><td className="px-5 py-5 font-bold">{task.assistant?.name || task.assistant?.username || 'Chưa gán'}</td><td className={`px-5 py-5 font-semibold ${task.deadline && new Date(task.deadline) < new Date() && !['completed','approved','cancelled','rejected'].includes(task.status) ? 'text-manga-red' : 'text-gray-600'}`}>{formatDate(task.deadline)}</td><td className="px-5 py-5"><div className="space-y-2"><AdminStatusBadge status={task.status} /><select value={task.status} disabled={busyId === task.task_id} onChange={(e) => changeStatus(task, e.target.value as PageTaskStatus)} className="block border-2 border-manga-ink px-2 py-2 text-xs font-black">{STATUSES.map((value) => <option key={value} value={value}>{value.replace(/_/g, ' ')}</option>)}</select></div></td><td className="px-5 py-5"><div className="flex justify-end gap-2"><button onClick={() => setDetail(task)} className={`${iconClass} bg-[#282828] text-white`}><Eye /></button><button onClick={() => openEdit(task)} className={iconClass}><Edit3 /></button><button disabled={busyId === task.task_id} onClick={() => remove(task)} className={`${iconClass} bg-manga-red text-white`}><Trash2 /></button></div></td></tr>)}</tbody></table></div>
       <div className="flex flex-col gap-4 border-t-2 border-manga-ink px-6 py-5 md:flex-row md:items-center md:justify-between"><p className="text-sm font-black uppercase">Hiển thị {start}-{end} / {pagination.total}</p><AdminPagination page={pagination.page} totalPages={pagination.totalPages} onPageChange={setPage} disabled={loading} /></div>
     </AdminTableFrame>
     {editing && <TaskModal task={editing} form={form} saving={saving} onChange={(key, value) => setForm((current) => ({ ...current, [key]: value }))} onClose={() => !saving && setEditing(null)} onSubmit={submit} />}

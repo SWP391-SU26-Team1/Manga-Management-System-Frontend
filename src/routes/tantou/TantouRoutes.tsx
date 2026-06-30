@@ -16,6 +16,7 @@ import EditorialReportsPage from '@/pages/tantou-editor/EditorialReportsPage'
 import TeamManagementPage from '@/pages/tantou-editor/TeamManagementPage'
 import TantouSettingsPage from '@/pages/tantou-editor/TantouSettingsPage'
 import ProfilePage from '@/pages/tantou-editor/ProfilePage'
+import NotificationsPage from '@/pages/tantou-editor/NotificationsPage'
 
 export default function TantouRoutes() {
   return (
@@ -35,6 +36,7 @@ export default function TantouRoutes() {
         <Route path="team" element={<TeamManagementPage />} />
         <Route path="settings" element={<TantouSettingsPage />} />
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
       </Route>
     </Routes>
   )

@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router'
-import { FileText, Clock, AlertTriangle, CheckCircle, Eye, Upload, Send, X, BookOpen } from 'lucide-react'
+import { FileText, Clock, AlertTriangle, CheckCircle, Eye, Send, X, BookOpen, MessageSquare } from 'lucide-react'
 import { seriesService, SeriesAPI } from '@/services/series.service'
 import { chapterService } from '@/services/chapter.service'
 import { pageService } from '@/services/page.service'
-import { uploadService } from '@/services/upload.service'
 import { manuscriptService, ManuscriptAPI } from '@/services/manuscript.service'
-import { rankingService } from '@/services/ranking.service'
+import { editorService } from '@/services/editor.service'
 
 const getChapterDisplayStatus = (ch: any, m?: any) => {
   if (m) {
@@ -15,16 +14,16 @@ const getChapterDisplayStatus = (ch: any, m?: any) => {
     }
     switch (m.status) {
       case 'draft':
-        return 'ĐANG SOẠN'
+        return 'CHỜ TANTOU DUYỆT'
       case 'needs_revision':
         return 'NHẬN XÉT TỪ EDITOR'
       case 'rejected':
         return 'TỪ CHỐI'
       case 'submitted':
-      case 'in_review':
-        return 'CHỜ TANTOU DUYỆT'
       case 'approved':
         return 'ĐÃ DUYỆT'
+      case 'in_review':
+        return 'CHỜ TANTOU DUYỆT'
       case 'published':
         return 'ĐÃ XUẤT BẢN'
       case 'archived':
@@ -39,22 +38,24 @@ const getChapterDisplayStatus = (ch: any, m?: any) => {
   // No manuscript
   switch (ch.status) {
     case 'draft':
-      return 'ĐANG SOẠN'
     case 'pending_review':
-      return 'CHỜ TANTOU DUYỆT'
+      return 'CHƯA NỘP'
     case 'approved':
+    case 'submitted':
       return 'ĐÃ DUYỆT'
     case 'published':
       return 'ĐÃ XUẤT BẢN'
     case 'rejected':
       return 'TỪ CHỐI'
     default:
-      return 'ĐANG VẼ LỚP'
+      return 'CHƯA NỘP'
   }
 }
 
 const getStatusDisplay = (displayStatus: string) => {
   switch (displayStatus) {
+    case 'CHƯA NỘP':
+      return { label: 'CHƯA NỘP', classes: 'bg-gray-400 text-white border-2 border-black font-extrabold' }
     case 'ĐANG SOẠN':
       return { label: 'ĐANG SOẠN', classes: 'bg-orange-500 text-white border-2 border-black font-extrabold' }
     case 'GỢI Ý TỪ TRỢ LÝ':
@@ -92,14 +93,21 @@ export default function ManuscriptsPage() {
   
   const [newChapterTitle, setNewChapterTitle] = useState('')
   const [newChapterNum, setNewChapterNum] = useState('')
-  const [newChapterPages, setNewChapterPages] = useState('20')
-  const [files, setFiles] = useState<File[]>([])
+  const [scriptContent, setScriptContent] = useState('')
 
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [viewingSuggestion, setViewingSuggestion] = useState<any | null>(null)
   const [viewingEditorComment, setViewingEditorComment] = useState<any | null>(null)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg)
+    setTimeout(() => setToastMessage(null), 3000)
+  }
+
+
 
   // Load data from services
   const loadData = async () => {
@@ -127,7 +135,7 @@ export default function ManuscriptsPage() {
 
       // Fetch notifications to extract editor feedback notes
       try {
-        const notifs = await rankingService.getNotifications()
+        const notifs = await editorService.getNotifications()
         setNotifications(notifs)
       } catch (err) {
         console.error('Failed to load notifications:', err)
@@ -216,59 +224,97 @@ export default function ManuscriptsPage() {
         chapterNumberStr = String(newCh.chapter_number)
       }
 
-      // 2. Nếu người dùng chọn file tải lên, tiến hành tạo và submit manuscript
-      if (files.length > 0) {
-        // a. Upload files lên Cloudinary
-        const uploadPromises = files.map(f => uploadService.uploadSingle(f, 'manuscripts'))
-        const uploadResults = await Promise.all(uploadPromises)
-
-        // b. Lấy mangaka_id từ localStorage
-        const userStr = localStorage.getItem('mangaflow_user')
-        let mangakaId = ''
-        if (userStr) {
-          try {
-            const parsed = JSON.parse(userStr)
-            mangakaId = parsed.user?.id || parsed.id || ''
-          } catch {
-            // ignore
-          }
-        }
-
-        if (!mangakaId) {
-          throw new Error('Không tìm thấy thông tin tài khoản đăng nhập!')
-        }
-
-        // c. Tạo manuscript
-        const manuscript = await manuscriptService.create({
-          mangaka_id: mangakaId,
-          series_id: selectedSeriesId,
-          chapter_id: chapterId,
-          title: `Bản thảo Chương ${chapterNumberStr}: ${chapterTitle}`,
-          file_url: uploadResults[0].secure_url
-        })
-
-        // d. Thêm file liên kết để backend/editor có thể đọc
-        await Promise.all(
-          uploadResults.map((res, index) => {
-            const f = files[index]
-            return manuscriptService.addFile({
-              manuscript_id: manuscript._id,
-              file_url: res.secure_url,
-              file_name: f.name,
-              file_type: f.name.split('.').pop() || 'psd'
-            })
-          })
-        )
-
-        // e. Submit manuscript lên Board
-        await manuscriptService.submit(manuscript._id)
+      // 2. Kiểm tra tính hợp lệ của kịch bản chữ
+      if (!scriptContent.trim()) {
+        setErrorMsg('Vui lòng nhập nội dung kịch bản chữ!')
+        setIsSubmitting(false)
+        return
       }
 
-      alert('Đã thực hiện thành công!')
+      // b. Lấy mangaka_id từ localStorage
+      const userStr = localStorage.getItem('mangaflow_user')
+      let mangakaId = ''
+      if (userStr) {
+        try {
+          const parsed = JSON.parse(userStr)
+          mangakaId = parsed.user?.id || parsed.id || ''
+        } catch {
+          // ignore
+        }
+      }
+
+      if (!mangakaId) {
+        throw new Error('Không tìm thấy thông tin tài khoản đăng nhập!')
+      }
+
+      // c. Tạo manuscript với trạng thái 'draft' (Chờ Tantou duyệt) và nội dung kịch bản chữ
+      await manuscriptService.create({
+        mangaka_id: mangakaId,
+        series_id: selectedSeriesId,
+        chapter_id: chapterId,
+        title: `Bản thảo Chương ${chapterNumberStr}: ${chapterTitle}`,
+        content: scriptContent.trim(),
+        status: 'draft'
+      })
+
+      // f. Gửi thông báo đến toàn bộ các Tantou Editor phụ trách
+      try {
+        const mems = await seriesService.getMembers(selectedSeriesId)
+        const editors = mems
+          .filter((m: any) => m.users?.role?.toLowerCase() === 'editor')
+          .map((m: any) => m.users.user_id)
+          
+          // Danh sách các Biên tập viên (Tantou Editor) trong hệ thống để tất cả đều nhận được thông báo
+          const systemEditors = [
+            'b29fb935-7a5d-4988-9327-a8e453ba7322', // LuanHuynh296
+            'f9a1ee69-6036-4fd6-bbef-de0e00370309', // editor_akira (Akira Watanabe)
+            '83556777-7c27-4039-ba81-655e58a788a7', // Tantou_Editor
+            '66666666-6666-6666-6666-666666666666', // editor_haru
+            '90000000-0000-0000-0000-000000000004', // editor_mika
+            'dcba68dd-5e62-49e2-a826-d2f5e6941561', // codex_test_1781698003205
+            'usr_editor_001'                        // fallback mock
+          ]
+
+          systemEditors.forEach(id => {
+            if (!editors.includes(id)) {
+              editors.push(id)
+            }
+          })
+
+          const activeSeries = seriesList.find(s => s._id === selectedSeriesId)
+          
+          // Lấy tên của mangaka hiện tại để chèn vào thông báo
+          let mangakaName = 'BiLong'
+          if (userStr) {
+            try {
+              const parsed = JSON.parse(userStr)
+              mangakaName = parsed.fullName || parsed.name || parsed.username || parsed.user?.fullName || parsed.user?.name || parsed.user?.username || 'BiLong'
+            } catch {
+              // ignore
+            }
+          }
+
+          await Promise.all(
+            editors.map(editorId =>
+              editorService.sendInternalNotification(
+                editorId,
+                "Cập nhật mới",
+                `Có bản thảo mới từ ${mangakaName} cần duyệt cho bộ truyện [${activeSeries?.title || 'One Piece'}].`,
+                "manuscript_submitted"
+              ).catch(errNotif => {
+                console.error(`Lỗi khi gửi thông báo cho editor ${editorId}:`, errNotif)
+              })
+            )
+          )
+        } catch (errNotifs) {
+          console.error("Lỗi khi xử lý thông báo nộp bản thảo cho Tantou:", errNotifs)
+        }
+
+      showToast('Đã nộp bản thảo thành công!')
       setShowSubmitModal(false)
       setNewChapterTitle('')
       setNewChapterNum('')
-      setFiles([])
+      setScriptContent('')
       setSelectedChapterId(null)
       
       // Reload page data
@@ -381,7 +427,7 @@ export default function ManuscriptsPage() {
                 setSelectedChapterId(null)
                 setNewChapterTitle('')
                 setNewChapterNum('')
-                setFiles([])
+                setScriptContent('')
                 if (seriesList.length > 0) {
                   setSelectedSeriesId(seriesList[0]._id)
                 }
@@ -484,14 +530,15 @@ export default function ManuscriptsPage() {
                             setSelectedChapterId(ch.id)
                             setNewChapterNum(String(ch.chapterNumber))
                             setNewChapterTitle(ch.title)
-                            setFiles([])
+                            setScriptContent(ch.latestManuscript?.content || '')
                             setShowSubmitModal(true)
                           }}
                           className="flex items-center gap-1.5 text-[10px] font-black text-black uppercase hover:underline text-left whitespace-nowrap"
                         >
-                          <Upload className="w-3.5 h-3.5 flex-shrink-0" />
+                          <Send className="w-3.5 h-3.5 flex-shrink-0" />
                           NỘP BẢN THẢO MỚI
                         </button>
+
                         {ch.displayStatus === 'GỢI Ý TỪ TRỢ LÝ' && ch.latestManuscript && (
                           <button
                             onClick={() => setViewingSuggestion(ch)}
@@ -632,17 +679,6 @@ export default function ManuscriptsPage() {
                   required
                 />
               </div>
-              <div>
-                <label className="block text-[11px] font-black uppercase mb-1">Số Trang dự kiến</label>
-                <input
-                  type="number"
-                  value={newChapterPages}
-                  onChange={e => setNewChapterPages(e.target.value)}
-                  className="w-full border-2 border-black p-2 text-xs font-bold focus:outline-none rounded-none"
-                  placeholder="20"
-                  required
-                />
-              </div>
             </div>
 
             <div className="mb-4">
@@ -658,30 +694,16 @@ export default function ManuscriptsPage() {
               />
             </div>
 
-            <div className="mb-5">
+            <div className="mb-4">
               <label className="block text-[11px] font-black uppercase mb-1">
-                File đính kèm (PSD/ZIP/Ảnh) {!selectedChapterId && '(Tùy chọn)'}
+                Nội dung kịch bản chữ (Nếu có)
               </label>
-              <label className="border-2 border-dashed border-gray-400 p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:border-black bg-gray-50 transition-all rounded-none block">
-                <Upload className="w-7 h-7 mb-2 text-gray-500 mx-auto" />
-                <p className="text-[10px] font-black text-gray-500 uppercase max-w-xs mx-auto break-all">
-                  {files.length > 0 
-                    ? `Đã chọn ${files.length} file: ${files.map(f => f.name).join(', ')}`
-                    : 'Kéo thả file/ảnh hoặc click để tải lên'}
-                </p>
-                <input
-                  type="file"
-                  multiple
-                  accept=".psd,.zip,.rar,.pdf,image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files.length > 0) {
-                      setFiles(Array.from(e.target.files))
-                    }
-                  }}
-                  required={!!selectedChapterId}
-                />
-              </label>
+              <textarea
+                value={scriptContent}
+                onChange={e => setScriptContent(e.target.value)}
+                className="w-full border-2 border-black p-2 text-xs font-bold focus:outline-none rounded-none h-28 resize-none text-gray-800"
+                placeholder="Nhập hoặc chỉnh sửa nội dung kịch bản chữ tại đây..."
+              />
             </div>
 
             <div className="flex gap-3 justify-end">
@@ -691,7 +713,7 @@ export default function ManuscriptsPage() {
                   setShowSubmitModal(false)
                   setNewChapterTitle('')
                   setNewChapterNum('')
-                  setFiles([])
+                  setScriptContent('')
                   setSelectedChapterId(null)
                 }}
                 disabled={isSubmitting}
@@ -816,6 +838,14 @@ export default function ManuscriptsPage() {
           </div>
         </div>
       )}
+
+      {toastMessage && (
+        <div className="fixed bottom-5 right-5 z-50 bg-black text-white px-6 py-3 border-4 border-[#E63946] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] font-bold text-sm flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <CheckCircle className="w-5 h-5 text-green-400" />
+          {toastMessage}
+        </div>
+      )}
+
       </div>
 
       {/* Footer */}

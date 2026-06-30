@@ -103,6 +103,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             return [mappedNotif, ...prev]
           })
 
+          // Dispatch window event so Header and Dashboard components re-fetch list from backend in real-time
+          window.dispatchEvent(new Event('mangaflow_notifications_updated'))
+
           let category: ToastAlert['category'] = 'rating_success'
           if (newNotification.type === 'RISK' || newNotification.type === 'OVERDUE') {
             category = 'rating_failed'

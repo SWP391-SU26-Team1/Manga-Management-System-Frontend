@@ -394,6 +394,11 @@ export const editorService = {
     return res.data
   },
 
+  overrideManuscriptStatus: async (manuscriptId: string, status: string) => {
+    const res = await api.patch(`/api/editor/manuscripts/${manuscriptId}/override-status`, { status })
+    return res.data
+  },
+
   rejectManuscript: async (manuscriptId: string) => {
     const res = await api.patch(`/api/editor/manuscripts/${manuscriptId}/reject`)
     return res.data
@@ -414,10 +419,7 @@ export const editorService = {
     return res.data
   },
 
-  overrideManuscriptStatus: async (manuscriptId: string, status: string) => {
-    const res = await api.patch(`/api/editor/manuscripts/${manuscriptId}/override-status`, { status })
-    return res.data
-  },
+
 
   bulkApproveManuscripts: async (manuscriptIds: string[], note?: string) => {
     const res = await api.patch('/api/editor/manuscripts/bulk/approve', { manuscript_ids: manuscriptIds, note })
@@ -824,7 +826,15 @@ export const editorService = {
 
   // Tantou submits a pending_review series to the Editorial Board (creates review_session)
   submitSeriesToBoard: async (seriesId: string) => {
-    const res = await api.post(`/api/editor/series/${seriesId}/submit-to-board`)
+    // 1. Cập nhật trạng thái series sang pending_review
+    await api.patch(`/api/editor/series/${seriesId}/status`, { status: 'pending_review' })
+    // 2. Tạo một review session để Hội đồng thấy đề xuất duyệt
+    const res = await api.post('/api/editor/review-sessions', {
+      series_id: seriesId,
+      name: `Duyệt Series`,
+      description: `Đề xuất duyệt tác phẩm từ Tantou Editor`,
+      status: 'pending'
+    })
     return res.data
   },
 

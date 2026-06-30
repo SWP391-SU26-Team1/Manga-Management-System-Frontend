@@ -8,6 +8,7 @@ import { pageService, PageAPI } from '@/services/page.service'
 import { taskService, TaskAPI, LAYER_TYPE_MAP, TaskType } from '@/services/task.service'
 import { regionService } from '@/services/region.service'
 import { uploadService } from '@/services/upload.service'
+import { editorService } from '@/services/editor.service'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -340,6 +341,20 @@ function AssignTaskContent() {
         region_id: dbRegionId
       })
 
+      // Send real-time notification to the assigned assistant (assignedTo is the user_id)
+      if (assignedTo) {
+        try {
+          await editorService.sendInternalNotification(
+            assignedTo,
+            "Nhiệm vụ mới được giao",
+            `Bạn đã được giao nhiệm vụ vẽ lớp [${layerType}] cho Trang ${activePage?.page_number ?? 'N/A'}.`,
+            "task_assigned"
+          )
+        } catch (errNotif) {
+          console.error("Lỗi khi gửi thông báo nội bộ cho trợ lý:", errNotif)
+        }
+      }
+
       setTaskSuccessMsg('Đã giao nhiệm vụ thành công!')
       setTimeout(() => {
         setTaskSuccessMsg('')
@@ -409,7 +424,23 @@ function AssignTaskContent() {
 
   const handleAssignTask = async (taskId: string) => {
     try {
+      const targetTask = tasks.find(t => t._id === taskId)
       await taskService.assign(selectedSeriesId, selectedChapterId, selectedPageId, taskId)
+      
+      // Send real-time notification to the assigned assistant
+      if (targetTask && targetTask.assigned_to) {
+        try {
+          await editorService.sendInternalNotification(
+            targetTask.assigned_to,
+            "Nhiệm vụ mới được giao",
+            `Bạn đã được phân công nhiệm vụ vẽ lớp [${targetTask.task_type || 'task'}] cho Trang ${activePage?.page_number ?? 'N/A'}.`,
+            "task_assigned"
+          )
+        } catch (errNotif) {
+          console.error("Lỗi khi gửi thông báo nội bộ cho trợ lý:", errNotif)
+        }
+      }
+
       setTaskSuccessMsg('Giao việc thành công!')
       setTimeout(() => {
         setTaskSuccessMsg('')

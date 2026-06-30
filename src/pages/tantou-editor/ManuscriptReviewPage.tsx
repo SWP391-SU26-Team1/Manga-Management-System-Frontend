@@ -534,17 +534,55 @@ export default function ManuscriptReviewPage() {
     if (isSubmittingSeries) return
     try {
       setIsSubmittingSeries(true)
-      await editorService.updateSeriesStatus(sId, 'approved')
-      showToast(`Đã phê duyệt Series thành công!`)
+      await editorService.submitSeriesToBoard(sId)
+      showToast(`Đã nộp đề xuất duyệt Series lên Hội Đồng Biên Tập!`)
+
+      // Gửi thông báo đến toàn bộ các Admin và Board member trong hệ thống
+      try {
+        const targetSeries = seriesList.find(s => s.id === sId)
+        const seriesTitle = targetSeries ? targetSeries.title : 'Series mới'
+
+        const systemAdminsAndBoard = [
+          '8915af7c-1825-43cb-bce8-614abf1143c7', // phat123 (admin)
+          '11111111-1111-1111-1111-111111111111', // admin01 (admin)
+          '3790bad3-ac55-4d31-9176-a7318aab0429', // Admin (admin)
+          '2c38fe0d-cd90-45cf-adcd-e5794ae46200', // Toaster (admin)
+          '75770833-7b5e-4fc9-a633-b30ca303fa29', // luanAdmin0101 (admin)
+          '029d5fd5-d073-47b5-8cd2-6edce019edd7', // Phongtt (board)
+          'a1780a4d-fdb8-4aaf-8747-d2ca45512dfd', // Editorial_Board (board)
+          '5a0d4321-beb5-4c10-bebd-0b05f20e11b4', // huhuhuu (board)
+          '8c91ee85-be04-4a60-b99b-6957fb63eeca', // board_accept (board)
+          '0983b7c1-d1cd-4de8-8ec7-6e3e140cfe3c', // ChiefEditor (board)
+          '03f618c4-b208-4b07-9741-a954b68195ee', // phong (board)
+          '7bce43df-62b2-40dd-a41a-975686ae7ab9'  // truongtamphong (board)
+        ]
+
+        await Promise.all(
+          systemAdminsAndBoard.map(userId =>
+            editorService.sendInternalNotification(
+              userId,
+              "Đề xuất duyệt Series mới",
+              `Tác phẩm [${seriesTitle}] đã được Tantou Editor duyệt và nộp lên Hội đồng biên tập chờ phê duyệt.`,
+              "series_submitted_to_board"
+            ).catch(errNotif => {
+              console.error(`Lỗi khi gửi thông báo cho admin/board ${userId}:`, errNotif)
+            })
+          )
+        )
+      } catch (errNotifs) {
+        console.error("Lỗi khi xử lý gửi thông báo đề xuất series:", errNotifs)
+      }
+
       await fetchSeriesToReview()
     } catch (err: any) {
-      console.error('Failed to approve series:', err)
+      console.error('Failed to submit series:', err)
       const msg = err?.response?.data?.message || ''
-      showToast(msg || 'Lỗi khi phê duyệt Series!')
+      showToast(msg || 'Lỗi khi nộp lên Hội Đồng!')
     } finally {
       setIsSubmittingSeries(false)
     }
   }
+
 
   const handleRequestRevisionSeries = async (sId: string) => {
     try {

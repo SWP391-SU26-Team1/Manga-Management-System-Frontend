@@ -6,6 +6,10 @@ import {
 } from 'lucide-react'
 import { seriesService, SeriesAPI, getErrorMessage } from '@/services/series.service'
 import { chapterService, ChapterAPI } from '@/services/chapter.service'
+import { pageService, PageAPI } from '@/services/page.service'
+import { taskService } from '@/services/task.service'
+import { MangaPage } from '@/data/mangakaMockData'
+import { ChapterLayerTable } from '@/components/mangaka/ChapterLayerTable'
 
 const TABS = ['Danh sách Chapter', 'Trạng thái Board Review', 'Thành viên Series']
 
@@ -25,6 +29,139 @@ export default function SeriesDetailPage() {
   const [memberError, setMemberError] = useState('')
   const [memberSuccess, setMemberSuccess] = useState('')
   const [isAddingMember, setIsAddingMember] = useState(false)
+
+  // Page Expansion & Manga Reader States
+  const [expandedChapterId, setExpandedChapterId] = useState<string | null>(null)
+  const [chapterPages, setChapterPages] = useState<{ [chapterId: string]: PageAPI[] }>({})
+  const [chapterMangaPages, setChapterMangaPages] = useState<{ [chapterId: string]: MangaPage[] }>({})
+  const [loadingPages, setLoadingPages] = useState<{ [chapterId: string]: boolean }>({})
+  const [chapterViewModes, setChapterViewModes] = useState<{ [chapterId: string]: 'grid' | 'table' }>({})
+  
+  const [activeReaderChapter, setActiveReaderChapter] = useState<ChapterAPI | null>(null)
+  const [readerPages, setReaderPages] = useState<PageAPI[]>([])
+  const [readerCurrentPageIndex, setReaderCurrentPageIndex] = useState<number>(0)
+
+  const toggleExpandChapter = async (chapterId: string) => {
+    if (expandedChapterId === chapterId) {
+      setExpandedChapterId(null)
+      return
+    }
+    setExpandedChapterId(chapterId)
+    
+    // Only load if not cached yet
+    if (!chapterPages[chapterId] || !chapterMangaPages[chapterId]) {
+      setLoadingPages(prev => ({ ...prev, [chapterId]: true }))
+      try {
+        const pages = await pageService.getByChapterId(chapterId)
+        // Sort by page number ascending
+        const sortedPages = [...pages].sort((a, b) => a.page_number - b.page_number)
+        
+        // Fetch tasks of all pages in parallel
+        const pagesTasks = await Promise.all(
+          sortedPages.map(p => taskService.getByPage(seriesId!, chapterId, p._id).catch(() => []))
+        )
+        
+        const mappedPages: MangaPage[] = sortedPages.map((page, idx) => {
+          const pageTasks = pagesTasks[idx] || []
+          
+          const getLayerStatus = (type: string) => {
+            const t = pageTasks.find(x => x.task_type === type)
+            if (!t) return 'Not Started'
+            const status = t.status.toLowerCase()
+            if (status === 'approved' || status === 'completed') return 'Approved'
+            if (status === 'needs_revision' || status === 'need_fix' || status === 'rejected') return 'Need Fix'
+            if (status === 'submitted' || status === 'in_review') return 'Submitted'
+            if (status === 'in_progress' || status === 'doing' || status === 'assigned') return 'Doing'
+            return 'Not Started'
+          }
+
+          const mapOverallStatus = (status: string) => {
+            const s = status.toLowerCase()
+            if (s === 'approved' || s === 'published' || s === 'completed') return 'Approved'
+            if (s === 'in_review' || s === 'submitted') return 'Submitted'
+            if (s === 'draft' || s === 'doing' || s === 'in_progress') return 'Doing'
+            return 'Not Started'
+          }
+
+          return {
+            id: page._id,
+            chapterId: page.chapter_id,
+            pageNumber: page.page_number,
+            thumbnailUrl: page.image_url || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200&auto=format&fit=crop',
+            panelFrameStatus: getLayerStatus('cleaning'),
+            lineArtStatus: getLayerStatus('inking'),
+            speechBalloonStatus: getLayerStatus('lettering'),
+            backgroundStatus: getLayerStatus('background'),
+            assetStatus: getLayerStatus('coloring'),
+            assistantSubmissionStatus: getLayerStatus('sfx'),
+            overallStatus: mapOverallStatus(page.status)
+          }
+        })
+
+        setChapterPages(prev => ({ ...prev, [chapterId]: sortedPages }))
+        setChapterMangaPages(prev => ({ ...prev, [chapterId]: mappedPages }))
+      } catch (err) {
+        console.error('Error fetching pages of chapter:', err)
+      } finally {
+        setLoadingPages(prev => ({ ...prev, [chapterId]: false }))
+      }
+    }
+  }
+
+  const openReader = async (chapter: ChapterAPI, startPageId?: string) => {
+    let pages = chapterPages[chapter._id] || []
+    
+    if (pages.length === 0) {
+      // Fetch if not cached
+      try {
+        pages = await pageService.getByChapterId(chapter._id)
+        pages = [...pages].sort((a, b) => a.page_number - b.page_number)
+        setChapterPages(prev => ({ ...prev, [chapter._id]: pages }))
+      } catch (err) {
+        console.error('Error fetching pages for reader:', err)
+        return
+      }
+    }
+
+    setReaderPages(pages)
+    
+    let startIndex = 0
+    if (startPageId) {
+      const idx = pages.findIndex(p => p._id === startPageId)
+      if (idx !== -1) startIndex = idx
+    }
+    
+    setReaderCurrentPageIndex(startIndex)
+    setActiveReaderChapter(chapter)
+  }
+
+  const handlePrevPage = () => {
+    if (readerCurrentPageIndex > 0) {
+      setReaderCurrentPageIndex(prev => prev - 1)
+    }
+  }
+
+  const handleNextPage = () => {
+    if (readerCurrentPageIndex < readerPages.length - 1) {
+      setReaderCurrentPageIndex(prev => prev + 1)
+    }
+  }
+
+  // Keyboard navigation for reader
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!activeReaderChapter) return
+      if (e.key === 'ArrowLeft') {
+        handlePrevPage()
+      } else if (e.key === 'ArrowRight') {
+        handleNextPage()
+      } else if (e.key === 'Escape') {
+        setActiveReaderChapter(null)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [activeReaderChapter, readerCurrentPageIndex, readerPages.length])
 
   useEffect(() => {
     if (!seriesId) return
@@ -262,31 +399,163 @@ export default function SeriesDetailPage() {
                 </div>
                 <div className="divide-y-2 divide-gray-100">
                   {chapters.map(chapter => (
-                    <div key={chapter._id} className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-3 hover:bg-red-50/20 transition-colors">
-                      <div>
-                        <div className="flex items-center gap-3 mb-1">
-                          <span className="font-manga text-2xl font-bold text-manga-red">CH.{chapter.chapter_number}</span>
-                          <h3 className="font-bold text-base">{chapter.title}</h3>
+                    <div key={chapter._id} className="flex flex-col">
+                      <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-3 hover:bg-red-50/20 transition-colors">
+                        <div>
+                          <div className="flex items-center gap-3 mb-1">
+                            <span className="font-manga text-2xl font-bold text-manga-red">CH.{chapter.chapter_number}</span>
+                            <h3 className="font-bold text-base">{chapter.title}</h3>
+                          </div>
+                          <div className="flex items-center gap-4 text-xs text-gray-500 font-bold">
+                            <span className="flex items-center gap-1">
+                              <AlertCircle className="w-3.5 h-3.5" />
+                              Tạo: {new Date(chapter.created_at).toLocaleDateString('vi-VN')}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-4 text-xs text-gray-500 font-bold">
-                          <span className="flex items-center gap-1">
-                            <AlertCircle className="w-3.5 h-3.5" />
-                            Tạo: {new Date(chapter.created_at).toLocaleDateString('vi-VN')}
+                        <div className="flex items-center gap-3">
+                          <span className={`px-3 py-1 font-bold uppercase text-[10px] border-2 ${getChapterStatusClasses(chapter.status)}`}>
+                            {chapter.status}
                           </span>
+                          
+                          <button
+                            onClick={() => toggleExpandChapter(chapter._id)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 border-2 border-manga-ink font-bold text-xs uppercase transition-colors ${
+                              expandedChapterId === chapter._id
+                                ? 'bg-manga-ink text-white'
+                                : 'bg-white text-manga-ink hover:bg-gray-100'
+                            }`}
+                            title="Chi tiết từng trang"
+                          >
+                            <Layers className="w-3.5 h-3.5" />
+                            {expandedChapterId === chapter._id ? 'Đóng chi tiết' : 'Chi tiết trang'}
+                          </button>
+
+                          <button
+                            onClick={() => navigate('/dashboard/mangaka/manuscripts')}
+                            className="p-2 border-2 border-manga-ink bg-white hover:bg-manga-ink hover:text-white transition-colors"
+                            title="Xem bản thảo"
+                          >
+                            <FileCheck className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className={`px-3 py-1 font-bold uppercase text-[10px] border-2 ${getChapterStatusClasses(chapter.status)}`}>
-                          {chapter.status}
-                        </span>
-                        <button
-                          onClick={() => navigate('/dashboard/mangaka/manuscripts')}
-                          className="p-2 border-2 border-manga-ink bg-white hover:bg-manga-ink hover:text-white transition-colors"
-                          title="Xem bản thảo"
-                        >
-                          <FileCheck className="w-4 h-4" />
-                        </button>
-                      </div>
+
+                      {/* Expansion area */}
+                      {expandedChapterId === chapter._id && (
+                        <div className="p-5 bg-gray-50 border-t-2 border-manga-ink">
+                          {loadingPages[chapter._id] ? (
+                            <div className="py-8 text-center">
+                              <div className="w-6 h-6 border-2 border-black border-t-[#E63946] rounded-full animate-spin mx-auto mb-2" />
+                              <p className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Đang tải chi tiết trang...</p>
+                            </div>
+                          ) : !chapterPages[chapter._id] || chapterPages[chapter._id].length === 0 ? (
+                            <div className="py-6 text-center text-xs font-bold text-gray-400 uppercase">
+                              Chưa có trang nào được tạo cho chapter này.
+                            </div>
+                          ) : (
+                            <div>
+                              {/* Header with Quick Read and View Toggle */}
+                              <div className="flex justify-between items-center mb-4">
+                                <div className="flex items-center gap-4">
+                                  <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                                    Danh sách {chapterPages[chapter._id].length} trang bản thảo
+                                  </span>
+                                  {/* View Switcher buttons */}
+                                  <div className="flex border border-black text-[9px] font-bold">
+                                    <button
+                                      onClick={() => setChapterViewModes(prev => ({ ...prev, [chapter._id]: 'grid' }))}
+                                      className={`px-2 py-1 uppercase transition-all ${
+                                        (chapterViewModes[chapter._id] || 'grid') === 'grid'
+                                          ? 'bg-black text-white'
+                                          : 'bg-white text-black hover:bg-gray-100'
+                                      }`}
+                                    >
+                                      Lưới ảnh
+                                    </button>
+                                    <button
+                                      onClick={() => setChapterViewModes(prev => ({ ...prev, [chapter._id]: 'table' }))}
+                                      className={`px-2 py-1 uppercase transition-all ${
+                                        chapterViewModes[chapter._id] === 'table'
+                                          ? 'bg-black text-white'
+                                          : 'bg-white text-black hover:bg-gray-100'
+                                      }`}
+                                    >
+                                      Bảng tiến độ
+                                    </button>
+                                  </div>
+                                </div>
+                                {chapterPages[chapter._id].some(p => p.image_url) && (
+                                  <button
+                                    onClick={() => openReader(chapter)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#E63946] text-white border-2 border-black font-manga font-bold text-[10px] uppercase hover:bg-red-700 transition-colors shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 hover:shadow-none"
+                                  >
+                                    Đọc Chapter
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Render Grid View */}
+                              {(chapterViewModes[chapter._id] || 'grid') === 'grid' ? (
+                                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-4">
+                                  {chapterPages[chapter._id].map((page) => {
+                                    const hasImage = !!page.image_url
+                                    return (
+                                      <div
+                                        key={page._id}
+                                        onClick={() => openReader(chapter, page._id)}
+                                        className="bg-white border-2 border-black p-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_rgba(0,0,0,1)] transition-all cursor-pointer flex flex-col group"
+                                      >
+                                        {/* Thumbnail Container */}
+                                        <div className="aspect-[3/4] border border-gray-200 bg-gray-50 overflow-hidden relative mb-2 flex items-center justify-center">
+                                          {hasImage ? (
+                                            <img
+                                              src={page.image_url!}
+                                              alt={`Trang ${page.page_number}`}
+                                              className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                                            />
+                                          ) : (
+                                            <div className="w-full h-full flex flex-col items-center justify-center text-center p-2 text-gray-400 bg-gray-50">
+                                              <Layers className="w-5 h-5 mb-1 text-gray-300" />
+                                              <span className="text-[8px] font-black uppercase tracking-wider text-gray-400">Đang vẽ lớp</span>
+                                            </div>
+                                          )}
+                                          
+                                          {/* Overlay status badge */}
+                                          {!(page.status === 'approved' || page.status === 'published' || hasImage) && (
+                                            <div className="absolute top-1 right-1">
+                                              <span className={`px-1.5 py-0.5 border text-[7px] font-black uppercase rounded-none leading-none inline-block ${
+                                                page.status === 'in_review'
+                                                  ? 'bg-blue-100 text-blue-700 border-blue-300'
+                                                  : 'bg-yellow-100 text-yellow-700 border-yellow-300'
+                                              }`}>
+                                                {page.status === 'in_review' ? 'Chờ duyệt' : 'Đang vẽ'}
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        {/* Page info */}
+                                        <div className="text-center mt-auto">
+                                          <p className="font-manga text-xs font-bold text-manga-ink">Trang {page.page_number}</p>
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              ) : (
+                                /* Render Progress Table View using ChapterLayerTable component */
+                                <ChapterLayerTable
+                                  pages={chapterMangaPages[chapter._id] || []}
+                                  seriesId={series._id}
+                                  chapterId={chapter._id}
+                                  chapterNumber={chapter.chapter_number}
+                                />
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                   {chapters.length === 0 && (
@@ -448,6 +717,115 @@ export default function SeriesDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Manga Reader Modal */}
+      {activeReaderChapter && (
+        <div className="fixed inset-0 bg-black/95 z-[100] flex flex-col items-center justify-center font-bold text-white select-none animate-in fade-in duration-200">
+          
+          {/* Header */}
+          <div className="w-full bg-manga-ink border-b-2 border-gray-800 px-6 py-4 flex items-center justify-between shrink-0">
+            <div>
+              <h2 className="font-manga text-xl text-manga-red tracking-wide uppercase">
+                {series.title}
+              </h2>
+              <p className="text-xs text-gray-400 font-bold uppercase mt-0.5">
+                Chương {activeReaderChapter.chapter_number}: {activeReaderChapter.title}
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              <span className="text-xs font-mono bg-gray-800 px-3 py-1 border border-gray-700 uppercase">
+                Trang {readerCurrentPageIndex + 1} / {readerPages.length}
+              </span>
+              <button
+                onClick={() => setActiveReaderChapter(null)}
+                className="px-4 py-1.5 bg-[#E63946] border border-black hover:bg-red-700 text-xs font-black uppercase transition-all"
+              >
+                Đóng lại
+              </button>
+            </div>
+          </div>
+
+          {/* Reader Area */}
+          <div className="flex-1 w-full max-w-4xl flex items-center justify-between p-4 relative min-h-0">
+            {/* Prev Button */}
+            <button
+              onClick={handlePrevPage}
+              disabled={readerCurrentPageIndex === 0}
+              className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-[#E63946] border border-gray-700 p-4 rounded-none hover:scale-105 transition-all disabled:opacity-30 disabled:pointer-events-none z-10 font-black text-lg"
+            >
+              ←
+            </button>
+
+            {/* Main Image Container */}
+            <div className="w-full h-full flex items-center justify-center p-4">
+              {readerPages.length > 0 ? (
+                <div className="relative max-h-full max-w-full flex flex-col items-center justify-center">
+                  {readerPages[readerCurrentPageIndex].image_url ? (
+                    <img
+                      src={readerPages[readerCurrentPageIndex].image_url!}
+                      alt={`Trang ${readerPages[readerCurrentPageIndex].page_number}`}
+                      className="max-h-[70vh] object-contain border-2 border-gray-800 bg-white"
+                    />
+                  ) : (
+                    <div className="w-[300px] aspect-[3/4] border-2 border-dashed border-gray-600 flex flex-col items-center justify-center p-6 text-center text-gray-400 bg-gray-900">
+                      <Layers className="w-12 h-12 mb-3 text-gray-600" />
+                      <p className="text-sm font-bold uppercase text-gray-300">Trang chưa hoàn thiện</p>
+                      <p className="text-xs mt-2 leading-relaxed">Trang này chưa được duyệt hoặc ghép các lớp ảnh vẽ.</p>
+                    </div>
+                  )}
+                  <div className="mt-3 text-center">
+                    <span className="text-xs bg-black/40 px-3 py-1 font-bold text-gray-400 border border-gray-800">
+                      Bản thảo Trang {readerPages[readerCurrentPageIndex].page_number} ({readerPages[readerCurrentPageIndex].status.toUpperCase()})
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center text-gray-500 uppercase">
+                  Không có trang truyện nào được tải.
+                </div>
+              )}
+            </div>
+
+            {/* Next Button */}
+            <button
+              onClick={handleNextPage}
+              disabled={readerCurrentPageIndex === readerPages.length - 1}
+              className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-[#E63946] border border-gray-700 p-4 rounded-none hover:scale-105 transition-all disabled:opacity-30 disabled:pointer-events-none z-10 font-black text-lg"
+            >
+              →
+            </button>
+          </div>
+
+          {/* Bottom Thumbnail Navigator */}
+          {readerPages.length > 1 && (
+            <div className="w-full bg-manga-ink border-t border-gray-800 p-4 shrink-0 flex justify-center gap-2 overflow-x-auto min-h-0 select-none">
+              {readerPages.map((p, idx) => (
+                <button
+                  key={p._id}
+                  onClick={() => setReaderCurrentPageIndex(idx)}
+                  className={`w-12 h-16 border-2 relative shrink-0 transition-all ${
+                    readerCurrentPageIndex === idx
+                      ? 'border-[#E63946] scale-105 shadow-md shadow-[#E63946]/20'
+                      : 'border-gray-800 opacity-60 hover:opacity-100'
+                  } bg-gray-900 overflow-hidden`}
+                >
+                  {p.image_url ? (
+                    <img src={p.image_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-[8px] text-gray-500">
+                      P.{p.page_number}
+                    </div>
+                  )}
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-[8px] text-center text-gray-300 font-mono">
+                    {p.page_number}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

@@ -10,6 +10,7 @@ import type {
 } from '@/services/admin/admin.types'
 import { reviewSessionApi } from '@/services/admin/reviewSessionApi'
 import { voteApi } from '@/services/admin/voteApi'
+import { boardService } from '@/services/board.service'
 import { ConfirmDialog } from './ConfirmDialog'
 import { EmptyState } from './EmptyState'
 import { ErrorState } from './ErrorState'
@@ -210,6 +211,14 @@ export function AdminReviewSessionsPage() {
       try {
         const detail = await reviewSessionApi.detail(sessionId)
         setDetailSession(detail || session)
+
+        // Load result summary if session is completed or finished
+        if (session.status === 'completed' || session.status === 'finished' || detail?.status === 'completed' || detail?.status === 'finished') {
+          const resData = await reviewSessionApi.getResult(sessionId)
+          if (resData?.summary) {
+            setResults((current) => ({ ...current, [sessionId]: resData.summary }))
+          }
+        }
       } catch (detailError) {
         notify('error', getErrorMessage(detailError))
       } finally {
@@ -313,8 +322,13 @@ export function AdminReviewSessionsPage() {
     setBusyKey(`${action}:${sessionId}`)
 
     try {
-      await reviewSessionApi[action](sessionId)
+      const resData = await reviewSessionApi[action](sessionId)
       notify('success', `${action.replace(/^\w/, (letter) => letter.toUpperCase())} session successful.`)
+      
+      if (action === 'finalize' && resData?.summary) {
+        setResults((current) => ({ ...current, [sessionId]: resData.summary }))
+      }
+
       await loadSessions()
       if (detailOpen && detailSession && getSessionId(detailSession) === sessionId) {
         await openDetail(session, activeTab)
@@ -327,14 +341,24 @@ export function AdminReviewSessionsPage() {
   }
 
   const handleWorkflowAction = (session: ReviewSession, action: WorkflowAction) => {
-    if (action === 'cancel' || action === 'finish') {
+    if (action === 'cancel' || action === 'finish' || action === 'finalize') {
       setConfirmState({
-        title: action === 'cancel' ? 'Cancel review session?' : 'Finish review session?',
+        title: action === 'cancel' 
+          ? 'Cancel review session?' 
+          : action === 'finalize' 
+            ? 'Finalize review session?' 
+            : 'Finish review session?',
         message:
           action === 'cancel'
             ? `This will cancel "${getSessionName(session)}" and stop the active workflow.`
-            : `This will close "${getSessionName(session)}" after completion.`,
-        confirmLabel: action === 'cancel' ? 'Cancel Session' : 'Finish Session',
+            : action === 'finalize'
+              ? `This will close voting on "${getSessionName(session)}", calculate the average score, and generate a recommendation.`
+              : `This will close "${getSessionName(session)}" after completion.`,
+        confirmLabel: action === 'cancel' 
+          ? 'Cancel Session' 
+          : action === 'finalize' 
+            ? 'Finalize Session' 
+            : 'Finish Session',
         tone: action === 'cancel' ? 'danger' : 'warning',
         onConfirm: () => runWorkflow(session, action),
       })
@@ -383,12 +407,51 @@ export function AdminReviewSessionsPage() {
       const result = (await reviewSessionApi.processResult(sessionId)) as ReviewSessionProcessResult
       setResults((current) => ({ ...current, [sessionId]: result }))
       setVoteCounts((current) => ({ ...current, [sessionId]: result.total_votes }))
+
+      // Apply the dominant decision to the chapter or series
+      let decisionStr = ''
+      const upperDec = result.dominant_decision?.toUpperCase() || ''
+      if (upperDec === 'APPROVE' || upperDec === 'APPROVED') decisionStr = 'approve'
+      else if (upperDec === 'REJECT' || upperDec === 'REJECTED') decisionStr = 'reject'
+
+      if (decisionStr) {
+        const chapterId = session.chapter_id || (session as any).chapterId
+        const seriesId = session.series_id || (session as any).seriesId
+        
+        try {
+          if (chapterId) {
+            await boardService.applyChapterDecision(chapterId, decisionStr, `Automatically ${decisionStr}d based on board votes.`)
+          }
+          if (seriesId) {
+            await boardService.applySeriesDecision(seriesId, decisionStr, `Automatically ${decisionStr}d based on board votes.`)
+          }
+        } catch (e) {
+          console.error("Error applying decisions:", e)
+        }
+      }
       notify('success', 'Vote result processed successfully.')
       await loadSessions()
     } catch (processError) {
       notify('error', getErrorMessage(processError))
     } finally {
       setProcessingSessionId(null)
+    }
+  }
+
+  const handleApplyDecision = async (session: ReviewSession, status: string, note: string) => {
+    const sessionId = requireSessionId(session)
+    if (!sessionId) return
+
+    setDetailLoading(true)
+    try {
+      await reviewSessionApi.applyDecision(sessionId, { status, note })
+      notify('success', `Decision applied successfully: ${status}`)
+      await loadSessions()
+      await openDetail(session, 'overview')
+    } catch (applyError) {
+      notify('error', getErrorMessage(applyError))
+    } finally {
+      setDetailLoading(false)
     }
   }
 
@@ -660,6 +723,7 @@ export function AdminReviewSessionsPage() {
         onVerifyVote={handleVerifyVote}
         onDeleteVote={handleDeleteVote}
         onReloadVotes={() => loadVotes()}
+        onApplyDecision={handleApplyDecision}
       />
 
       <VoteFormModal

@@ -61,6 +61,7 @@ export interface Assistant {
 
 export interface AssistantSubmission {
   id: string;
+  submissionId?: string;
   assistantName: string;
   chapterTitle: string;
   pageNumber: number;
@@ -70,6 +71,7 @@ export interface AssistantSubmission {
   previewUrl: string;
   note: string;
   status: "Pending" | "Need Fix" | "Approved";
+  originalImageUrl?: string;
 }
 
 export interface AssetItem {

@@ -33,6 +33,7 @@ interface TimelineStep {
   date: string;
   label: string;
   done: boolean;
+  active: boolean;
   key: string;
 }
 
@@ -52,8 +53,8 @@ const mapBackendTaskToAssistantTask = (task: PageTask): AssistantTask => {
   let mappedStatus: AssistantTask['status'] = 'Not Started'
   if (task.status === 'in_progress') mappedStatus = 'In Progress'
   else if (task.status === 'submitted') mappedStatus = 'Submitted'
-  else if (task.status === 'needs_revision') mappedStatus = 'Need Fix'
-  else if (task.status === 'completed') mappedStatus = 'Approved'
+  else if (task.status === 'needs_revision' || task.status === 'rejected') mappedStatus = 'Need Fix'
+  else if (task.status === 'completed' || task.status === 'approved') mappedStatus = 'Approved'
   else if (task.status === 'assigned') mappedStatus = 'Not Started'
 
   return {
@@ -110,6 +111,35 @@ export default function FeedbackPage() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const [activeMarkerId, setActiveMarkerId] = useState<number | null>(null)
+
+  const getImageUrl = (url?: string | null) => {
+    if (!url) return 'https://images.unsplash.com/photo-1563089145-599997674d42?q=80&w=600&auto=format&fit=crop'
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url
+    const apiURL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+    return `${apiURL}${url.startsWith('/') ? '' : '/'}${url}`
+  }
+
+  const parseMarkersFromComments = () => {
+    const parsedMarkers: Array<{ index: number; x: number; y: number; text: string }> = []
+    activeFeedbacks.forEach((fb) => {
+      if (!fb.content) return
+      const lines = fb.content.split('\n')
+      lines.forEach((line) => {
+        const match = line.match(/Điểm\s*số\s*(\d+)\s*\(vị\s*trí\s*ngang\s*(\d+)%,\s*dọc\s*(\d+)%\):\s*(.*)/i)
+        if (match) {
+          parsedMarkers.push({
+            index: parseInt(match[1], 10),
+            x: parseFloat(match[2]),
+            y: parseFloat(match[3]),
+            text: match[4] || ''
+          })
+        }
+      })
+    })
+    return parsedMarkers
+  }
 
   // Load tasks on mount
   useEffect(() => {
@@ -168,33 +198,89 @@ export default function FeedbackPage() {
         status: activeTaskData.status
       } : { created_at: '', deadline: '', status: '' }
 
-      // Build dynamic timeline
+      // Build dynamic timeline based on task status & overdue state
       const steps: TimelineStep[] = []
-      steps.push({
-        date: '',
-        label: 'Nhận nhiệm vụ',
-        done: true,
-        key: 'assign'
-      })
+      
+      if (activeTaskData) {
+        const isApproved = activeTaskData.status === 'Approved'
+        const isSubmitted = activeTaskData.status === 'Submitted'
+        
+        // Parse deadline
+        const deadlineDate = activeTaskData.deadline ? new Date(activeTaskData.deadline) : null
+        const today = new Date()
+        const isOverdue = deadlineDate ? (today.getTime() > deadlineDate.getTime() && !isApproved) : false
 
-      const sortedSubs = [...(subs || [])].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-      sortedSubs.forEach((sub, idx) => {
+        const sortedSubs = [...(subs || [])].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+        
+        // Safe format helper for step dates
+        const formatStepDate = (dateStr?: string) => {
+          if (!dateStr) return ''
+          const d = new Date(dateStr)
+          if (isNaN(d.getTime())) return ''
+          return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
+        }
+
+        // Active step indexing:
+        // 0: Nhận nhiệm vụ (Active if In Progress / Need Fix and not overdue)
+        // 1: Nộp bản v1 (Active if Submitted and not overdue)
+        // 2: Hạn chót (Active if overdue)
+        // 3: Hoàn thành (Active if Approved)
+        let activeIdx = 0
+        if (isApproved) {
+          activeIdx = 3
+        } else if (isOverdue) {
+          activeIdx = 2
+        } else if (isSubmitted) {
+          activeIdx = 1
+        } else {
+          activeIdx = 0
+        }
+
+        // Step 1: Nhận nhiệm vụ
         steps.push({
-          date: new Date(sub.created_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
-          label: `Nộp bản v${idx + 1} (${sub.status === 'approved' ? 'Đã duyệt' : sub.status === 'needs_revision' ? 'Yêu cầu sửa' : 'Chờ duyệt'})`,
-          done: true,
-          key: `sub_${sub.submission_id}`
+          date: formatStepDate(activeTaskData.createdAt || new Date().toISOString()),
+          label: 'Nhận nhiệm vụ',
+          active: activeIdx === 0,
+          done: activeIdx >= 0,
+          key: 'assign'
         })
-      })
 
-      if (activeTaskData?.deadline) {
+        // Step 2: Nộp bản v1 (Chờ duyệt)
+        const latestSub = sortedSubs[sortedSubs.length - 1]
+        let subLabel = 'Nộp bản v1 (Chờ duyệt)'
+        if (latestSub) {
+          const subVer = sortedSubs.length
+          const statusText = latestSub.status === 'approved' ? 'Đã duyệt' : latestSub.status === 'needs_revision' ? 'Yêu cầu sửa' : 'Chờ duyệt'
+          subLabel = `Nộp bản v${subVer} (${statusText})`
+        }
         steps.push({
-          date: new Date(activeTaskData.deadline).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
-          label: 'Hạn chót (Deadline)',
-          done: activeTaskData.status === 'Approved',
+          date: latestSub ? formatStepDate(latestSub.created_at) : '',
+          label: subLabel,
+          active: activeIdx === 1,
+          done: activeIdx >= 1 || !!latestSub,
+          key: 'submission'
+        })
+
+        // Step 3: Hạn chót (Deadline)
+        steps.push({
+          date: formatStepDate(activeTaskData.deadline),
+          label: isOverdue ? 'Quá hạn nộp bài' : 'Hạn chót (Deadline)',
+          active: activeIdx === 2,
+          done: activeIdx >= 2 || isApproved,
           key: 'deadline'
         })
+
+        // Step 4: Hoàn thành
+        const approvedSub = sortedSubs.find(s => s.status === 'approved')
+        steps.push({
+          date: approvedSub ? formatStepDate(approvedSub.created_at) : '',
+          label: 'Hoàn thành',
+          active: activeIdx === 3,
+          done: activeIdx === 3,
+          key: 'completed'
+        })
       }
+      
       setActiveTimeline(steps)
 
       // 3. Load feedbacks for the latest submission if available
@@ -543,6 +629,50 @@ export default function FeedbackPage() {
                   </div>
                 </div>
 
+                {/* Box 1.5: BẢN VẼ & ĐIỂM LỖI */}
+                {submissions.length > 0 && (
+                  <div className="bg-white border-2 border-manga-ink p-4 shadow-[3px_3px_0px_rgba(15,15,15,1)] flex flex-col gap-2">
+                    <h3 className="font-manga text-xs font-black uppercase tracking-wider text-manga-ink border-b-2 border-manga-ink pb-1.5">
+                      BẢN VẼ & ĐIỂM LỖI
+                    </h3>
+                    <div className="relative border border-gray-200 bg-gray-100 overflow-hidden flex items-center justify-center">
+                      <img
+                        src={getImageUrl(submissions[0].file_url)}
+                        alt="Latest Submission"
+                        className="w-full h-auto object-contain block"
+                      />
+                      {parseMarkersFromComments().map((marker) => (
+                        <div
+                          key={marker.index}
+                          className="absolute z-20"
+                          style={{ left: `${marker.x}%`, top: `${marker.y}%`, transform: 'translate(-50%, -50%)' }}
+                        >
+                          <div
+                            className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border-2 cursor-pointer transition-all ${
+                              activeMarkerId === marker.index
+                                ? 'bg-manga-red border-white text-white scale-110'
+                                : 'bg-white border-manga-red text-[#E63946]'
+                            }`}
+                            onClick={() => setActiveMarkerId(activeMarkerId === marker.index ? null : marker.index)}
+                            title={marker.text}
+                          >
+                            {marker.index}
+                          </div>
+                          {activeMarkerId === marker.index && (
+                            <div className="absolute top-7 left-1/2 -translate-x-1/2 bg-white text-zinc-800 border-2 border-manga-ink p-2 w-40 z-30 text-[10px] font-bold shadow-[2px_2px_0px_rgba(0,0,0,1)]">
+                              <p className="text-[9px] text-[#E63946] uppercase font-black">Lỗi #{marker.index}</p>
+                              <p className="mt-0.5 leading-snug">{marker.text}</p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[9px] text-gray-400 font-bold text-center mt-1 uppercase">
+                      Click vào các điểm tròn đỏ trên ảnh để xem chi tiết lỗi cần sửa
+                    </p>
+                  </div>
+                )}
+
                 {/* Box 2: TIẾN TRÌNH NỘP BÀI */}
                 <div className="bg-white border-2 border-manga-ink p-4 shadow-[3px_3px_0px_rgba(15,15,15,1)] flex flex-col">
                   <h3 className="font-manga text-xs font-black uppercase tracking-wider text-manga-ink border-b-2 border-manga-ink pb-1.5 mb-4">
@@ -555,11 +685,18 @@ export default function FeedbackPage() {
                       return (
                         <div key={idx} className="relative flex flex-col gap-0.5">
                           {/* Bullet point indicator */}
-                          <div className={`absolute -left-[23px] top-1 w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center bg-white ${
-                            step.done ? 'border-[#E63946] bg-[#E63946]' : 'border-zinc-300 bg-white'
+                          <div className={`absolute -left-[23px] top-1 w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${
+                            step.active 
+                              ? 'border-[#E63946] bg-[#E63946] shadow-[0_0_6px_rgba(230,57,70,0.5)] animate-pulse' 
+                              : step.done 
+                                ? 'border-[#E63946] bg-white' 
+                                : 'border-zinc-300 bg-white'
                           }`}>
-                            {step.done && (
+                            {step.active && (
                               <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                            )}
+                            {!step.active && step.done && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#E63946]" />
                             )}
                           </div>
                           <div className="flex items-center gap-1.5">

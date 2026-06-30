@@ -1,14 +1,16 @@
 import React from 'react'
-import { Routes, Route } from 'react-router'
+import { Navigate, Route, Routes } from 'react-router'
 import { RoleGuard } from '@/components/common/RoleGuard'
 import AdminLayout from '@/layouts/admin/AdminLayout'
 import AdminChaptersPage from '@/pages/admin/AdminChaptersPage'
 import AdminDashboardPage from '@/pages/admin/AdminDashboardPage'
-import AdminPlaceholderPage from '@/pages/admin/AdminPlaceholderPage'
 import AdminProfilePage from '@/pages/admin/AdminProfilePage'
+import AdminRankingsPage from '@/pages/admin/AdminRankingsPage'
 import AdminReviewSessionsPage from '@/pages/admin/AdminReviewSessionsPage'
 import AdminSeriesPage from '@/pages/admin/AdminSeriesPage'
+import AdminTasksPage from '@/pages/admin/AdminTasksPage'
 import AdminUsersPage from '@/pages/admin/AdminUsersPage'
+import AdminVotesPage from '@/pages/admin/AdminVotesPage'
 
 export default function AdminRoutes() {
   return (
@@ -25,43 +27,12 @@ export default function AdminRoutes() {
         <Route path="profile" element={<AdminProfilePage />} />
         <Route path="series" element={<AdminSeriesPage />} />
         <Route path="chapters" element={<AdminChaptersPage />} />
-        <Route
-          path="tasks"
-          element={
-            <AdminPlaceholderPage
-              title="Quản lý công việc"
-              description="Danh sách, lọc và can thiệp trạng thái công việc của assistant thông qua service page-tasks."
-            />
-          }
-        />
+        <Route path="tasks" element={<AdminTasksPage />} />
         <Route path="review-sessions" element={<AdminReviewSessionsPage />} />
-        <Route
-          path="votes"
-          element={
-            <AdminPlaceholderPage
-              title="Bình chọn"
-              description="Kiểm tra phiếu bình chọn, xác minh quyết định và rà soát điểm của hội đồng."
-            />
-          }
-        />
-        <Route
-          path="rankings"
-          element={
-            <AdminPlaceholderPage
-              title="Xếp hạng"
-              description="Quản lý đợt xếp hạng, thứ hạng series và thứ hạng chương."
-            />
-          }
-        />
-        <Route
-          path="notifications"
-          element={
-            <AdminPlaceholderPage
-              title="Thông báo"
-              description="Tạo, kiểm tra và dọn dẹp thông báo hệ thống gửi đến người dùng."
-            />
-          }
-        />
+        <Route path="votes" element={<AdminVotesPage />} />
+        <Route path="rankings" element={<AdminRankingsPage />} />
+        <Route path="notifications" element={<Navigate to="/dashboard/admin" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard/admin" replace />} />
       </Route>
     </Routes>
   )

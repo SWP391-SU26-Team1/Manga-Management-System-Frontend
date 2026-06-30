@@ -421,6 +421,23 @@ function AssignTaskContent() {
     }
   }
 
+  const handleAssignTask = async (taskId: string) => {
+    try {
+      await taskService.assign(selectedSeriesId, selectedChapterId, selectedPageId, taskId)
+      setTaskSuccessMsg('Giao việc thành công!')
+      setTimeout(() => {
+        setTaskSuccessMsg('')
+      }, 4000)
+      
+      // Reload tasks
+      const ts = await taskService.getByPage(selectedSeriesId, selectedChapterId, selectedPageId)
+      setTasks(ts)
+    } catch (err) {
+      const e = err as { response?: { data?: { message?: string } } }
+      alert(e?.response?.data?.message ?? 'Giao việc thất bại, vui lòng thử lại.')
+    }
+  }
+
   // ── Drawing handlers ───────────────────────────────────────────────────────
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -861,7 +878,7 @@ function AssignTaskContent() {
           DANH SÁCH NHIỆM VỤ ĐÃ GIAO
           {isLoadingTasks && <span className="ml-2 w-4 h-4 border-2 border-manga-ink border-t-manga-red rounded-full animate-spin inline-block" />}
         </h2>
-        <TaskTable tasks={displayTasks} onDeleteTask={handleDeleteTask} />
+        <TaskTable tasks={displayTasks} onDeleteTask={handleDeleteTask} onAssignTask={handleAssignTask} />
       </div>
 
       {/* Footer */}

@@ -7,33 +7,37 @@ import { mangakaNav } from '@/configs/navigation/mangakaNav'
 import { assistantNav } from '@/configs/navigation/assistantNav'
 import { boardNav } from '@/configs/navigation/boardNav'
 import { tantouNav } from '@/configs/navigation/tantouNav'
+import { adminNav } from '@/configs/navigation/adminNav'
 
 const getNavConfig = (role: string) => {
-  switch (role) {
+  switch (role?.toUpperCase()) {
     case 'MANGAKA': return mangakaNav;
     case 'ASSISTANT': return assistantNav;
     case 'EDITORIAL_BOARD': return boardNav;
     case 'TANTOU': return tantouNav;
+    case 'ADMIN': return adminNav;
     default: return [];
   }
 }
 
 const getRoleText = (role: string) => {
-  switch (role) {
+  switch (role?.toUpperCase()) {
     case 'MANGAKA': return 'PHÒNG LÀM VIỆC MANGAKA';
     case 'ASSISTANT': return 'Phòng làm việc Trợ lý';
     case 'EDITORIAL_BOARD': return 'Editorial Board Panel';
     case 'TANTOU': return 'Tantou Editor Panel';
+    case 'ADMIN': return 'HỆ THỐNG QUẢN TRỊ';
     default: return 'MANGAFLOW PANEL';
   }
 }
 
 const getDashboardPath = (role: string) => {
-  switch (role) {
+  switch (role?.toUpperCase()) {
     case 'MANGAKA': return '/dashboard/mangaka';
     case 'ASSISTANT': return '/dashboard/assistant';
     case 'EDITORIAL_BOARD': return '/dashboard/board';
     case 'TANTOU': return '/dashboard/tantou';
+    case 'ADMIN': return '/dashboard/admin';
     default: return '/';
   }
 }

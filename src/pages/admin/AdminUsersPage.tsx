@@ -634,17 +634,9 @@ export default function AdminUsersPage() {
 
       <AdminTableFrame>
         <div className="space-y-5 border-b-2 border-manga-ink p-6">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <AdminFilters
-              tabs={STATUS_TABS}
-              activeTab={statusTabLabel(statusFilter)}
-              onTabChange={(tab) => {
-                setStatusFilter(normalizeStatusTab(tab))
-                setPage(1)
-              }}
-            />
-            <form onSubmit={handleSearch} className="flex flex-col gap-3 md:flex-row">
-              <div className="relative min-w-0 md:w-80">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <form onSubmit={handleSearch} className="flex-1 max-w-lg">
+              <div className="relative">
                 <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500" />
                 <input
                   value={keywordInput}
@@ -653,33 +645,9 @@ export default function AdminUsersPage() {
                   className={`${inputClass} pl-12`}
                 />
               </div>
-              <AdminButton type="submit" icon={Search} disabled={loading}>
-                Tìm kiếm
-              </AdminButton>
             </form>
-          </div>
-
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <label className="min-w-48">
-                <span className={labelClass}>Vai trò</span>
-                <select
-                  value={roleFilter}
-                  onChange={(event) => {
-                    setRoleFilter(event.target.value as RoleFilter)
-                    setPage(1)
-                  }}
-                  className={inputClass}
-                >
-                  <option value="all">TẤT CẢ VAI TRÒ</option>
-                  {USER_ROLES.map((role) => (
-                    <option key={role} value={role}>
-                      {roleLabel[role]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="min-w-48">
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="min-w-44">
                 <span className={labelClass}>Sắp xếp</span>
                 <select
                   value={sortOrder}
@@ -687,20 +655,20 @@ export default function AdminUsersPage() {
                     setSortOrder(event.target.value as 'asc' | 'desc')
                     setPage(1)
                   }}
-                  className={inputClass}
+                  className={`${inputClass} !py-2`}
                 >
                   <option value="desc">MỚI NHẤT TRƯỚC</option>
                   <option value="asc">CŨ NHẤT TRƯỚC</option>
                 </select>
               </label>
-            </div>
-            <div className="flex gap-3">
-              <AdminButton type="button" variant="white" icon={RefreshCw} onClick={loadUsers} disabled={loading}>
-                Tải lại
-              </AdminButton>
-              <AdminButton type="button" variant="dark" icon={X} onClick={resetFilters}>
-                Xóa lọc
-              </AdminButton>
+              <div className="flex gap-2 self-end">
+                <AdminButton type="button" variant="white" icon={RefreshCw} onClick={loadUsers} disabled={loading}>
+                  Tải lại
+                </AdminButton>
+                <AdminButton type="button" variant="dark" icon={X} onClick={resetFilters}>
+                  Xóa lọc
+                </AdminButton>
+              </div>
             </div>
           </div>
         </div>
@@ -708,11 +676,49 @@ export default function AdminUsersPage() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1040px] border-collapse text-left">
             <thead className="bg-[#282828] text-white">
-              <tr className="text-sm font-black uppercase">
+              <tr className="text-sm font-black uppercase text-xs">
                 <th className="border-r-2 border-black px-8 py-5">Hồ sơ người dùng</th>
                 <th className="border-r-2 border-black px-7 py-5">Email liên hệ</th>
-                <th className="border-r-2 border-black px-7 py-5">Vai trò</th>
-                <th className="border-r-2 border-black px-7 py-5">Trạng thái</th>
+                <th className="border-r-2 border-black px-7 py-5 min-w-[200px]">
+                  <div className="flex flex-col gap-1">
+                    <span>Vai trò</span>
+                    <select
+                      value={roleFilter}
+                      onChange={(event) => {
+                        setRoleFilter(event.target.value as RoleFilter)
+                        setPage(1)
+                      }}
+                      className="block w-full border border-gray-600 bg-[#3a3a3a] text-white px-2 py-1 text-xs font-bold outline-none focus:border-white"
+                    >
+                      <option value="all">TẤT CẢ VAI TRÒ</option>
+                      {USER_ROLES.map((role) => (
+                        <option key={role} value={role}>
+                          {roleLabel[role]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </th>
+                <th className="border-r-2 border-black px-7 py-5 min-w-[190px]">
+                  <div className="flex flex-col gap-1">
+                    <span>Trạng thái</span>
+                    <select
+                      value={statusFilter}
+                      onChange={(event) => {
+                        setStatusFilter(event.target.value as StatusFilter)
+                        setPage(1)
+                      }}
+                      className="block w-full border border-gray-600 bg-[#3a3a3a] text-white px-2 py-1 text-xs font-bold outline-none focus:border-white"
+                    >
+                      <option value="all">TẤT CẢ TRẠNG THÁI</option>
+                      {USER_STATUSES.map((status) => (
+                        <option key={status} value={status}>
+                          {statusLabel[status]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </th>
                 <th className="px-7 py-5 text-right">Thao tác</th>
               </tr>
             </thead>

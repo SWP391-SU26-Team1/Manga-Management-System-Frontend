@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router'
 import { Mail, Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react'
 import { validateEmail, validatePassword } from '@/utils/validators'
 import authService from '@/services/auth.service'
-import { userService } from '@/services/user.service'
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -95,26 +94,11 @@ export default function LoginPage() {
     try {
       const data = await authService.login({ email, password })
       
-      // Lưu data cơ bản từ login trước (token cần có để gọi /api/auth/me)
       const storedUserData = {
         ...data.user,
         token: data.token
       }
       localStorage.setItem('mangaflow_user', JSON.stringify(storedUserData))
-
-      // Gọi /api/auth/me để lấy profile đầy đủ nhất (bao gồm avatar_url mới nhất)
-      try {
-        const freshProfile = await userService.getMe()
-        const refreshed = {
-          ...storedUserData,
-          fullName: freshProfile.fullName || storedUserData.fullName,
-          avatarUrl: freshProfile.avatarUrl || storedUserData.avatarUrl,
-          bio: freshProfile.bio || storedUserData.bio,
-        }
-        localStorage.setItem('mangaflow_user', JSON.stringify(refreshed))
-      } catch {
-        // Không block login nếu /api/auth/me thất bại
-      }
 
       if (storedUserData.role === 'MANGAKA') {
         navigate('/dashboard/mangaka')
@@ -122,10 +106,10 @@ export default function LoginPage() {
         navigate('/dashboard/assistant')
       } else if (storedUserData.role === 'EDITOR') {
         navigate('/dashboard/tantou-editor')
-      } else if (storedUserData.role === 'BOARD') {
-        navigate('/dashboard/editorial-board')
-      } else if (storedUserData.role === 'ADMIN') {
+      } else if (storedUserData.role?.toUpperCase() === 'ADMIN') {
         navigate('/dashboard/admin')
+      } else if (['BOARD', 'CHIEF_EDITOR'].includes(storedUserData.role?.toUpperCase())) {
+        navigate('/dashboard/editorial-board')
       } else {
         navigate('/')
       }

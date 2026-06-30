@@ -60,7 +60,11 @@ const mapBackendUser = (user: BackendUser) => ({
 
 export const authService = {
   login: async (payload: LoginPayload): Promise<AuthResponse> => {
-    const response = await api.post<BackendAuthResponse>('/api/auth/login', payload)
+    const normalizedPayload = {
+      email: payload.email.toLowerCase().trim(),
+      password: payload.password
+    }
+    const response = await api.post<BackendAuthResponse>('/api/auth/login', normalizedPayload)
     const { token, user } = response.data.data
     return {
       token,
@@ -79,7 +83,11 @@ export const authService = {
   },
 
   register: async (payload: { username: string; email: string; password: string; role: string }): Promise<AuthResponse> => {
-    const response = await api.post<BackendAuthResponse>('/api/auth/register', payload)
+    const normalizedPayload = {
+      ...payload,
+      email: payload.email.toLowerCase().trim()
+    }
+    const response = await api.post<BackendAuthResponse>('/api/auth/register', normalizedPayload)
     const { token, user } = response.data.data
     return {
       token,

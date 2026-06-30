@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { PenTool, PencilRuler, FileSignature, Sparkles, Eye, EyeOff, ArrowLeft } from 'lucide-react'
+import { PenTool, PencilRuler, FileSignature, Sparkles, Eye, EyeOff, ArrowLeft, Award } from 'lucide-react'
 import { validateUsername, validateEmail, validatePassword, validateConfirmPassword } from '@/utils/validators'
 import authService from '@/services/auth.service'
 
 export default function RegisterPage() {
   const navigate = useNavigate()
-  const [role, setRole] = useState<'mangaka' | 'assistant' | 'editor'>('mangaka')
+  const [role, setRole] = useState<'mangaka' | 'assistant' | 'editor' | 'board'>('mangaka')
   const [registerError, setRegisterError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
@@ -39,8 +39,13 @@ export default function RegisterPage() {
         ? '/dashboard/assistant'
         : registeredUser.role === 'EDITOR'
         ? '/dashboard/tantou-editor'
+
+        : registeredUser.role === 'BOARD'
+        ? '/dashboard/editorial-board'
+
         : registeredUser.role === 'ADMIN'
         ? '/dashboard/admin'
+
         : '/'
     navigate(dashboardPath)
   }
@@ -125,28 +130,21 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setRegisterError(null)
 
-    const uErr = validateUsername(username) || ''
-    const eErr = validateEmail(email) || ''
-    const pErr = validatePassword(password) || ''
-    const cErr = validateConfirmPassword(password, confirmPassword) || ''
+    // Validate all fields
+    validateField('username', username)
+    validateField('email', email)
+    validateField('password', password)
+    validateField('confirmPassword', confirmPassword)
 
-    setErrors({
-      username: uErr,
-      email: eErr,
-      password: pErr,
-      confirmPassword: cErr,
-    })
+    if (errors.username || errors.email || errors.password || errors.confirmPassword || !username || !email || !password || !confirmPassword) {
+      setTouched({ username: true, email: true, password: true, confirmPassword: true })
+      return
+    }
 
-    setTouched({
-      username: true,
-      email: true,
-      password: true,
-      confirmPassword: true,
-    })
-
-    if (uErr || eErr || pErr || cErr) {
+    // Intercept Privileged Roles to handle Backend limitation gracefully on the Frontend
+    if (role === 'board' || role === 'editor') {
+      setRegisterError(`Vì lý do bảo mật, tài khoản ${role === 'board' ? 'Hội đồng Biên tập' : 'Biên tập viên'} không được phép tự đăng ký tự do. Vui lòng đăng nhập bằng tài khoản được cấp hoặc liên hệ Admin.`)
       return
     }
 
@@ -267,7 +265,7 @@ export default function RegisterPage() {
               </h2>
 
             {/* Roles Selection */}
-            <div className="grid grid-cols-3 gap-3 md:gap-4 mb-10">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-10">
               {/* Mangaka */}
               <button
                 type="button"
@@ -308,6 +306,20 @@ export default function RegisterPage() {
               >
                 <FileSignature className="w-6 h-6 mb-2" />
                 <span className="text-xs font-bold uppercase tracking-wider text-center">Biên tập viên</span>
+              </button>
+
+              {/* Board */}
+              <button
+                type="button"
+                onClick={() => setRole('board')}
+                className={`flex flex-col items-center justify-center p-4 border-2 transition-all ${
+                  role === 'board'
+                    ? 'border-manga-ink bg-manga-ink text-white'
+                    : 'border-manga-ink bg-white text-manga-ink hover:bg-gray-50'
+                }`}
+              >
+                <Award className="w-6 h-6 mb-2" />
+                <span className="text-xs font-bold uppercase tracking-wider text-center">Hội đồng</span>
               </button>
             </div>
 

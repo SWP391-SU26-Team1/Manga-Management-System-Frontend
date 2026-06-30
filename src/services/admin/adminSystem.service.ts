@@ -21,11 +21,11 @@ const importFile = async (url: string, file: File): Promise<ImportResult> => {
 }
 
 export const adminSystemService = {
-  getActivityLogs: (params?: { page?: number; limit?: number }) => adminList<ActivityLog>('/api/activity-logs', params),
-  getStorageUsage: () => adminGet('/api/storage-usage'),
-  getTrustScore: () => adminGet('/api/trust-score'),
-  getHealth: () => adminGet('/api/system-health'),
-  exportFullSystem: () => adminGet('/api/export/full-system'),
-  importUsers: (file: File) => importFile('/api/import/users', file),
-  importSeries: (file: File) => importFile('/api/import/series', file),
+  getActivityLogs: (params?: { page?: number; limit?: number }) => adminList<ActivityLog>('/api/admin/activity-logs', params),
+  getStorageUsage: () => adminGet('/api/admin/storage-usage'),
+  getTrustScore: () => adminGet('/api/admin/trust-score'),
+  getHealth: () => adminGet('/api/admin/system-health'),
+  exportFullSystem: () => adminGet('/api/admin/export/full-system'),
+  importUsers: (file: File) => importFile('/api/admin/import/users', file),
+  importSeries: (file: File) => importFile('/api/admin/import/series', file),
 }

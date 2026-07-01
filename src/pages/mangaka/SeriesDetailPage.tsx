@@ -282,7 +282,7 @@ export default function SeriesDetailPage() {
 
   const getSeriesStatusColor = (status: string) => {
     switch (status) {
-      case 'published': return 'bg-blue-100 text-blue-700 border-blue-300'
+      case 'published': return 'bg-manga-red text-white border-manga-ink'
       case 'under_review': return 'bg-orange-100 text-orange-700 border-orange-300'
       case 'in_production': return 'bg-green-100 text-green-700 border-green-300'
       case 'approved': return 'bg-green-100 text-green-700 border-green-300'
@@ -310,7 +310,7 @@ export default function SeriesDetailPage() {
       case 'draft': return 'bg-gray-100 text-gray-500 border-gray-300'
       case 'need_fix': return 'bg-red-100 text-red-700 border-red-300'
       case 'approved': return 'bg-green-100 text-green-700 border-green-300'
-      case 'published': return 'bg-blue-100 text-blue-700 border-blue-300'
+      case 'published': return 'bg-manga-red text-white border-manga-ink'
       default: return 'bg-gray-100 text-gray-500 border-gray-300'
     }
   }

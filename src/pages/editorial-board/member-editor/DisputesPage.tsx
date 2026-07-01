@@ -153,9 +153,7 @@ export function DisputeDetailsPage() {
             editorMetricValue: res.editorMetricValue,
             editorMetricTarget: res.editorMetricTarget,
             status: res.status,
-            chiefDecision: res.chiefDecision,
-            chiefCompromise: res.chiefCompromise,
-            chiefNextActions: res.chiefNextActions,
+
             memberOpinion: res.memberOpinion ? {
               leaning: res.memberOpinion.leaning,
               reason: res.memberOpinion.reason,
@@ -348,9 +346,9 @@ export function DisputeDetailsPage() {
       </div>
 
       {/* Consultation & Council Decision (Bottom Area) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start mb-8">
-        {/* Left Bottom: Member Opinion Form */}
-        <div className="lg:col-span-2 bg-white border-4 border-manga-ink p-6 shadow-[6px_6px_0px_rgba(15,15,15,1)]">
+      <div className="mb-8">
+        {/* Member Opinion Form */}
+        <div className="bg-white border-4 border-manga-ink p-6 shadow-[6px_6px_0px_rgba(15,15,15,1)]">
           <div className="inline-block px-3 py-1 bg-manga-red text-white font-bold uppercase text-[9px] border-2 border-manga-ink shadow-sm mb-4">
             Ý KIẾN THAM MƯU CỦA BẠN
           </div>
@@ -406,7 +404,7 @@ export function DisputeDetailsPage() {
               <div>
                 {caseItem.memberOpinion ? (
                   <span className="text-[10px] font-bold text-emerald-600">
-                    ✓ Đã lưu tham mưu (Có thể thay đổi trước khi Chief đóng phiên)
+                    ✓ Đã lưu tham mưu (Có thể thay đổi trước khi đóng phiên)
                   </span>
                 ) : (
                   showSavedToast && (
@@ -424,39 +422,6 @@ export function DisputeDetailsPage() {
               >
                 {caseItem.memberOpinion ? 'CẬP NHẬT Ý KIẾN' : 'GỬI Ý KIẾN THAM MƯU'}
               </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Bottom: Official Board Decision (Chief Only - LOCKED) */}
-        <div className="bg-white border-4 border-manga-ink p-6 shadow-[6px_6px_0px_rgba(15,15,15,1)] relative h-full flex flex-col justify-between">
-          {/* Locked Overlay block */}
-          <div className="absolute inset-0 bg-white/70 backdrop-blur-[1.5px] z-20 flex flex-col items-center justify-center p-4 text-center">
-            <div className="bg-manga-ink text-white p-3 border-2 border-manga-ink shadow-md mb-2">
-              <Lock className="w-6 h-6" />
-            </div>
-            <h4 className="font-manga text-xl font-bold uppercase text-manga-ink">CHIEF EDITOR ONLY</h4>
-            <p className="text-[9px] text-gray-500 font-extrabold uppercase mt-1 leading-tight max-w-[150px]">
-              Chỉ Trưởng ban Biên tập mới có quyền ban hành phán quyết.
-            </p>
-          </div>
-
-          {/* Dummy visual layout of locked panel */}
-          <div className="opacity-40 select-none">
-            <h3 className="font-manga text-base font-black uppercase mb-3">Quyết định phán quyết</h3>
-            
-            <div className="space-y-3">
-              <div className="border-2 border-gray-300 p-2">
-                <span className="block text-[8px] font-bold text-gray-400">GIẢI PHÁP ĐỀ XUẤT</span>
-                <p className="text-[10px] font-bold truncate">{caseItem.chiefCompromise || 'Đang chờ nhập...'}</p>
-              </div>
-              <div className="border-2 border-gray-300 p-2">
-                <span className="block text-[8px] font-bold text-gray-400">HÀNH ĐỘNG TIẾP THEO</span>
-                <p className="text-[10px] font-bold truncate">{caseItem.chiefNextActions || 'Đang chờ nhập...'}</p>
-              </div>
-              <div className="py-2.5 bg-manga-red border-2 border-manga-ink text-center text-white text-[10px] font-manga font-bold uppercase">
-                BAN HÀNH PHÁN QUYẾT
-              </div>
             </div>
           </div>
         </div>

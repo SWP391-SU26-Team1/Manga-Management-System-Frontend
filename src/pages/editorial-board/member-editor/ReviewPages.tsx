@@ -140,7 +140,6 @@ export function ReadDraftPage() {
       id: Date.now().toString(),
       author: currentUser.fullName,
       role: currentUser.role,
-      isChief: false,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       content: newComment
     }])
@@ -337,21 +336,22 @@ export function ReadDraftPage() {
             <X className="w-6 h-6" />
           </button>
 
-          <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
-            <img
-              src={mockImage}
-              alt="Zoomed Manga Page"
-              onClick={handleLightboxImageClick}
-              style={{
-                transform: `scale(${zoomScale})`,
-                transformOrigin: transformOrigin
-              }}
-              className={`h-[95vh] w-auto max-w-[95vw] object-contain transition-transform duration-300 ${zoomScale === 1 ? 'cursor-zoom-in' : 'cursor-zoom-out'}`}
-            />
+          <div className="relative w-full h-full overflow-y-auto flex flex-col items-center pt-8 pb-12 gap-0">
+            {displayPages.map((p, idx) => {
+              const src = typeof p === 'string' ? p : p?.image_url || p?.file_url || fallbackPages[0];
+              return (
+                <img
+                  key={idx}
+                  src={src}
+                  alt={`Manga Page ${idx + 1}`}
+                  className="w-full max-w-3xl object-contain bg-white"
+                />
+              )
+            })}
           </div>
 
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/60 text-white px-4 py-2 rounded-full text-xs font-bold pointer-events-none">
-            {zoomScale === 1 ? 'Bấm vào vùng bất kỳ để phóng to' : 'Bấm lại để thu nhỏ'}
+            Cuộn để xem tiếp các trang
           </div>
         </div>
       )}
@@ -702,7 +702,6 @@ export function VotePage() {
       id: Date.now().toString(),
       author: currentUser.fullName,
       role: currentUser.role,
-      isChief: false,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       content: newComment
     }])

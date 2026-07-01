@@ -12,8 +12,13 @@ import {
   FileText
 } from 'lucide-react'
 
-// Main panel menu items
 const mainMenuItems = [
+  {
+    label: "Trang chủ",
+    path: "/dashboard/editorial-board",
+    exact: true,
+    icon: LayoutDashboard
+  },
   {
     label: "Review Session",
     path: "/dashboard/editorial-board/proposals",

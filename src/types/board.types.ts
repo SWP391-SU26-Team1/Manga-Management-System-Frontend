@@ -23,7 +23,6 @@ export interface BoardComment {
   id: string;
   author: string;
   role: string;
-  isChief?: boolean;
   isPinned?: boolean;
   time: string;
   content: string;
@@ -44,9 +43,6 @@ export interface DisputeCase {
   editorMetricValue: number;
   editorMetricTarget: number;
   status: 'PENDING' | 'DECIDED';
-  chiefDecision?: 'AUTHOR' | 'EDITOR' | 'COMPROMISE';
-  chiefCompromise?: string;
-  chiefNextActions?: string;
   memberOpinion?: {
     leaning: 'AUTHOR' | 'EDITOR' | 'COMPROMISE';
     reason: string;

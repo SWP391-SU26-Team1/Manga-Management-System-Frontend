@@ -5,6 +5,7 @@ import { seriesService } from '@/services/series.service'
 import { chapterService } from '@/services/chapter.service'
 import { manuscriptService } from '@/services/manuscript.service'
 import { editorService } from '@/services/editor.service'
+import api from '@/services/api'
 
 export default function CreateManuscriptPage() {
   const navigate = useNavigate()
@@ -54,7 +55,11 @@ export default function CreateManuscriptPage() {
       try {
         const list = await chapterService.getBySeriesId(selectedSeriesId)
         setChapters(list)
-        setSelectedChapterId('')
+        if (list.length > 0) {
+          setSelectedChapterId(list[0]._id)
+        } else {
+          setSelectedChapterId('')
+        }
       } catch (err) {
         console.error(err)
         setChapters([])
@@ -100,14 +105,24 @@ export default function CreateManuscriptPage() {
         throw new Error('Không tìm thấy thông tin tài khoản đăng nhập mangaka!')
       }
 
-      await manuscriptService.create({
+      const createdMs = await manuscriptService.create({
         mangaka_id: mangakaId,
         series_id: selectedSeriesId,
         chapter_id: selectedChapterId || undefined,
         title: title.trim(),
         content: content.trim(),
-        status: 'draft' // Gửi bản thảo dưới trạng thái 'draft' (Chờ Tantou duyệt)
+        status: 'submitted'
       })
+
+      // Gọi workflow submit để chuyển trạng thái từ 'draft' -> 'submitted'
+      try {
+        const msId = createdMs._id || (createdMs as any).manuscript_id
+        if (msId) {
+          await api.patch(`/api/manuscripts/${msId}/submit`)
+        }
+      } catch (submitErr) {
+        console.warn('Auto-submit workflow failed:', submitErr)
+      }
 
       // Gửi thông báo đến toàn bộ các Tantou Editor phụ trách
       try {
@@ -163,7 +178,6 @@ export default function CreateManuscriptPage() {
       } catch (errNotifs) {
         console.error("Lỗi khi xử lý thông báo nộp bản thảo cho Tantou:", errNotifs)
       }
-
       setSuccessMsg('✅ Đã nộp bản thảo kịch bản cho Tantou Editor thành công!')
       setTimeout(() => navigate('/dashboard/mangaka/manuscripts'), 2000)
     } catch (err: any) {

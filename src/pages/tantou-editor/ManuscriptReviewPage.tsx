@@ -137,7 +137,7 @@ export default function ManuscriptReviewPage() {
       const data = res.data || res
       const list: ApiManuscript[] = Array.isArray(data) ? data : (data.manuscripts || data.items || [])
 
-      const filteredList = list.filter(m => ['submitted', 'in_review'].includes(m.status?.toLowerCase()))
+      const filteredList = list.filter(m => ['draft', 'submitted', 'in_review'].includes(m.status?.toLowerCase()))
 
       // Fetch full details for each filtered manuscript to get series, chapter, and mangaka info
       const detailedList = await Promise.all(
@@ -375,6 +375,10 @@ export default function ManuscriptReviewPage() {
     }
     try {
       setLoading(true)
+      // Đảm bảo bản thảo ở trạng thái 'submitted' trước khi reject (xử lý trường hợp bị kẹt ở 'draft')
+      try {
+        await editorService.overrideManuscriptStatus(mId, 'submitted')
+      } catch (_) { /* ignore if already submitted */ }
       await editorService.rejectManuscript(mId)
       
       // Reject chapter directly
@@ -408,6 +412,10 @@ export default function ManuscriptReviewPage() {
     if (!activeManuscript) return
     try {
       setLoading(true)
+      // Đảm bảo bản thảo ở trạng thái 'submitted' trước khi approve (xử lý trường hợp bị kẹt ở 'draft')
+      try {
+        await editorService.overrideManuscriptStatus(mId, 'submitted')
+      } catch (_) { /* ignore if already submitted */ }
       await editorService.approveManuscript(mId)
       
       // Approve chapter directly

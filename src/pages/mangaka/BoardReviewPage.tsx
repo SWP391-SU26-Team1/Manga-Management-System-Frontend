@@ -68,7 +68,16 @@ export default function BoardReviewPage() {
       setLoading(true)
       // 1. Update manuscript description first
       await api.patch(`/api/manuscripts/${selectedReview.id}`, { description: revisionNote })
-      // 2. Submit the manuscript
+      
+      // 2. Chuyển trạng thái: rejected -> draft (revise), rồi draft -> submitted (submit)
+      try {
+        // Thử revise trước (rejected -> draft)
+        await api.patch(`/api/manuscripts/${selectedReview.id}/status`, { status: 'draft' })
+      } catch (reviseErr) {
+        console.warn('Revise step failed, trying direct submit:', reviseErr)
+      }
+      
+      // 3. Submit the manuscript (draft -> submitted)
       await manuscriptService.submit(selectedReview.id)
       
       alert(`Đã nộp bản sửa đổi cho bản thảo thành công!`);

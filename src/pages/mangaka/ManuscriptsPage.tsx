@@ -6,7 +6,8 @@ import { chapterService } from '@/services/chapter.service'
 import { pageService } from '@/services/page.service'
 import { uploadService } from '@/services/upload.service'
 import { manuscriptService, ManuscriptAPI } from '@/services/manuscript.service'
-import { rankingService } from '@/services/ranking.service'
+import { editorService } from '@/services/editor.service'
+import api from '@/services/api'
 
 const getChapterDisplayStatus = (ch: any, m?: any) => {
   if (m) {
@@ -15,14 +16,15 @@ const getChapterDisplayStatus = (ch: any, m?: any) => {
     }
     switch (m.status) {
       case 'draft':
-        return 'ĐANG SOẠN'
+      case 'draft':
+      case 'submitted':
+      case 'in_review':
+        return 'CHỜ TANTOU DUYỆT'
       case 'needs_revision':
         return 'NHẬN XÉT TỪ EDITOR'
       case 'rejected':
         return 'TỪ CHỐI'
-      case 'submitted':
-      case 'in_review':
-        return 'CHỜ TANTOU DUYỆT'
+
       case 'approved':
         return 'ĐÃ DUYỆT'
       case 'published':
@@ -127,7 +129,7 @@ export default function ManuscriptsPage() {
 
       // Fetch notifications to extract editor feedback notes
       try {
-        const notifs = await rankingService.getNotifications()
+        const notifs = await editorService.getNotifications()
         setNotifications(notifs)
       } catch (err) {
         console.error('Failed to load notifications:', err)
@@ -216,52 +218,113 @@ export default function ManuscriptsPage() {
         chapterNumberStr = String(newCh.chapter_number)
       }
 
-      // 2. Nếu người dùng chọn file tải lên, tiến hành tạo và submit manuscript
+      // b. Lấy mangaka_id từ localStorage
+      const userStr = localStorage.getItem('mangaflow_user')
+      let mangakaId = ''
+      if (userStr) {
+        try {
+          const parsed = JSON.parse(userStr)
+          mangakaId = parsed.user?.id || parsed.id || ''
+        } catch {
+          // ignore
+        }
+      }
+
+      if (!mangakaId) {
+        throw new Error('Không tìm thấy thông tin tài khoản đăng nhập!')
+      }
+
+      // c. Tạo manuscript (backend sẽ lưu với status 'draft'), sau đó tự động submit
+      const createdMs = await manuscriptService.create({
+        mangaka_id: mangakaId,
+        series_id: selectedSeriesId,
+        chapter_id: chapterId,
+        title: `Bản thảo Chương ${chapterNumberStr}: ${chapterTitle}`,
+        file_url: files.length > 0 ? (await Promise.all(files.map(f => uploadService.uploadSingle(f, 'manuscripts'))))[0].secure_url : undefined,
+        status: 'submitted'
+      })
+
+      // d. Gọi workflow submit để chuyển trạng thái từ 'draft' -> 'submitted'
+      try {
+        const msId = createdMs._id || (createdMs as any).manuscript_id
+        if (msId) {
+          await api.patch(`/api/manuscripts/${msId}/submit`)
+        }
+      } catch (submitErr) {
+        console.warn('Auto-submit workflow failed, manuscript may still be in draft:', submitErr)
+      }
+
+      // e. Nếu có file upload, thêm file liên kết
       if (files.length > 0) {
-        // a. Upload files lên Cloudinary
         const uploadPromises = files.map(f => uploadService.uploadSingle(f, 'manuscripts'))
         const uploadResults = await Promise.all(uploadPromises)
-
-        // b. Lấy mangaka_id từ localStorage
-        const userStr = localStorage.getItem('mangaflow_user')
-        let mangakaId = ''
-        if (userStr) {
-          try {
-            const parsed = JSON.parse(userStr)
-            mangakaId = parsed.user?.id || parsed.id || ''
-          } catch {
-            // ignore
-          }
-        }
-
-        if (!mangakaId) {
-          throw new Error('Không tìm thấy thông tin tài khoản đăng nhập!')
-        }
-
-        // c. Tạo manuscript
-        const manuscript = await manuscriptService.create({
-          mangaka_id: mangakaId,
-          series_id: selectedSeriesId,
-          chapter_id: chapterId,
-          title: `Bản thảo Chương ${chapterNumberStr}: ${chapterTitle}`,
-          file_url: uploadResults[0].secure_url
-        })
-
-        // d. Thêm file liên kết để backend/editor có thể đọc
         await Promise.all(
           uploadResults.map((res, index) => {
             const f = files[index]
             return manuscriptService.addFile({
-              manuscript_id: manuscript._id,
+              manuscript_id: createdMs._id,
               file_url: res.secure_url,
               file_name: f.name,
               file_type: f.name.split('.').pop() || 'psd'
             })
           })
         )
+      }
 
-        // e. Submit manuscript lên Board
-        await manuscriptService.submit(manuscript._id)
+      // f. Gửi thông báo đến toàn bộ các Tantou Editor phụ trách
+      try {
+        const mems = await seriesService.getMembers(selectedSeriesId)
+        const editors = mems
+          .filter((m: any) => m.users?.role?.toLowerCase() === 'editor')
+          .map((m: any) => m.users.user_id)
+          
+          // Danh sách các Biên tập viên (Tantou Editor) trong hệ thống để tất cả đều nhận được thông báo
+          const systemEditors = [
+            'b29fb935-7a5d-4988-9327-a8e453ba7322', // LuanHuynh296
+            'f9a1ee69-6036-4fd6-bbef-de0e00370309', // editor_akira (Akira Watanabe)
+            '83556777-7c27-4039-ba81-655e58a788a7', // Tantou_Editor
+            '66666666-6666-6666-6666-666666666666', // editor_haru
+            '90000000-0000-0000-0000-000000000004', // editor_mika
+            'dcba68dd-5e62-49e2-a826-d2f5e6941561', // codex_test_1781698003205
+            'usr_editor_001'                        // fallback mock
+          ]
+
+          systemEditors.forEach(id => {
+            if (!editors.includes(id)) {
+              editors.push(id)
+            }
+          })
+
+          const activeSeries = seriesList.find(s => s._id === selectedSeriesId)
+          
+          // Lấy tên của mangaka hiện tại để chèn vào thông báo
+          let mangakaName = 'BiLong'
+          if (userStr) {
+            try {
+              const parsed = JSON.parse(userStr)
+              mangakaName = parsed.fullName || parsed.name || parsed.username || parsed.user?.fullName || parsed.user?.name || parsed.user?.username || 'BiLong'
+            } catch {
+              // ignore
+            }
+          }
+
+          const rfc4122UuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/;
+          const validEditors = editors.filter(id => rfc4122UuidRegex.test(id))
+
+          await Promise.all(
+            validEditors.map(editorId =>
+              editorService.sendInternalNotification(
+                editorId,
+                "Cập nhật mới",
+                `Có bản thảo mới từ ${mangakaName} cần duyệt cho bộ truyện [${activeSeries?.title || 'One Piece'}].`,
+                "manuscript_submitted"
+              ).catch(errNotif => {
+                console.error(`Lỗi khi gửi thông báo cho editor ${editorId}:`, errNotif)
+              })
+            )
+          )
+      } catch (errNotifs) {
+        console.error("Lỗi khi xử lý thông báo nộp bản thảo cho Tantou:", errNotifs)
       }
 
       alert('Đã thực hiện thành công!')

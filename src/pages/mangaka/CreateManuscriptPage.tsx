@@ -4,6 +4,8 @@ import { ArrowLeft, Save, FileText, BookOpen, Clock, AlertTriangle, CheckCircle,
 import { seriesService } from '@/services/series.service'
 import { chapterService } from '@/services/chapter.service'
 import { manuscriptService } from '@/services/manuscript.service'
+import { editorService } from '@/services/editor.service'
+import api from '@/services/api'
 
 export default function CreateManuscriptPage() {
   const navigate = useNavigate()
@@ -103,15 +105,79 @@ export default function CreateManuscriptPage() {
         throw new Error('Không tìm thấy thông tin tài khoản đăng nhập mangaka!')
       }
 
-      await manuscriptService.create({
+      const createdMs = await manuscriptService.create({
         mangaka_id: mangakaId,
         series_id: selectedSeriesId,
         chapter_id: selectedChapterId || undefined,
         title: title.trim(),
         content: content.trim(),
-        status: 'submitted' // Gửi trực tiếp lên Tantou Editor duyệt
+        status: 'submitted'
       })
 
+      // Gọi workflow submit để chuyển trạng thái từ 'draft' -> 'submitted'
+      try {
+        const msId = createdMs._id || (createdMs as any).manuscript_id
+        if (msId) {
+          await api.patch(`/api/manuscripts/${msId}/submit`)
+        }
+      } catch (submitErr) {
+        console.warn('Auto-submit workflow failed:', submitErr)
+      }
+
+      // Gửi thông báo đến toàn bộ các Tantou Editor phụ trách
+      try {
+        const mems = await seriesService.getMembers(selectedSeriesId)
+        const editors = mems
+          .filter((m: any) => m.users?.role?.toLowerCase() === 'editor')
+          .map((m: any) => m.users.user_id)
+        
+        // Danh sách các Biên tập viên (Tantou Editor) trong hệ thống để tất cả đều nhận được thông báo
+        const systemEditors = [
+          'b29fb935-7a5d-4988-9327-a8e453ba7322', // LuanHuynh296
+          'f9a1ee69-6036-4fd6-bbef-de0e00370309', // editor_akira (Akira Watanabe)
+          '83556777-7c27-4039-ba81-655e58a788a7', // Tantou_Editor
+          '66666666-6666-6666-6666-666666666666', // editor_haru
+          '90000000-0000-0000-0000-000000000004', // editor_mika
+          'dcba68dd-5e62-49e2-a826-d2f5e6941561'  // codex_test_1781698003205
+        ]
+
+        systemEditors.forEach(id => {
+          if (!editors.includes(id)) {
+            editors.push(id)
+          }
+        })
+
+        const activeSeries = seriesList.find(s => s._id === selectedSeriesId)
+        
+        // Lấy tên của mangaka hiện tại để chèn vào thông báo
+        let mangakaName = 'BiLong'
+        if (userStr) {
+          try {
+            const parsed = JSON.parse(userStr)
+            mangakaName = parsed.fullName || parsed.name || parsed.username || parsed.user?.fullName || parsed.user?.name || parsed.user?.username || 'BiLong'
+          } catch {
+            // ignore
+          }
+        }
+
+        const rfc4122UuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/;
+        const validEditors = editors.filter(id => rfc4122UuidRegex.test(id))
+
+        await Promise.all(
+          validEditors.map(editorId =>
+            editorService.sendInternalNotification(
+              editorId,
+              "Cập nhật mới",
+              `Có bản thảo mới từ ${mangakaName} cần duyệt cho bộ truyện [${activeSeries?.title || 'One Piece'}].`,
+              "manuscript_submitted"
+            ).catch(errNotif => {
+              console.error(`Lỗi khi gửi thông báo cho editor ${editorId}:`, errNotif)
+            })
+          )
+        )
+      } catch (errNotifs) {
+        console.error("Lỗi khi xử lý thông báo nộp bản thảo cho Tantou:", errNotifs)
+      }
       setSuccessMsg('✅ Đã nộp bản thảo kịch bản cho Tantou Editor thành công!')
       setTimeout(() => navigate('/dashboard/mangaka/manuscripts'), 2000)
     } catch (err: any) {

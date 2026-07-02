@@ -285,7 +285,7 @@ export default function SeriesDetailPage() {
       case 'published': return 'bg-blue-100 text-blue-700 border-blue-300'
       case 'under_review': return 'bg-orange-100 text-orange-700 border-orange-300'
       case 'in_production': return 'bg-green-100 text-green-700 border-green-300'
-      case 'approved': return 'bg-green-100 text-green-700 border-green-300'
+      case 'approved': return 'bg-purple-100 text-purple-700 border-purple-300'
       case 'draft': return 'bg-gray-100 text-gray-500 border-gray-300'
       default: return 'bg-gray-100 text-gray-500 border-gray-300'
     }
@@ -296,7 +296,7 @@ export default function SeriesDetailPage() {
       draft: 'Bản nháp',
       in_production: 'Đang vẽ',
       under_review: 'Chờ duyệt',
-      approved: 'Đã duyệt',
+      approved: 'Đang vẽ',
       published: 'Đã xuất bản',
     }
     return map[status] ?? status

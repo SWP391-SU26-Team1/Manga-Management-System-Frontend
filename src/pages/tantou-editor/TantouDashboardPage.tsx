@@ -6,6 +6,29 @@ import { editorService } from '@/services/editor.service'
 export default function TantouDashboardPage() {
   const navigate = useNavigate()
 
+  const getNotificationLink = (type: string) => {
+    const t = (type || '').toLowerCase()
+    if (t.includes('manuscript')) return '/dashboard/tantou-editor/manuscript-review'
+    if (t.includes('vote') || t.includes('decision')) return '/dashboard/tantou-editor/workflow'
+    return '/dashboard/tantou-editor/notifications'
+  }
+
+  const handleNotifClick = async (notif: any) => {
+    try {
+      const notifId = notif.notification_id || notif.id
+      if (notifId && !notif.is_read) {
+        await editorService.markNotificationRead(notifId)
+        // Emit event to update count on header
+        window.dispatchEvent(new Event('mangaflow_notifications_updated'))
+        // Reload dashboard notifications
+        fetchDashboard()
+      }
+    } catch (err) {
+      console.error('Failed to mark notification as read:', err)
+    }
+    navigate(getNotificationLink(notif.type))
+  }
+
   // Get user from localStorage
   const storedUser = localStorage.getItem('mangaflow_user')
   const user = storedUser ? JSON.parse(storedUser) : null
@@ -18,6 +41,15 @@ export default function TantouDashboardPage() {
 
   useEffect(() => {
     fetchDashboard()
+
+    const handleNotificationsUpdate = () => {
+      fetchDashboard()
+    }
+    window.addEventListener('mangaflow_notifications_updated', handleNotificationsUpdate)
+
+    return () => {
+      window.removeEventListener('mangaflow_notifications_updated', handleNotificationsUpdate)
+    }
   }, [])
 
   const fetchDashboard = async () => {
@@ -71,7 +103,7 @@ export default function TantouDashboardPage() {
 
   const { managingSeries, pendingReview, needRevision, approvedThisMonth, overdue, atRiskSeries, todayOverview } = stats
 
-  const recentNotifications = dashboardData?.recentNotifications || dashboardData?.recent_notifications || []
+  const recentNotifications = (dashboardData?.recentNotifications || dashboardData?.recent_notifications || []).filter((n: any) => !n.is_read)
 
   // Loading state
   if (loading) {
@@ -193,7 +225,7 @@ export default function TantouDashboardPage() {
               {recentNotifications.length > 0 && (
                 <span className="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-sm">{recentNotifications.filter((n: any) => !n.is_read).length || recentNotifications.length} CHƯA ĐỌC</span>
               )}
-              <button onClick={() => navigate('/dashboard/tantou-editor/alerts')} className="text-xs font-bold text-gray-500 hover:text-red-600 flex items-center gap-1 transition-colors">
+              <button onClick={() => navigate('/dashboard/tantou-editor/notifications')} className="text-xs font-bold text-gray-500 hover:text-red-600 flex items-center gap-1 transition-colors">
                 Xem tất cả <ArrowRight className="w-3 h-3" />
               </button>
             </div>
@@ -201,7 +233,11 @@ export default function TantouDashboardPage() {
 
           <div className="border-2 border-manga-ink bg-white divide-y-2 divide-gray-100">
             {recentNotifications.length > 0 ? recentNotifications.slice(0, 6).map((notif: any, idx: number) => (
-              <div key={notif.notification_id || notif.id || idx} className="p-4 hover:bg-gray-50 transition-colors cursor-pointer group">
+              <div 
+                key={notif.notification_id || notif.id || idx} 
+                onClick={() => handleNotifClick(notif)}
+                className="p-4 hover:bg-gray-50 transition-colors cursor-pointer group"
+              >
                 <div className="flex justify-between items-start mb-1">
                   <h3 className={`font-bold text-xs uppercase flex items-center gap-2 ${
                     notif.type === 'urgent' ? 'text-red-600' :
@@ -241,14 +277,6 @@ export default function TantouDashboardPage() {
               <span className="flex items-center gap-2"><FileText className="w-4 h-4 text-red-500" /> Review bản thảo mới nhất</span>
               <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
             </Link>
-            <Link to="/dashboard/tantou-editor/feedback" className="flex items-center justify-between p-2 text-sm font-bold text-blue-600 hover:bg-blue-50 transition-colors group rounded">
-              <span className="flex items-center gap-2"><RefreshCw className="w-4 h-4 text-green-500" /> Phản hồi & bản nộp lại</span>
-              <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
-            </Link>
-            <Link to="/dashboard/tantou-editor/studio-progress" className="flex items-center justify-between p-2 text-sm font-bold text-blue-600 hover:bg-blue-50 transition-colors group rounded">
-              <span className="flex items-center gap-2"><TrendingUp className="w-4 h-4 text-blue-500" /> Giám sát tiến độ chương</span>
-              <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
-            </Link>
             <Link to="/dashboard/tantou-editor/reports" className="flex items-center justify-between p-2 text-sm font-bold text-blue-600 hover:bg-blue-50 transition-colors group rounded">
               <span className="flex items-center gap-2"><MessageSquareText className="w-4 h-4 text-purple-500" /> Tạo báo cáo Editorial Board</span>
               <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -263,10 +291,6 @@ export default function TantouDashboardPage() {
             <div className="flex justify-between items-center">
               <span className="text-gray-300">Chapter chờ review</span>
               <span className="text-blue-400">{todayOverview.chaptersToReview} chapter</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-300">Bản nộp lại mới</span>
-              <span className="text-green-400">{todayOverview.newResubmissions} bản</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-300">Cảnh báo rủi ro</span>

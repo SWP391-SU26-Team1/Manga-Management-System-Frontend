@@ -57,7 +57,7 @@ export default function NotificationsPage() {
   const mapLink = (backendType: string): string => {
     const t = (backendType || '').toLowerCase()
     if (t.includes('manuscript')) return '/dashboard/tantou-editor/manuscript-review'
-    if (t.includes('feedback')) return '/dashboard/tantou-editor/feedback'
+    if (t.includes('feedback')) return '/dashboard/tantou-editor/notifications'
     if (t.includes('vote') || t.includes('decision')) return '/dashboard/tantou-editor/workflow'
     return ''
   }
@@ -273,7 +273,7 @@ export default function NotificationsPage() {
               key={n.id}
               onClick={() => handleNotifClick(n)}
               className={`bg-white border-4 border-black p-4 flex gap-4 transition-all relative cursor-pointer group shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-x-1 active:translate-y-1 active:shadow-none ${
-                !n.isRead ? 'bg-[#fffbeb]' : ''
+                !n.isRead ? 'bg-gray-50/80' : 'bg-white'
               }`}
             >
               <div className="flex flex-col items-start gap-1 flex-1">
@@ -293,22 +293,31 @@ export default function NotificationsPage() {
                   )}
                 </div>
 
-                <h3 className={`text-sm font-black uppercase mt-1 leading-tight group-hover:text-[#E63946] transition-colors ${
-                  !n.isRead ? 'text-black' : 'text-zinc-600'
+                <h3 className={`text-sm uppercase mt-1 leading-tight group-hover:text-[#E63946] transition-colors ${
+                  !n.isRead ? 'font-black text-black' : 'font-normal text-zinc-500'
                 }`}>
                   {n.title}
                 </h3>
                 
-                <p className="text-xs font-bold text-gray-500 mt-1 leading-relaxed">
+                <p className={`text-xs mt-1 leading-relaxed ${
+                  !n.isRead ? 'font-bold text-gray-800' : 'font-normal text-gray-400'
+                }`}>
                   {n.message}
                 </p>
               </div>
 
               <div className="flex flex-col sm:flex-row items-center gap-2 flex-shrink-0 self-center">
                 {n.link && (
-                  <span className="p-2 border-2 border-black bg-zinc-50 hover:bg-black hover:text-white transition-colors">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleNotifClick(n)
+                    }}
+                    className="p-2 border-2 border-black bg-zinc-50 hover:bg-black hover:text-white transition-colors cursor-pointer"
+                  >
                     <ArrowRight className="w-4 h-4" />
-                  </span>
+                  </button>
                 )}
                 {!n.isRead && (
                   <button

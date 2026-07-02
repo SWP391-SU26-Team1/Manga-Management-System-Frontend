@@ -9,9 +9,7 @@ const routeLabels: Record<string, string> = {
   [BASE]: 'Trang Chủ',
   [`${BASE}/series`]: 'Series Phụ Trách',
   [`${BASE}/chapters`]: 'Chapter / Page',
-  [`${BASE}/studio-progress`]: 'Tiến Độ Studio',
   [`${BASE}/manuscript-review`]: 'Review Bản Thảo',
-  [`${BASE}/feedback`]: 'Phản Hồi & Nộp Lại',
   [`${BASE}/workflow`]: 'Quy Trình Duyệt',
   [`${BASE}/alerts`]: 'Cảnh Báo',
   [`${BASE}/ranking`]: 'Ranking / Hiệu Suất',
@@ -30,6 +28,34 @@ export default function TantouHeader() {
   const [showNotifications, setShowNotifications] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [notifications, setNotifications] = useState<any[]>([])
+  const [lastSeenNotifId, setLastSeenNotifId] = useState<string | null>(() => {
+    return localStorage.getItem('mangaflow_last_seen_notif_id')
+  })
+
+  const updateLastSeenNotif = (id: string) => {
+    setLastSeenNotifId(id)
+    localStorage.setItem('mangaflow_last_seen_notif_id', id)
+  }
+
+  const getBadgeCount = () => {
+    const unread = notifications.filter(n => !n.is_read)
+    if (!lastSeenNotifId) return unread.length
+    const lastSeenIndex = notifications.findIndex(n => n.notification_id === lastSeenNotifId)
+    if (lastSeenIndex === -1) return unread.length
+    
+    const newerUnread = notifications.slice(0, lastSeenIndex).filter(n => !n.is_read).length
+    return newerUnread
+  }
+
+  const badgeCount = getBadgeCount()
+
+  const handleBellClick = () => {
+    const nextShow = !showNotifications
+    setShowNotifications(nextShow)
+    if (nextShow && notifications.length > 0) {
+      updateLastSeenNotif(notifications[0].notification_id)
+    }
+  }
   
   const notificationRef = useRef<HTMLDivElement>(null)
   const userMenuRef = useRef<HTMLDivElement>(null)
@@ -89,7 +115,7 @@ export default function TantouHeader() {
     if (t.includes('manuscript')) {
       navigate('/dashboard/tantou-editor/manuscript-review')
     } else if (t.includes('feedback')) {
-      navigate('/dashboard/tantou-editor/feedback')
+      navigate('/dashboard/tantou-editor/notifications')
     } else if (t.includes('vote') || t.includes('decision')) {
       navigate('/dashboard/tantou-editor/workflow')
     } else {
@@ -206,13 +232,13 @@ export default function TantouHeader() {
         <div className="relative" ref={notificationRef}>
           <button 
             id="notification-bell-btn"
-            onClick={() => setShowNotifications(!showNotifications)}
+            onClick={handleBellClick}
             className="relative cursor-pointer hover:text-[#E63946] transition-colors focus:outline-none bg-transparent border-0 p-1 flex items-center"
           >
             <Bell className="w-5 h-5 text-gray-600 hover:text-gray-900 transition-colors" />
-            {unreadCount > 0 && (
+            {badgeCount > 0 && (
               <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#E63946] text-white text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-white">
-                {unreadCount}
+                {badgeCount}
               </span>
             )}
           </button>
@@ -244,19 +270,25 @@ export default function TantouHeader() {
                         key={notif.notification_id} 
                         onClick={() => handleNotifClick(notif)}
                         className={`p-3.5 hover:bg-zinc-50 transition-colors flex gap-3 items-start cursor-pointer group ${
-                          !notif.is_read ? 'bg-amber-50/20' : ''
+                          !notif.is_read ? 'bg-gray-50/80' : 'bg-white'
                         }`}
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex justify-between items-baseline gap-2">
-                            <h4 className={`text-xs font-extrabold text-gray-900 truncate leading-tight group-hover:text-[#E63946] transition-colors ${!notif.is_read ? 'text-[#E63946]' : ''}`}>
+                            <h4 className={`text-xs truncate leading-tight transition-colors ${
+                              !notif.is_read 
+                                ? 'font-extrabold text-gray-900 group-hover:text-[#E63946]' 
+                                : 'font-normal text-gray-500 group-hover:text-gray-700'
+                            }`}>
                               {title}
                             </h4>
                             <span className="text-[9px] text-gray-400 font-bold flex-shrink-0">
                               {formatTimeAgo(notif.created_at)}
                             </span>
                           </div>
-                          <p className="text-[10px] text-gray-500 font-semibold leading-normal mt-1 break-words">
+                          <p className={`text-[10px] leading-normal mt-1 break-words ${
+                            !notif.is_read ? 'font-bold text-gray-800' : 'font-normal text-gray-400'
+                          }`}>
                             {message}
                           </p>
                         </div>

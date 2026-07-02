@@ -4,13 +4,14 @@ import { Search, Filter, ChevronDown, ChevronRight, FileText, BookOpen, Edit, Ch
 import { editorService, ApiSeries } from '@/services/editor.service'
 
 // Map backend status to display status
-type DisplayStatus = 'PUBLISHING' | 'IN REVIEW' | 'AT RISK' | 'PAUSED' | 'ARCHIVED' | 'DRAFT'
+type DisplayStatus = 'PUBLISHING' | 'IN REVIEW' | 'AT RISK' | 'PAUSED' | 'ARCHIVED' | 'DRAFT' | 'DRAWING'
 
 const mapApiStatusToDisplay = (apiStatus: string): DisplayStatus => {
   switch (apiStatus) {
     case 'published': return 'PUBLISHING'
     case 'pending_review': return 'IN REVIEW'
-    case 'approved': return 'PUBLISHING'
+    case 'approved': return 'DRAWING'
+    case 'in_production': return 'DRAWING'
     case 'draft': return 'DRAFT'
     case 'hidden':
     case 'archived':
@@ -25,6 +26,7 @@ const mapDisplayStatusToApi = (displayStatus: string): string => {
   switch (displayStatus) {
     case 'PUBLISHING': return 'published'
     case 'IN REVIEW': return 'pending_review'
+    case 'DRAWING': return 'approved'
     case 'AT RISK': return 'rejected'
     case 'PAUSED': return 'hidden'
     case 'ARCHIVED': return 'archived'
@@ -79,14 +81,7 @@ export default function SeriesManagementPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
-  // Modal states
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-  const [editingSeries, setEditingSeries] = useState<DisplaySeries | null>(null)
-  
-  // Edit Form inputs
-  const [formTitle, setFormTitle] = useState('')
-  const [formGenre, setFormGenre] = useState('')
-  const [formDescription, setFormDescription] = useState('')
+
   
   // Toast state
   const [toastMessage, setToastMessage] = useState<string | null>(null)
@@ -102,7 +97,9 @@ export default function SeriesManagementPage() {
       const res = await editorService.getSeries()
       const data = res.data || res
       const list = Array.isArray(data) ? data : (data.series || data.items || [])
-      setSeriesList(list.map(mapApiToDisplay))
+      // Chỉ hiển thị các bộ truyện đã được duyệt/đang hoạt động (loại bỏ pending_review, draft, rejected)
+      const activeList = list.filter((s: any) => ['published', 'approved', 'in_production', 'hidden', 'archived'].includes(s.status))
+      setSeriesList(activeList.map(mapApiToDisplay))
     } catch (err: any) {
       console.error('Failed to load series:', err)
       setError('Không thể tải danh sách series.')
@@ -127,6 +124,8 @@ export default function SeriesManagementPage() {
     switch (status) {
       case 'PUBLISHING':
         return <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-bold border border-green-700">ĐANG XUẤT BẢN</span>
+      case 'DRAWING':
+        return <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-bold border border-purple-700">ĐANG VẼ</span>
       case 'IN REVIEW':
         return <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold border border-blue-700">ĐANG DUYỆT</span>
       case 'AT RISK':
@@ -146,63 +145,9 @@ export default function SeriesManagementPage() {
     setSelectedSeries(series)
   }
 
-  // Handle Edit Click
-  const handleOpenEditModal = (series: DisplaySeries) => {
-    setEditingSeries(series)
-    setFormTitle(series.title)
-    setFormGenre(series.genre)
-    setFormDescription(series.description || '')
-    setIsEditModalOpen(true)
-  }
 
-  const handleSaveSeriesEdit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!editingSeries) return
 
-    try {
-      await editorService.updateSeries(editingSeries.id, {
-        title: formTitle,
-        description: formDescription,
-      })
 
-      setSeriesList(prev => prev.map(s => {
-        if (s.id === editingSeries.id) {
-          return {
-            ...s,
-            title: formTitle,
-            genre: formGenre,
-            description: formDescription
-          }
-        }
-        return s
-      }))
-
-      setIsEditModalOpen(false)
-      showToast(`Đã lưu thay đổi thông tin truyện ${formTitle}!`)
-    } catch (err: any) {
-      console.error('Failed to update series:', err)
-      showToast('Lỗi khi cập nhật thông tin series!')
-    }
-  }
-
-  // Handle status update
-  const handleStatusChange = async (id: string, newDisplayStatus: DisplayStatus) => {
-    try {
-      const apiStatus = mapDisplayStatusToApi(newDisplayStatus)
-      await editorService.updateSeriesStatus(id, apiStatus)
-      
-      setSeriesList(prev => prev.map(s => {
-        if (s.id === id) {
-          return { ...s, status: newDisplayStatus }
-        }
-        return s
-      }))
-      showToast(`Đã thay đổi trạng thái của truyện sang: ${newDisplayStatus}!`)
-    } catch (err: any) {
-      console.error('Failed to update status:', err)
-      showToast('Lỗi khi thay đổi trạng thái!')
-    }
-  }
 
   const handleAction = async (action: 'hide' | 'archive' | 'republish') => {
     if (!selectedSeries) return
@@ -289,7 +234,7 @@ export default function SeriesManagementPage() {
           <div className="text-sm font-bold">
             <span className="text-green-600">{seriesList.filter(s => s.status === 'PUBLISHING').length} Đang xuất bản</span> 
             <span className="text-gray-300 mx-2">|</span>{' '}
-            <span className="text-red-600">{seriesList.filter(s => s.status === 'AT RISK').length} Rủi ro</span>
+            <span className="text-purple-600">{seriesList.filter(s => s.status === 'DRAWING').length} Đang vẽ</span>
           </div>
         </div>
 
@@ -314,11 +259,9 @@ export default function SeriesManagementPage() {
             >
               <option value="ALL">Tất cả</option>
               <option value="PUBLISHING">Đang xuất bản</option>
-              <option value="IN REVIEW">Đang duyệt</option>
-              <option value="AT RISK">Rủi ro</option>
+              <option value="DRAWING">Đang vẽ</option>
               <option value="PAUSED">Tạm ngưng</option>
               <option value="ARCHIVED">Đã lưu trữ</option>
-              <option value="DRAFT">Bản nháp</option>
             </select>
           </div>
         </div>
@@ -394,28 +337,14 @@ export default function SeriesManagementPage() {
 
             {/* Modal Body */}
             <div className="p-6 space-y-6">
-              {/* Status Change */}
+              {/* Active Status */}
               <div className="border-2 border-gray-200 p-4">
                 <h3 className="font-bold uppercase text-xs mb-3 text-manga-ink border-b-2 border-gray-100 pb-2">
                   Trạng Thái Hoạt Động
                 </h3>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Thay Đổi Trạng Thái</label>
-                  <select
-                    value={selectedSeries.status}
-                    onChange={(e) => {
-                      handleStatusChange(selectedSeries.id, e.target.value as any)
-                      setSelectedSeries({ ...selectedSeries, status: e.target.value as DisplayStatus })
-                    }}
-                    className="w-full border-2 border-manga-ink p-2 text-xs font-bold focus:outline-none"
-                  >
-                    <option value="PUBLISHING">PUBLISHING (Đang Xuất Bản)</option>
-                    <option value="IN REVIEW">IN REVIEW (Đang Duyệt)</option>
-                    <option value="AT RISK">AT RISK (Rủi Ro Hủy)</option>
-                    <option value="PAUSED">PAUSED (Tạm Ngừng)</option>
-                    <option value="ARCHIVED">ARCHIVED (Lưu Trữ)</option>
-                    <option value="DRAFT">DRAFT (Bản Nháp)</option>
-                  </select>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-xs font-bold text-gray-400 uppercase">Trạng thái hiện tại:</span>
+                  {getStatusBadge(selectedSeries.status)}
                 </div>
               </div>
 
@@ -423,12 +352,6 @@ export default function SeriesManagementPage() {
               <div className="border-2 border-gray-200 p-4">
                 <div className="flex justify-between items-center mb-4 border-b-2 border-gray-100 pb-2">
                   <h3 className="font-bold uppercase text-xs text-manga-ink">Thông Tin</h3>
-                  <button 
-                    onClick={() => handleOpenEditModal(selectedSeries)}
-                    className="text-xs font-bold text-manga-red hover:text-red-700 flex items-center gap-0.5"
-                  >
-                    <Edit className="w-3.5 h-3.5" /> Sửa
-                  </button>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4 mb-4">
@@ -504,70 +427,7 @@ export default function SeriesManagementPage() {
         </div>
       )}
 
-      {/* Edit Series Modal */}
-      {isEditModalOpen && editingSeries && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleSaveSeriesEdit} className="bg-white border-4 border-manga-ink p-6 max-w-md w-full animate-in zoom-in-95 duration-150">
-            <div className="flex justify-between items-center border-b-2 border-gray-100 pb-3 mb-4">
-              <h2 className="font-manga text-xl font-bold uppercase text-manga-ink">Chỉnh Sửa Thông Tin Truyện</h2>
-              <button type="button" onClick={() => setIsEditModalOpen(false)} className="text-gray-400 hover:text-manga-ink">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tên Truyện (Series Title)</label>
-                <input 
-                  type="text" 
-                  value={formTitle}
-                  onChange={(e) => setFormTitle(e.target.value)}
-                  className="w-full border-2 border-manga-ink p-2 text-sm focus:outline-none focus:border-red-500 font-bold" 
-                  required
-                />
-              </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Thể Loại</label>
-                <input 
-                  type="text" 
-                  value={formGenre}
-                  onChange={(e) => setFormGenre(e.target.value)}
-                  className="w-full border-2 border-manga-ink p-2 text-sm focus:outline-none" 
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Mô tả cốt truyện</label>
-                <textarea 
-                  rows={4}
-                  value={formDescription}
-                  onChange={(e) => setFormDescription(e.target.value)}
-                  className="w-full border-2 border-manga-ink p-2 text-sm focus:outline-none resize-none font-medium" 
-                  placeholder="Nhập mô tả cốt truyện chính..."
-                />
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-end gap-3 border-t-2 border-gray-100 pt-4">
-              <button 
-                type="button" 
-                onClick={() => setIsEditModalOpen(false)}
-                className="px-4 py-2 border-2 border-gray-300 font-bold text-sm uppercase hover:bg-gray-50"
-              >
-                Hủy
-              </button>
-              <button 
-                type="submit"
-                className="px-4 py-2 bg-manga-ink text-white font-bold text-sm uppercase hover:bg-black"
-              >
-                Lưu lại
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
     </div>
   )
 }

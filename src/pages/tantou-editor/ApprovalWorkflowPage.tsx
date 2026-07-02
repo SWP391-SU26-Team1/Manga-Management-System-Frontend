@@ -396,7 +396,7 @@ export default function ApprovalWorkflowPage() {
                   </h3>
                   
                   <div className="flex flex-col relative mt-2 pl-4">
-                    {/* Step 1: Nộp bài */}
+                    {/* Step 1: Đề xuất tác phẩm mới (Mangaka) */}
                     <div className="flex items-start gap-4 relative min-w-0">
                       <div className="flex flex-col items-center">
                         <div className="w-8 h-8 rounded-full border-2 border-green-500 bg-green-50 flex items-center justify-center text-green-600 font-bold text-sm shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)] z-10">
@@ -405,15 +405,43 @@ export default function ApprovalWorkflowPage() {
                         <div className="w-0.5 h-12 bg-gray-200"></div>
                       </div>
                       <div className="flex flex-col min-w-0 pt-1.5 pb-2">
-                        <span className="text-sm font-bold text-green-600">Nộp bài</span>
+                        <span className="text-sm font-bold text-green-600">1. Đăng ký Series mới (Mangaka)</span>
                         <span className="text-[11px] text-gray-500 font-medium">
-                          {selectedItem.series.toLowerCase().includes("ben 10") ? "Inoue Hana" : "Yamamoto Ren"}
+                          Tác giả gửi thông tin và bản phác thảo thô của bộ truyện mới
                         </span>
                         <span className="text-[10px] text-gray-400 font-bold mt-0.5">{selectedItem.submitDate}</span>
                       </div>
                     </div>
 
-                    {/* Step 2: Tantou Duyệt */}
+                    {/* Step 2: Phê duyệt Đang vẽ (Tantou Editor) */}
+                    <div className="flex items-start gap-4 relative min-w-0">
+                      <div className="flex flex-col items-center">
+                        <div className="w-8 h-8 rounded-full border-2 border-green-500 bg-green-50 flex items-center justify-center text-green-600 font-bold text-sm shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)] z-10">
+                          <Check className="w-4 h-4 text-green-650" />
+                        </div>
+                        <div className="w-0.5 h-12 bg-gray-200"></div>
+                      </div>
+                      <div className="flex flex-col min-w-0 pt-1.5 pb-2">
+                        <span className="text-sm font-bold text-green-600">2. Phê duyệt đưa vào sản xuất (Tantou Editor)</span>
+                        <span className="text-[11px] text-gray-500 font-medium">Biên tập viên duyệt chuyển trạng thái sang "Đang vẽ" (Drawing)</span>
+                      </div>
+                    </div>
+
+                    {/* Step 3: Hoàn thiện chương & bản thảo (Họa sĩ & Trợ lý) */}
+                    <div className="flex items-start gap-4 relative min-w-0">
+                      <div className="flex flex-col items-center">
+                        <div className="w-8 h-8 rounded-full border-2 border-green-500 bg-green-50 flex items-center justify-center text-green-600 font-bold text-sm shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)] z-10">
+                          <Check className="w-4 h-4 text-green-650" />
+                        </div>
+                        <div className="w-0.5 h-12 bg-gray-200"></div>
+                      </div>
+                      <div className="flex flex-col min-w-0 pt-1.5 pb-2">
+                        <span className="text-sm font-bold text-green-600">3. Phác thảo & Phân chia trang vẽ</span>
+                        <span className="text-[11px] text-gray-500 font-medium">Tác giả và trợ lý phân chia các trang vẽ cụ thể cho từng chapter</span>
+                      </div>
+                    </div>
+
+                    {/* Step 4: Kiểm duyệt bản thảo (Tantou Editor) */}
                     <div className="flex items-start gap-4 relative min-w-0">
                       <div className="flex flex-col items-center">
                         <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center font-bold text-sm shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)] z-10 ${
@@ -433,48 +461,14 @@ export default function ApprovalWorkflowPage() {
                           selectedItem.status === 'APPROVED' ? 'text-green-600' :
                           selectedItem.status === 'REJECTED' ? 'text-red-600' :
                           'text-manga-ink'
-                        }`}>Tantou Duyệt</span>
-                        <span className="text-[11px] text-gray-500 font-medium">Tanaka Keiko</span>
-                        {selectedItem.status === 'APPROVED' && <span className="text-[10px] text-orange-500 font-bold italic mt-0.5">Duyệt kèm ghi chú nhỏ</span>}
-                        {selectedItem.status === 'REJECTED' && <span className="text-[10px] text-orange-500 font-bold italic mt-0.5">Trả lại để sửa đổi</span>}
+                        }`}>4. Kiểm duyệt bản thảo trang vẽ (Tantou Editor)</span>
+                        <span className="text-[11px] text-gray-500 font-medium font-sans">Duyệt hoặc yêu cầu sửa từng trang của chương</span>
+                        {selectedItem.status === 'APPROVED' && <span className="text-[10px] text-orange-500 font-bold italic mt-0.5">Đã duyệt toàn bộ các trang</span>}
+                        {selectedItem.status === 'REJECTED' && <span className="text-[10px] text-orange-500 font-bold italic mt-0.5">Yêu cầu sửa lại trang lỗi</span>}
                       </div>
                     </div>
 
-                    {/* Step 3: Tổng Biên Tập */}
-                    <div className="flex items-start gap-4 relative min-w-0">
-                      <div className="flex flex-col items-center">
-                        <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center font-bold text-sm shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)] z-10 ${
-                          selectedItem.status === 'APPROVED' ? 'border-green-500 bg-green-50 text-green-600' :
-                          'border-gray-300 bg-gray-50 text-gray-400'
-                        }`}>
-                          {selectedItem.status === 'APPROVED' ? <Check className="w-4 h-4 text-green-600" /> : <Clock className="w-4 h-4 text-gray-400" />}
-                        </div>
-                        <div className="w-0.5 h-12 bg-gray-200"></div>
-                      </div>
-                      <div className="flex flex-col min-w-0 pt-1.5 pb-2">
-                        <span className={`text-sm font-bold ${selectedItem.status === 'APPROVED' ? 'text-green-600' : 'text-gray-400'}`}>Tổng Biên Tập</span>
-                        <span className="text-[11px] text-gray-500 font-medium font-sans">Hayashi Noboru</span>
-                      </div>
-                    </div>
-
-                    {/* Step 4: Nhà Xuất Bản */}
-                    <div className="flex items-start gap-4 relative min-w-0">
-                      <div className="flex flex-col items-center">
-                        <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center font-bold text-sm shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)] z-10 ${
-                          selectedItem.status === 'APPROVED' ? 'border-green-500 bg-green-50 text-green-600' :
-                          'border-gray-300 bg-gray-50 text-gray-400'
-                        }`}>
-                          {selectedItem.status === 'APPROVED' ? <Check className="w-4 h-4 text-green-600" /> : <Clock className="w-4 h-4 text-gray-400" />}
-                        </div>
-                        <div className="w-0.5 h-12 bg-gray-200"></div>
-                      </div>
-                      <div className="flex flex-col min-w-0 pt-1.5 pb-2">
-                        <span className={`text-sm font-bold ${selectedItem.status === 'APPROVED' ? 'text-green-600' : 'text-gray-400'}`}>Nhà Xuất Bản</span>
-                        <span className="text-[11px] text-gray-500 font-medium font-sans">Matsuda Pub.</span>
-                      </div>
-                    </div>
-
-                    {/* Step 5: Sẵn Sàng In */}
+                    {/* Step 5: Phê duyệt Xuất bản (Tổng Biên Tập / Admin) */}
                     <div className="flex items-start gap-4 relative min-w-0">
                       <div className="flex flex-col items-center">
                         <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center font-bold text-sm shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)] z-10 ${
@@ -485,8 +479,8 @@ export default function ApprovalWorkflowPage() {
                         </div>
                       </div>
                       <div className="flex flex-col min-w-0 pt-1.5 pb-2">
-                        <span className={`text-sm font-bold ${selectedItem.status === 'APPROVED' ? 'text-green-600' : 'text-gray-400'}`}>Sẵn Sàng In</span>
-                        <span className="text-[11px] text-gray-500 font-medium font-sans">Nhóm Sản Xuất</span>
+                        <span className={`text-sm font-bold ${selectedItem.status === 'APPROVED' ? 'text-green-600' : 'text-gray-400'}`}>5. Phê duyệt xuất bản (Admin / Ban quản trị)</span>
+                        <span className="text-[11px] text-gray-500 font-medium font-sans">Chính thức đưa tác phẩm sang trạng thái "Đang xuất bản" (Publishing)</span>
                       </div>
                     </div>
                   </div>

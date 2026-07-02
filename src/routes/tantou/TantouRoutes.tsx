@@ -6,9 +6,7 @@ import TantouDashboardPage from '@/pages/tantou-editor/TantouDashboardPage'
 import SeriesManagementPage from '@/pages/tantou-editor/SeriesManagementPage'
 import PageProgressPage from '@/pages/tantou-editor/PageProgressPage'
 import ManuscriptReviewPage from '@/pages/tantou-editor/ManuscriptReviewPage'
-import StudioProgressPage from '@/pages/tantou-editor/StudioProgressPage'
 import RecoveryProposalPage from '@/pages/tantou-editor/RecoveryProposalPage'
-import FeedbackResubmitPage from '@/pages/tantou-editor/FeedbackResubmitPage'
 import ApprovalWorkflowPage from '@/pages/tantou-editor/ApprovalWorkflowPage'
 import AlertsPage from '@/pages/tantou-editor/AlertsPage'
 import RankingPerformancePage from '@/pages/tantou-editor/RankingPerformancePage'
@@ -25,9 +23,7 @@ export default function TantouRoutes() {
         <Route index element={<TantouDashboardPage />} />
         <Route path="series" element={<SeriesManagementPage />} />
         <Route path="chapters" element={<PageProgressPage />} />
-        <Route path="studio-progress" element={<StudioProgressPage />} />
         <Route path="manuscript-review" element={<ManuscriptReviewPage />} />
-        <Route path="feedback" element={<FeedbackResubmitPage />} />
         <Route path="workflow" element={<ApprovalWorkflowPage />} />
         <Route path="alerts" element={<AlertsPage />} />
         <Route path="ranking" element={<RankingPerformancePage />} />

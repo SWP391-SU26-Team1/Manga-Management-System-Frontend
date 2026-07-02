@@ -542,8 +542,8 @@ export default function ManuscriptReviewPage() {
     if (isSubmittingSeries) return
     try {
       setIsSubmittingSeries(true)
-      await editorService.submitSeriesToBoard(sId)
-      showToast(`Đã nộp đề xuất duyệt Series lên Hội Đồng Biên Tập!`)
+      await editorService.updateSeriesStatus(sId, 'approved')
+      showToast(`Đã phê duyệt Series thành công! Trạng thái hiện tại: Đang vẽ.`)
 
       // Gửi thông báo đến toàn bộ các Admin và Board member trong hệ thống
       try {
@@ -569,9 +569,9 @@ export default function ManuscriptReviewPage() {
           systemAdminsAndBoard.map(userId =>
             editorService.sendInternalNotification(
               userId,
-              "Đề xuất duyệt Series mới",
-              `Tác phẩm [${seriesTitle}] đã được Tantou Editor duyệt và nộp lên Hội đồng biên tập chờ phê duyệt.`,
-              "series_submitted_to_board"
+              "Series mới đã được duyệt",
+              `Tác phẩm [${seriesTitle}] đã được Tantou Editor phê duyệt trực tiếp (Trạng thái: Đang vẽ).`,
+              "series_approved_by_tantou"
             ).catch(errNotif => {
               console.error(`Lỗi khi gửi thông báo cho admin/board ${userId}:`, errNotif)
             })
@@ -583,9 +583,9 @@ export default function ManuscriptReviewPage() {
 
       await fetchSeriesToReview()
     } catch (err: any) {
-      console.error('Failed to submit series:', err)
+      console.error('Failed to approve series:', err)
       const msg = err?.response?.data?.message || ''
-      showToast(msg || 'Lỗi khi nộp lên Hội Đồng!')
+      showToast(msg || 'Lỗi khi phê duyệt Series!')
     } finally {
       setIsSubmittingSeries(false)
     }

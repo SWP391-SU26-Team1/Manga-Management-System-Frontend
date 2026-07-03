@@ -237,6 +237,17 @@ export default function SeriesDetailPage() {
     }
   }
 
+  const handleSubmitChapterReview = async (chapterId: string) => {
+    if (!seriesId) return
+    try {
+      await chapterService.submitReview(seriesId, chapterId)
+      showAlert('Thành công', 'Nộp chapter lên Editor duyệt thành công!', 'success')
+      await fetchData()
+    } catch (err) {
+      showAlert('Lỗi', getErrorMessage(err), 'error')
+    }
+  }
+
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault()
     setMemberError('')
@@ -507,6 +518,16 @@ export default function SeriesDetailPage() {
                             {expandedChapterId === chapter._id ? 'Đóng chi tiết' : 'Chi tiết trang'}
                           </button>
 
+                          {['draft', 'rejected', 'need_fix'].includes(chapter.status.toLowerCase()) && (
+                            <button
+                              onClick={() => handleSubmitChapterReview(chapter._id)}
+                              className="px-3 py-1.5 bg-[#E63946] text-white border-2 border-black font-bold text-xs uppercase hover:bg-red-700 transition-colors shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
+                              title="Nộp chapter lên Editor duyệt"
+                            >
+                              Nộp Chapter
+                            </button>
+                          )}
+
                           <button
                             onClick={() => navigate('/dashboard/mangaka/manuscripts')}
                             className="p-2 border-2 border-manga-ink bg-white hover:bg-manga-ink hover:text-white transition-colors"
@@ -561,7 +582,7 @@ export default function SeriesDetailPage() {
                                     </button>
                                   </div>
                                 </div>
-                                 {chapterPages[chapter._id].some(p => p.image_url) && (chapter.status === 'approved' || chapter.status === 'published') && (
+                                 {chapterPages[chapter._id].some(p => p.image_url) && (
                                   <button
                                     onClick={() => openReader(chapter)}
                                     className="flex items-center gap-1.5 px-3 py-1.5 bg-[#E63946] text-white border-2 border-black font-manga font-bold text-[10px] uppercase hover:bg-red-700 transition-colors shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 hover:shadow-none"
@@ -576,20 +597,19 @@ export default function SeriesDetailPage() {
                                 <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-4">
                                   {chapterPages[chapter._id].map((page) => {
                                     const hasImage = !!page.image_url
-                                    const isApproved = chapter.status === 'approved' || chapter.status === 'published'
                                     return (
                                       <div
                                         key={page._id}
-                                        onClick={() => isApproved && openReader(chapter, page._id)}
+                                        onClick={() => hasImage && openReader(chapter, page._id)}
                                         className={`bg-white border-2 border-black p-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] ${
-                                          isApproved 
+                                          hasImage 
                                             ? 'hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_rgba(0,0,0,1)] cursor-pointer' 
                                             : 'cursor-default'
                                         } transition-all flex flex-col group`}
                                       >
                                         {/* Thumbnail Container */}
                                         <div className="aspect-[3/4] border border-gray-200 bg-gray-50 overflow-hidden relative mb-2 flex items-center justify-center">
-                                          {hasImage && isApproved ? (
+                                          {hasImage ? (
                                             <img
                                               src={page.image_url!}
                                               alt={`Trang ${page.page_number}`}

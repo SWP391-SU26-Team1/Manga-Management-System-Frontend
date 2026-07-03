@@ -28,7 +28,7 @@ type UILayerType = 'Line Art' | 'Background' | 'Panel Frame' | 'Speech Balloon' 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 function AssignTaskContent() {
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   // Data from API
   const [seriesList, setSeriesList] = useState<SeriesAPI[]>([])
@@ -52,6 +52,26 @@ function AssignTaskContent() {
   const [successMsg, setSuccessMsg] = useState('')
   const [taskSuccessMsg, setTaskSuccessMsg] = useState('')
   const [taskWarningMsg, setTaskWarningMsg] = useState('')
+
+  // Pre-fill layerType and note from query parameters
+  useEffect(() => {
+    const paramLayer = searchParams.get('layerType')
+    const paramNote = searchParams.get('note')
+
+    if (paramLayer) {
+      let mapped: UILayerType = 'Line Art'
+      const lower = paramLayer.toLowerCase()
+      if (lower === 'screentone' || lower === 'coloring') mapped = 'Screentone'
+      else if (lower === 'background') mapped = 'Background'
+      else if (lower === 'speech balloon' || lower === 'lettering') mapped = 'Speech Balloon'
+      else if (lower === 'panel frame' || lower === 'cleaning' || lower === 'sfx') mapped = 'Panel Frame'
+      setLayerType(mapped)
+    }
+
+    if (paramNote) {
+      setNote(decodeURIComponent(paramNote))
+    }
+  }, [searchParams])
 
   // Image state
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -106,6 +126,7 @@ function AssignTaskContent() {
       // Auto select the first created page
       if (createdPages.length > 0) {
         setSelectedPageId(createdPages[0]._id)
+        setSearchParams({ seriesId: selectedSeriesId, chapterId: selectedChapterId, pageId: createdPages[0]._id })
       }
       
       setSuccessMsg('Đã tải lên các trang phác thảo thô thành công!')
@@ -182,7 +203,7 @@ function AssignTaskContent() {
       }
     }
     fetchSeries()
-  }, [searchParams])
+  }, [])
 
   // ── Load chapters and members when series changes ──────────────────────────
   useEffect(() => {
@@ -571,7 +592,11 @@ function AssignTaskContent() {
           ) : (
             <select
               value={selectedSeriesId}
-              onChange={e => setSelectedSeriesId(e.target.value)}
+              onChange={e => {
+                const nextId = e.target.value
+                setSelectedSeriesId(nextId)
+                setSearchParams({ seriesId: nextId })
+              }}
               className="border-2 border-manga-ink px-2.5 py-1.5 font-bold text-xs bg-white uppercase focus:outline-none"
             >
               {seriesList.length === 0 && <option value="">-- Chưa có series --</option>}
@@ -590,7 +615,11 @@ function AssignTaskContent() {
           ) : (
             <select
               value={selectedChapterId}
-              onChange={e => setSelectedChapterId(e.target.value)}
+              onChange={e => {
+                const nextId = e.target.value
+                setSelectedChapterId(nextId)
+                setSearchParams({ seriesId: selectedSeriesId, chapterId: nextId })
+              }}
               disabled={chapters.length === 0}
               className="border-2 border-manga-ink px-2.5 py-1.5 font-bold text-xs bg-white uppercase focus:outline-none disabled:opacity-50"
             >
@@ -611,7 +640,11 @@ function AssignTaskContent() {
             <div className="flex items-center gap-2">
               <select
                 value={selectedPageId}
-                onChange={e => setSelectedPageId(e.target.value)}
+                onChange={e => {
+                  const nextId = e.target.value
+                  setSelectedPageId(nextId)
+                  setSearchParams({ seriesId: selectedSeriesId, chapterId: selectedChapterId, pageId: nextId })
+                }}
                 disabled={pages.length === 0}
                 className="border-2 border-manga-ink px-2.5 py-1.5 font-bold text-xs bg-white uppercase focus:outline-none disabled:opacity-50"
               >

@@ -20,6 +20,7 @@ export interface AuthResponse {
       activeProjects?: number
       rating?: number
     }
+    createdAt?: string
   }
   token: string
 }
@@ -34,6 +35,7 @@ interface BackendUser {
   avatarUrl?: string    // camelCase fallback
   bio?: string
   stats?: any
+  created_at?: string
 }
 
 interface BackendAuthResponse {
@@ -54,7 +56,8 @@ const mapBackendUser = (user: BackendUser) => ({
   // Ưu tiên avatar_url (snake_case từ backend), fallback camelCase, sau đó pravatar
   avatarUrl: user.avatar_url || user.avatarUrl || `https://i.pravatar.cc/150?u=${user.username}`,
   bio: user.bio || '',
-  stats: user.stats || { projectsCompleted: 0, activeProjects: 0 }
+  stats: user.stats || { projectsCompleted: 0, activeProjects: 0 },
+  createdAt: user.created_at
 })
 
 

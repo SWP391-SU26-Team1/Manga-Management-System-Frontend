@@ -245,6 +245,11 @@ export const boardService = {
   getSeriesById: async (seriesId: string): Promise<any> => {
     const response = await api.get(`/api/series/${seriesId}`)
     return response.data.data || response.data
+  },
+
+  getSeriesDetail: async (seriesId: string): Promise<any> => {
+    const response = await api.get(`/api/series/${seriesId}/detail`)
+    return response.data.data || response.data
   }
 }
 

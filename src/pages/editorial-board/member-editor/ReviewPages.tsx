@@ -32,6 +32,8 @@ export function ReadDraftPage() {
 
   const [isFullscreen, setIsFullscreen] = useState(false)
   const imageContainerRef = useRef<HTMLDivElement>(null)
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
+  const [isReadingMode, setIsReadingMode] = useState(false)
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -75,6 +77,7 @@ export function ReadDraftPage() {
   const [loadingFiles, setLoadingFiles] = useState(false)
   const [chapterInfo, setChapterInfo] = useState<any>(null)
   const [sessionInfo, setSessionInfo] = useState<any>(null)
+  const [seriesInfo, setSeriesInfo] = useState<any>(null)
 
   // Manga mock images fallback
   const fallbackPages = [
@@ -87,7 +90,17 @@ export function ReadDraftPage() {
       setLoadingFiles(true)
       // Load true chapter info
       const chapterData = await chapterService.getById(chapterId)
-      if (chapterData) setChapterInfo(chapterData)
+      if (chapterData) {
+        setChapterInfo(chapterData)
+        if (chapterData.series_id) {
+          try {
+            const sData = await boardService.getSeriesDetail(chapterData.series_id)
+            if (sData) setSeriesInfo(sData)
+          } catch (err) {
+            console.error('Error loading series:', err)
+          }
+        }
+      }
 
       if (urlSessionId) {
         try {
@@ -148,8 +161,15 @@ export function ReadDraftPage() {
 
 
 
-  const chapterTitleDisplay = chapterInfo?.title || 'WHISPERS OF MANA'
+  const chapterTitleDisplay = chapterInfo?.title || 'Đang tải...'
+  const seriesTitleDisplay = seriesInfo?.title || 'Đang tải...'
   const chapterNumberDisplay = chapterInfo?.chapter_number || 1
+  
+  const mangakaMember = seriesInfo?.series_member?.find((m: any) => m.role_in_series === 'mangaka' || m.role_in_series === 'owner')
+  const mangakaInfo = mangakaMember?.users || seriesInfo?.author
+  const authorDisplay = seriesInfo
+    ? (typeof mangakaInfo === 'string' ? mangakaInfo : mangakaInfo?.username || mangakaInfo?.fullName || mangakaInfo?.name || 'Tác giả ẩn danh')
+    : 'Đang tải...'
 
   return (
     <div className="max-w-6xl mx-auto pb-12 font-sans">
@@ -182,17 +202,17 @@ export function ReadDraftPage() {
             <div className="flex justify-between items-center border-b-2 border-manga-ink pb-3 mb-4">
               <div>
                 <h2 className="font-manga text-xl font-bold text-manga-ink uppercase">
-                  TÊN DỰ ÁN: {chapterTitleDisplay}
+                  TÊN DỰ ÁN: {seriesTitleDisplay}
                 </h2>
                 <p className="text-xs font-bold text-gray-500 mt-1 uppercase">
-                  Chương {chapterNumberDisplay}: Bản Thảo Review | Tác giả: Nhóm MangaFlow Studio
+                  Chương {chapterNumberDisplay}: {chapterTitleDisplay} | Tác giả: {authorDisplay}
                 </p>
               </div>
               <div className="flex gap-2 text-manga-ink">
                 <button
-                  onClick={toggleZoom}
-                  className={`p-1.5 border-2 border-manga-ink hover:bg-zinc-100 cursor-pointer`}
-                  title="Thu phóng ảnh"
+                  onClick={() => setIsDetailModalOpen(true)}
+                  className={`p-1.5 border-2 border-manga-ink hover:bg-zinc-100 cursor-pointer flex items-center justify-center`}
+                  title="Chi tiết bản thảo"
                 >
                   <ZoomIn className="w-4 h-4" />
                 </button>
@@ -257,7 +277,7 @@ export function ReadDraftPage() {
               {sessionInfo?.description || chapterInfo?.description || 'Không có ghi chú nào đính kèm cho bản thảo này.'}
             </p>
             <div className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1.5">
-              <span>✍ {sessionInfo?.created_by?.username || sessionInfo?.created_by?.fullName || chapterInfo?.author_name || 'LEAD MANGAKA / EDITOR'}</span>
+              <span>✍ {authorDisplay}</span>
             </div>
           </div>
         </div>
@@ -272,7 +292,7 @@ export function ReadDraftPage() {
             <ul className="space-y-3 text-[11px] font-bold text-gray-700">
               <li className="flex justify-between border-b-2 border-dashed border-gray-200 pb-2">
                 <span className="uppercase text-gray-400">Dự án</span>
-                <span className="text-manga-ink">{chapterTitleDisplay}</span>
+                <span className="text-manga-ink">{seriesTitleDisplay}</span>
               </li>
               <li className="flex justify-between border-b-2 border-dashed border-gray-200 pb-2">
                 <span className="uppercase text-gray-400">Tiến độ</span>
@@ -280,7 +300,7 @@ export function ReadDraftPage() {
               </li>
               <li className="flex justify-between border-b-2 border-dashed border-gray-200 pb-2">
                 <span className="uppercase text-gray-400">Tác giả</span>
-                <span className="text-manga-ink uppercase">{chapterInfo?.author_name || 'MangaFlow Studio'}</span>
+                <span className="text-manga-ink uppercase">{authorDisplay}</span>
               </li>
               <li className="flex flex-col gap-1">
                 <span className="uppercase text-gray-400">Deadline biểu quyết</span>
@@ -324,6 +344,137 @@ export function ReadDraftPage() {
           </Link>
         </div>
       </div>
+
+      {/* Chapter Manuscript Modal */}
+      {isDetailModalOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-all duration-300 animate-in fade-in">
+          <div className="bg-white border-4 border-manga-ink w-full max-w-5xl max-h-[90vh] flex flex-col shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] rounded-md overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="bg-gray-50 border-b-4 border-manga-ink p-4 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="font-manga text-lg font-bold text-manga-ink">
+                  {chapterTitleDisplay} - Chi Tiết Bản Thảo Hình Ảnh
+                </span>
+                
+                {displayPages.length > 0 && (
+                  <button 
+                    onClick={() => {
+                      setIsDetailModalOpen(false)
+                      toggleZoom()
+                    }}
+                    className="ml-4 bg-manga-red hover:bg-red-600 text-white px-3.5 py-1 border-2 border-black font-extrabold text-xs uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5" /> Đọc Truyện
+                  </button>
+                )}
+              </div>
+              <button 
+                onClick={() => setIsDetailModalOpen(false)}
+                className="w-8 h-8 flex items-center justify-center border-2 border-manga-ink hover:bg-manga-red hover:text-white transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
+              {/* Summary Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 border-2 border-dashed border-gray-300 p-4 rounded bg-[#FAF9F6] shadow-[2px_2px_0px_0px_rgba(0,0,0,0.05)]">
+                <div>
+                  <div className="text-[10px] text-gray-400 font-extrabold uppercase">Tổng số trang</div>
+                  <div className="text-xl font-black text-manga-ink">{displayPages.length} trang</div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-gray-400 font-extrabold uppercase">Trạng thái</div>
+                  <div className="text-xl font-black text-blue-600">
+                    Chờ xét duyệt
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-gray-400 font-extrabold uppercase">Tác giả</div>
+                  <div className="text-xl font-black text-gray-600">{authorDisplay}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-gray-400 font-extrabold uppercase">Tiến độ hoàn thành</div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-xl font-black text-manga-red">100%</div>
+                    <div className="h-2 flex-1 bg-gray-200 border border-gray-300 rounded overflow-hidden">
+                      <div className="h-full bg-manga-red" style={{ width: `100%` }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pages Grid Section */}
+              <div>
+                <h3 className="font-manga text-sm font-bold uppercase tracking-wider text-manga-ink mb-4 border-b-2 border-manga-ink pb-2">
+                  Danh sách trang vẽ của chương
+                </h3>
+
+                {displayPages.length > 0 ? (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    {displayPages.map((page: any, idx: number) => {
+                      const currentStatus = 'Chờ xét duyệt'
+                      const imageUrl = typeof page === 'string' ? page : page.image_url || page.file_url
+
+                      return (
+                        <div 
+                          key={idx}
+                          className="border-2 border-manga-ink bg-white shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-0.5 transition-all flex flex-col group rounded overflow-hidden"
+                        >
+                          <div className="relative h-64 bg-gray-100 border-b-2 border-manga-ink overflow-hidden flex items-center justify-center">
+                            {imageUrl ? (
+                                <img 
+                                  src={imageUrl} 
+                                  alt={`P.${idx + 1}`} 
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-all duration-300"
+                                />
+                            ) : (
+                              <div className="flex flex-col items-center justify-center p-4 text-center">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase">Chưa có hình ảnh</span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="p-3 flex flex-col gap-2">
+                            <div className="flex items-center justify-between">
+                              <span className="font-black text-sm text-manga-ink">P.{String(idx + 1).padStart(2, '0')}</span>
+                              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[9px] font-extrabold border border-blue-200 uppercase rounded-sm">
+                                {currentStatus}
+                              </span>
+                            </div>
+
+                            <div className="text-[10px] text-gray-500 font-bold flex items-center gap-1.5">
+                              <div className="w-3.5 h-3.5 rounded-full bg-manga-ink text-white flex items-center justify-center text-[7px] font-bold">
+                                {authorDisplay.charAt(0).toUpperCase()}
+                              </div>
+                              <span>Họa sĩ: <strong className="text-gray-700">{authorDisplay}</strong></span>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-400 font-bold text-xs bg-gray-50/50">
+                    Không có trang vẽ nào.
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Modal Footer */}
+            <div className="bg-gray-50 border-t-4 border-manga-ink p-4 flex items-center justify-end gap-3 flex-shrink-0">
+              <button 
+                onClick={() => setIsDetailModalOpen(false)}
+                className="bg-black text-white hover:bg-gray-800 px-6 py-2 font-bold text-xs uppercase tracking-wider shadow-[3px_3px_0px_0px_rgba(0,0,0,0.3)] transition-all cursor-pointer"
+              >
+                Đóng Lại
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Lightbox Zoom Modal */}
       {isZoomed && (

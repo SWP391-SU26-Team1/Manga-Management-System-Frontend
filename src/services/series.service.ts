@@ -12,6 +12,7 @@ export interface SeriesAPI {
   view_count?: number
   created_at: string
   updated_at?: string
+  author?: any
 }
 
 export interface CreateSeriesPayload {
@@ -44,6 +45,7 @@ const mapSeries = (data: any): SeriesAPI => {
     view_count: data.view_count,
     created_at: data.created_at,
     updated_at: data.updated_at,
+    author: data.author || data.mangaka_id || data.author_name || null,
   }
 }
 

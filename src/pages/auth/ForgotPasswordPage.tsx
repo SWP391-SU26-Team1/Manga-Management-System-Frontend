@@ -1,38 +1,61 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { ArrowLeft, Mail, Sparkles, Lock, Eye, EyeOff } from 'lucide-react'
+import { ArrowLeft, Mail, Sparkles, Lock, Eye, EyeOff, ShieldCheck, ArrowRight, RotateCcw } from 'lucide-react'
 import { validateEmail, validatePassword, validateConfirmPassword } from '@/utils/validators'
-import { MOCK_USERS } from '@/data/mockUsers'
+import authService from '@/services/auth.service'
 
 export default function ForgotPasswordPage() {
   const navigate = useNavigate()
   
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
   const [email, setEmail] = useState('')
-  const [oldPassword, setOldPassword] = useState('')
+  const [otp, setOtp] = useState<string[]>(new Array(6).fill(''))
+  const [activeInput, setActiveInput] = useState<number>(0)
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  const [showOldPassword, setShowOldPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const [errors, setErrors] = useState({
     email: '',
-    oldPassword: '',
+    otp: '',
     newPassword: '',
     confirmPassword: '',
   })
 
   const [touched, setTouched] = useState({
     email: false,
-    oldPassword: false,
     newPassword: false,
     confirmPassword: false,
   })
 
-  const [submitted, setSubmitted] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [timer, setTimer] = useState(59)
+  const [canResend, setCanResend] = useState(false)
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([])
 
-  const getInputClass = (field: 'email' | 'oldPassword' | 'newPassword' | 'confirmPassword', extraPaddingRight = 'pr-4') => {
+  // Resend countdown timer for step 2
+  useEffect(() => {
+    let interval: any
+    if (step === 2 && timer > 0) {
+      interval = setInterval(() => {
+        setTimer((prev) => prev - 1)
+      }, 1000)
+    } else if (timer === 0) {
+      setCanResend(true)
+    }
+    return () => clearInterval(interval)
+  }, [step, timer])
+
+  // Focus active input on step 2
+  useEffect(() => {
+    if (step === 2 && inputRefs.current[activeInput]) {
+      inputRefs.current[activeInput]?.focus()
+    }
+  }, [step, activeInput])
+
+  const getInputClass = (field: 'email' | 'newPassword' | 'confirmPassword', extraPaddingRight = 'pr-4') => {
     const isTouched = touched[field]
     const error = errors[field]
     
@@ -54,11 +77,6 @@ export default function ForgotPasswordPage() {
     switch (field) {
       case 'email':
         error = validateEmail(email) || ''
-        break
-      case 'oldPassword':
-        if (!oldPassword) {
-          error = 'Mật khẩu cũ là bắt buộc.'
-        }
         break
       case 'newPassword':
         error = validatePassword(newPassword) || ''
@@ -82,7 +100,6 @@ export default function ForgotPasswordPage() {
   const handleChange = (val: string, field: string) => {
     switch (field) {
       case 'email': setEmail(val); break
-      case 'oldPassword': setOldPassword(val); break
       case 'newPassword': setNewPassword(val); break
       case 'confirmPassword': setConfirmPassword(val); break
     }
@@ -91,7 +108,6 @@ export default function ForgotPasswordPage() {
       setErrors((prev) => {
         let error = ''
         if (field === 'email') error = validateEmail(val) || ''
-        if (field === 'oldPassword') error = val ? '' : 'Mật khẩu cũ là bắt buộc.'
         if (field === 'newPassword') {
           error = validatePassword(val) || ''
           if (touched.confirmPassword) {
@@ -105,64 +121,168 @@ export default function ForgotPasswordPage() {
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  // OTP Handlers
+  const handleOtpChange = (val: string, index: number) => {
+    if (isNaN(Number(val))) return
 
+    const newOtp = [...otp]
+    newOtp[index] = val.slice(-1)
+    setOtp(newOtp)
+    setErrors((prev) => ({ ...prev, otp: '' }))
+
+    if (val && index < 5) {
+      setActiveInput(index + 1)
+    }
+  }
+
+  const handleOtpKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
+    if (e.key === 'Backspace') {
+      const newOtp = [...otp]
+      if (!otp[index] && index > 0) {
+        newOtp[index - 1] = ''
+        setOtp(newOtp)
+        setActiveInput(index - 1)
+      } else {
+        newOtp[index] = ''
+        setOtp(newOtp)
+      }
+    } else if (e.key === 'ArrowLeft' && index > 0) {
+      setActiveInput(index - 1)
+    } else if (e.key === 'ArrowRight' && index < 5) {
+      setActiveInput(index + 1)
+    }
+  }
+
+  const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault()
+    const pastedData = e.clipboardData.getData('text').trim()
+    if (/^\d{6}$/.test(pastedData)) {
+      setOtp(pastedData.split(''))
+      setActiveInput(5)
+      setErrors((prev) => ({ ...prev, otp: '' }))
+    }
+  }
+
+  // Submission Handlers
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
     const emailErr = validateEmail(email) || ''
-    const oldPasswordErr = oldPassword ? '' : 'Mật khẩu cũ là bắt buộc.'
+    setErrors((prev) => ({ ...prev, email: emailErr }))
+    setTouched((prev) => ({ ...prev, email: true }))
+
+    if (emailErr) return
+
+    setLoading(true)
+    try {
+      await authService.forgotPassword(email)
+      setTimer(59)
+      setCanResend(false)
+      setOtp(new Array(6).fill(''))
+      setActiveInput(0)
+      setStep(2)
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Email không tồn tại hoặc lỗi hệ thống.'
+      setErrors((prev) => ({ ...prev, email: msg }))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleOtpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const otpCode = otp.join('')
+    if (otpCode.length < 6) {
+      setErrors((prev) => ({ ...prev, otp: 'Vui lòng nhập đầy đủ mã OTP 6 chữ số.' }))
+      return
+    }
+
+    setLoading(true)
+    try {
+      await authService.verifyPasswordOtp(email, otpCode)
+      setStep(3)
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Mã OTP không chính xác hoặc đã hết hạn.'
+      setErrors((prev) => ({ ...prev, otp: msg }))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleResendOtp = async () => {
+    if (!canResend) return
+    setLoading(true)
+    try {
+      await authService.forgotPassword(email)
+      setTimer(59)
+      setCanResend(false)
+      setOtp(new Array(6).fill(''))
+      setActiveInput(0)
+      setErrors((prev) => ({ ...prev, otp: '' }))
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Có lỗi xảy ra khi gửi lại mã OTP.'
+      setErrors((prev) => ({ ...prev, otp: msg }))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleResetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
     const newPasswordErr = validatePassword(newPassword) || ''
     const confirmPasswordErr = validateConfirmPassword(newPassword, confirmPassword) || ''
 
-    setErrors({
-      email: emailErr,
-      oldPassword: oldPasswordErr,
+    setErrors((prev) => ({
+      ...prev,
       newPassword: newPasswordErr,
       confirmPassword: confirmPasswordErr,
-    })
+    }))
 
-    setTouched({
-      email: true,
-      oldPassword: true,
+    setTouched((prev) => ({
+      ...prev,
       newPassword: true,
       confirmPassword: true,
-    })
+    }))
 
-    if (emailErr || oldPasswordErr || newPasswordErr || confirmPasswordErr) {
-      return
+    if (newPasswordErr || confirmPasswordErr) return
+
+    setLoading(true)
+    try {
+      await authService.resetPassword({
+        email,
+        otp: otp.join(''),
+        newPassword,
+        confirmPassword,
+      })
+      setStep(4)
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Đặt lại mật khẩu thất bại. Vui lòng thử lại.'
+      setErrors((prev) => ({ ...prev, newPassword: msg }))
+    } finally {
+      setLoading(false)
     }
-
-    // Database simulation validation
-    const user = MOCK_USERS.find((u) => u.email.toLowerCase() === email.trim().toLowerCase())
-    if (!user) {
-      setErrors((prev) => ({ ...prev, email: 'Email không tồn tại trong hệ thống.' }))
-      return
-    }
-
-    if (user.password !== oldPassword) {
-      setErrors((prev) => ({ ...prev, oldPassword: 'Mật khẩu cũ không chính xác.' }))
-      return
-    }
-
-    // Save new password
-    user.password = newPassword
-    setSubmitted(true)
   }
 
-  const isFormValid =
-    email &&
-    oldPassword &&
-    newPassword &&
-    confirmPassword &&
-    !errors.email &&
-    !errors.oldPassword &&
-    !errors.newPassword &&
-    !errors.confirmPassword
+  const handleBackAction = () => {
+    if (step === 2) {
+      setStep(1)
+    } else if (step === 3) {
+      setStep(2)
+    } else {
+      navigate('/login')
+    }
+  }
+
+  const isEmailFormValid = email && !errors.email
+  const isOtpFormValid = otp.every(val => val !== '')
+  const isResetFormValid = newPassword && confirmPassword && !errors.newPassword && !errors.confirmPassword
 
   return (
     <div className="min-h-screen bg-white relative flex items-center justify-center p-4 font-sans overflow-hidden">
+      {/* Back Button */}
       <button
-        onClick={() => navigate(-1)}
-        className="absolute top-6 left-6 md:top-10 md:left-10 z-50 p-2 bg-white text-manga-ink manga-border manga-shadow-sm hover:translate-y-1 hover:manga-shadow-none transition-all flex items-center justify-center"
+        onClick={handleBackAction}
+        disabled={loading}
+        className="absolute top-6 left-6 md:top-10 md:left-10 z-50 p-2 bg-white text-manga-ink manga-border manga-shadow-sm hover:translate-y-1 hover:manga-shadow-none transition-all flex items-center justify-center disabled:opacity-50"
         aria-label="Quay lại"
       >
         <ArrowLeft className="w-6 h-6" />
@@ -182,39 +302,27 @@ export default function ForgotPasswordPage() {
               MANGAFLOW
             </div>
             <h1 className="font-manga text-4xl font-bold uppercase mt-2 mb-2 tracking-wide">
-              Khôi phục mật khẩu
+              {step === 1 && 'Khôi phục mật khẩu'}
+              {step === 2 && 'Xác thực mã OTP'}
+              {step === 3 && 'Đặt lại mật khẩu'}
+              {step === 4 && 'Thành công!'}
             </h1>
             <p className="text-gray-300 text-sm">
-              Nhập thông tin bên dưới để thay đổi mật khẩu của bạn
+              {step === 1 && 'Nhập email của bạn để nhận mã OTP khôi phục'}
+              {step === 2 && `Mã xác thực đã được gửi tới email: ${email}`}
+              {step === 3 && 'Thiết lập mật khẩu mới cho tài khoản của bạn'}
+              {step === 4 && 'Mật khẩu tài khoản của bạn đã được cập nhật'}
             </p>
           </div>
 
           {/* Body */}
           <div className="p-8">
-            {submitted ? (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-manga-red rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Sparkles className="w-8 h-8 text-white" />
-                </div>
-                <h2 className="font-manga text-2xl font-bold uppercase text-manga-ink mb-2">
-                  Đặt lại thành công!
-                </h2>
-                <p className="text-sm font-bold text-gray-600 mb-6">
-                  Mật khẩu tài khoản <strong>{email}</strong> đã được thay đổi. Bạn có thể sử dụng mật khẩu mới để đăng nhập ngay bây giờ.
-                </p>
-                <Link
-                  to="/login"
-                  className="inline-block bg-manga-ink text-white font-bold uppercase tracking-widest py-3 px-8 manga-border manga-shadow-sm hover:translate-y-1 hover:manga-shadow-none transition-all"
-                >
-                  Quay lại đăng nhập
-                </Link>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Email Input */}
+            {/* STEP 1: Enter Email */}
+            {step === 1 && (
+              <form onSubmit={handleEmailSubmit} className="space-y-6">
                 <div className="space-y-2">
                   <label className="block text-sm font-bold uppercase tracking-wider text-manga-ink">
-                    Email
+                    Email đăng ký
                   </label>
                   <div className="relative">
                     <Mail className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -225,6 +333,7 @@ export default function ForgotPasswordPage() {
                       onBlur={() => handleBlur('email')}
                       placeholder="mangaka@example.com"
                       className={getInputClass('email', 'pr-4')}
+                      disabled={loading}
                     />
                   </div>
                   {errors.email && (
@@ -232,34 +341,86 @@ export default function ForgotPasswordPage() {
                   )}
                 </div>
 
-                {/* Old Password Input */}
-                <div className="space-y-2">
-                  <label className="block text-sm font-bold uppercase tracking-wider text-manga-ink">
-                    Mật khẩu cũ
+                <button
+                  type="submit"
+                  disabled={!isEmailFormValid || loading}
+                  className="w-full bg-manga-red text-white font-bold uppercase tracking-widest py-3.5 px-8 manga-border manga-shadow-sm hover:translate-y-0.5 hover:manga-shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {loading ? 'Đang gửi...' : 'Gửi mã OTP'} <ArrowRight className="w-4 h-4" />
+                </button>
+
+                <div className="text-center text-sm font-medium">
+                  Đã nhớ mật khẩu?{' '}
+                  <Link to="/login" className="font-bold underline decoration-2 underline-offset-4 hover:text-manga-red transition-colors">
+                    Đăng nhập
+                  </Link>
+                </div>
+              </form>
+            )}
+
+            {/* STEP 2: Enter OTP */}
+            {step === 2 && (
+              <form onSubmit={handleOtpSubmit} className="space-y-6">
+                <div className="space-y-3">
+                  <label className="block text-xs font-extrabold uppercase tracking-wider text-manga-ink">
+                    Nhập mã OTP 6 số:
                   </label>
-                  <div className="relative">
-                    <Lock className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input
-                      type={showOldPassword ? 'text' : 'password'}
-                      value={oldPassword}
-                      onChange={(e) => handleChange(e.target.value, 'oldPassword')}
-                      onBlur={() => handleBlur('oldPassword')}
-                      placeholder="••••••••"
-                      className={getInputClass('oldPassword', 'pr-10')}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowOldPassword(!showOldPassword)}
-                      className="absolute right-0 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-manga-ink transition-colors"
-                    >
-                      {showOldPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
+                  
+                  <div className="flex justify-between gap-2" onPaste={handleOtpPaste}>
+                    {otp.map((digit, idx) => (
+                      <input
+                        key={idx}
+                        type="text"
+                        pattern="\d*"
+                        maxLength={1}
+                        value={digit}
+                        ref={(el) => { inputRefs.current[idx] = el; }}
+                        onChange={(e) => handleOtpChange(e.target.value, idx)}
+                        onKeyDown={(e) => handleOtpKeyDown(e, idx)}
+                        disabled={loading}
+                        className={`w-12 h-14 text-center font-manga text-2xl font-bold bg-manga-paper border-2 manga-shadow-sm focus:outline-none transition-all
+                          ${activeInput === idx 
+                            ? 'border-manga-red scale-105 shadow-[3px_3px_0px_0px_rgba(230,57,70,1)]' 
+                            : 'border-manga-ink'
+                          }`}
+                      />
+                    ))}
                   </div>
-                  {errors.oldPassword && (
-                    <p className="text-manga-red text-xs font-bold mt-1">{errors.oldPassword}</p>
+                  {errors.otp && (
+                    <p className="text-manga-red text-xs font-bold mt-1 text-center">{errors.otp}</p>
                   )}
                 </div>
 
+                <button
+                  type="submit"
+                  disabled={!isOtpFormValid || loading}
+                  className="w-full bg-manga-red text-white font-bold uppercase tracking-widest py-3.5 px-8 manga-border manga-shadow-sm hover:translate-y-0.5 hover:manga-shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {loading ? 'Đang xác thực...' : 'Xác nhận OTP'} <ArrowRight className="w-4 h-4" />
+                </button>
+
+                <div className="text-center text-xs font-bold text-manga-ink pt-2">
+                  {canResend ? (
+                    <button 
+                      type="button"
+                      onClick={handleResendOtp}
+                      disabled={loading}
+                      className="inline-flex items-center gap-1.5 text-manga-red hover:underline uppercase decoration-2 underline-offset-4 disabled:opacity-50"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" /> Gửi lại mã OTP
+                    </button>
+                  ) : (
+                    <span className="text-gray-400">
+                      Gửi lại mã OTP sau: <span className="text-manga-ink font-extrabold">{timer}s</span>
+                    </span>
+                  )}
+                </div>
+              </form>
+            )}
+
+            {/* STEP 3: Reset Password */}
+            {step === 3 && (
+              <form onSubmit={handleResetSubmit} className="space-y-6">
                 {/* New Password Input */}
                 <div className="space-y-2">
                   <label className="block text-sm font-bold uppercase tracking-wider text-manga-ink">
@@ -274,6 +435,7 @@ export default function ForgotPasswordPage() {
                       onBlur={() => handleBlur('newPassword')}
                       placeholder="••••••••"
                       className={getInputClass('newPassword', 'pr-10')}
+                      disabled={loading}
                     />
                     <button
                       type="button"
@@ -306,6 +468,7 @@ export default function ForgotPasswordPage() {
                       onBlur={() => handleBlur('confirmPassword')}
                       placeholder="••••••••"
                       className={getInputClass('confirmPassword', 'pr-10')}
+                      disabled={loading}
                     />
                     <button
                       type="button"
@@ -322,19 +485,33 @@ export default function ForgotPasswordPage() {
 
                 <button
                   type="submit"
-                  disabled={!isFormValid}
-                  className="w-full bg-manga-red text-white font-bold uppercase tracking-widest py-3 px-8 manga-border manga-shadow-sm hover:translate-y-1 hover:manga-shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={!isResetFormValid || loading}
+                  className="w-full bg-manga-red text-white font-bold uppercase tracking-widest py-3.5 px-8 manga-border manga-shadow-sm hover:translate-y-0.5 hover:manga-shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  Xác nhận đổi mật khẩu
+                  {loading ? 'Đang xử lý...' : 'Đặt lại mật khẩu'}
                 </button>
-
-                <div className="text-center text-sm font-medium">
-                  Đã nhớ mật khẩu?{' '}
-                  <Link to="/login" className="font-bold underline decoration-2 underline-offset-4 hover:text-manga-red transition-colors">
-                    Đăng nhập
-                  </Link>
-                </div>
               </form>
+            )}
+
+            {/* STEP 4: Success */}
+            {step === 4 && (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-manga-red rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Sparkles className="w-8 h-8 text-white" />
+                </div>
+                <h2 className="font-manga text-2xl font-bold uppercase text-manga-ink mb-2">
+                  Đặt lại thành công!
+                </h2>
+                <p className="text-sm font-bold text-gray-600 mb-6">
+                  Mật khẩu tài khoản <strong>{email}</strong> đã được thay đổi. Bạn có thể sử dụng mật khẩu mới để đăng nhập ngay bây giờ.
+                </p>
+                <Link
+                  to="/login"
+                  className="inline-block bg-manga-ink text-white font-bold uppercase tracking-widest py-3 px-8 manga-border manga-shadow-sm hover:translate-y-1 hover:manga-shadow-none transition-all"
+                >
+                  Quay lại đăng nhập
+                </Link>
+              </div>
             )}
           </div>
         </div>
@@ -342,4 +519,3 @@ export default function ForgotPasswordPage() {
     </div>
   )
 }
-

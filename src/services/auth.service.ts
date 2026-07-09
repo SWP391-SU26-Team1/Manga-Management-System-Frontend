@@ -106,6 +106,21 @@ export const authService = {
       user: mapBackendUser(user)
     }
   },
+
+  forgotPassword: async (email: string): Promise<any> => {
+    return api.post('/api/auth/forgot-password', { email: email.toLowerCase().trim() })
+  },
+
+  verifyPasswordOtp: async (email: string, otp: string): Promise<any> => {
+    return api.post('/api/auth/verify-password-otp', { email: email.toLowerCase().trim(), otp })
+  },
+
+  resetPassword: async (payload: any): Promise<any> => {
+    return api.post('/api/auth/reset-password', {
+      ...payload,
+      email: payload.email.toLowerCase().trim()
+    })
+  },
 }
 
 export default authService

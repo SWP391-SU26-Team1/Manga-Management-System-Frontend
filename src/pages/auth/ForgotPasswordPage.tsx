@@ -24,7 +24,7 @@ const translateErrorMessage = (msg: string): string => {
 export default function ForgotPasswordPage() {
   const navigate = useNavigate()
   
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
+  const [step, setStep] = useState<1 | 2 | 3>(1)
   const [email, setEmail] = useState('')
   const [otp, setOtp] = useState<string[]>(new Array(6).fill(''))
   const [activeInput, setActiveInput] = useState<number>(0)
@@ -267,16 +267,39 @@ export default function ForgotPasswordPage() {
 
     setLoading(true)
     try {
+      // 1. Thực hiện reset mật khẩu
       await authService.resetPassword({
         email,
         otp: otp.join(''),
         newPassword,
         confirmPassword,
       })
-      setStep(4)
+
+      // 2. Tự động đăng nhập bằng mật khẩu mới
+      const data = await authService.login({ email, password: newPassword })
+      
+      const storedUserData = {
+        ...data.user,
+        token: data.token
+      }
+      localStorage.setItem('mangaflow_user', JSON.stringify(storedUserData))
+
+      // 3. Điều hướng trực tiếp vào màn hình chính dựa theo role
+      if (storedUserData.role === 'MANGAKA') {
+        navigate('/dashboard/mangaka')
+      } else if (storedUserData.role === 'ASSISTANT') {
+        navigate('/dashboard/assistant')
+      } else if (storedUserData.role === 'EDITOR') {
+        navigate('/dashboard/tantou-editor')
+      } else if (storedUserData.role?.toUpperCase() === 'ADMIN') {
+        navigate('/dashboard/admin')
+      } else if (['BOARD', 'CHIEF_EDITOR'].includes(storedUserData.role?.toUpperCase())) {
+        navigate('/dashboard/editorial-board')
+      } else {
+        navigate('/')
+      }
     } catch (err: any) {
-      const rawMsg = err.response?.data?.message || 'Đặt lại mật khẩu thất bại. Vui lòng thử lại.'
-      const msg = translateErrorMessage(rawMsg)
+      const msg = err.response?.data?.message || 'Đặt lại mật khẩu hoặc đăng nhập tự động thất bại.'
       setErrors((prev) => ({ ...prev, newPassword: msg }))
     } finally {
       setLoading(false)
@@ -326,13 +349,11 @@ export default function ForgotPasswordPage() {
               {step === 1 && 'Khôi phục mật khẩu'}
               {step === 2 && 'Xác thực mã OTP'}
               {step === 3 && 'Đặt lại mật khẩu'}
-              {step === 4 && 'Thành công!'}
             </h1>
             <p className="text-gray-300 text-sm">
               {step === 1 && 'Nhập email của bạn để nhận mã OTP khôi phục'}
               {step === 2 && `Mã xác thực đã được gửi tới email: ${email}`}
               {step === 3 && 'Thiết lập mật khẩu mới cho tài khoản của bạn'}
-              {step === 4 && 'Mật khẩu tài khoản của bạn đã được cập nhật'}
             </p>
           </div>
 
@@ -514,26 +535,7 @@ export default function ForgotPasswordPage() {
               </form>
             )}
 
-            {/* STEP 4: Success */}
-            {step === 4 && (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-manga-red rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Sparkles className="w-8 h-8 text-white" />
-                </div>
-                <h2 className="font-manga text-2xl font-bold uppercase text-manga-ink mb-2">
-                  Đặt lại thành công!
-                </h2>
-                <p className="text-sm font-bold text-gray-600 mb-6">
-                  Mật khẩu tài khoản <strong>{email}</strong> đã được thay đổi. Bạn có thể sử dụng mật khẩu mới để đăng nhập ngay bây giờ.
-                </p>
-                <Link
-                  to="/login"
-                  className="inline-block bg-manga-ink text-white font-bold uppercase tracking-widest py-3 px-8 manga-border manga-shadow-sm hover:translate-y-1 hover:manga-shadow-none transition-all"
-                >
-                  Quay lại đăng nhập
-                </Link>
-              </div>
-            )}
+
           </div>
         </div>
       </div>

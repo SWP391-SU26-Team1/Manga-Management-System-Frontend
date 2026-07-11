@@ -4,6 +4,23 @@ import { ArrowLeft, Mail, Sparkles, Lock, Eye, EyeOff, ShieldCheck, ArrowRight, 
 import { validateEmail, validatePassword, validateConfirmPassword } from '@/utils/validators'
 import authService from '@/services/auth.service'
 
+const translateErrorMessage = (msg: string): string => {
+  if (!msg) return 'Đã xảy ra lỗi hệ thống. Vui lòng thử lại.'
+  
+  const lowerMsg = msg.toLowerCase()
+  if (lowerMsg.includes('no account found') || lowerMsg.includes('email không tồn tại')) {
+    return 'Email không tồn tại trong hệ thống.'
+  }
+  if (lowerMsg.includes('invalid or expired otp') || lowerMsg.includes('otp không chính xác')) {
+    return 'Mã OTP không chính xác hoặc đã hết hạn.'
+  }
+  if (lowerMsg.includes('otp verification is required')) {
+    return 'Vui lòng xác thực mã OTP trước khi đổi mật khẩu.'
+  }
+  
+  return msg
+}
+
 export default function ForgotPasswordPage() {
   const navigate = useNavigate()
   
@@ -181,7 +198,8 @@ export default function ForgotPasswordPage() {
       setActiveInput(0)
       setStep(2)
     } catch (err: any) {
-      const msg = err.response?.data?.message || 'Email không tồn tại hoặc lỗi hệ thống.'
+      const rawMsg = err.response?.data?.message || 'Email không tồn tại hoặc lỗi hệ thống.'
+      const msg = translateErrorMessage(rawMsg)
       setErrors((prev) => ({ ...prev, email: msg }))
     } finally {
       setLoading(false)
@@ -201,7 +219,8 @@ export default function ForgotPasswordPage() {
       await authService.verifyPasswordOtp(email, otpCode)
       setStep(3)
     } catch (err: any) {
-      const msg = err.response?.data?.message || 'Mã OTP không chính xác hoặc đã hết hạn.'
+      const rawMsg = err.response?.data?.message || 'Mã OTP không chính xác hoặc đã hết hạn.'
+      const msg = translateErrorMessage(rawMsg)
       setErrors((prev) => ({ ...prev, otp: msg }))
     } finally {
       setLoading(false)
@@ -219,7 +238,8 @@ export default function ForgotPasswordPage() {
       setActiveInput(0)
       setErrors((prev) => ({ ...prev, otp: '' }))
     } catch (err: any) {
-      const msg = err.response?.data?.message || 'Có lỗi xảy ra khi gửi lại mã OTP.'
+      const rawMsg = err.response?.data?.message || 'Có lỗi xảy ra khi gửi lại mã OTP.'
+      const msg = translateErrorMessage(rawMsg)
       setErrors((prev) => ({ ...prev, otp: msg }))
     } finally {
       setLoading(false)
@@ -255,7 +275,8 @@ export default function ForgotPasswordPage() {
       })
       setStep(4)
     } catch (err: any) {
-      const msg = err.response?.data?.message || 'Đặt lại mật khẩu thất bại. Vui lòng thử lại.'
+      const rawMsg = err.response?.data?.message || 'Đặt lại mật khẩu thất bại. Vui lòng thử lại.'
+      const msg = translateErrorMessage(rawMsg)
       setErrors((prev) => ({ ...prev, newPassword: msg }))
     } finally {
       setLoading(false)

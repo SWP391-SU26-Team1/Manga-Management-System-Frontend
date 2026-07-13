@@ -86,8 +86,12 @@ export default function TantouSettingsPage() {
         if (parsed.user) {
           parsed.user.fullName = profileName
           parsed.user.username = profileUsername
+        } else {
+          parsed.fullName = profileName
+          parsed.username = profileUsername
         }
         localStorage.setItem('mangaflow_user', JSON.stringify(parsed))
+        window.dispatchEvent(new Event('mangaflow_profile_updated'))
       } catch {}
     }
     showToast('Đã lưu thay đổi hồ sơ cá nhân thành công!')

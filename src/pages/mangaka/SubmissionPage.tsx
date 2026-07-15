@@ -32,6 +32,7 @@ import chapterService from '@/services/chapter.service'
 import feedbackService from '@/services/feedback.service'
 import api from '@/services/api'
 import regionService from '@/services/region.service'
+import { editorService } from '@/services/editor.service'
 
 const filters = ['Tất cả', 'Chờ duyệt', 'Cần chỉnh sửa', 'Đã duyệt & Đóng gói', 'Quá hạn']
 
@@ -111,12 +112,16 @@ export default function SubmissionPage() {
       const subIdMap: Record<string, string> = {}
       const subNotesMap: Record<string, string> = {}
       const subVersionMap: Record<string, any> = {}
-      pendingSubs.forEach((sub: any) => {
-        if (sub.task_id) {
-          subMap[sub.task_id] = sub.file_url
-          subIdMap[sub.task_id] = sub.submission_id
-          subNotesMap[sub.task_id] = sub.submission_notes || ''
-          subVersionMap[sub.task_id] = sub.version_number
+      pendingSubs.forEach((group: any) => {
+        if (group.pages) {
+          group.pages.forEach((sub: any) => {
+            if (sub.task_id) {
+              subMap[sub.task_id] = sub.file_url
+              subIdMap[sub.task_id] = sub.submission_id
+              subNotesMap[sub.task_id] = sub.submission_notes || ''
+              subVersionMap[sub.task_id] = sub.version_number
+            }
+          })
         }
       })
 
@@ -249,6 +254,64 @@ export default function SubmissionPage() {
       isSubscribed = false
     }
   }, [selectedId, submissionsList, rawTasks, chaptersMap])
+
+  const [selectedTaskFeedbacks, setSelectedTaskFeedbacks] = useState<any[]>([])
+  const [isLoadingFeedbacks, setIsLoadingFeedbacks] = useState(false)
+
+  useEffect(() => {
+    if (!selected) {
+      setSelectedTaskFeedbacks([])
+      return
+    }
+    const currentRawTask = rawTasks.find((t) => t.task_id === selected.id)
+    if (!currentRawTask) {
+      setSelectedTaskFeedbacks([])
+      return
+    }
+    
+    let isSubscribed = true
+    const fetchFeedbacks = async () => {
+      setIsLoadingFeedbacks(true)
+      try {
+        const allFeedbacks = await feedbackService.getAll()
+        const filtered = allFeedbacks.filter(f => f.submission?.page?.page_id === currentRawTask.page_id)
+        if (isSubscribed) {
+          setSelectedTaskFeedbacks(filtered)
+        }
+      } catch (err) {
+        console.error('Failed to load feedbacks for submission', err)
+        if (isSubscribed) {
+          setSelectedTaskFeedbacks([])
+        }
+      } finally {
+        if (isSubscribed) {
+          setIsLoadingFeedbacks(false)
+        }
+      }
+    }
+    fetchFeedbacks()
+    return () => {
+      isSubscribed = false
+    }
+  }, [selectedId, rawTasks])
+
+  const getAssignTaskUrl = () => {
+    if (!selected) return '#'
+    const rawTask = rawTasks.find((t) => t.task_id === selected.id)
+    if (!rawTask) return '#'
+    const pageId = rawTask.page_id
+    const chapterId = rawTask.page?.chapter_id
+    const chapterInfo = chaptersMap[chapterId]
+    const seriesId = chapterInfo?.seriesId
+    if (!seriesId || !chapterId || !pageId) return '#'
+    
+    const latestFeedback = selectedTaskFeedbacks[selectedTaskFeedbacks.length - 1]
+    const tantouName = latestFeedback?.mangaka?.name || latestFeedback?.mangaka?.username || 'Editor'
+    const feedbackContent = latestFeedback?.content || ''
+    const feedbackNote = `Yêu cầu sửa từ Tantou [${tantouName}]: ${feedbackContent}`
+    
+    return `/dashboard/mangaka/assign-task?seriesId=${seriesId}&chapterId=${chapterId}&pageId=${pageId}&layerType=${rawTask.task_type}&note=${encodeURIComponent(feedbackNote)}`
+  }
 
   const mappedRegions = pageRegions.map((r: any, idx: number) => ({
     id: r.region_id,
@@ -415,6 +478,32 @@ export default function SubmissionPage() {
     } catch (err) {
       console.error(err)
       alert('Không thể gửi yêu cầu chỉnh sửa. Lỗi: ' + ((err as any).response?.data?.message || (err as any).message))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSimulateSubmit = async () => {
+    if (!selected) return
+    const rawTask = rawTasks.find((t) => t.task_id === selected.id)
+    if (!rawTask) {
+      alert('Không tìm thấy thông tin task tương ứng.')
+      return
+    }
+
+    try {
+      setLoading(true)
+      await editorService.overrideTaskStatus(selected.id, 'submitted')
+      await editorService.updatePageStatus(rawTask.page_id, 'review')
+      
+      setToastMessage('Đã giả lập trợ lý nộp bài thành công!')
+      setTimeout(() => {
+        setToastMessage(null)
+      }, 5000)
+      loadData()
+    } catch (err: any) {
+      console.error(err)
+      alert('Không thể giả lập nộp bài. Lỗi: ' + (err.response?.data?.message || err.message))
     } finally {
       setLoading(false)
     }
@@ -735,8 +824,46 @@ export default function SubmissionPage() {
                     BẢN VẼ ĐÃ ĐƯỢC PHÊ DUYỆT
                   </div>
                 ) : selected.status === 'Need Fix' ? (
-                  <div className="bg-red-50 border-2 border-manga-red text-manga-red p-3 font-bold text-center text-xs uppercase">
-                    Yêu cầu chỉnh sửa đã gửi
+                  <div className="flex flex-col gap-3">
+                    <div className="bg-[#FFF5F5] border-2 border-manga-red p-4 text-left">
+                      <span className="text-[10px] font-bold uppercase text-manga-red block mb-1">
+                        Yêu cầu chỉnh sửa từ Tantou Editor
+                      </span>
+                      {isLoadingFeedbacks ? (
+                        <span className="text-xs text-gray-500 font-bold animate-pulse">Đang tải lý do chỉnh sửa...</span>
+                      ) : selectedTaskFeedbacks.length > 0 ? (
+                        selectedTaskFeedbacks.map((f, idx) => (
+                          <div key={f.feedback_id || idx} className="mb-2 last:mb-0 border-b border-red-100 pb-2 last:border-0">
+                            <p className="text-xs text-gray-800 font-extrabold mb-1 flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-manga-red"></span>
+                              Tantou: {f.mangaka?.name || f.mangaka?.username || 'Biên tập viên'}
+                            </p>
+                            <p className="text-xs text-gray-600 font-bold whitespace-pre-wrap leading-relaxed">
+                              {f.content}
+                            </p>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-gray-500 font-bold italic">
+                          Chưa cập nhật lý do chi tiết từ Editor.
+                        </p>
+                      )}
+                    </div>
+                    
+                    <Link
+                      to={getAssignTaskUrl()}
+                      className="w-full bg-manga-red text-white text-center font-manga font-bold text-sm uppercase py-2.5 border-2 border-manga-ink manga-shadow-sm hover:translate-y-0.5 hover:shadow-none transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <Sparkles className="w-4 h-4" /> Giao việc cho trợ lý
+                    </Link>
+
+                    <button
+                      onClick={handleSimulateSubmit}
+                      className="w-full bg-blue-600 text-white text-center font-manga font-bold text-xs uppercase py-2 border-2 border-manga-ink manga-shadow-sm hover:translate-y-0.5 hover:shadow-none transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      title="Giả lập trợ lý vẽ xong và nộp bản vẽ mới"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin-slow" /> Giả lập Trợ lý nộp bài
+                    </button>
                   </div>
                 ) : (
                   <>

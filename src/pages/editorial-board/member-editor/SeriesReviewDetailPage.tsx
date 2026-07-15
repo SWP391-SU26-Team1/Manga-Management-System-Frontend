@@ -22,73 +22,7 @@ export default function SeriesReviewDetailPage() {
   const [showSavedToast, setShowSavedToast] = useState(false)
   const [existingVoteId, setExistingVoteId] = useState<string | null>(null)
 
-  const [grade, setGrade] = useState<{ [key: string]: number }>({
-    plot: 0,
-    art: 0,
-    market: 0
-  })
-
-  const seriesCriteria = [
-    { key: 'plot', label: '1. Cốt truyện & Thế giới', desc: 'Sáng tạo, logic, độ hấp dẫn' },
-    { key: 'art', label: '2. Tạo hình & Concept', desc: 'Thiết kế nhân vật, phong cách' },
-    { key: 'market', label: '3. Tiềm năng Thương mại', desc: 'Phù hợp xu hướng độc giả' }
-  ]
-
-  const handleSelectScore = (key: string, score: number) => {
-    setGrade(prev => ({ ...prev, [key]: score }))
-  }
-
-  const calculateAverageScore = () => {
-    const scores = Object.values(grade).filter(v => v > 0)
-    if (scores.length === 0) return 0
-    const avg = scores.reduce((a, b) => a + b, 0) / scores.length
-    return Math.round(avg * 10) / 10
-  }
-
-  const [comments, setComments] = useState<any[]>([
-    { id: 1, author: 'MINH K. (ART DIRECTOR)', text: 'Cốt truyện cổ trang này có hướng khai thác mới lạ, nét vẽ minh họa của tác giả rất vững.', time: '2 giờ trước' },
-    { id: 2, author: 'LAN PHƯƠNG (EDITOR)', text: 'Tôi đồng tình với đề xuất chạy thử Pilot của Biên tập viên phụ trách. Bản thảo có tiềm năng đạt lượng đọc cao.', time: '1 giờ trước' }
-  ])
-  const [newComment, setNewComment] = useState('')
-
-  // Mock member voting stats for this series
-  const mockVotingStats = seriesId === 'phoenix-legend' ? {
-    totalVotes: 8,
-    maxVotes: 12,
-    approveVotes: 6,
-    rejectVotes: 2,
-    percentApprove: 75,
-    percentReject: 25,
-    details: [
-      { name: 'Minh K.', role: 'Art Director', vote: 'APPROVE', comment: 'Cốt truyện cổ trang này có hướng khai thác mới lạ, nét vẽ minh họa của tác giả rất vững.' },
-      { name: 'Lan Phương', role: 'Editor', vote: 'APPROVE', comment: 'Tôi đồng tình với đề xuất chạy thử Pilot của Biên tập viên phụ trách. Bản thảo có tiềm năng đạt lượng đọc cao.' },
-      { name: 'Tuấn A.', role: 'Senior Editor', vote: 'REJECT', comment: 'Cốt truyện có phần hơi kén độc giả đại chúng, cần chú ý nhịp truyện.' },
-      { name: 'Bình Minh', role: 'Producer', vote: 'APPROVE', comment: 'Phù hợp định hướng phát hành thử nghiệm.' },
-      { name: 'Mỹ Linh', role: 'Marketing Manager', vote: 'APPROVE', comment: 'Độc giả nữ rất thích thể loại cổ trang drama này.' },
-      { name: 'Hoàng Long', role: 'Lead Editor', vote: 'REJECT', comment: 'Phần kết chương 1 cần đẩy kịch tính lên cao hơn nữa.' },
-      { name: 'Thu Thảo', role: 'Editor', vote: 'APPROVE', comment: 'Lineart vẽ tay rất chất lượng, các mảng đen dùng hợp lý.' },
-      { name: 'Quốc Bảo', role: 'Editorial staff', vote: 'APPROVE', comment: 'Ủng hộ duyệt Pilot 3 chương đầu.' }
-    ]
-  } : {
-    totalVotes: 10,
-    maxVotes: 12,
-    approveVotes: 8,
-    rejectVotes: 2,
-    percentApprove: 80,
-    percentReject: 20,
-    details: [
-      { name: 'Minh K.', role: 'Art Director', vote: 'APPROVE', comment: 'Phong cách năng động, thể hiện chuyển động cơ thể rất tốt.' },
-      { name: 'Lan Phương', role: 'Editor', vote: 'APPROVE', comment: 'Truyện thể thao truyền cảm hứng, độc giả trẻ sẽ đón nhận tốt.' },
-      { name: 'Tuấn A.', role: 'Senior Editor', vote: 'REJECT', comment: 'Nhân vật chính hơi mờ nhạt ở những trang đầu.' },
-      { name: 'Bình Minh', role: 'Producer', vote: 'APPROVE', comment: 'Thị trường truyện thể thao đang thiếu những bộ chất lượng như thế này.' },
-      { name: 'Mỹ Linh', role: 'Marketing Manager', vote: 'APPROVE', comment: 'Chiến dịch marketing sẽ tập trung vào ý chí vươn lên của nhân vật.' },
-      { name: 'Hoàng Long', role: 'Lead Editor', vote: 'APPROVE', comment: 'Đã chỉnh sửa thoại theo góp ý, bản mới nhất rất tốt.' },
-      { name: 'Thu Thảo', role: 'Editor', vote: 'APPROVE', comment: 'Phân cảnh thi đấu điền kinh vẽ rất cuốn hút, kịch tính.' },
-      { name: 'Quốc Bảo', role: 'Editorial staff', vote: 'APPROVE', comment: 'Duyệt thử nghiệm ngay.' },
-      { name: 'Duy Mạnh', role: 'Art Consultant', vote: 'REJECT', comment: 'Tỉ lệ giải phẫu chân tay ở một số phân cảnh chạy hơi lỗi.' },
-      { name: 'Ánh Tuyết', role: 'Editor', vote: 'APPROVE', comment: 'Thoại ngắn gọn, súc tích.' }
-    ]
-  }
+  const [comments, setComments] = useState<any[]>([])
 
   useEffect(() => {
     const loadDetailAndVote = async () => {
@@ -118,12 +52,21 @@ export default function SeriesReviewDetailPage() {
       try {
         if (urlSessionId) {
           const resList = await boardService.getVote(urlSessionId)
-          const userVote = resList && resList.length > 0 ? resList.find(v => v.voter_id === currentUser.id || v.users?.username === currentUser.fullName) : null
-          
-          if (userVote) {
-            setExistingVoteId(userVote.vote_id)
-            setDecision(userVote.decision === 'APPROVE' || userVote.decision === 'APPROVED' ? 'APPROVE' : 'REJECT')
-            setNote(userVote.note || '')
+          if (resList && resList.length > 0) {
+            const mappedComments = resList.filter(v => v.note).map(v => ({
+              id: v.vote_id,
+              author: (v.users?.fullName || v.users?.username || 'Thành viên') + ' (' + (v.decision === 'APPROVE' || v.decision === 'APPROVED' ? 'ĐỒNG Ý' : 'BÁC BỎ') + ')',
+              text: v.note,
+              time: new Date(v.created_at || Date.now()).toLocaleString('vi-VN')
+            }))
+            setComments(mappedComments)
+
+            const userVote = resList.find(v => v.voter_id === currentUser.id || v.users?.username === currentUser.fullName)
+            if (userVote) {
+              setExistingVoteId(userVote.vote_id)
+              setDecision(userVote.decision === 'APPROVE' || userVote.decision === 'APPROVED' ? 'APPROVE' : 'REJECT')
+              setNote(userVote.note || '')
+            }
           }
         }
       } catch (err) {
@@ -142,8 +85,7 @@ export default function SeriesReviewDetailPage() {
       const sessionId = urlSessionId
       const payload = {
         decision,
-        note,
-        score: calculateAverageScore()
+        note
       }
       if (existingVoteId) {
         await boardService.updateVote(existingVoteId, payload)
@@ -201,32 +143,7 @@ export default function SeriesReviewDetailPage() {
 
 
 
-  const handleSendComment = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newComment.trim()) return
-    const storedUser = localStorage.getItem('mangaflow_user')
-    const userObj = storedUser ? JSON.parse(storedUser) : { fullName: 'Minamoto Shizuka', role: 'BOARD' }
-    
-    setComments([...comments, {
-      id: Date.now(),
-      author: userObj.fullName.toUpperCase() + ' (MEMBER EDITOR)',
-      text: newComment,
-      time: 'Vừa xong'
-    }])
-    setNewComment('')
-  }
 
-  const handlePinComment = (id: number) => {
-    const commentToPin = comments.find(c => c.id === id)
-    if (commentToPin) {
-      const remaining = comments.filter(c => c.id !== id)
-      setComments([{ ...commentToPin, pinned: true, author: commentToPin.author.includes('📌') ? commentToPin.author : `📌 ${commentToPin.author}` }, ...remaining])
-    }
-  }
-
-  const handleDeleteComment = (id: number) => {
-    setComments(comments.filter(c => c.id !== id))
-  }
 
   if (!series) {
     return (
@@ -316,47 +233,10 @@ export default function SeriesReviewDetailPage() {
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Grading Board */}
-            <div className="bg-white border-4 border-manga-ink p-6 shadow-[6px_6px_0px_rgba(15,15,15,1)]">
-              <div className="inline-block px-3 py-1 bg-manga-ink text-white font-bold uppercase text-[9px] border-2 border-manga-ink shadow-sm mb-4">
-                BẢNG ĐIỂM CHUYÊN MÔN
-              </div>
-              <div className="space-y-5">
-                {seriesCriteria.map((crit) => (
-                  <div key={crit.key} className="border-b-2 border-gray-100 pb-4">
-                    <div className="flex flex-col mb-2">
-                      <h4 className="text-xs font-black uppercase text-manga-ink leading-tight">
-                        {crit.label}
-                      </h4>
-                      <p className="text-[10px] text-gray-400 font-semibold mt-0.5">
-                        {crit.desc}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1 bg-zinc-50 border-2 border-manga-ink p-1 shadow-sm w-fit">
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => (
-                        <button
-                          key={star}
-                          onClick={() => handleSelectScore(crit.key, star)}
-                          className="text-manga-ink hover:scale-110 active:scale-95 cursor-pointer bg-transparent border-0 p-0.5"
-                        >
-                          {star <= grade[crit.key] ? (
-                            <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                          ) : (
-                            <Star className="w-4 h-4 text-gray-300" />
-                          )}
-                        </button>
-                      ))}
-                      <span className="font-manga text-sm font-black ml-2 w-6 text-center">
-                        {grade[crit.key]}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          /* Normal Member Editor Vote panel */
-          <div className="bg-white border-4 border-manga-ink p-6 shadow-[6px_6px_0px_rgba(15,15,15,1)]">
+        {/* Right Col (1 col): Normal Member Editor Vote panel */}
+        <div className="bg-white border-4 border-manga-ink p-6 shadow-[6px_6px_0px_rgba(15,15,15,1)] self-start sticky top-24">
             <div className="inline-block px-3 py-1 bg-manga-ink text-white font-bold uppercase text-[9px] border-2 border-manga-ink shadow-sm mb-4">
               BỎ PHIẾU HỘI ĐỒNG
             </div>
@@ -418,7 +298,6 @@ export default function SeriesReviewDetailPage() {
               </div>
             </div>
           </div>
-        </div>
       </div>
 
       {/* Discussion forum (Board comments thread) */}
@@ -453,21 +332,6 @@ export default function SeriesReviewDetailPage() {
           })}
         </div>
 
-        <form onSubmit={handleSendComment} className="flex gap-2 border-t-2 border-manga-ink pt-4">
-          <input
-            type="text"
-            value={newComment}
-            onChange={e => setNewComment(e.target.value)}
-            placeholder="Nhập ý kiến thảo luận về dự án truyện này..."
-            className="flex-1 border-2 border-manga-ink px-4 py-2.5 text-xs font-bold outline-none focus:border-manga-red bg-zinc-50"
-          />
-          <button 
-            type="submit" 
-            className="bg-manga-ink text-white border-2 border-manga-ink px-5 py-2.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:bg-manga-red hover:shadow-[1px_1px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] cursor-pointer"
-          >
-            <Send className="w-4 h-4" />
-          </button>
-        </form>
       </div>
     </div>
   )

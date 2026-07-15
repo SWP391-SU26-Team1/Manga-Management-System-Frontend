@@ -53,13 +53,40 @@ export interface RankingEntry {
 }
 
 export const rankingService = {
-  /** GET /api/rankings/series/top - Lấy danh sách xếp hạng series */
+  /** GET /api/ranking-periods - Lấy danh sách kỳ xếp hạng */
+  getRankingPeriods: async (): Promise<any[]> => {
+    try {
+      const response = await api.get('/api/ranking-periods')
+      return response.data.data?.data || response.data.data || []
+    } catch (error) {
+      console.error('Error fetching ranking periods:', error)
+      return []
+    }
+  },
+
+  /** GET /api/ranking-periods/:periodId/series-rankings - Lấy bảng xếp hạng theo kỳ */
+  getSeriesRankingsByPeriod: async (periodId: string): Promise<BackendSeriesRanking[]> => {
+    try {
+      const response = await api.get(`/api/ranking-periods/${periodId}/series-rankings`)
+      return response.data.data?.data || response.data.data || []
+    } catch (error) {
+      console.error('Error fetching series rankings for period:', error)
+      return []
+    }
+  },
+
+  /** GET /api/rankings/series/top - Lấy danh sách xếp hạng series (API cũ) */
   getTopSeries: async (limit: number = 20): Promise<BackendSeriesRanking[]> => {
-    const response = await api.get<{ success: boolean; data: BackendSeriesRanking[] }>(
-      '/api/rankings/series/top',
-      { params: { limit } }
-    )
-    return response.data.data ?? []
+    try {
+      const response = await api.get<{ success: boolean; data: BackendSeriesRanking[] }>(
+        '/api/rankings/series/top',
+        { params: { limit } }
+      )
+      return response.data.data ?? []
+    } catch (error) {
+      console.error('Error fetching top series:', error)
+      return []
+    }
   },
 
   /** Alias cho getTopSeries — dùng cho Dashboard widget */

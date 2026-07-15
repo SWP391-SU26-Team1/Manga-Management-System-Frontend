@@ -161,13 +161,15 @@ export const boardService = {
     return response.data.data || []
   },
 
-  getSeriesRankings: async (): Promise<any[]> => {
-    const response = await api.get('/api/board/series-rankings')
+  getSeriesRankings: async (periodId?: string): Promise<any[]> => {
+    const url = periodId ? `/api/board/series-rankings?periodId=${periodId}` : '/api/board/series-rankings'
+    const response = await api.get(url)
     return response.data.data || []
   },
 
-  getChapterRankings: async (): Promise<any[]> => {
-    const response = await api.get('/api/board/chapter-rankings')
+  getChapterRankings: async (periodId?: string): Promise<any[]> => {
+    const url = periodId ? `/api/board/chapter-rankings?periodId=${periodId}` : '/api/board/chapter-rankings'
+    const response = await api.get(url)
     return response.data.data || []
   },
 

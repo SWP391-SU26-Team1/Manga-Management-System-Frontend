@@ -7,6 +7,7 @@ import { mangakaNav } from '@/configs/navigation/mangakaNav'
 import { assistantNav } from '@/configs/navigation/assistantNav'
 import { boardNav } from '@/configs/navigation/boardNav'
 import { tantouNav } from '@/configs/navigation/tantouNav'
+import { userNav } from '@/configs/navigation/userNav'
 
 const getNavConfig = (role: string) => {
   switch (role) {
@@ -16,6 +17,8 @@ const getNavConfig = (role: string) => {
     case 'BOARD': return boardNav;
     case 'TANTOU':
     case 'EDITOR': return tantouNav;
+    case 'USER':
+    case 'READER': return userNav;
     default: return [];
   }
 }
@@ -28,6 +31,8 @@ const getRoleText = (role: string) => {
     case 'BOARD': return 'Editorial Board Panel';
     case 'TANTOU':
     case 'EDITOR': return 'Tantou Editor Panel';
+    case 'USER':
+    case 'READER': return 'Reader Dashboard';
     default: return 'MANGAFLOW PANEL';
   }
 }
@@ -40,6 +45,8 @@ const getDashboardPath = (role: string) => {
     case 'BOARD': return '/dashboard/editorial-board';
     case 'TANTOU':
     case 'EDITOR': return '/dashboard/tantou-editor';
+    case 'USER':
+    case 'READER': return '/dashboard/user';
     default: return '/';
   }
 }

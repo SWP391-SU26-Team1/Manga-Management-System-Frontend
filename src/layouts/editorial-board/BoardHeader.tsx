@@ -170,6 +170,15 @@ export default function BoardHeader() {
 
       {/* Actions section */}
       <div className="flex items-center gap-6">
+        {/* Temporary Return to User Page Button */}
+        <Link 
+          to="/"
+          className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-white bg-manga-red hover:bg-red-600 transition-colors border-2 border-transparent hover:border-black rounded-lg"
+          title="Về trang dành cho Độc giả"
+        >
+          <ExternalLink className="w-4 h-4" /> Về trang Độc giả
+        </Link>
+
         {/* Search Bar */}
         <div className="relative w-64">
           <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />

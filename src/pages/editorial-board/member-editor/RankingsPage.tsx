@@ -11,30 +11,47 @@ export default function RankingsPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true)
+    const fetchPeriods = async () => {
       try {
-        const [periodRes, seriesRes, chapterRes] = await Promise.all([
-          boardService.getRankingPeriods(),
-          boardService.getSeriesRankings(),
-          boardService.getChapterRankings()
-        ])
-        
+        const periodRes = await boardService.getRankingPeriods()
         setPeriods(periodRes || [])
         if (periodRes && periodRes.length > 0) {
+          // Setting activePeriod will trigger the other useEffect
           setActivePeriod(periodRes[0].id || periodRes[0].period_id || '')
+        } else {
+          // If no periods, try fetching latest anyway
+          fetchRankingsForPeriod('')
         }
-        
-        setSeriesRankings(seriesRes || [])
-        setChapterRankings(chapterRes || [])
       } catch (error) {
-        console.error('Failed to load rankings:', error)
-      } finally {
+        console.error('Failed to load periods:', error)
         setLoading(false)
       }
     }
-    fetchData()
+    fetchPeriods()
   }, [])
+
+  const fetchRankingsForPeriod = async (periodId: string) => {
+    setLoading(true)
+    try {
+      const [seriesRes, chapterRes] = await Promise.all([
+        boardService.getSeriesRankings(periodId),
+        boardService.getChapterRankings(periodId)
+      ])
+      
+      setSeriesRankings(seriesRes || [])
+      setChapterRankings(chapterRes || [])
+    } catch (error) {
+      console.error('Failed to load rankings:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activePeriod) {
+      fetchRankingsForPeriod(activePeriod)
+    }
+  }, [activePeriod])
 
   const currentRankings = activeTab === 'SERIES' ? seriesRankings : chapterRankings
 

@@ -99,7 +99,7 @@ export default function TantouDashboardPage() {
       paused: dashboardData?.managingSeries?.paused ?? dashboardData?.active_paused_count ?? dashboardData?.paused_count ?? 0,
     },
     pendingReview: {
-      total: dashboardData?.pendingReview?.total ?? dashboardData?.actual_pending_review ?? (dashboardData?.submitted ?? 0) + (dashboardData?.in_review ?? 0) ?? 0,
+      total: dashboardData?.pendingReview?.total ?? dashboardData?.actual_pending_review ?? ((dashboardData?.submitted ?? 0) + (dashboardData?.in_review ?? 0)),
       deadlineThisWeek: dashboardData?.pendingReview?.deadlineThisWeek ?? dashboardData?.deadline_this_week ?? 0,
     },
     needRevision: {

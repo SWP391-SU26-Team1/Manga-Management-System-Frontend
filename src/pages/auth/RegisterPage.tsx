@@ -202,11 +202,6 @@ export default function RegisterPage() {
       return
     }
 
-    // Intercept Privileged Roles to handle Backend limitation gracefully on the Frontend
-    if (role === 'board' || role === 'editor') {
-      setRegisterError(`Vì lý do bảo mật, tài khoản ${role === 'board' ? 'Hội đồng Biên tập' : 'Biên tập viên'} không được phép tự đăng ký tự do. Vui lòng đăng nhập bằng tài khoản được cấp hoặc liên hệ Admin.`)
-      return
-    }
 
     setLoading(true)
     try {

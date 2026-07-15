@@ -31,6 +31,9 @@ export default function SeriesDetailPage() {
   const [memberSuccess, setMemberSuccess] = useState('')
   const [isAddingMember, setIsAddingMember] = useState(false)
   const [availableAssistants, setAvailableAssistants] = useState<any[]>([])
+  const [availableEditors, setAvailableEditors] = useState<any[]>([])
+  const [newEditorUserId, setNewEditorUserId] = useState('')
+  const [newEditorRole, setNewEditorRole] = useState('editor')
 
   // Member Delete Confirmation Modal States
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -191,18 +194,23 @@ export default function SeriesDetailPage() {
     setIsLoading(true)
     setError('')
     try {
-      const [s, chs, mems, asts] = await Promise.all([
+      const [s, chs, mems, asts, edts] = await Promise.all([
         seriesService.getById(seriesId),
         chapterService.getBySeriesId(seriesId),
         seriesService.getMembers(seriesId),
         userService.listAssistants().catch(() => []),
+        userService.listEditors().catch(() => []),
       ])
       setSeries(s)
       setChapters([...chs].sort((a, b) => b.chapter_number - a.chapter_number))
       setMembers(mems)
       setAvailableAssistants(asts)
+      setAvailableEditors(edts)
       if (asts.length > 0) {
         setNewMemberUserId(asts[0].id)
+      }
+      if (edts.length > 0) {
+        setNewEditorUserId(edts[0].id)
       }
     } catch (err) {
       setError(getErrorMessage(err))
@@ -251,6 +259,29 @@ export default function SeriesDetailPage() {
       })
       setMemberSuccess('Thêm thành viên vào dự án thành công!')
       setNewMemberUserId('')
+      const mems = await seriesService.getMembers(seriesId!)
+      setMembers(mems)
+    } catch (err) {
+      setMemberError(getErrorMessage(err))
+    } finally {
+      setIsAddingMember(false)
+    }
+  }
+
+  const handleAddEditor = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setMemberError('')
+    setMemberSuccess('')
+    if (!newEditorUserId.trim()) return
+
+    setIsAddingMember(true)
+    try {
+      await seriesService.addMember(seriesId!, {
+        user_id: newEditorUserId.trim(),
+        role_in_series: newEditorRole,
+      })
+      setMemberSuccess('Thêm Tantou Editor vào dự án thành công!')
+      setNewEditorUserId('')
       const mems = await seriesService.getMembers(seriesId!)
       setMembers(mems)
     } catch (err) {
@@ -713,14 +744,12 @@ export default function SeriesDetailPage() {
 
                       <div>
                         <label className="block text-xs uppercase tracking-widest mb-1.5">Vai trò trong dự án *</label>
-                        <select
-                          value={newMemberRole}
-                          onChange={e => setNewMemberRole(e.target.value)}
-                          className="w-full border-2 border-manga-ink px-3 py-2 text-sm focus:outline-none focus:border-manga-red bg-white"
-                        >
-                          <option value="assistant">Assistant (Trợ lý vẽ)</option>
-                          <option value="mangaka">Mangaka (Đồng tác giả)</option>
-                        </select>
+                        <input
+                          type="text"
+                          readOnly
+                          value="Assistant (Trợ lý vẽ)"
+                          className="w-full border-2 border-manga-ink px-3 py-2 text-sm focus:outline-none bg-gray-100 cursor-not-allowed font-bold"
+                        />
                       </div>
 
                       <button
@@ -729,6 +758,51 @@ export default function SeriesDetailPage() {
                         className="w-full bg-manga-red hover:bg-red-700 text-white font-manga font-bold text-xs uppercase py-3 border-2 border-manga-ink manga-shadow-sm hover:translate-y-0.5 hover:shadow-none transition-all disabled:opacity-50"
                       >
                         {isAddingMember ? 'Đang xử lý...' : 'Thêm thành viên'}
+                      </button>
+                    </form>
+
+                    <hr className="my-6 border-t-2 border-dashed border-manga-ink/20" />
+
+                    <h3 className="font-manga text-xl font-bold uppercase mb-4 flex items-center gap-2">
+                      <UserPlus className="w-5 h-5 text-manga-red" />
+                      Thêm Tantou Editor
+                    </h3>
+
+                    <form onSubmit={handleAddEditor} className="space-y-4 font-bold text-sm text-manga-ink">
+                      <div>
+                        <label className="block text-xs uppercase tracking-widest mb-1.5">Chọn Tantou Editor *</label>
+                        <select
+                          required
+                          value={newEditorUserId}
+                          onChange={e => setNewEditorUserId(e.target.value)}
+                          className="w-full border-2 border-manga-ink px-3 py-2 text-sm focus:outline-none focus:border-manga-red bg-white font-bold"
+                        >
+                          <option value="">-- Chọn Tantou Editor --</option>
+                          {availableEditors.map(edt => (
+                            <option key={edt.id} value={edt.id}>
+                              {edt.fullName}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-[10px] text-gray-400 mt-1">Chọn biên tập viên hoạt động trong hệ thống</p>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs uppercase tracking-widest mb-1.5">Vai trò trong dự án *</label>
+                        <input
+                          type="text"
+                          readOnly
+                          value="Editor (Tantou Editor)"
+                          className="w-full border-2 border-manga-ink px-3 py-2 text-sm focus:outline-none bg-gray-100 cursor-not-allowed font-bold"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isAddingMember}
+                        className="w-full bg-manga-red hover:bg-red-700 text-white font-manga font-bold text-xs uppercase py-3 border-2 border-manga-ink manga-shadow-sm hover:translate-y-0.5 hover:shadow-none transition-all disabled:opacity-50"
+                      >
+                        {isAddingMember ? 'Đang xử lý...' : 'Thêm Tantou Editor'}
                       </button>
                     </form>
                   </div>

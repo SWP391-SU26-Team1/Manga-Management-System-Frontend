@@ -16,7 +16,6 @@ const getChapterDisplayStatus = (ch: any, m?: any) => {
     }
     switch (m.status) {
       case 'draft':
-      case 'draft':
       case 'submitted':
       case 'in_review':
         return 'CHỜ TANTOU DUYỆT'

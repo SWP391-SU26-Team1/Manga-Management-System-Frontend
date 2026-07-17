@@ -365,7 +365,7 @@ export default function SeriesDetailPage() {
 
             {/* Tab Content: Chapters */}
             {activeTab === 'chapters' && (
-              <div className="space-y-4">
+              <div className="space-y-4 max-h-[440px] overflow-y-auto pr-2" style={{ scrollbarWidth: 'thin' }}>
                 {chapters.map((chapter, index) => (
                   <Link 
                     key={chapter.id}

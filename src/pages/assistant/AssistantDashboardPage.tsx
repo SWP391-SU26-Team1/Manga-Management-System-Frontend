@@ -210,14 +210,16 @@ export default function AssistantDashboardPage() {
       t = 'Bản nộp đã được duyệt'
     } else if (titleLower.includes('new task assigned')) {
       t = 'Nhiệm vụ mới được giao'
+    } else if (titleLower.includes('task reassigned')) {
+      t = 'Nhiệm vụ phân công lại'
     } else if (titleLower.includes('series approved')) {
       t = 'Bộ truyện đã được duyệt'
-    } else if (titleLower.includes('revision requested')) {
+    } else if (titleLower.includes('revision requested') || titleLower.includes('needs_revision')) {
       t = 'Yêu cầu chỉnh sửa'
     } else if (titleLower.includes('task completed')) {
       t = 'Nhiệm vụ đã hoàn thành'
-    } else if (titleLower.includes('task rejected')) {
-      t = 'Nhiệm vụ bị từ chối'
+    } else if (titleLower.includes('task rejected') || titleLower.includes('submission rejected')) {
+      t = 'Bài nộp bị từ chối'
     } else if (titleLower.includes('manuscript submitted')) {
       t = 'Bản thảo đã được nộp'
     } else if (titleLower.includes('task submitted')) {
@@ -228,8 +230,17 @@ export default function AssistantDashboardPage() {
     if (contentLower.includes('your page version') && contentLower.includes('has been approved')) {
       const match = c.match(/version\s+(\d+)/i)
       const versionNum = match ? match[1] : '1'
-      c = `Phiên bản trang ${versionNum} của bạn đã được phê duyệt.`
-    } else if (contentLower.includes('you have been assigned a new')) {
+      c = `Phiên bản bản vẽ trang ${versionNum} của bạn đã được tác giả phê duyệt.`
+    } else if (contentLower.includes('your page version') && contentLower.includes('has been rejected')) {
+      const match = c.match(/version\s+(\d+)/i)
+      const versionNum = match ? match[1] : '1'
+      c = `Phiên bản bản vẽ trang ${versionNum} của bạn bị từ chối.`
+    } else if (contentLower.includes('reviewer requested changes on page version')) {
+      const match = c.match(/version\s+(\d+):\s*(.*)/i)
+      const versionNum = match ? match[1] : '1'
+      const note = match ? match[2] : ''
+      c = `Tác giả yêu cầu chỉnh sửa ở phiên bản bản vẽ trang ${versionNum}: ${note}`
+    } else if (contentLower.includes('you have been assigned a new') || contentLower.includes('you have a new')) {
       let taskType = ''
       if (contentLower.includes('inking')) taskType = 'vẽ nét (Inking)'
       else if (contentLower.includes('coloring')) taskType = 'tô màu (Coloring)'
@@ -249,6 +260,8 @@ export default function AssistantDashboardPage() {
       c = 'Bản nộp nhiệm vụ của bạn không được phê duyệt và bị từ chối.'
     } else if (contentLower.includes('a task has been submitted for review')) {
       c = 'Nhiệm vụ đã được nộp và đang chờ tác giả phê duyệt.'
+    } else if (contentLower.includes('reassigned to you') || contentLower.includes('has been reassigned to you')) {
+      c = 'Một nhiệm vụ vẽ đã được bàn giao lại cho bạn.'
     }
 
     return { title: t, content: c }

@@ -1,13 +1,26 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router'
 import { Star } from 'lucide-react'
 import { PublishedSeries } from '@/types/reader.types'
+import { readerService } from '@/services/reader.service'
 
 interface SearchSeriesCardProps {
   series: PublishedSeries
 }
 
 export default function SearchSeriesCard({ series }: SearchSeriesCardProps) {
+  const [latestChapter, setLatestChapter] = useState(series.latestChapterNumber)
+
+  useEffect(() => {
+    if (series.latestChapterNumber === 0) {
+      readerService.getPublishedChapters(series.id, 'newest').then(chapters => {
+        if (chapters.length > 0) {
+          setLatestChapter(chapters[0].chapterNumber)
+        }
+      })
+    }
+  }, [series.id, series.latestChapterNumber])
+
   return (
     <Link to={`/series/${series.id}`} className="group block bg-white border-[3px] border-black shadow-[6px_6px_0px_rgba(0,0,0,1)] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-y-[4px] hover:translate-x-[4px] transition-all flex flex-col h-full dark:bg-zinc-800 dark:border-black dark:shadow-[6px_6px_0px_#000] dark:hover:shadow-[2px_2px_0px_#000]">
       {/* Cover Image Container */}
@@ -41,7 +54,7 @@ export default function SearchSeriesCard({ series }: SearchSeriesCardProps) {
               {series.rating.toFixed(1)}
             </div>
             <div className="border-2 border-black px-2 py-0.5 text-xs font-bold uppercase bg-white dark:bg-zinc-700 dark:border-black dark:text-white">
-              Ch. {series.totalChapters}
+              CH. {latestChapter}
             </div>
           </div>
         </div>

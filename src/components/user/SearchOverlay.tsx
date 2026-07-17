@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Search, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { readerService } from '@/services/reader.service'
-import { SearchResult } from '@/types/reader.types'
+import { SearchResult, GENRES } from '@/types/reader.types'
 import SearchSeriesCard from '@/components/user/SearchSeriesCard'
 
 interface SearchOverlayProps {
@@ -85,6 +85,36 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
             </button>
           </form>
 
+          {/* Genre Tags */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            <button
+              type="button"
+              onClick={() => setActiveGenre('Tất cả')}
+              className={`px-3 py-1.5 border-[2px] border-black font-bold text-xs uppercase transition-all ${
+                activeGenre === 'Tất cả' 
+                  ? 'bg-manga-red text-white shadow-[2px_2px_0px_rgba(0,0,0,1)] translate-y-[2px] translate-x-[2px] dark:border-black' 
+                  : 'bg-white text-black shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-y-[2px] hover:translate-x-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] dark:bg-zinc-800 dark:text-white dark:border-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-[2px_2px_0px_#000]'
+              }`}
+            >
+              Tất cả
+            </button>
+            {GENRES.map(g => (
+              <button
+                key={g.id}
+                type="button"
+                onClick={() => setActiveGenre(g.name)}
+                className={`px-3 py-1.5 border-[2px] border-black font-bold text-xs uppercase transition-all flex items-center gap-1 ${
+                  activeGenre === g.name 
+                    ? 'bg-manga-red text-white shadow-[2px_2px_0px_rgba(0,0,0,1)] translate-y-[2px] translate-x-[2px] dark:border-black' 
+                    : 'bg-white text-black shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-y-[2px] hover:translate-x-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] dark:bg-zinc-800 dark:text-white dark:border-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-[2px_2px_0px_#000]'
+                }`}
+              >
+                <span>{g.name}</span>
+                <span className="text-[10px]">{g.icon}</span>
+              </button>
+            ))}
+          </div>
+
           {/* Filters Bar */}
           <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-6 gap-4">
             <h2 className="font-bold text-sm md:text-lg text-black uppercase tracking-wide dark:text-white">
@@ -92,18 +122,6 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
             </h2>
             
             <div className="flex flex-wrap gap-2 w-full xl:w-auto">
-              <select 
-                value={activeGenre} 
-                onChange={(e) => setActiveGenre(e.target.value)}
-                className="border-[3px] border-black bg-white px-3 py-1.5 md:px-4 md:py-2 font-bold text-xs md:text-sm outline-none cursor-pointer appearance-none uppercase shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all flex-1 xl:flex-none dark:bg-zinc-700 dark:border-black dark:text-white dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-[2px_2px_0px_#000]"
-                style={{ backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23000000%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right .7em top 50%', backgroundSize: '.65em auto', paddingRight: '2rem' }}
-              >
-                <option value="Tất cả">Thể loại: Tất cả</option>
-                <option value="Action">Thể loại: Action</option>
-                <option value="Fantasy">Thể loại: Fantasy</option>
-                <option value="Romance">Thể loại: Romance</option>
-                <option value="Sci-Fi">Thể loại: Sci-Fi</option>
-              </select>
 
               <select className="border-[3px] border-black bg-white px-3 py-1.5 md:px-4 md:py-2 font-bold text-xs md:text-sm outline-none cursor-pointer appearance-none uppercase shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all flex-1 xl:flex-none dark:bg-zinc-700 dark:border-black dark:text-white dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-[2px_2px_0px_#000]" style={{ backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23000000%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right .7em top 50%', backgroundSize: '.65em auto', paddingRight: '2rem' }}>
                 <option>Trạng thái: Tất cả</option>

@@ -31,8 +31,8 @@ const mapSeries = (s: any): PublishedSeries => {
     totalChapters,
     latestChapterNumber,
     latestChapterDate: s.updated_at,
-    rating: 4.8, // Fallback mock as DB doesn't have rating yet
-    ratingCount: Math.floor(Math.random() * 500) + 10,
+    rating: s.rating || 0,
+    ratingCount: s.rating_count || 0,
     authorName,
     authorAvatarUrl,
     createdAt: s.created_at,

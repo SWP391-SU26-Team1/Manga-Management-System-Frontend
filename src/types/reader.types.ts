@@ -227,6 +227,9 @@ export const GENRES: Genre[] = [
   { id: '10', name: 'Slice of Life', slug: 'slice-of-life', icon: '🌸', seriesCount: 0 },
   { id: '11', name: 'Mecha',        slug: 'mecha',        icon: '🤖',  seriesCount: 0 },
   { id: '12', name: 'School',       slug: 'school',       icon: '🏫',  seriesCount: 0 },
+  { id: '13', name: 'Manga',        slug: 'manga',        icon: '🇯🇵',  seriesCount: 0 },
+  { id: '14', name: 'Manhwa',       slug: 'manhwa',       icon: '🇰🇷',  seriesCount: 0 },
+  { id: '15', name: 'Manhua',       slug: 'manhua',       icon: '🇨🇳',  seriesCount: 0 },
 ]
 
 export const DEFAULT_READER_SETTINGS: ReaderSettings = {

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router'
 import { Search, Bell, User, Edit3, Users, Send, TrendingUp, BookOpen, Star } from 'lucide-react'
 import { readerService } from '@/services/reader.service'
-import { PublishedSeries } from '@/types/reader.types'
+import { PublishedSeries, GENRES } from '@/types/reader.types'
 import SeriesCard from '@/components/user/SeriesCard'
 
 export default function UserHomePage() {
@@ -153,14 +153,14 @@ export default function UserHomePage() {
           </h2>
           
           <div className="flex flex-wrap justify-center gap-4">
-            {['Action', 'Fantasy', 'Romance', 'Sci-Fi', 'Comedy', 'Drama', 'Sports', 'Horror', 'Mystery'].map((genre, idx) => (
+            {GENRES.map((genre, idx) => (
               <Link 
-                key={genre} 
-                to={`/search?genre=${genre}`}
+                key={genre.id} 
+                to={`/search?genre=${genre.name}`}
                 className="px-6 py-3 border-2 border-manga-ink bg-white font-bold uppercase hover:bg-manga-ink hover:text-white transition-colors shadow-[4px_4px_0px_rgba(40,40,40,1)] hover:shadow-none hover:translate-y-1 hover:translate-x-1 animate-slide-up dark:bg-zinc-800 dark:border-black dark:text-white dark:hover:bg-zinc-700 dark:shadow-[4px_4px_0px_#000]"
                 style={{ animationDelay: `${0.3 + idx * 0.05}s` }}
               >
-                {genre}
+                {genre.name}
               </Link>
             ))}
           </div>

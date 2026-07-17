@@ -128,8 +128,8 @@ export default function ManuscriptsPage() {
 
       // Fetch notifications to extract editor feedback notes
       try {
-        const notifs = await editorService.getNotifications()
-        setNotifications(notifs)
+        const response = await api.get<{ success: boolean; data: any[] }>('/api/notifications')
+        setNotifications(response.data.data || [])
       } catch (err) {
         console.error('Failed to load notifications:', err)
       }

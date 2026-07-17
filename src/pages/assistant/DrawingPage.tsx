@@ -50,12 +50,12 @@ export default function DrawingPage() {
   const [selectorSeriesList, setSelectorSeriesList] = useState<any[]>([])
   const [selectorChaptersMap, setSelectorChaptersMap] = useState<Record<string, any[]>>({})
   const [selectorPagesMap, setSelectorPagesMap] = useState<Record<string, any[]>>({})
-  
+
   // Quick Selector selected states
   const [quickSeriesId, setQuickSeriesId] = useState<string>('')
   const [quickChapterId, setQuickChapterId] = useState<string>('')
   const [quickPageId, setQuickPageId] = useState<string>('')
-  
+
   // Custom states for rich cards & filtering
   const [seriesNamesMap, setSeriesNamesMap] = useState<Record<string, string>>({})
   const [filterSeriesId, setFilterSeriesId] = useState<string>('ALL')
@@ -84,10 +84,10 @@ export default function DrawingPage() {
     if (!deleteTargetPageId) return
     localStorage.removeItem(`mangaflow_drawing_draft_${deleteTargetPageId}`)
     showToast('Đã xóa bản nháp nét vẽ thành công!')
-    
+
     // Refresh page list
     loadDrawingPages()
-    
+
     // Close modal
     setShowDeleteConfirm(false)
     setDeleteTargetPageId(null)
@@ -134,8 +134,12 @@ export default function DrawingPage() {
           try {
             const detail = await assistantService.getDrawingPageDetail(pageId)
             return detail
-          } catch (e) {
+          } catch (e: any) {
             console.warn(`Error fetching drawing page detail for draft ${pageId}:`, e)
+            // If page is deleted (404) or no longer accessible (403), remove from localStorage
+            if (e.response && (e.response.status === 404 || e.response.status === 403)) {
+              localStorage.removeItem(`mangaflow_drawing_draft_${pageId}`)
+            }
             return null
           }
         })
@@ -187,7 +191,7 @@ export default function DrawingPage() {
           if (!series) return
 
           namesMap[series.series_id] = series.title
-          
+
           seriesMap[series.series_id] = {
             series_id: series.series_id,
             title: series.title
@@ -232,12 +236,12 @@ export default function DrawingPage() {
         if (seriesList.length > 0) {
           const firstSeriesId = seriesList[0].series_id
           setQuickSeriesId(firstSeriesId)
-          
+
           const chapters = finalChaptersMap[firstSeriesId] || []
           if (chapters.length > 0) {
             const firstChapterId = chapters[0].chapter_id
             setQuickChapterId(firstChapterId)
-            
+
             const pages = finalPagesMap[firstChapterId] || []
             if (pages.length > 0) {
               setQuickPageId(pages[0].page_id)
@@ -298,16 +302,16 @@ export default function DrawingPage() {
     } else if (statusFilter !== 'ALL' && page.status !== statusFilter) {
       return false
     }
-    
+
     // 2. Series Filter Dropdown
     if (filterSeriesId !== 'ALL' && page.chapter?.series_id !== filterSeriesId) return false
-    
+
     // 3. Task Type Filter Dropdown
     if (filterTaskType !== 'ALL') {
       const hasMatchingTask = page.page_task?.some(task => task.task_type.toLowerCase() === filterTaskType.toLowerCase())
       if (!hasMatchingTask) return false
     }
-    
+
     return true
   })
 
@@ -387,33 +391,29 @@ export default function DrawingPage() {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setStatusFilter('ALL')}
-            className={`px-4 py-2 text-xs font-bold uppercase border-2 transition-colors cursor-pointer ${
-              statusFilter === 'ALL' ? 'bg-manga-ink text-white border-manga-ink' : 'bg-white text-gray-500 border-gray-200 hover:border-manga-ink'
-            }`}
+            className={`px-4 py-2 text-xs font-bold uppercase border-2 transition-colors cursor-pointer ${statusFilter === 'ALL' ? 'bg-manga-ink text-white border-manga-ink' : 'bg-white text-gray-500 border-gray-200 hover:border-manga-ink'
+              }`}
           >
             Tất cả ({pages.length})
           </button>
           <button
             onClick={() => setStatusFilter('in_progress')}
-            className={`px-4 py-2 text-xs font-bold uppercase border-2 transition-colors cursor-pointer ${
-              statusFilter === 'in_progress' ? 'bg-manga-ink text-white border-manga-ink' : 'bg-white text-gray-500 border-gray-200 hover:border-manga-ink'
-            }`}
+            className={`px-4 py-2 text-xs font-bold uppercase border-2 transition-colors cursor-pointer ${statusFilter === 'in_progress' ? 'bg-manga-ink text-white border-manga-ink' : 'bg-white text-gray-500 border-gray-200 hover:border-manga-ink'
+              }`}
           >
             Đang thực hiện ({pages.filter(p => p.status === 'in_progress').length})
           </button>
           <button
             onClick={() => setStatusFilter('local_drafts')}
-            className={`px-4 py-2 text-xs font-bold uppercase border-2 transition-colors cursor-pointer ${
-              statusFilter === 'local_drafts' ? 'bg-manga-ink text-white border-manga-ink' : 'bg-white text-gray-500 border-gray-200 hover:border-manga-ink'
-            }`}
+            className={`px-4 py-2 text-xs font-bold uppercase border-2 transition-colors cursor-pointer ${statusFilter === 'local_drafts' ? 'bg-manga-ink text-white border-manga-ink' : 'bg-white text-gray-500 border-gray-200 hover:border-manga-ink'
+              }`}
           >
             Nháp nét vẽ ({localDraftPageIds.length})
           </button>
           <button
             onClick={() => setStatusFilter('review')}
-            className={`px-4 py-2 text-xs font-bold uppercase border-2 transition-colors cursor-pointer ${
-              statusFilter === 'review' ? 'bg-manga-ink text-white border-manga-ink' : 'bg-white text-gray-500 border-gray-200 hover:border-manga-ink'
-            }`}
+            className={`px-4 py-2 text-xs font-bold uppercase border-2 transition-colors cursor-pointer ${statusFilter === 'review' ? 'bg-manga-ink text-white border-manga-ink' : 'bg-white text-gray-500 border-gray-200 hover:border-manga-ink'
+              }`}
           >
             Chờ duyệt ({pages.filter(p => p.status === 'review').length})
           </button>
@@ -483,31 +483,31 @@ export default function DrawingPage() {
           {filteredPages.map((page) => {
             const sortedVersions = [...(page.page_version || [])].sort((a, b) => b.version_number - a.version_number)
             const latestImage = sortedVersions[0]?.image_url || page.image_url || ''
-            
+
             const myTasksOnPage = page.page_task || []
-            
+
             // Calculate deadline & overdue state
             const activeTasks = myTasksOnPage.filter(t => t.status !== 'completed' && t.status !== 'approved')
             const mainTask = activeTasks[0] || myTasksOnPage[0]
             const deadlineStr = mainTask?.deadline ? new Date(mainTask.deadline).toLocaleDateString('vi-VN') : 'N/A'
             const isOverdue = mainTask?.deadline ? new Date(mainTask.deadline).getTime() < Date.now() && (mainTask.status !== 'completed' && mainTask.status !== 'approved') : false
-            
+
             // Calculate region progress
             const totalTasks = myTasksOnPage.length
             const completedTasksCount = myTasksOnPage.filter(t => t.status === 'completed' || t.status === 'approved').length
-            
+
             const isWaitingReview = page.status === 'review'
             const isRevision = myTasksOnPage.some(t => t.status === 'needs_revision' || t.status === 'rejected')
             const hasLocalDraft = localDraftPageIds.includes(page.page_id)
-            const buttonText = isWaitingReview 
-              ? 'Xem chi tiết' 
-              : (hasLocalDraft 
-                  ? 'Vẽ Tiếp (Bản Nháp)' 
-                  : (isRevision ? 'Sửa ngay' : 'Vẽ ngay'))
-            const buttonBgClass = isWaitingReview 
-              ? 'bg-zinc-500 border-zinc-500 hover:bg-zinc-600 hover:border-black text-white' 
+            const buttonText = isWaitingReview
+              ? 'Xem chi tiết'
+              : (hasLocalDraft
+                ? 'Vẽ Tiếp (Bản Nháp)'
+                : (isRevision ? 'Sửa ngay' : 'Vẽ ngay'))
+            const buttonBgClass = isWaitingReview
+              ? 'bg-zinc-500 border-zinc-500 hover:bg-zinc-600 hover:border-black text-white'
               : 'bg-manga-ink hover:bg-[#E63946] text-white'
-            
+
             return (
               <div
                 key={page.page_id}
@@ -534,7 +534,7 @@ export default function DrawingPage() {
                       <Eye className="w-4 h-4" /> {isWaitingReview ? 'Xem Bản Vẽ' : 'Vào Không Gian Vẽ'}
                     </button>
                   </div>
-                  
+
                   <div className="absolute top-3 left-3 bg-white border-2 border-manga-ink px-2.5 py-0.5 text-[10px] font-black uppercase shadow-[2px_2px_0px_rgba(0,0,0,1)]">
                     Trang {page.page_number}
                   </div>
@@ -547,22 +547,21 @@ export default function DrawingPage() {
                   )}
 
                   <div className="absolute top-3 right-3">
-                    <span className={`px-2 py-0.5 border text-[9px] font-black uppercase shadow-[2px_2px_0px_rgba(0,0,0,1)] ${
-                      page.status === 'in_progress'
+                    <span className={`px-2 py-0.5 border text-[9px] font-black uppercase shadow-[2px_2px_0px_rgba(0,0,0,1)] ${page.status === 'in_progress'
                         ? 'bg-blue-100 text-blue-700 border-blue-400'
                         : page.status === 'review'
-                        ? 'bg-purple-100 text-purple-700 border-purple-400'
-                        : page.status === 'draft'
-                        ? 'bg-zinc-100 text-zinc-700 border-zinc-400'
-                        : 'bg-amber-100 text-amber-700 border-amber-400'
-                    }`}>
-                      {page.status === 'in_progress' 
-                        ? 'Đang vẽ' 
-                        : page.status === 'review' 
-                        ? 'Chờ duyệt' 
-                        : page.status === 'draft' 
-                        ? 'Chưa vẽ' 
-                        : 'Cần sửa'}
+                          ? 'bg-purple-100 text-purple-700 border-purple-400'
+                          : page.status === 'draft'
+                            ? 'bg-zinc-100 text-zinc-700 border-zinc-400'
+                            : 'bg-amber-100 text-amber-700 border-amber-400'
+                      }`}>
+                      {page.status === 'in_progress'
+                        ? 'Đang vẽ'
+                        : page.status === 'review'
+                          ? 'Chờ duyệt'
+                          : page.status === 'draft'
+                            ? 'Chưa vẽ'
+                            : 'Cần sửa'}
                     </span>
                   </div>
                 </div>
@@ -608,12 +607,11 @@ export default function DrawingPage() {
                       {myTasksOnPage.map((task, idx) => (
                         <div key={task.task_id || idx} className="flex items-center justify-between text-xs font-semibold text-gray-700">
                           <span className="truncate">• {task.task_type.toUpperCase()}</span>
-                          <span className={`text-[9px] font-bold px-1.5 uppercase border ${
-                            (task.status === 'completed' || task.status === 'approved') ? 'text-green-600 bg-green-50 border-green-300' :
-                            task.status === 'submitted' ? 'text-purple-600 bg-purple-50 border-purple-300' :
-                            (task.status === 'needs_revision' || task.status === 'rejected') ? 'text-red-600 bg-red-50 border-red-300' :
-                            'text-blue-600 bg-blue-50 border-blue-300'
-                          }`}>
+                          <span className={`text-[9px] font-bold px-1.5 uppercase border ${(task.status === 'completed' || task.status === 'approved') ? 'text-green-600 bg-green-50 border-green-300' :
+                              task.status === 'submitted' ? 'text-purple-600 bg-purple-50 border-purple-300' :
+                                (task.status === 'needs_revision' || task.status === 'rejected') ? 'text-red-600 bg-red-50 border-red-300' :
+                                  'text-blue-600 bg-blue-50 border-blue-300'
+                            }`}>
                             {task.status === 'approved' ? 'approved' : task.status === 'rejected' ? 'needs_revision' : task.status}
                           </span>
                         </div>
@@ -660,11 +658,11 @@ export default function DrawingPage() {
           <div className="bg-white border-4 border-black w-full max-w-md shadow-[8px_8px_0px_0px_rgba(230,57,70,1)] animate-zoom-in text-manga-ink font-bold font-sans">
             <div className="bg-manga-ink p-4 text-white flex justify-between items-center">
               <h3 className="font-manga text-xl uppercase font-bold tracking-wide">Xác nhận xóa bản nháp</h3>
-              <button 
+              <button
                 onClick={() => {
                   setShowDeleteConfirm(false)
                   setDeleteTargetPageId(null)
-                }} 
+                }}
                 className="hover:text-[#E63946] transition cursor-pointer bg-transparent border-none text-white"
               >
                 <X className="w-6 h-6" />
@@ -676,16 +674,16 @@ export default function DrawingPage() {
               </p>
               <p className="mb-6 text-manga-red font-black">Bạn có chắc chắn muốn xóa không?</p>
               <div className="flex gap-4">
-                <button 
+                <button
                   onClick={() => {
                     setShowDeleteConfirm(false)
                     setDeleteTargetPageId(null)
-                  }} 
+                  }}
                   className="flex-1 py-3 border-2 border-black font-bold text-xs uppercase hover:bg-gray-150 transition cursor-pointer bg-white text-black"
                 >
                   Hủy / Giữ lại
                 </button>
-                <button 
+                <button
                   onClick={confirmDeleteDraft}
                   className="flex-1 py-3 bg-[#E63946] text-white border-2 border-black font-black uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-red-600 transition cursor-pointer flex items-center justify-center"
                 >

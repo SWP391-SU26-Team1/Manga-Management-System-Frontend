@@ -47,6 +47,9 @@ export default function ChapterReaderPage() {
       })
       readerService.logView(seriesId, chapterId)
       
+      // Immediately mark as read when user opens the chapter
+      readerService.saveReadingProgress({ series_id: seriesId, chapter_id: chapterId, page_number: 1 });
+      
       try {
         const stored = localStorage.getItem(getLikeKey());
         const parsed = stored ? JSON.parse(stored) : {};
@@ -54,20 +57,6 @@ export default function ChapterReaderPage() {
       } catch (err) {}
     }
   }, [chapterId, seriesId])
-
-  useEffect(() => {
-    const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && chapterId && seriesId) {
-        readerService.saveReadingProgress({ series_id: seriesId, chapter_id: chapterId, page_number: 1 });
-      }
-    }, { threshold: 0.1 });
-
-    if (bottomRef.current) {
-      observer.observe(bottomRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, [chapterId, seriesId, pages.length]);
 
   const currentChapterIndex = allChapters.findIndex(c => c.id === chapterId)
   

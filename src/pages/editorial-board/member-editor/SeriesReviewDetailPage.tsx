@@ -22,33 +22,10 @@ export default function SeriesReviewDetailPage() {
   const [showSavedToast, setShowSavedToast] = useState(false)
   const [existingVoteId, setExistingVoteId] = useState<string | null>(null)
 
-  const [grade, setGrade] = useState<{ [key: string]: number }>({
-    plot: 0,
-    art: 0,
-    market: 0
-  })
 
-  const seriesCriteria = [
-    { key: 'plot', label: '1. Cốt truyện & Thế giới', desc: 'Sáng tạo, logic, độ hấp dẫn' },
-    { key: 'art', label: '2. Tạo hình & Concept', desc: 'Thiết kế nhân vật, phong cách' },
-    { key: 'market', label: '3. Tiềm năng Thương mại', desc: 'Phù hợp xu hướng độc giả' }
-  ]
 
-  const handleSelectScore = (key: string, score: number) => {
-    setGrade(prev => ({ ...prev, [key]: score }))
-  }
-
-  const calculateAverageScore = () => {
-    const scores = Object.values(grade).filter(v => v > 0)
-    if (scores.length === 0) return 0
-    const avg = scores.reduce((a, b) => a + b, 0) / scores.length
-    return Math.round(avg * 10) / 10
-  }
-
-  const [comments, setComments] = useState<any[]>([
-    { id: 1, author: 'MINH K. (ART DIRECTOR)', text: 'Cốt truyện cổ trang này có hướng khai thác mới lạ, nét vẽ minh họa của tác giả rất vững.', time: '2 giờ trước' },
-    { id: 2, author: 'LAN PHƯƠNG (EDITOR)', text: 'Tôi đồng tình với đề xuất chạy thử Pilot của Biên tập viên phụ trách. Bản thảo có tiềm năng đạt lượng đọc cao.', time: '1 giờ trước' }
-  ])
+  const [sessionStatus, setSessionStatus] = useState<string>('open')
+  const [comments, setComments] = useState<any[]>([])
   const [newComment, setNewComment] = useState('')
 
   // Mock member voting stats for this series
@@ -117,6 +94,15 @@ export default function SeriesReviewDetailPage() {
 
       try {
         if (urlSessionId) {
+          try {
+            const proposal = await boardService.getProposalById(urlSessionId)
+            if (proposal && proposal.status) {
+              setSessionStatus(proposal.status)
+            }
+          } catch (err) {
+            console.warn('API error fetching proposal status:', err)
+          }
+
           const resList = await boardService.getVote(urlSessionId)
           const userVote = resList && resList.length > 0 ? resList.find(v => v.voter_id === currentUser.id || v.users?.username === currentUser.fullName) : null
           
@@ -125,6 +111,16 @@ export default function SeriesReviewDetailPage() {
             setDecision(userVote.decision === 'APPROVE' || userVote.decision === 'APPROVED' ? 'APPROVE' : 'REJECT')
             setNote(userVote.note || '')
           }
+
+          const boardComments = resList
+            .filter((v: any) => v.note && v.note.trim() !== '')
+            .map((v: any) => ({
+              id: v.vote_id,
+              author: (v.users?.fullName || v.users?.username || 'MEMBER').toUpperCase() + ' (EDITOR)',
+              text: v.note,
+              time: new Date(v.created_at || new Date()).toLocaleString('vi-VN')
+            }))
+          setComments(boardComments)
         }
       } catch (err) {
         console.warn('API error fetching user votes:', err)
@@ -139,11 +135,19 @@ export default function SeriesReviewDetailPage() {
       if (!urlSessionId) {
         throw new Error("Missing official Review Session. Cannot vote.");
       }
+      if (sessionStatus !== 'open' && sessionStatus !== 'pending' && sessionStatus !== 'in_progress') {
+        addNotification(
+          'VOTE FAILED',
+          'Phiên duyệt này đã đóng, bạn không thể gửi hoặc sửa phiếu biểu quyết nữa!',
+          'RISK',
+          'voting_failed'
+        )
+        return
+      }
       const sessionId = urlSessionId
       const payload = {
         decision,
-        note,
-        score: calculateAverageScore()
+        note
       }
       if (existingVoteId) {
         await boardService.updateVote(existingVoteId, payload)
@@ -316,46 +320,10 @@ export default function SeriesReviewDetailPage() {
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Grading Board */}
-            <div className="bg-white border-4 border-manga-ink p-6 shadow-[6px_6px_0px_rgba(15,15,15,1)]">
-              <div className="inline-block px-3 py-1 bg-manga-ink text-white font-bold uppercase text-[9px] border-2 border-manga-ink shadow-sm mb-4">
-                BẢNG ĐIỂM CHUYÊN MÔN
-              </div>
-              <div className="space-y-5">
-                {seriesCriteria.map((crit) => (
-                  <div key={crit.key} className="border-b-2 border-gray-100 pb-4">
-                    <div className="flex flex-col mb-2">
-                      <h4 className="text-xs font-black uppercase text-manga-ink leading-tight">
-                        {crit.label}
-                      </h4>
-                      <p className="text-[10px] text-gray-400 font-semibold mt-0.5">
-                        {crit.desc}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1 bg-zinc-50 border-2 border-manga-ink p-1 shadow-sm w-fit">
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => (
-                        <button
-                          key={star}
-                          onClick={() => handleSelectScore(crit.key, star)}
-                          className="text-manga-ink hover:scale-110 active:scale-95 cursor-pointer bg-transparent border-0 p-0.5"
-                        >
-                          {star <= grade[crit.key] ? (
-                            <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                          ) : (
-                            <Star className="w-4 h-4 text-gray-300" />
-                          )}
-                        </button>
-                      ))}
-                      <span className="font-manga text-sm font-black ml-2 w-6 text-center">
-                        {grade[crit.key]}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          /* Normal Member Editor Vote panel */
+        {/* Normal Member Editor Vote panel */}
+        <div className="lg:col-span-1">
           <div className="bg-white border-4 border-manga-ink p-6 shadow-[6px_6px_0px_rgba(15,15,15,1)]">
             <div className="inline-block px-3 py-1 bg-manga-ink text-white font-bold uppercase text-[9px] border-2 border-manga-ink shadow-sm mb-4">
               BỎ PHIẾU HỘI ĐỒNG
@@ -411,9 +379,16 @@ export default function SeriesReviewDetailPage() {
                 <button
                   type="button"
                   onClick={handleSubmitVote}
-                  className="w-full bg-manga-ink text-white font-manga font-bold text-xs uppercase py-3 border-2 border-manga-ink shadow-[3px_3px_0px_rgba(0,0,0,1)] hover:bg-manga-red hover:shadow-[1px_1px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer text-center"
+                  disabled={sessionStatus !== 'open' && sessionStatus !== 'pending' && sessionStatus !== 'in_progress'}
+                  className={`w-full font-manga font-bold text-xs uppercase py-3 border-2 transition-all text-center ${
+                    sessionStatus !== 'open' && sessionStatus !== 'pending' && sessionStatus !== 'in_progress'
+                      ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed shadow-none'
+                      : 'bg-manga-ink text-white border-manga-ink shadow-[3px_3px_0px_rgba(0,0,0,1)] hover:bg-manga-red hover:shadow-[1px_1px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] active:translate-y-[2px] active:shadow-none cursor-pointer'
+                  }`}
                 >
-                  {existingVoteId ? 'SỬA PHIẾU CỦA BẠN' : 'GỬI PHIẾU BIỂU QUYẾT'}
+                  {sessionStatus !== 'open' && sessionStatus !== 'pending' && sessionStatus !== 'in_progress'
+                    ? 'PHIÊN DUYỆT ĐÃ ĐÓNG'
+                    : existingVoteId ? 'SỬA PHIẾU CỦA BẠN' : 'GỬI PHIẾU BIỂU QUYẾT'}
                 </button>
               </div>
             </div>

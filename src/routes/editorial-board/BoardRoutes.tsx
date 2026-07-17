@@ -16,7 +16,6 @@ import ProposalsListPage from '@/pages/editorial-board/member-editor/ProposalsLi
 import { DisputesListPage, DisputeDetailsPage } from '@/pages/editorial-board/member-editor/DisputesPage'
 
 
-
 export default function BoardRoutes() {
   const storedUser = localStorage.getItem('mangaflow_user')
   const user = storedUser ? JSON.parse(storedUser) : null

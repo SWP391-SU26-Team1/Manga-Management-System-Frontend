@@ -20,7 +20,7 @@ const mainMenuItems = [
     icon: LayoutDashboard
   },
   {
-    label: "Phiên Đánh Giá",
+    label: "Review Session",
     path: "/dashboard/editorial-board/proposals",
     icon: FileText
   },

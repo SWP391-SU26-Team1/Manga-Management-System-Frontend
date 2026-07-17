@@ -32,6 +32,8 @@ export interface SeriesDetail extends PublishedSeries {
   publishSchedule: string | null
   genres: string[]
   teamMembers: SeriesTeamMember[]
+  totalViews?: number
+  totalLikes?: number
 }
 
 // ─── Chapter (đã publish) ───────────────────────────────────────────────────

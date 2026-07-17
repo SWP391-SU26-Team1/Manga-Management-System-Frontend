@@ -87,13 +87,28 @@ export const readerService = {
         m.roleInSeries === 'tantou'
       );
 
+      // Lọc 1 user = 1 like cho toàn bộ Series (để công bằng giữa các mangaka có nhiều/ít chapter)
+      let uniqueLikes = 0;
+      if (s.chapter) {
+        const uniqueUsers = new Set();
+        s.chapter.forEach((c: any) => {
+          c.chapter_like?.forEach((like: any) => {
+            if (like.user_id) uniqueUsers.add(like.user_id);
+          });
+        });
+        uniqueLikes = uniqueUsers.size;
+      }
+      const totalLikes = uniqueLikes > 0 ? uniqueLikes : (s.total_likes || 0);
+
       return {
         ...base,
         editorName: editor ? editor.name : null,
         editorAvatarUrl: editor ? editor.avatarUrl : null,
         publishSchedule: 'Hàng tuần',
         genres: base.genre ? base.genre.split(',').map((g: string) => g.trim()) : [],
-        teamMembers
+        teamMembers,
+        totalViews: s.total_views || 0,
+        totalLikes: totalLikes
       }
     } catch (error) {
       console.error('Error fetching series detail:', error);
@@ -103,23 +118,41 @@ export const readerService = {
 
   searchSeries: async (params: SearchParams): Promise<SearchResult> => {
     try {
-      const apiParams: any = { status: 'published', limit: params.limit || 12 };
-      if (params.page) {
-        apiParams.offset = (params.page - 1) * apiParams.limit;
-      }
-      if (params.query) apiParams.keyword = params.query;
-      if (params.genre) apiParams.genre = params.genre;
+      // Vì Backend hiện tại chỉ hỗ trợ search theo title (query.ilike("title", ...)),
+      // Để tìm được theo Tác Giả, ta sẽ fetch 1 lượng lớn truyện về và tự filter ở Frontend.
+      const apiParams: any = { status: 'published', limit: 200 };
       
       const res = await api.get('/api/series', { params: apiParams });
       
-      const items = (res.data.data || []).map(mapSeries);
-      const total = res.data.pagination?.total || items.length;
-      const limit = res.data.pagination?.limit || apiParams.limit;
+      let items = (res.data.data || []).map(mapSeries);
+      
+      // 1. Filter theo query (Title hoặc Author)
+      if (params.query) {
+        const q = params.query.toLowerCase();
+        items = items.filter((item: PublishedSeries) => 
+          item.title.toLowerCase().includes(q) || 
+          item.authorName.toLowerCase().includes(q)
+        );
+      }
+
+      // 2. Filter theo genre
+      if (params.genre) {
+        items = items.filter((item: PublishedSeries) => 
+          item.genre === params.genre || 
+          item.genre.includes(params.genre!)
+        );
+      }
+      
+      // 3. Phân trang cục bộ
+      const limit = params.limit || 12;
+      const total = items.length;
+      const page = params.page || 1;
+      const paginatedItems = items.slice((page - 1) * limit, page * limit);
       
       return {
-        series: items,
+        series: paginatedItems,
         total,
-        page: params.page || 1,
+        page,
         totalPages: Math.ceil(total / limit) || 1
       }
     } catch (error) {
@@ -257,6 +290,7 @@ export const readerService = {
            });
            localStorage.setItem('localReadingHistory', JSON.stringify(history.slice(0, 50)));
         }
+        window.dispatchEvent(new Event('mangaflow_history_update'));
         return true;
       }
 
@@ -266,6 +300,7 @@ export const readerService = {
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      window.dispatchEvent(new Event('mangaflow_history_update'));
       return true;
     } catch (error) {
       console.error('Error saving reading progress:', error);
@@ -281,12 +316,20 @@ export const readerService = {
     return true;
   },
 
-  logView: async (seriesId: string, chapterId: string): Promise<boolean> => {
+  logView: async (seriesId: string, chapterId: string): Promise<void> => {
     try {
       await api.post('/api/view-logs', { series_id: seriesId, chapter_id: chapterId });
-      return true;
     } catch (error) {
       console.error('Error logging view:', error);
+    }
+  },
+
+  toggleChapterLike: async (chapterId: string): Promise<boolean> => {
+    try {
+      await api.post('/api/chapter-likes', { chapter_id: chapterId });
+      return true;
+    } catch (error) {
+      console.error('Error toggling chapter like:', error);
       return false;
     }
   },
@@ -311,9 +354,9 @@ export const readerService = {
     }
   },
 
-  postChapterComment: async (chapterId: string, content: string): Promise<boolean> => {
+  postChapterComment: async (chapterId: string, content: string, parentCommentId?: string): Promise<boolean> => {
     try {
-      await api.post(`/api/chapters/${chapterId}/comments`, { chapter_id: chapterId, content });
+      await api.post(`/api/chapters/${chapterId}/comments`, { chapter_id: chapterId, content, parent_comment_id: parentCommentId });
       return true;
     } catch (error) {
       console.error('Error posting chapter comment:', error);

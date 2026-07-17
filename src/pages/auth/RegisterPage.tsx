@@ -146,17 +146,20 @@ export default function RegisterPage() {
     const isTouched = touched[field]
     const error = errors[field]
     
-    let borderClass = 'border-manga-ink focus:border-manga-red'
+    let borderClass = 'border-black dark:border-gray-500 focus:border-manga-red dark:focus:border-manga-red'
+    let textClass = 'text-manga-ink dark:text-white'
     
     if (isTouched) {
       if (error) {
         borderClass = 'border-manga-red focus:border-manga-red'
+        textClass = 'text-manga-red dark:text-manga-red'
       } else {
         borderClass = 'border-green-500 focus:border-green-500'
+        textClass = 'text-manga-ink dark:text-white'
       }
     }
     
-    return `w-full py-2 border-b-2 bg-transparent focus:outline-none transition-colors text-sm placeholder:text-gray-300 ${borderClass} ${extraClasses}`
+    return `w-full py-2 border-b-2 bg-transparent focus:outline-none transition-colors text-sm placeholder:text-gray-300 ${borderClass} ${textClass} ${extraClasses}`
   }
 
   const validateField = (field: string, val: string) => {
@@ -246,22 +249,22 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#fcfcfc] relative flex items-center justify-center p-4 md:p-8 font-sans overflow-hidden">
+    <div className="min-h-screen bg-[#F5F5F5] dark:bg-zinc-900 relative flex items-center justify-center p-4 font-sans overflow-hidden transition-colors">
       <button
         onClick={() => navigate('/')}
-        className="absolute top-6 left-6 md:top-10 md:left-10 z-50 p-2 bg-white text-manga-ink manga-border manga-shadow-sm hover:translate-y-1 hover:manga-shadow-none transition-all flex items-center justify-center"
+        className="absolute top-6 left-6 md:top-10 md:left-10 z-50 p-2 bg-white dark:bg-zinc-800 text-manga-ink dark:text-white manga-border manga-shadow-sm hover:translate-y-1 hover:manga-shadow-none transition-all flex items-center justify-center"
         aria-label="Quay lại"
       >
         <ArrowLeft className="w-6 h-6" />
       </button>
 
       {/* Background Manga Panels */}
-      <div className="absolute inset-0 pointer-events-none opacity-20">
-        <div className="absolute top-[-5%] left-[-5%] w-[400px] h-[500px] border-[6px] border-manga-ink -rotate-12 bg-gray-100" style={{ backgroundImage: "url('/images/cover-1.png')", backgroundSize: 'cover', opacity: 0.3, filter: 'grayscale(100%)' }} />
-        <div className="absolute bottom-[-10%] right-[-5%] w-[500px] h-[400px] border-[6px] border-manga-ink rotate-6 bg-gray-100" style={{ backgroundImage: "url('/images/hero.png')", backgroundSize: 'cover', opacity: 0.3, filter: 'grayscale(100%)' }} />
+      <div className="absolute inset-0 pointer-events-none opacity-20 dark:opacity-10">
+        <div className="absolute top-[-5%] left-[-5%] w-[400px] h-[500px] border-[6px] border-manga-ink dark:border-black -rotate-12 bg-gray-100 dark:bg-zinc-800" style={{ backgroundImage: "url('/images/cover-1.png')", backgroundSize: 'cover', opacity: 0.3, filter: 'grayscale(100%)' }} />
+        <div className="absolute bottom-[-10%] right-[-5%] w-[500px] h-[400px] border-[6px] border-manga-ink dark:border-black rotate-6 bg-gray-100 dark:bg-zinc-800" style={{ backgroundImage: "url('/images/hero.png')", backgroundSize: 'cover', opacity: 0.3, filter: 'grayscale(100%)' }} />
       </div>
 
-      <div className="w-full max-w-5xl z-10 flex flex-col md:flex-row manga-border manga-shadow bg-white">
+      <div className="w-full max-w-5xl z-10 flex flex-col md:flex-row manga-border manga-shadow bg-white dark:bg-zinc-800 transition-colors">
 
         {/* Left Block - Intro */}
         <div className="w-full md:w-5/12 bg-manga-ink text-white p-10 md:p-14 flex flex-col justify-between relative overflow-hidden">
@@ -289,7 +292,7 @@ export default function RegisterPage() {
         </div>
 
         {/* Right Block - Form */}
-        <div className="w-full md:w-7/12 bg-white p-10 md:p-14 relative z-10">
+        <div className="w-full md:w-7/12 bg-white dark:bg-zinc-800 p-10 md:p-14 relative z-10 transition-colors">
           {showSuccess ? (
             <div className="flex flex-col items-center justify-center h-full text-center py-6 space-y-6">
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center text-green-500 animate-bounce">
@@ -395,45 +398,45 @@ export default function RegisterPage() {
               </button>
             </div>
 
-            <div className="space-y-6">
-              {/* Username Input */}
-              <div className="space-y-1">
-                <label className="block text-[11px] font-bold uppercase tracking-widest text-manga-ink">
-                  Tên đăng ký
-                </label>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => handleChange(e, 'username')}
-                  onBlur={() => handleBlur('username')}
-                  placeholder="Nhập tên đăng nhập của bạn (VD: nguyen_van_a)"
-                  className={getInputClass('username')}
-                />
-                {errors.username && <p className="text-manga-red text-xs font-bold mt-1">{errors.username}</p>}
-              </div>
-
-              {/* Email Input */}
-              <div className="space-y-1">
-                <label className="block text-[11px] font-bold uppercase tracking-widest text-manga-ink">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => handleChange(e, 'email')}
-                  onBlur={() => handleBlur('email')}
-                  placeholder="example@studio.com"
-                  className={getInputClass('email')}
-                />
-                {errors.email && <p className="text-manga-red text-xs font-bold mt-1">{errors.email}</p>}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Password Input */}
+              <div className="space-y-6">
+                {/* Username Input */}
                 <div className="space-y-1">
-                  <label className="block text-[11px] font-bold uppercase tracking-widest text-manga-ink">
-                    Mật khẩu
+                  <label className="block text-[11px] font-bold uppercase tracking-widest text-manga-ink dark:text-white">
+                    Tên đăng ký
                   </label>
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => handleChange(e, 'username')}
+                    onBlur={() => handleBlur('username')}
+                    placeholder="Nhập tên đăng nhập của bạn (VD: nguyen_van_a)"
+                    className={getInputClass('username')}
+                  />
+                  {errors.username && <p className="text-manga-red text-xs font-bold mt-1">{errors.username}</p>}
+                </div>
+
+                {/* Email Input */}
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-bold uppercase tracking-widest text-manga-ink dark:text-white">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => handleChange(e, 'email')}
+                    onBlur={() => handleBlur('email')}
+                    placeholder="example@studio.com"
+                    className={getInputClass('email')}
+                  />
+                  {errors.email && <p className="text-manga-red text-xs font-bold mt-1">{errors.email}</p>}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Password Input */}
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold uppercase tracking-widest text-manga-ink dark:text-white">
+                      Mật khẩu
+                    </label>
                   <div className="relative">
                     <input
                       type={showPassword ? 'text' : 'password'}
@@ -462,7 +465,7 @@ export default function RegisterPage() {
 
                 {/* Confirm Password Input */}
                 <div className="space-y-1">
-                  <label className="block text-[11px] font-bold uppercase tracking-widest text-manga-ink">
+                  <label className="block text-[11px] font-bold uppercase tracking-widest text-manga-ink dark:text-white">
                     Xác nhận mật khẩu
                   </label>
                   <div className="relative">

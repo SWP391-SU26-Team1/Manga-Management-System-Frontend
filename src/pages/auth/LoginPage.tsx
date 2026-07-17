@@ -96,25 +96,19 @@ export default function LoginPage() {
     if (w.google) {
       w.google.accounts.id.prompt()
     } else {
-      alert("Google Sign-In SDK đang tải. Vui lòng thử lại sau vài giây.")
+      alert("Google Sign-In SDK đang tải. V vui lòng thử lại sau vài giây.")
     }
   }
 
   const getInputClass = (field: 'email' | 'password', extraPaddingRight = 'pr-4') => {
-    const isTouched = touched[field]
-    const error = errors[field]
-    
-    let borderClass = 'border-manga-ink focus:border-manga-red'
-    
-    if (isTouched) {
-      if (error) {
-        borderClass = 'border-manga-red focus:border-manga-red'
-      } else {
-        borderClass = 'border-green-500 focus:border-green-500'
-      }
+    const base = `w-full pl-8 py-2 bg-transparent border-b-2 focus:outline-none transition-colors ${extraPaddingRight} `
+    if (touched[field] && errors[field]) {
+      return base + 'border-manga-red text-manga-red dark:text-manga-red focus:border-manga-red'
     }
-    
-    return `w-full pl-8 ${extraPaddingRight} py-2 border-b-2 bg-transparent focus:outline-none transition-colors ${borderClass}`
+    if (touched[field] && !errors[field] && (field === 'email' ? email : password)) {
+      return base + 'border-green-500 text-manga-ink dark:text-white focus:border-green-500'
+    }
+    return base + 'border-black dark:border-gray-500 text-manga-ink dark:text-white focus:border-manga-red dark:focus:border-manga-red'
   }
 
   const validateField = (field: 'email' | 'password', value: string) => {
@@ -204,26 +198,26 @@ export default function LoginPage() {
     !errors.password
 
   return (
-    <div className="min-h-screen bg-white relative flex items-center justify-center p-4 font-sans overflow-hidden">
+    <div className="min-h-screen bg-[#F5F5F5] dark:bg-zinc-900 relative flex items-center justify-center p-4 font-sans overflow-hidden transition-colors">
       <button
         onClick={() => navigate('/register')}
-        className="absolute top-6 left-6 md:top-10 md:left-10 z-50 p-2 bg-white text-manga-ink manga-border manga-shadow-sm hover:translate-y-1 hover:manga-shadow-none transition-all flex items-center justify-center"
+        className="absolute top-6 left-6 md:top-10 md:left-10 z-50 p-2 bg-white dark:bg-zinc-800 text-manga-ink dark:text-white manga-border manga-shadow-sm hover:translate-y-1 hover:manga-shadow-none transition-all flex items-center justify-center"
         aria-label="Quay lại"
       >
         <ArrowLeft className="w-6 h-6" />
       </button>
 
       {/* Background Manga Panels (Decorative) */}
-      <div className="absolute inset-0 pointer-events-none opacity-20">
-        <div className="absolute top-10 left-10 w-64 h-80 border-4 border-manga-ink -rotate-6 bg-gray-50" />
-        <div className="absolute bottom-20 right-20 w-96 h-64 border-4 border-manga-ink rotate-3 bg-gray-50" />
-        <div className="absolute -top-10 right-32 w-72 h-72 border-4 border-manga-ink rotate-12 bg-gray-50" />
-        <div className="absolute bottom-10 left-20 w-80 h-40 border-4 border-manga-ink -rotate-2 bg-gray-50" />
+      <div className="absolute inset-0 pointer-events-none opacity-20 dark:opacity-10">
+        <div className="absolute top-10 left-10 w-64 h-80 border-4 border-manga-ink dark:border-black -rotate-6 bg-gray-50 dark:bg-zinc-800" />
+        <div className="absolute bottom-20 right-20 w-96 h-64 border-4 border-manga-ink dark:border-black rotate-3 bg-gray-50 dark:bg-zinc-800" />
+        <div className="absolute -top-10 right-32 w-72 h-72 border-4 border-manga-ink dark:border-black rotate-12 bg-gray-50 dark:bg-zinc-800" />
+        <div className="absolute bottom-10 left-20 w-80 h-40 border-4 border-manga-ink dark:border-black -rotate-2 bg-gray-50 dark:bg-zinc-800" />
       </div>
 
       <div className="w-full max-w-lg z-10">
         {/* Form Card */}
-        <div className="manga-border manga-shadow bg-white flex flex-col">
+        <div className="manga-border manga-shadow bg-white dark:bg-zinc-800 flex flex-col transition-colors">
           {/* Header Card */}
           <div className="bg-manga-ink p-8 text-white relative">
             <div className="absolute -top-4 left-6 bg-white text-manga-ink font-manga font-bold px-3 py-1 text-sm manga-border">
@@ -249,7 +243,7 @@ export default function LoginPage() {
 
               {/* Email Input */}
               <div className="space-y-2">
-                <label className="block text-sm font-bold uppercase tracking-wider text-manga-ink">
+                <label className="block text-sm font-bold uppercase tracking-wider text-manga-ink dark:text-white">
                   Email
                 </label>
                 <div className="relative">
@@ -271,7 +265,7 @@ export default function LoginPage() {
               {/* Password Input */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <label className="block text-sm font-bold uppercase tracking-wider text-manga-ink">
+                  <label className="block text-sm font-bold uppercase tracking-wider text-manga-ink dark:text-white">
                     Mật khẩu
                   </label>
                   <Link to="/forgot-password" className="text-xs font-bold text-manga-red hover:underline">

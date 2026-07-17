@@ -4,7 +4,7 @@ import { Link } from 'react-router'
 import { rankingService, BackendSeriesRanking } from '@/services/ranking.service'
 
 export default function RankingsPage() {
-  const [rankingType, setRankingType] = useState<'series' | 'chapter'>('series')
+  const [rankingType, setRankingType] = useState<'view' | 'like'>('view')
   const [period, setPeriod] = useState<'week' | 'month'>('week')
   
   const [rankings, setRankings] = useState<any[]>([])
@@ -15,20 +15,26 @@ export default function RankingsPage() {
       setIsLoading(true)
       try {
         let data: BackendSeriesRanking[] = []
-        // Currently we fetch top series. Later we can integrate getRankingPeriods
-        data = await rankingService.getTopSeries(10)
+        data = await rankingService.getTopSeries(50)
         
-        const formatted = data.map((item, index) => ({
-          rankPosition: item.rank_position || index + 1,
-          previousRank: item.rank_position || index + 1,
+        const sortedData = [...data].sort((a, b) => {
+          if (rankingType === 'view') {
+            return (b.series?.view_count || 0) - (a.series?.view_count || 0)
+          }
+          return (b.total_vote || 0) - (a.total_vote || 0)
+        })
+
+        const formatted = sortedData.map((item, index) => ({
+          rankPosition: index + 1,
+          previousRank: index + 1,
           trendDirection: 'same',
           trendChange: 0,
           seriesId: item.series_id,
           title: item.series?.title || 'Chưa rõ tên truyện',
           coverImageUrl: item.series?.cover_image_url || `https://i.pravatar.cc/300?u=rank_${item.series_id}`,
           genre: item.series?.genre || 'N/A',
-          authorName: 'Đang cập nhật', // Backend Ranking type currently doesn't include author
-          score: (item.score || 0).toFixed(1),
+          authorName: 'Đang cập nhật',
+          score: rankingType === 'view' ? (item.series?.view_count || 0).toString() : (item.total_vote || 0).toString(),
           totalVotes: item.total_vote || 0,
           viewCount: item.series?.view_count || 0,
           totalChapters: 0
@@ -68,36 +74,39 @@ export default function RankingsPage() {
         {/* Left Column (Main Rankings) - 70% */}
         <div className="lg:w-[70%]">
           
-          {/* Ranking Type Toggle */}
-          <div className="flex bg-white border-4 border-black mb-6 shadow-[4px_4px_0px_#000]">
-            <button 
-              onClick={() => setRankingType('series')}
-              className={`flex-1 py-3 font-bold uppercase text-lg transition-colors border-r-4 border-black ${rankingType === 'series' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}
-            >
-              Ranking Series
-            </button>
-            <button 
-              onClick={() => setRankingType('chapter')}
-              className={`flex-1 py-3 font-bold uppercase text-lg transition-colors ${rankingType === 'chapter' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}
-            >
-              Ranking Chapter
-            </button>
-          </div>
+          {/* Filter Bar: Side by side */}
+          <div className="flex flex-col md:flex-row gap-6 mb-12">
+            {/* Ranking Type Toggle */}
+            <div className="flex w-full md:w-1/2 bg-white border-4 border-black shadow-[4px_4px_0px_#000]">
+              <button 
+                onClick={() => setRankingType('view')}
+                className={`flex-1 py-3 font-bold uppercase text-sm md:text-base transition-colors border-r-4 border-black ${rankingType === 'view' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}
+              >
+                Ranking theo View
+              </button>
+              <button 
+                onClick={() => setRankingType('like')}
+                className={`flex-1 py-3 font-bold uppercase text-sm md:text-base transition-colors ${rankingType === 'like' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}
+              >
+                Ranking theo Like
+              </button>
+            </div>
 
-          {/* Time Period Tabs */}
-          <div className="flex border-4 border-black mb-12 shadow-[4px_4px_0px_#000]">
-            <button 
-              onClick={() => setPeriod('week')}
-              className={`flex-1 py-3 font-bold uppercase transition-colors border-r-4 border-black ${period === 'week' ? 'bg-[#1a1a1a] text-white' : 'bg-white text-black hover:bg-gray-100'}`}
-            >
-              TOP TUẦN
-            </button>
-            <button 
-              onClick={() => setPeriod('month')}
-              className={`flex-1 py-3 font-bold uppercase transition-colors ${period === 'month' ? 'bg-[#1a1a1a] text-white' : 'bg-white text-black hover:bg-gray-100'}`}
-            >
-              TOP THÁNG
-            </button>
+            {/* Time Period Tabs */}
+            <div className="flex w-full md:w-1/2 border-4 border-black shadow-[4px_4px_0px_#000]">
+              <button 
+                onClick={() => setPeriod('week')}
+                className={`flex-1 py-3 font-bold uppercase text-sm md:text-base transition-colors border-r-4 border-black ${period === 'week' ? 'bg-[#1a1a1a] text-white' : 'bg-white text-black hover:bg-gray-100'}`}
+              >
+                TOP TUẦN
+              </button>
+              <button 
+                onClick={() => setPeriod('month')}
+                className={`flex-1 py-3 font-bold uppercase text-sm md:text-base transition-colors ${period === 'month' ? 'bg-[#1a1a1a] text-white' : 'bg-white text-black hover:bg-gray-100'}`}
+              >
+                TOP THÁNG
+              </button>
+            </div>
           </div>
 
           {isLoading ? (
@@ -123,7 +132,7 @@ export default function RankingsPage() {
                         </div>
                         <h3 className="font-bold text-center uppercase text-sm truncate px-2 hover:text-manga-red">{top3[1].title}</h3>
                       </Link>
-                      <div className="text-manga-red font-bold text-center mt-1">~ {top3[1].score} ĐIỂM</div>
+                      <div className="text-manga-red font-bold text-center mt-1">~ {top3[1].score}{rankingType === 'view' ? ' LƯỢT ĐỌC' : ' THEO DÕI'}</div>
                     </div>
                   </div>
                 )}
@@ -153,7 +162,7 @@ export default function RankingsPage() {
                         <h3 className="font-manga text-xl text-center uppercase font-bold truncate px-2 mb-2 hover:text-manga-red">{top3[0].title}</h3>
                       </Link>
                       <div className="bg-manga-red text-white font-bold text-center py-2 text-lg border-2 border-black">
-                        <Trophy className="w-4 h-4 inline-block mr-1 -mt-1" /> {top3[0].score} ĐIỂM
+                        <Trophy className="w-4 h-4 inline-block mr-1 -mt-1" /> {top3[0].score}{rankingType === 'view' ? ' LƯỢT ĐỌC' : ' THEO DÕI'}
                       </div>
                     </div>
                   </div>
@@ -173,7 +182,7 @@ export default function RankingsPage() {
                         </div>
                         <h3 className="font-bold text-center uppercase text-sm truncate px-2 hover:text-manga-red">{top3[2].title}</h3>
                       </Link>
-                      <div className="text-manga-red font-bold text-center mt-1">~ {top3[2].score} ĐIỂM</div>
+                      <div className="text-manga-red font-bold text-center mt-1">~ {top3[2].score}{rankingType === 'view' ? ' LƯỢT ĐỌC' : ' THEO DÕI'}</div>
                     </div>
                   </div>
                 )}
@@ -200,11 +209,11 @@ export default function RankingsPage() {
                         <div className="flex-1 min-w-0 ml-4">
                           <h4 className="font-bold uppercase text-sm truncate group-hover:text-manga-red transition-colors">{item.title}</h4>
                           <p className="text-xs text-gray-500 mt-1 truncate">
-                            {item.genre} • Lượt xem: {item.viewCount}
+                            {item.genre} • {rankingType === 'view' ? 'Lượt xem' : 'Lượt theo dõi'}: {rankingType === 'view' ? item.viewCount : item.totalVotes}
                           </p>
                         </div>
                         <div className="text-manga-red font-black text-xl ml-4 flex items-end">
-                          {item.score} <span className="text-[10px] text-gray-500 uppercase ml-1 pb-1">ĐIỂM</span>
+                          {item.score} <span className="text-[10px] text-gray-500 uppercase ml-1 pb-1">{rankingType === 'view' ? 'LƯỢT ĐỌC' : 'THEO DÕI'}</span>
                         </div>
                       </Link>
                     ))}

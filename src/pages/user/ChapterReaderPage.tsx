@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router'
-import { ArrowLeft, Menu, Settings, ChevronLeft, ChevronRight, MessageCircle } from 'lucide-react'
+import { ArrowLeft, Menu, Settings, ChevronLeft, ChevronRight, MessageCircle, Heart } from 'lucide-react'
 import { readerService } from '@/services/reader.service'
 import { MangaPage, PublishedChapter } from '@/types/reader.types'
 import ChapterCommentsPanel from '@/components/user/ChapterCommentsPanel'
@@ -14,6 +14,15 @@ export default function ChapterReaderPage() {
   const [allChapters, setAllChapters] = useState<PublishedChapter[]>([])
   const [showNav, setShowNav] = useState(true)
   const [showComments, setShowComments] = useState(false)
+  const [isLiked, setIsLiked] = useState(() => {
+    try {
+      const stored = localStorage.getItem('mangaflow_liked_chapters');
+      const parsed = stored ? JSON.parse(stored) : {};
+      return false; // will update in useEffect
+    } catch {
+      return false;
+    }
+  })
   
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -26,6 +35,12 @@ export default function ChapterReaderPage() {
         if (current) setChapter(current)
       })
       readerService.logView(seriesId, chapterId)
+      
+      try {
+        const stored = localStorage.getItem('mangaflow_liked_chapters');
+        const parsed = stored ? JSON.parse(stored) : {};
+        setIsLiked(!!parsed[chapterId]);
+      } catch (err) {}
     }
   }, [chapterId, seriesId])
 
@@ -68,6 +83,31 @@ export default function ChapterReaderPage() {
   // Toggle nav bars on click
   const handleViewClick = () => {
     setShowNav(!showNav)
+  }
+
+  const handleChapterLike = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const userStr = localStorage.getItem('mangaflow_user') || localStorage.getItem('user');
+    if (!userStr) {
+      alert('Vui lòng đăng nhập để theo dõi (like) chương này!');
+      return;
+    }
+    if (chapterId) {
+      const newIsLiked = !isLiked;
+      setIsLiked(newIsLiked);
+      try {
+        const stored = localStorage.getItem(getLikeKey());
+        const parsed = stored ? JSON.parse(stored) : {};
+        if (newIsLiked) {
+          parsed[chapterId] = true;
+        } else {
+          delete parsed[chapterId];
+        }
+        localStorage.setItem(getLikeKey(), JSON.stringify(parsed));
+        window.dispatchEvent(new Event('mangaflow_like_update'));
+      } catch (err) {}
+    }
   }
 
   if (!chapter) return <div className="min-h-screen bg-[#121212] flex items-center justify-center text-white">Đang tải chương...</div>
@@ -143,13 +183,23 @@ export default function ChapterReaderPage() {
             <ChevronLeft className="w-5 h-5" /> Trước
           </button>
           
-          <button 
-            onClick={() => setShowComments(true)}
-            className="text-gray-400 hover:text-white flex flex-col items-center gap-1 group"
-          >
-            <MessageCircle className="w-5 h-5 group-hover:text-manga-red" />
-            <span className="text-[10px] uppercase font-bold">Bình luận</span>
-          </button>
+          <div className="flex items-center gap-8">
+            <button 
+              onClick={handleChapterLike}
+              className="text-gray-400 hover:text-white flex flex-col items-center gap-1 group"
+            >
+              <Heart className={`w-5 h-5 ${isLiked ? 'fill-manga-red text-manga-red' : 'group-hover:text-manga-red'}`} />
+              <span className={`text-[10px] uppercase font-bold ${isLiked ? 'text-manga-red' : ''}`}>{isLiked ? 'Đã theo dõi' : 'Theo dõi'}</span>
+            </button>
+            
+            <button 
+              onClick={() => setShowComments(true)}
+              className="text-gray-400 hover:text-white flex flex-col items-center gap-1 group"
+            >
+              <MessageCircle className="w-5 h-5 group-hover:text-manga-red" />
+              <span className="text-[10px] uppercase font-bold">Bình luận</span>
+            </button>
+          </div>
           
           <button 
             onClick={handleNextChapter}

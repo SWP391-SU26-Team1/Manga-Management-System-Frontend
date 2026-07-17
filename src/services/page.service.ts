@@ -29,7 +29,7 @@ export const pageService = {
   /** GET /api/chapters/:chapterId/pages */
   getByChapterId: async (chapterId: string): Promise<PageAPI[]> => {
     const res = await api.get<{ success: boolean; data: any[] }>(
-      `/api/chapters/${chapterId}/pages`
+      `/api/chapters/${chapterId}/pages?limit=100`
     )
     return (res.data.data ?? [])
       .filter((p: any) => p.status !== 'deleted')

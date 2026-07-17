@@ -5,6 +5,17 @@ import { readerService } from '@/services/reader.service'
 import { MangaPage, PublishedChapter } from '@/types/reader.types'
 import ChapterCommentsPanel from '@/components/user/ChapterCommentsPanel'
 
+const getLikeKey = () => {
+  try {
+    const userStr = localStorage.getItem('mangaflow_user') || localStorage.getItem('user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      if (user.id) return `mangaflow_liked_chapters_${user.id}`;
+    }
+  } catch (e) {}
+  return 'mangaflow_liked_chapters_guest';
+}
+
 export default function ChapterReaderPage() {
   const { seriesId, chapterId } = useParams()
   const navigate = useNavigate()
@@ -16,7 +27,7 @@ export default function ChapterReaderPage() {
   const [showComments, setShowComments] = useState(false)
   const [isLiked, setIsLiked] = useState(() => {
     try {
-      const stored = localStorage.getItem('mangaflow_liked_chapters');
+      const stored = localStorage.getItem(getLikeKey());
       const parsed = stored ? JSON.parse(stored) : {};
       return false; // will update in useEffect
     } catch {
@@ -37,7 +48,7 @@ export default function ChapterReaderPage() {
       readerService.logView(seriesId, chapterId)
       
       try {
-        const stored = localStorage.getItem('mangaflow_liked_chapters');
+        const stored = localStorage.getItem(getLikeKey());
         const parsed = stored ? JSON.parse(stored) : {};
         setIsLiked(!!parsed[chapterId]);
       } catch (err) {}

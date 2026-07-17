@@ -112,16 +112,12 @@ export default function SubmissionPage() {
       const subIdMap: Record<string, string> = {}
       const subNotesMap: Record<string, string> = {}
       const subVersionMap: Record<string, any> = {}
-      pendingSubs.forEach((group: any) => {
-        if (group.pages) {
-          group.pages.forEach((sub: any) => {
-            if (sub.task_id) {
-              subMap[sub.task_id] = sub.file_url
-              subIdMap[sub.task_id] = sub.submission_id
-              subNotesMap[sub.task_id] = sub.submission_notes || ''
-              subVersionMap[sub.task_id] = sub.version_number
-            }
-          })
+      pendingSubs.forEach((sub: any) => {
+        if (sub && sub.task_id) {
+          subMap[sub.task_id] = sub.file_url
+          subIdMap[sub.task_id] = sub.submission_id
+          subNotesMap[sub.task_id] = sub.submission_notes || ''
+          subVersionMap[sub.task_id] = sub.version_number
         }
       })
 
@@ -274,9 +270,34 @@ export default function SubmissionPage() {
       setIsLoadingFeedbacks(true)
       try {
         const allFeedbacks = await feedbackService.getAll()
-        const filtered = allFeedbacks.filter(f => f.submission?.page?.page_id === currentRawTask.page_id)
+        const filtered = allFeedbacks.filter(f => f.task_id === currentRawTask.task_id)
         if (isSubscribed) {
           setSelectedTaskFeedbacks(filtered)
+
+          // Load submission details for Needs Revision or rejected tasks that are selected
+          const feedbackWithSub = [...filtered].reverse().find(f => f.submission_id)
+          const targetSubId = feedbackWithSub?.submission_id
+          if (targetSubId) {
+            try {
+              const subDetail = await feedbackService.getSubmissionDetail(targetSubId)
+              if (subDetail && subDetail.file_url && isSubscribed) {
+                setSubmissionsList(prev => prev.map(item => {
+                  if (item.id === selected.id) {
+                    return {
+                      ...item,
+                      previewUrl: getImageUrl(subDetail.file_url),
+                      submissionId: subDetail.submission_id,
+                      submissionNotes: subDetail.submission_notes || '',
+                      versionNumber: subDetail.version_number ? `v${subDetail.version_number}` : ''
+                    }
+                  }
+                  return item
+                }))
+              }
+            } catch (subErr) {
+              console.error('Failed to load submission detail from feedback:', subErr)
+            }
+          }
         }
       } catch (err) {
         console.error('Failed to load feedbacks for submission', err)

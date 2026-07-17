@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Bell, Check, Trash2, Filter } from 'lucide-react'
+import { Bell, Check, Trash2, Filter, AlertTriangle } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import assistantService, { AssistantNotification } from '@/services/assistant.service'
 
@@ -9,6 +9,7 @@ export default function NotificationsPage() {
   const [filter, setFilter] = useState<"All" | "Unread">("All")
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
   const translateNotification = (title: string, content: string) => {
     let t = title || ''
@@ -128,16 +129,22 @@ export default function NotificationsPage() {
     }
   }
 
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
+  const handleDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!confirm('Bạn có chắc chắn muốn xóa thông báo này?')) return
+    setDeleteConfirmId(id)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirmId) return
     try {
-      await assistantService.deleteNotification(id)
+      await assistantService.deleteNotification(deleteConfirmId)
       await loadNotifications()
       window.dispatchEvent(new Event('mangaflow_notifications_updated'))
     } catch (err) {
       console.error(err)
       alert('Không thể xóa thông báo.')
+    } finally {
+      setDeleteConfirmId(null)
     }
   }
 
@@ -284,6 +291,39 @@ export default function NotificationsPage() {
         <div className="font-manga text-2xl text-manga-red">MangaFlow</div>
         <div>© 2026 MangaFlow System. Gangan Press Co. Ltd. All rights reserved.</div>
       </footer>
+
+      {/* Custom Confirmation Modal */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white border-4 border-manga-ink w-full max-w-md shadow-[8px_8px_0px_rgba(0,0,0,1)] p-6">
+            <div className="flex items-center gap-3 text-manga-red mb-4">
+              <AlertTriangle className="w-8 h-8 shrink-0 text-[#E63946]" />
+              <h3 className="font-manga text-2xl font-bold uppercase text-manga-ink">
+                XÁC NHẬN XÓA
+              </h3>
+            </div>
+            
+            <p className="text-sm font-bold text-gray-700 mb-6 leading-relaxed">
+              Bạn có chắc chắn muốn xóa thông báo này? Hành động này sẽ xóa vĩnh viễn và không thể khôi phục.
+            </p>
+
+            <div className="flex gap-4">
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                className="flex-1 py-2.5 border-2 border-manga-ink font-bold text-xs uppercase hover:bg-gray-100 transition-colors bg-white cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="flex-1 py-2.5 bg-[#E63946] text-white border-2 border-black font-black uppercase transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none text-xs cursor-pointer"
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

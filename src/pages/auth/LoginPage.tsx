@@ -34,20 +34,33 @@ export default function LoginPage() {
         ...data.user,
         token: data.token
       }
-      localStorage.setItem('mangaflow_user', JSON.stringify(storedUserData))
 
-      if (storedUserData.role === 'MANGAKA') {
-        navigate('/dashboard/mangaka')
-      } else if (storedUserData.role === 'ASSISTANT') {
-        navigate('/dashboard/assistant')
-      } else if (storedUserData.role === 'EDITOR') {
-        navigate('/dashboard/tantou-editor')
-      } else if (storedUserData.role?.toUpperCase() === 'ADMIN') {
-        navigate('/dashboard/admin')
-      } else if (['BOARD', 'CHIEF_EDITOR'].includes(storedUserData.role?.toUpperCase())) {
-        navigate('/dashboard/editorial-board')
+      // Check if this is a first-time Google sign-up (created less than 15s ago)
+      // Force UTC parsing by appending Z if no offset is present
+      const createdAtTime = data.user.createdAt 
+        ? new Date(data.user.createdAt.endsWith('Z') || data.user.createdAt.includes('+') ? data.user.createdAt : `${data.user.createdAt}Z`).getTime()
+        : 0;
+      const isNewUser = createdAtTime > 0 && (new Date().getTime() - createdAtTime < 15000);
+
+      if (isNewUser) {
+        // Save to sessionStorage to verify with OTP before official login
+        sessionStorage.setItem('pending_google_user', JSON.stringify(storedUserData))
+        navigate(`/verify-otp?email=${encodeURIComponent(storedUserData.email)}`)
       } else {
-        navigate('/')
+        localStorage.setItem('mangaflow_user', JSON.stringify(storedUserData))
+        if (storedUserData.role === 'MANGAKA') {
+          navigate('/dashboard/mangaka')
+        } else if (storedUserData.role === 'ASSISTANT') {
+          navigate('/dashboard/assistant')
+        } else if (storedUserData.role === 'EDITOR') {
+          navigate('/dashboard/tantou-editor')
+        } else if (storedUserData.role?.toUpperCase() === 'ADMIN') {
+          navigate('/dashboard/admin')
+        } else if (['BOARD', 'CHIEF_EDITOR'].includes(storedUserData.role?.toUpperCase())) {
+          navigate('/dashboard/editorial-board')
+        } else {
+          navigate('/')
+        }
       }
     } catch (err: any) {
       console.error('Google login error:', err)

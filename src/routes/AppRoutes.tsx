@@ -8,6 +8,7 @@ import AuthLayout from '@/layouts/AuthLayout'
 import LoginPage from '@/pages/auth/LoginPage'
 import RegisterPage from '@/pages/auth/RegisterPage'
 import ForgotPasswordPage from '@/pages/auth/ForgotPasswordPage'
+import OtpPage from '@/pages/auth/OtpPage'
 
 // Public page
 import UserHomePage from '@/pages/user/UserHomePage'
@@ -31,6 +32,7 @@ export default function AppRoutes() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/verify-otp" element={<OtpPage />} />
       </Route>
 
       {/* Role Dashboards - Delegated to specific route files */}

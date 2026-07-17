@@ -41,9 +41,23 @@ export default function TantouSidebar() {
     navigate('/login')
   }
 
-  // Get user from local storage
-  const storedUser = localStorage.getItem('mangaflow_user')
-  const user = storedUser ? JSON.parse(storedUser) : null
+  // Get user from local storage with state & listener to sync instantly
+  const [user, setUser] = React.useState<any>(() => {
+    const storedUser = localStorage.getItem('mangaflow_user')
+    return storedUser ? JSON.parse(storedUser) : null
+  })
+
+  React.useEffect(() => {
+    const handleProfileUpdate = () => {
+      const storedUser = localStorage.getItem('mangaflow_user')
+      setUser(storedUser ? JSON.parse(storedUser) : null)
+    }
+    window.addEventListener('mangaflow_profile_updated', handleProfileUpdate)
+    return () => {
+      window.removeEventListener('mangaflow_profile_updated', handleProfileUpdate)
+    }
+  }, [])
+
   const userName = user?.fullName || user?.name || user?.user?.fullName || user?.user?.name || 'Tanaka Keiko'
   const userRole = (user?.role === 'EDITOR' || user?.user?.role === 'EDITOR') ? 'Tantou Editor' : 'Unknown Role'
   const currentAvatar = user?.avatarUrl || user?.user?.avatarUrl || user?.avatar_url || user?.user?.avatar_url

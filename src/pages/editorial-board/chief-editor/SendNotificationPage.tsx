@@ -107,7 +107,7 @@ export default function SendNotificationPage() {
               <p>Kính gửi quý tác giả và nhóm biên tập phụ trách dự án <strong>{projectName}</strong>,</p>
               <p>Sau khi tiến hành đọc bản thảo chi tiết và tổng hợp điểm số đánh giá từ Hội đồng Biên tập MangaFlow Board, Trưởng ban Biên tập tối cao quyết định:</p>
               <div className="border-l-4 border-emerald-500 bg-emerald-50/50 p-3 font-bold">
-                ✓ PHÊ DUYỆT PHÁT HÀNH/XUẤT BẢN CHAPTER DRAFT MỚI NHẤT
+                PHÊ DUYỆT PHÁT HÀNH/XUẤT BẢN CHAPTER DRAFT MỚI NHẤT
               </div>
               <p>Chương truyện này đáp ứng đầy đủ tiêu chí chất lượng chuyên môn về lineart, kịch bản phân cảnh và nhịp độ. Lịch phát hành chính thức được ấn định vào ngày <strong>{dateStr}</strong>.</p>
               {extraNote && (

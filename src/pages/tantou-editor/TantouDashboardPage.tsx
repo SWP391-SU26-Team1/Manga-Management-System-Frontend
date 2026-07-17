@@ -56,8 +56,32 @@ export default function TantouDashboardPage() {
     try {
       setLoading(true)
       setError(null)
-      const res = await editorService.getDashboardOverview()
-      setDashboardData(res.data || res)
+      const [overviewRes, seriesRes, manuscriptsRes] = await Promise.all([
+        editorService.getDashboardOverview(),
+        editorService.getSeries(),
+        editorService.getManuscripts().catch(() => ({ data: [] }))
+      ])
+
+      const overview = overviewRes.data || overviewRes
+      
+      // Calculate active series count
+      const seriesData = seriesRes.data || seriesRes
+      const seriesList = Array.isArray(seriesData) ? seriesData : (seriesData.series || seriesData.items || [])
+      const activeSeries = seriesList.filter((s: any) => ['published', 'approved', 'in_production', 'hidden', 'archived'].includes(s.status))
+      overview.active_series_count = activeSeries.length
+      overview.active_publishing_count = activeSeries.filter((s: any) => s.status === 'published').length
+      overview.active_paused_count = activeSeries.filter((s: any) => ['hidden', 'archived'].includes(s.status)).length
+
+      // Calculate actual pending review manuscripts
+      const manuscriptsData = manuscriptsRes.data || manuscriptsRes
+      const manuscriptsList = Array.isArray(manuscriptsData) ? manuscriptsData : (manuscriptsData.manuscripts || manuscriptsData.items || [])
+      const pendingManuscripts = manuscriptsList.filter((m: any) => ['submitted', 'in_review'].includes(m.status?.toLowerCase()))
+      const revisionManuscripts = manuscriptsList.filter((m: any) => ['needs_revision', 'rejected'].includes(m.status?.toLowerCase()))
+
+      overview.actual_pending_review = pendingManuscripts.length
+      overview.actual_need_revision = revisionManuscripts.length
+
+      setDashboardData(overview)
     } catch (err: any) {
       console.error('Failed to load dashboard:', err)
       setError('Không thể tải dữ liệu dashboard. Vui lòng thử lại.')
@@ -69,24 +93,24 @@ export default function TantouDashboardPage() {
   // Extract stats from dashboard data with fallbacks
   const stats = {
     managingSeries: {
-      total: dashboardData?.managingSeries?.total ?? dashboardData?.managing_series ?? 0,
-      publishing: dashboardData?.managingSeries?.publishing ?? dashboardData?.publishing_count ?? 0,
+      total: dashboardData?.managingSeries?.total ?? dashboardData?.active_series_count ?? dashboardData?.managing_series ?? dashboardData?.total_series ?? 0,
+      publishing: dashboardData?.managingSeries?.publishing ?? dashboardData?.active_publishing_count ?? dashboardData?.publishing_count ?? 0,
       atRisk: dashboardData?.managingSeries?.atRisk ?? dashboardData?.at_risk_count ?? 0,
-      paused: dashboardData?.managingSeries?.paused ?? dashboardData?.paused_count ?? 0,
+      paused: dashboardData?.managingSeries?.paused ?? dashboardData?.active_paused_count ?? dashboardData?.paused_count ?? 0,
     },
     pendingReview: {
-      total: dashboardData?.pendingReview?.total ?? dashboardData?.pending_review ?? 0,
+      total: dashboardData?.pendingReview?.total ?? dashboardData?.actual_pending_review ?? ((dashboardData?.submitted ?? 0) + (dashboardData?.in_review ?? 0)),
       deadlineThisWeek: dashboardData?.pendingReview?.deadlineThisWeek ?? dashboardData?.deadline_this_week ?? 0,
     },
     needRevision: {
-      total: dashboardData?.needRevision?.total ?? dashboardData?.need_revision ?? 0,
+      total: dashboardData?.needRevision?.total ?? dashboardData?.actual_need_revision ?? dashboardData?.need_revision ?? dashboardData?.needs_revision ?? 0,
     },
     approvedThisMonth: {
-      total: dashboardData?.approvedThisMonth?.total ?? dashboardData?.approved_this_month ?? 0,
+      total: dashboardData?.approvedThisMonth?.total ?? dashboardData?.approved_this_month ?? dashboardData?.approved ?? 0,
       changeFromLastMonth: dashboardData?.approvedThisMonth?.changeFromLastMonth ?? dashboardData?.change_from_last_month ?? 0,
     },
     overdue: {
-      total: dashboardData?.overdue?.total ?? dashboardData?.overdue_count ?? 0,
+      total: dashboardData?.overdue?.total ?? dashboardData?.overdue_count ?? dashboardData?.overdue_tasks ?? 0,
     },
     atRiskSeries: {
       total: dashboardData?.atRiskSeries?.total ?? dashboardData?.at_risk_series_count ?? 0,
@@ -94,7 +118,7 @@ export default function TantouDashboardPage() {
       ranking: dashboardData?.atRiskSeries?.ranking ?? dashboardData?.at_risk_series_ranking ?? 0,
     },
     todayOverview: {
-      chaptersToReview: dashboardData?.todayOverview?.chaptersToReview ?? dashboardData?.chapters_to_review ?? 0,
+      chaptersToReview: dashboardData?.todayOverview?.chaptersToReview ?? dashboardData?.actual_pending_review ?? (dashboardData?.submitted ?? 0) ?? 0,
       newResubmissions: dashboardData?.todayOverview?.newResubmissions ?? dashboardData?.new_resubmissions ?? 0,
       riskAlerts: dashboardData?.todayOverview?.riskAlerts ?? dashboardData?.risk_alerts ?? 0,
       reportsToSend: dashboardData?.todayOverview?.reportsToSend ?? dashboardData?.reports_to_send ?? 0,

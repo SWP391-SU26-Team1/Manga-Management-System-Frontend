@@ -28,7 +28,7 @@ export default function TaskDetailModal({ taskId, onClose, onStatusChanged }: Ta
   const [activeTab, setActiveTab] = useState<'info' | 'submissions' | 'feedbacks' | 'resources'>('info')
   const [taskDetail, setTaskDetail] = useState<PageTaskDetail | null>(null)
   const [submissions, setSubmissions] = useState<AssistantSubmission[]>([])
-  
+
   // Status states
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [isSubmittingWorkflow, setIsSubmittingWorkflow] = useState<boolean>(false)
@@ -45,7 +45,7 @@ export default function TaskDetailModal({ taskId, onClose, onStatusChanged }: Ta
     try {
       const detail = await assistantService.getTaskDetail(taskId)
       setTaskDetail(detail)
-      
+
       const subs = await assistantService.listTaskSubmissions(taskId)
       setSubmissions(subs || [])
     } catch (err: any) {
@@ -149,7 +149,7 @@ export default function TaskDetailModal({ taskId, onClose, onStatusChanged }: Ta
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white border-4 border-black w-full max-w-4xl shadow-[8px_8px_0px_rgba(0,0,0,1)] relative flex flex-col max-h-[90vh] font-sans">
-        
+
         {/* Modal Header */}
         <div className="bg-[#1A1A1A] text-white p-4 border-b-4 border-black flex justify-between items-center">
           <div>
@@ -207,11 +207,10 @@ export default function TaskDetailModal({ taskId, onClose, onStatusChanged }: Ta
                       setActiveTab(tab)
                       setShowSubmitForm(false)
                     }}
-                    className={`px-4 sm:px-6 py-3 text-[11px] sm:text-xs font-black uppercase tracking-wider border-r-2 border-black flex-shrink-0 transition-colors ${
-                      activeTab === tab
+                    className={`px-4 sm:px-6 py-3 text-[11px] sm:text-xs font-black uppercase tracking-wider border-r-2 border-black flex-shrink-0 transition-colors ${activeTab === tab
                         ? 'bg-[#E63946] text-white'
                         : 'bg-white text-black hover:bg-gray-50'
-                    }`}
+                      }`}
                   >
                     {labelMap[tab]}
                   </button>
@@ -301,7 +300,7 @@ export default function TaskDetailModal({ taskId, onClose, onStatusChanged }: Ta
                       <h3 className="text-xs font-black uppercase tracking-wider text-black border-b border-gray-100 pb-1.5">
                         THÀNH PHẦN
                       </h3>
-                      
+
                       <div className="space-y-3 text-xs">
                         <div>
                           <p className="text-[10px] font-bold text-gray-400 uppercase">Loại công việc</p>
@@ -389,9 +388,8 @@ export default function TaskDetailModal({ taskId, onClose, onStatusChanged }: Ta
                               <span className="bg-black text-white px-2 py-0.5 text-[9px] font-black uppercase tracking-wider">
                                 Lần nộp {submissions.length - index}
                               </span>
-                              <span className={`text-[10px] font-black uppercase ${
-                                sub.status === 'approved' ? 'text-green-600' : sub.status === 'needs_revision' ? 'text-red-600' : 'text-yellow-600'
-                              }`}>
+                              <span className={`text-[10px] font-black uppercase ${sub.status === 'approved' ? 'text-green-600' : sub.status === 'needs_revision' ? 'text-red-600' : 'text-yellow-600'
+                                }`}>
                                 {sub.status}
                               </span>
                             </div>

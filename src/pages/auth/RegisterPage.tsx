@@ -30,9 +30,23 @@ export default function RegisterPage() {
         ...data.user,
         token: data.token
       }
-      localStorage.setItem('mangaflow_user', JSON.stringify(storedUserData))
-      setRegisteredUser(storedUserData)
-      setShowSuccess(true)
+
+      // Check if this is a first-time Google sign-up (created less than 15s ago)
+      // Force UTC parsing by appending Z if no offset is present
+      const createdAtTime = data.user.createdAt 
+        ? new Date(data.user.createdAt.endsWith('Z') || data.user.createdAt.includes('+') ? data.user.createdAt : `${data.user.createdAt}Z`).getTime()
+        : 0;
+      const isNewUser = createdAtTime > 0 && (new Date().getTime() - createdAtTime < 15000);
+
+      if (isNewUser) {
+        // Save to sessionStorage to verify with OTP before official login
+        sessionStorage.setItem('pending_google_user', JSON.stringify(storedUserData))
+        navigate(`/verify-otp?email=${encodeURIComponent(storedUserData.email)}`)
+      } else {
+        localStorage.setItem('mangaflow_user', JSON.stringify(storedUserData))
+        setRegisteredUser(storedUserData)
+        setShowSuccess(true)
+      }
     } catch (err: any) {
       console.error('Google register error:', err)
       const errorMsg = err.response?.data?.message || 'Đăng ký bằng Google thất bại.'
@@ -202,11 +216,6 @@ export default function RegisterPage() {
       return
     }
 
-    // Intercept Privileged Roles to handle Backend limitation gracefully on the Frontend
-    if (role === 'board' || role === 'editor') {
-      setRegisterError(`Vì lý do bảo mật, tài khoản ${role === 'board' ? 'Hội đồng Biên tập' : 'Biên tập viên'} không được phép tự đăng ký tự do. Vui lòng đăng nhập bằng tài khoản được cấp hoặc liên hệ Admin.`)
-      return
-    }
 
     setLoading(true)
     try {

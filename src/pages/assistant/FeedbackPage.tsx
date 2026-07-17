@@ -79,7 +79,7 @@ const timeAgo = (dateStr: string) => {
   const date = new Date(dateStr)
   if (isNaN(date.getTime())) return dateStr
   const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000)
-  
+
   let interval = Math.floor(seconds / 31536000)
   if (interval >= 1) return `${interval} năm trước`
   interval = Math.floor(seconds / 2592000)
@@ -97,12 +97,12 @@ export default function FeedbackPage() {
   const location = useLocation()
   const [tasks, setTasks] = useState<AssistantTask[]>([])
   const [selectedTaskId, setSelectedTaskId] = useState<string>('')
-  
+
   // API details states
   const [submissions, setSubmissions] = useState<BackendSubmission[]>([])
   const [activeFeedbacks, setActiveFeedbacks] = useState<FeedbackComment[]>([])
   const [activeTimeline, setActiveTimeline] = useState<TimelineStep[]>([])
-  
+
   // Loading & Submission states
   const [isLoadingTasks, setIsLoadingTasks] = useState(true)
   const [isLoadingDetails, setIsLoadingDetails] = useState(false)
@@ -171,7 +171,7 @@ export default function FeedbackPage() {
         const relevant = res.data
           .map(mapBackendTaskToAssistantTask)
           .filter(t => ['Need Fix', 'Submitted', 'In Progress', 'Approved'].includes(t.status))
-        
+
         setTasks(relevant)
 
         // Select first task if selectedTaskId is not present
@@ -203,18 +203,18 @@ export default function FeedbackPage() {
 
       // Build dynamic timeline based on task status & overdue state
       const steps: TimelineStep[] = []
-      
+
       if (activeTaskData) {
         const isApproved = activeTaskData.status === 'Approved'
         const isSubmitted = activeTaskData.status === 'Submitted'
-        
+
         // Parse deadline
         const deadlineDate = activeTaskData.deadline ? new Date(activeTaskData.deadline) : null
         const today = new Date()
         const isOverdue = deadlineDate ? (today.getTime() > deadlineDate.getTime() && !isApproved) : false
 
         const sortedSubs = [...(subs || [])].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-        
+
         // Safe format helper for step dates
         const formatStepDate = (dateStr?: string) => {
           if (!dateStr) return ''
@@ -283,7 +283,7 @@ export default function FeedbackPage() {
           key: 'completed'
         })
       }
-      
+
       setActiveTimeline(steps)
 
       // 3. Load feedbacks for the latest submission if available
@@ -428,14 +428,14 @@ export default function FeedbackPage() {
         file_url: uploadedFileUrl,
         submission_notes: noteContent
       })
-      
+
       showToast('success', `Đã nộp thành công bản sửa đổi ${getNextVersionText()} cho Task #${activeTask.id}!`)
-      
+
       // Clear Form & Reload
       setNoteContent('')
       setUploadedFile(null)
       setUploadedFileUrl('')
-      
+
       await loadTasks()
       await loadTaskDetailsAndFeedbacks(activeTask.id)
     } catch (err: any) {
@@ -475,9 +475,8 @@ export default function FeedbackPage() {
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-4 right-4 z-50 animate-bounce duration-300">
-          <div className={`manga-border manga-shadow-sm p-4 flex items-center gap-3 bg-white ${
-            toastMessage.type === 'success' ? 'border-emerald-500 text-emerald-800' : 'border-[#E63946] text-[#E63946]'
-          }`}>
+          <div className={`manga-border manga-shadow-sm p-4 flex items-center gap-3 bg-white ${toastMessage.type === 'success' ? 'border-emerald-500 text-emerald-800' : 'border-[#E63946] text-[#E63946]'
+            }`}>
             {toastMessage.type === 'success' ? (
               <CheckCircle2 className="w-6 h-6 text-emerald-500 shrink-0" />
             ) : (
@@ -515,7 +514,7 @@ export default function FeedbackPage() {
       ) : (
         /* Main 3-Column Responsive Grid */
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
+
           {/* Column 1: NHIỆM VỤ CÓ PHẢN HỒI (Sidebar List) - 4/12 width */}
           <div className="lg:col-span-4 flex flex-col gap-4">
             <div className="bg-white border-2 border-manga-ink p-3 shadow-none">
@@ -542,11 +541,10 @@ export default function FeedbackPage() {
                         setUploadedFile(null)
                         setUploadedFileUrl('')
                       }}
-                      className={`w-full text-left bg-white border-2 transition-all flex flex-col justify-between p-4 relative cursor-pointer outline-none ${
-                        isActive 
-                          ? 'border-[#E63946] shadow-[3px_3px_0px_0px_rgba(230,57,70,1)] scale-[1.01]' 
+                      className={`w-full text-left bg-white border-2 transition-all flex flex-col justify-between p-4 relative cursor-pointer outline-none ${isActive
+                          ? 'border-[#E63946] shadow-[3px_3px_0px_0px_rgba(230,57,70,1)] scale-[1.01]'
                           : 'border-manga-ink hover:border-[#E63946] hover:translate-y-[-1px] shadow-[2px_2px_0px_0px_rgba(15,15,15,1)] hover:shadow-[3px_3px_0px_0px_rgba(15,15,15,1)]'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center justify-end w-full gap-2 mb-2">
                         <span className={`text-[9px] font-black px-1.5 py-0.5 border ${status.text} ${status.bg} ${status.border} tracking-wide rounded-none`}>
@@ -608,7 +606,7 @@ export default function FeedbackPage() {
                   <h3 className="font-manga text-xs font-black uppercase tracking-wider text-manga-ink border-b-2 border-manga-ink pb-1.5 flex items-center justify-between">
                     <span>THÔNG TIN NHIỆM VỤ</span>
                   </h3>
-                  
+
                   <div className="flex flex-col gap-2.5">
                     <div className="flex justify-between text-xs font-bold">
                       <span className="text-gray-400">Loại:</span>
@@ -620,11 +618,10 @@ export default function FeedbackPage() {
                     </div>
                     <div className="flex justify-between text-xs font-bold items-center">
                       <span className="text-gray-400">Còn lại:</span>
-                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-none uppercase tracking-wide ${
-                        getRemainingDaysText(activeTask).includes('Quá hạn')
-                          ? 'bg-red-50 text-[#E63946] border border-red-200' 
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-none uppercase tracking-wide ${getRemainingDaysText(activeTask).includes('Quá hạn')
+                          ? 'bg-red-50 text-[#E63946] border border-red-200'
                           : 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                      }`}>
+                        }`}>
                         {getRemainingDaysText(activeTask)}
                       </span>
                     </div>
@@ -650,11 +647,10 @@ export default function FeedbackPage() {
                           style={{ left: `${marker.x}%`, top: `${marker.y}%`, transform: 'translate(-50%, -50%)' }}
                         >
                           <div
-                            className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border-2 cursor-pointer transition-all ${
-                              activeMarkerId === marker.index
+                            className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border-2 cursor-pointer transition-all ${activeMarkerId === marker.index
                                 ? 'bg-manga-red border-white text-white scale-110'
                                 : 'bg-white border-manga-red text-[#E63946]'
-                            }`}
+                              }`}
                             onClick={() => setActiveMarkerId(activeMarkerId === marker.index ? null : marker.index)}
                             title={marker.text}
                           >
@@ -687,13 +683,12 @@ export default function FeedbackPage() {
                       return (
                         <div key={idx} className="relative flex flex-col gap-0.5">
                           {/* Bullet point indicator */}
-                          <div className={`absolute -left-[23px] top-1 w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${
-                            step.active 
-                              ? 'border-[#E63946] bg-[#E63946] shadow-[0_0_6px_rgba(230,57,70,0.5)] animate-pulse' 
-                              : step.done 
-                                ? 'border-[#E63946] bg-white' 
+                          <div className={`absolute -left-[23px] top-1 w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${step.active
+                              ? 'border-[#E63946] bg-[#E63946] shadow-[0_0_6px_rgba(230,57,70,0.5)] animate-pulse'
+                              : step.done
+                                ? 'border-[#E63946] bg-white'
                                 : 'border-zinc-300 bg-white'
-                          }`}>
+                            }`}>
                             {step.active && (
                               <span className="w-1.5 h-1.5 rounded-full bg-white" />
                             )}
@@ -707,9 +702,8 @@ export default function FeedbackPage() {
                               <span className="bg-red-50 text-[#E63946] px-1 text-[8px] font-black border border-red-200">REVISION</span>
                             )}
                           </div>
-                          <p className={`text-xs font-bold leading-tight ${
-                            step.done ? 'text-manga-ink' : 'text-gray-400'
-                          }`}>
+                          <p className={`text-xs font-bold leading-tight ${step.done ? 'text-manga-ink' : 'text-gray-400'
+                            }`}>
                             {step.label}
                           </p>
                         </div>
@@ -857,7 +851,7 @@ export default function FeedbackPage() {
                           Đính kèm tệp bản sửa đổi <span className="text-[#E63946]">*</span>
                         </label>
 
-                        <input 
+                        <input
                           type="file"
                           ref={fileInputRef}
                           onChange={handleFileChange}
@@ -865,13 +859,12 @@ export default function FeedbackPage() {
                           className="hidden"
                         />
 
-                        <div 
+                        <div
                           onDragOver={handleDragOver}
                           onDrop={handleDrop}
                           onClick={() => fileInputRef.current?.click()}
-                          className={`border-2 border-dashed border-zinc-300 hover:border-[#E63946] bg-zinc-50/30 hover:bg-red-50/5 p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 ${
-                            uploadedFile ? 'border-emerald-500 bg-emerald-50/10' : ''
-                          }`}
+                          className={`border-2 border-dashed border-zinc-300 hover:border-[#E63946] bg-zinc-50/30 hover:bg-red-50/5 p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 ${uploadedFile ? 'border-emerald-500 bg-emerald-50/10' : ''
+                            }`}
                         >
                           {isUploading ? (
                             <div className="flex flex-col items-center justify-center gap-1.5">
@@ -887,7 +880,7 @@ export default function FeedbackPage() {
                                   {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
                                 </p>
                               </div>
-                              <button 
+                              <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation()

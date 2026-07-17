@@ -278,7 +278,7 @@ export default function SeriesDetailPage() {
                     <div className="flex items-center gap-2 bg-[#1a1a1a] text-white border-2 border-black px-3 py-1.5 group-hover:-translate-y-1 group-hover:-translate-x-1 group-hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all dark:shadow-[2px_2px_0px_#000]">
                       <div className="w-5 h-5 rounded-full overflow-hidden bg-gray-700 flex items-center justify-center shrink-0">
                         {series.editorAvatarUrl ? (
-                          <img src={series.editorAvatarUrl} alt={series.editorName} className="w-full h-full object-cover" />
+                          <img src={series.editorAvatarUrl || undefined} alt={series.editorName || undefined} className="w-full h-full object-cover" />
                         ) : (
                           <span className="text-[10px] font-bold text-gray-300">{series.editorName?.charAt(0)}</span>
                         )}

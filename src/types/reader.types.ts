@@ -17,6 +17,7 @@ export interface PublishedSeries {
   authorAvatarUrl: string | null
   createdAt: string
   updatedAt: string
+  isNew?: boolean
 }
 
 export interface SeriesTeamMember {

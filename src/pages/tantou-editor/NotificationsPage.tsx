@@ -56,7 +56,8 @@ export default function NotificationsPage() {
 
   const mapLink = (backendType: string): string => {
     const t = (backendType || '').toLowerCase()
-    if (t.includes('manuscript')) return '/dashboard/tantou-editor/manuscript-review'
+    if (t.includes('manuscript')) return '/dashboard/tantou-editor/manuscript-review?tab=manuscript'
+    if (t.includes('series')) return '/dashboard/tantou-editor/manuscript-review?tab=series'
     if (t.includes('feedback')) return '/dashboard/tantou-editor/notifications'
     if (t.includes('vote') || t.includes('decision')) return '/dashboard/tantou-editor/workflow'
     return ''

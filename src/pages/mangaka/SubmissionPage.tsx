@@ -270,7 +270,10 @@ export default function SubmissionPage() {
       setIsLoadingFeedbacks(true)
       try {
         const allFeedbacks = await feedbackService.getAll()
-        const filtered = allFeedbacks.filter(f => f.task_id === currentRawTask.task_id)
+        const filtered = allFeedbacks.filter(f => {
+          const sub = f.submission as any
+          return sub?.page_id === currentRawTask.page_id || sub?.page?.page_id === currentRawTask.page_id
+        })
         if (isSubscribed) {
           setSelectedTaskFeedbacks(filtered)
 

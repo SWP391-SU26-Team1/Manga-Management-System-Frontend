@@ -40,6 +40,18 @@ export default function SearchResultsPage() {
     setSearchParams(newParams)
   }
 
+  const handleGenreClick = (genreName: string) => {
+    setActiveGenre(genreName)
+    const newParams = new URLSearchParams(searchParams.toString())
+    if (genreName && genreName !== 'Tất cả') {
+      newParams.set('genre', genreName)
+    } else {
+      newParams.delete('genre')
+    }
+    newParams.set('page', '1')
+    setSearchParams(newParams)
+  }
+
   const handlePageChange = (newPage: number) => {
     if (newPage < 1 || (results && newPage > results.totalPages)) return;
     const newParams = new URLSearchParams(searchParams.toString())
@@ -82,9 +94,9 @@ export default function SearchResultsPage() {
           {/* Genre Tags */}
           <div className="flex flex-wrap gap-2 mb-4">
             <button
-              onClick={() => handleFilterChange('genre', '')}
+              onClick={() => handleGenreClick('')}
               className={`px-3 py-1.5 border-[2px] border-black font-bold text-xs uppercase transition-all ${
-                !genre 
+                !activeGenre 
                   ? 'bg-manga-red text-white shadow-[2px_2px_0px_rgba(0,0,0,1)] translate-y-[2px] translate-x-[2px] dark:border-black' 
                   : 'bg-white text-black shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-y-[2px] hover:translate-x-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] dark:bg-zinc-800 dark:text-white dark:border-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-[2px_2px_0px_#000]'
               }`}
@@ -94,9 +106,9 @@ export default function SearchResultsPage() {
             {GENRES.map(g => (
               <button
                 key={g.id}
-                onClick={() => handleFilterChange('genre', g.name)}
+                onClick={() => handleGenreClick(g.name)}
                 className={`px-3 py-1.5 border-[2px] border-black font-bold text-xs uppercase transition-all flex items-center gap-1 ${
-                  genre === g.name 
+                  activeGenre === g.name 
                     ? 'bg-manga-red text-white shadow-[2px_2px_0px_rgba(0,0,0,1)] translate-y-[2px] translate-x-[2px] dark:border-black' 
                     : 'bg-white text-black shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-y-[2px] hover:translate-x-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] dark:bg-zinc-800 dark:text-white dark:border-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-[2px_2px_0px_#000]'
                 }`}
@@ -108,7 +120,7 @@ export default function SearchResultsPage() {
 
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <h2 className="font-bold text-lg md:text-xl text-black uppercase tracking-wide dark:text-white">
-              Kết quả tìm kiếm cho <span className="text-manga-red">"{query}"</span>
+              Kết quả tìm kiếm cho <span className="text-manga-red">"{textQuery}"</span>
             </h2>
             
             <div className="flex flex-wrap gap-2 w-full md:w-auto">

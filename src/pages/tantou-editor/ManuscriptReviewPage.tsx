@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { CheckCircle2, AlertCircle, XCircle, Check, Edit3, Shield, Loader2 } from 'lucide-react'
+import { CheckCircle2, AlertCircle, XCircle, Check, Edit3, Shield, Loader2, MoreHorizontal, XSquare } from 'lucide-react'
 import { useSearchParams } from 'react-router'
 import { editorService, ApiManuscript, ApiReviewSession } from '@/services/editor.service'
 
@@ -93,6 +93,35 @@ export default function ManuscriptReviewPage() {
       return updated
     })
   }
+
+  // deletedIds state to track hidden/deleted review items
+  const [deletedIds, setDeletedIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('deleted_review_items')
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  })
+
+  const handleDeleteItem = (id: string) => {
+    setDeletedIds((prev) => {
+      if (prev.includes(id)) return prev
+      const updated = [...prev, id]
+      localStorage.setItem('deleted_review_items', JSON.stringify(updated))
+      return updated
+    })
+    if (selectedManuscriptId === id) setSelectedManuscriptId('')
+    if (selectedSeriesId === id) setSelectedSeriesId('')
+  }
+
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null)
+
+  useEffect(() => {
+    const handleCloseMenu = () => setActiveMenuId(null)
+    window.addEventListener('click', handleCloseMenu)
+    return () => window.removeEventListener('click', handleCloseMenu)
+  }, [])
 
   useEffect(() => {
     if (selectedManuscriptId) {
@@ -228,15 +257,21 @@ export default function ManuscriptReviewPage() {
   const fetchSeriesToReview = async () => {
     try {
       setLoadingSeries(true)
-      const [seriesRes, sessionsRes] = await Promise.all([
+      const [pendingRes, approvedRes, sessionsRes] = await Promise.all([
         editorService.getSeries({ status: 'pending_review' }),
+        editorService.getSeries({ status: 'approved' }),
         editorService.getReviewSessions({ limit: 100 })
       ])
 
-      const data = seriesRes.data || seriesRes
-      const list = Array.isArray(data) ? data : (data.series || data.items || [])
+      const pData = pendingRes.data || pendingRes
+      const pList = Array.isArray(pData) ? pData : (pData.series || pData.items || [])
 
-      const displayList: DisplaySeries[] = list.map((s: any) => ({
+      const aData = approvedRes.data || approvedRes
+      const aList = Array.isArray(aData) ? aData : (aData.series || aData.items || [])
+
+      const combinedList = [...pList, ...aList]
+
+      const displayList: DisplaySeries[] = combinedList.map((s: any) => ({
         id: s.series_id,
         title: s.title,
         genre: s.genre || '—',
@@ -247,16 +282,23 @@ export default function ManuscriptReviewPage() {
         createdAt: s.created_at ? new Date(s.created_at).toLocaleDateString('vi-VN') : '—'
       }))
 
+      const finalFilteredList: DisplaySeries[] = []
+
       for (const s of displayList) {
         try {
           const rawDetail = await editorService.getSeriesDetail(s.id)
           const detail = rawDetail.data || rawDetail
-          const owner = detail.series_member?.find((m: any) => m.role_in_series === 'owner')
-          if (owner?.users) {
-            s.mangaka = owner.users.name || owner.users.username || 'Tác giả ẩn danh'
+          const hasAssignedEditor = detail.series_member?.some((m: any) => m.role_in_series === 'editor')
+          if (!hasAssignedEditor) {
+            const owner = detail.series_member?.find((m: any) => m.role_in_series === 'owner')
+            if (owner?.users) {
+              s.mangaka = owner.users.name || owner.users.username || 'Tác giả ẩn danh'
+            }
+            finalFilteredList.push(s)
           }
         } catch (e) {
-          console.error('Failed to get series owner for:', s.id, e)
+          console.error('Failed to get series owner/members for:', s.id, e)
+          finalFilteredList.push(s)
         }
       }
 
@@ -267,7 +309,7 @@ export default function ManuscriptReviewPage() {
 
       setReviewSessions(sessList)
 
-      const filteredList = displayList.filter(s =>
+      const filteredList = finalFilteredList.filter(s =>
         !sessList.some(session => session.series_id === s.id && ['pending', 'in_progress'].includes(session.status))
       )
 
@@ -284,6 +326,10 @@ export default function ManuscriptReviewPage() {
       setLoadingSeries(false)
     }
   }
+
+  // Filtered lists excluding deleted/hidden items
+  const visibleManuscripts = manuscripts.filter(m => !deletedIds.includes(m.id))
+  const visibleSeries = seriesList.filter(s => !deletedIds.includes(s.id))
 
   // Get active manuscript
   const activeManuscript = manuscripts.find(m => m.id === selectedManuscriptId)
@@ -440,10 +486,11 @@ export default function ManuscriptReviewPage() {
   }
 
   const toggleSelectAll = () => {
-    if (selectedIds.length === manuscripts.length) {
+    const visibleIds = visibleManuscripts.map(m => m.id)
+    if (selectedIds.length === visibleIds.length) {
       setSelectedIds([])
     } else {
-      setSelectedIds(manuscripts.map(m => m.id))
+      setSelectedIds(visibleIds)
     }
   }
 
@@ -671,15 +718,15 @@ export default function ManuscriptReviewPage() {
       )}
 
       {/* Left Column: Chapters/Series list & Tab controls */}
-      <div className="w-80 flex-shrink-0 flex flex-col bg-white border-4 border-manga-ink overflow-hidden">
+      <div className="w-[260px] flex-shrink-0 flex flex-col bg-white border-4 border-manga-ink overflow-hidden">
         <div className="p-4 border-b-4 border-manga-ink bg-manga-ink text-white flex-shrink-0">
           <h2 className="font-manga text-xl font-bold uppercase tracking-wider">
             {activeTab === 'MANUSCRIPT' ? 'Duyệt Bản Thảo' : 'Duyệt Đề Xuất Series'}
           </h2>
           <p className="text-[10px] font-bold text-gray-300 mt-1 uppercase">
             {activeTab === 'MANUSCRIPT'
-              ? `${manuscripts.length} Bản Thảo Hiện Có`
-              : `${seriesList.length} Đề xuất mới chờ duyệt`
+              ? `${visibleManuscripts.length} Bản Thảo Hiện Có`
+              : `${visibleSeries.length} Đề xuất mới chờ duyệt`
             }
           </p>
         </div>
@@ -714,7 +761,7 @@ export default function ManuscriptReviewPage() {
                 <input
                   type="checkbox"
                   className="w-4 h-4 border-2 border-manga-ink accent-manga-ink"
-                  checked={selectedIds.length === manuscripts.length && manuscripts.length > 0}
+                  checked={selectedIds.length === visibleManuscripts.length && visibleManuscripts.length > 0}
                   onChange={toggleSelectAll}
                 />
                 Tất cả
@@ -736,14 +783,14 @@ export default function ManuscriptReviewPage() {
 
             {/* Manuscripts List */}
             <div className="flex-1 overflow-y-auto p-2 space-y-2 bg-gray-50">
-              {manuscripts.length === 0 ? (
+              {visibleManuscripts.length === 0 ? (
                 <div className="p-4 text-center text-xs font-bold text-gray-400">Không có bản thảo nào cần duyệt</div>
               ) : (
-                manuscripts.map((m) => (
+                visibleManuscripts.map((m) => (
                   <div
                     key={m.id}
                     onClick={() => handleSelectManuscript(m.id)}
-                    className={`p-3 border-2 cursor-pointer transition-all flex items-start gap-2 ${selectedManuscriptId === m.id
+                    className={`p-3 border-2 cursor-pointer transition-all flex items-start gap-2 group relative ${selectedManuscriptId === m.id
                       ? 'border-manga-ink bg-red-50/50 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
                       : viewedIds.includes(m.id)
                         ? 'border-gray-200 bg-zinc-50/50 opacity-70 hover:opacity-100 hover:border-gray-300'
@@ -756,7 +803,7 @@ export default function ManuscriptReviewPage() {
                       onChange={(e) => { e.stopPropagation(); toggleSelectId(m.id) }}
                       className="mt-1 w-4 h-4 border-2 border-manga-ink accent-manga-ink"
                     />
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 pr-6">
                       <div className="flex items-center justify-between mb-1">
                         <span className={`text-sm truncate pr-2 ${viewedIds.includes(m.id) ? 'font-semibold text-gray-500' : 'font-extrabold text-gray-900'}`}>{m.series}</span>
                         {getStatusBadge(m.status)}
@@ -766,6 +813,60 @@ export default function ManuscriptReviewPage() {
                         <span className={`font-bold truncate max-w-[100px] ${viewedIds.includes(m.id) ? 'text-gray-400' : 'text-gray-600'}`}>{m.mangaka}</span>
                       </div>
                     </div>
+
+                    {/* Three-dot action button */}
+                    <div className="absolute right-2 top-2 z-20">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setActiveMenuId(activeMenuId === m.id ? null : m.id)
+                        }}
+                        className="p-1 hover:bg-gray-200 border-2 border-transparent hover:border-manga-ink transition-all hidden group-hover:block bg-white shadow-sm rounded-full"
+                      >
+                        <MoreHorizontal className="w-4 h-4 text-manga-ink" />
+                      </button>
+
+                      {/* Dropdown Menu (Speech bubble tooltip style) */}
+                      {activeMenuId === m.id && (
+                        <div className="absolute right-0 mt-3 bg-white border border-gray-200 shadow-xl rounded-xl py-2 min-w-[200px] z-30 font-sans text-gray-800 normal-case">
+                          {/* Triangle Pointer pointing upwards to the three-dot button */}
+                          <div className="absolute bottom-full right-3 w-3 h-3 bg-white border-t border-l border-gray-200 transform translate-y-[7px] rotate-45" />
+                          
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              const isRead = viewedIds.includes(m.id)
+                              if (isRead) {
+                                setViewedIds(prev => {
+                                  const updated = prev.filter(id => id !== m.id)
+                                  localStorage.setItem('viewed_review_items', JSON.stringify(updated))
+                                  return updated
+                                })
+                              } else {
+                                markAsViewed(m.id)
+                              }
+                              setActiveMenuId(null)
+                            }}
+                            className="w-full text-left px-4 py-2 hover:bg-zinc-50 flex items-center gap-3 text-sm font-semibold transition-colors"
+                          >
+                            <Check className="w-4 h-4 text-gray-700" />
+                            {viewedIds.includes(m.id) ? 'Đánh dấu là chưa đọc' : 'Đánh dấu là đã đọc'}
+                          </button>
+                          
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteItem(m.id)
+                              setActiveMenuId(null)
+                            }}
+                            className="w-full text-left px-4 py-2 hover:bg-zinc-50 flex items-center gap-3 text-sm font-semibold text-red-600 hover:text-red-700 transition-colors"
+                          >
+                            <XSquare className="w-4 h-4" />
+                            Xóa thông báo này
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))
               )}
@@ -774,33 +875,89 @@ export default function ManuscriptReviewPage() {
         ) : (
           /* Series List */
           <div className="flex-1 overflow-y-auto p-2 space-y-2 bg-gray-50">
-            {seriesList.length === 0 ? (
+            {visibleSeries.length === 0 ? (
               <div className="p-4 text-center text-xs font-bold text-gray-400">Không có series mới nào cần duyệt</div>
             ) : (
-              seriesList.map((s) => (
+              visibleSeries.map((s) => (
                 <div
                   key={s.id}
                   onClick={() => setSelectedSeriesId(s.id)}
-                  className={`p-3 border-2 cursor-pointer transition-all flex items-start gap-2 ${selectedSeriesId === s.id
+                  className={`p-3 border-2 cursor-pointer transition-all flex items-start gap-2 group relative ${selectedSeriesId === s.id
                     ? 'border-manga-ink bg-red-50/50 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
-                    : viewedIds.includes(s.id)
+                    : (viewedIds.includes(s.id) || s.status === 'approved')
                       ? 'border-gray-200 bg-zinc-50/50 opacity-70 hover:opacity-100 hover:border-gray-300'
                       : 'border-manga-ink bg-white hover:border-black font-extrabold shadow-sm'
                     }`}
                 >
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 pr-6">
                     <div className="flex items-center justify-between mb-1">
-                      <span className={`text-sm truncate pr-2 ${viewedIds.includes(s.id) ? 'font-semibold text-gray-500' : 'font-extrabold text-gray-900'}`}>{s.title}</span>
+                      <span className={`text-sm truncate pr-2 ${(viewedIds.includes(s.id) || s.status === 'approved') ? 'font-semibold text-gray-500' : 'font-extrabold text-gray-900'}`}>{s.title}</span>
                       {hasActiveSession(s.id) ? (
                         <span className="bg-yellow-100 text-yellow-700 text-[10px] font-bold border border-yellow-700 px-2 py-0.5">CHỜ HỘI ĐỒNG</span>
+                      ) : s.status === 'approved' ? (
+                        <span className="bg-green-100 text-green-700 text-[10px] font-bold border border-green-700 px-2 py-0.5">ĐÃ DUYỆT</span>
                       ) : (
                         <span className="bg-orange-100 text-orange-700 text-[10px] font-bold border border-orange-700 px-2 py-0.5">ĐÃ NỘP</span>
                       )}
                     </div>
                     <div className="flex justify-between items-center text-xs">
-                      <span className={`font-bold ${viewedIds.includes(s.id) ? 'text-manga-red/70' : 'text-manga-red'}`}>{s.genre}</span>
-                      <span className={`font-bold truncate max-w-[120px] ${viewedIds.includes(s.id) ? 'text-gray-400' : 'text-gray-600'}`}>{s.mangaka}</span>
+                      <span className={`font-bold ${(viewedIds.includes(s.id) || s.status === 'approved') ? 'text-manga-red/70' : 'text-manga-red'}`}>{s.genre}</span>
+                      <span className={`font-bold truncate max-w-[120px] ${(viewedIds.includes(s.id) || s.status === 'approved') ? 'text-gray-400' : 'text-gray-600'}`}>{s.mangaka}</span>
                     </div>
+                  </div>
+
+                  {/* Three-dot action button */}
+                  <div className="absolute right-2 top-2 z-20">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setActiveMenuId(activeMenuId === s.id ? null : s.id)
+                      }}
+                      className="p-1 hover:bg-gray-200 border-2 border-transparent hover:border-manga-ink transition-all hidden group-hover:block bg-white shadow-sm rounded-full"
+                    >
+                      <MoreHorizontal className="w-4 h-4 text-manga-ink" />
+                    </button>
+
+                    {/* Dropdown Menu (Speech bubble tooltip style) */}
+                    {activeMenuId === s.id && (
+                      <div className="absolute right-0 mt-3 bg-white border border-gray-200 shadow-xl rounded-xl py-2 min-w-[200px] z-30 font-sans text-gray-800 normal-case">
+                        {/* Triangle Pointer pointing upwards */}
+                        <div className="absolute bottom-full right-3 w-3 h-3 bg-white border-t border-l border-gray-200 transform translate-y-[7px] rotate-45" />
+                        
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            const isRead = viewedIds.includes(s.id)
+                            if (isRead) {
+                              setViewedIds(prev => {
+                                const updated = prev.filter(id => id !== s.id)
+                                localStorage.setItem('viewed_review_items', JSON.stringify(updated))
+                                return updated
+                              })
+                            } else {
+                              markAsViewed(s.id)
+                            }
+                            setActiveMenuId(null)
+                          }}
+                          className="w-full text-left px-4 py-2 hover:bg-zinc-50 flex items-center gap-3 text-sm font-semibold transition-colors"
+                        >
+                          <Check className="w-4 h-4 text-gray-700" />
+                          {(viewedIds.includes(s.id) || s.status === 'approved') ? 'Đánh dấu là chưa đọc' : 'Đánh dấu là đã đọc'}
+                        </button>
+                        
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteItem(s.id)
+                            setActiveMenuId(null)
+                          }}
+                          className="w-full text-left px-4 py-2 hover:bg-zinc-50 flex items-center gap-3 text-sm font-semibold text-red-600 hover:text-red-700 transition-colors"
+                        >
+                          <XSquare className="w-4 h-4" />
+                          Xóa thông báo này
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))
@@ -853,7 +1010,7 @@ export default function ManuscriptReviewPage() {
           )}
     
           {activeManuscript ? (
-            <div className="w-[340px] flex-shrink-0 flex flex-col bg-white border-4 border-manga-ink p-4 h-full min-h-0 overflow-hidden gap-4">
+            <div className="w-[280px] flex-shrink-0 flex flex-col bg-white border-4 border-manga-ink p-4 h-full min-h-0 overflow-hidden gap-4">
               {/* Header */}
               <div className="border-b-4 border-manga-ink pb-3 mb-1 flex items-center justify-between">
                 <h2 className="font-manga text-base font-bold uppercase tracking-wider text-manga-ink">Bảng Điều Khiển</h2>
@@ -927,7 +1084,7 @@ export default function ManuscriptReviewPage() {
               <div className="h-6 flex-shrink-0" />
             </div>
           ) : (
-            <div className="w-80 bg-white border-4 border-manga-ink p-4 flex items-center justify-center text-center">
+            <div className="w-[280px] bg-white border-4 border-manga-ink p-4 flex items-center justify-center text-center">
               <p className="text-xs font-bold text-gray-400">Chọn bản thảo ở danh sách bên để quyết định.</p>
             </div>
           )}
@@ -996,7 +1153,17 @@ export default function ManuscriptReviewPage() {
               </div>
 
               {/* Decisions / Action buttons at the bottom */}
-              {hasActiveSession(activeSeries.id) ? (
+              {activeSeries.status === 'approved' ? (
+                <div className="border-t-2 border-manga-ink pt-3 flex flex-col gap-2 flex-shrink-0">
+                  <div className="bg-green-50 border-4 border-green-500 p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-3">
+                    <CheckCircle2 className="w-8 h-8 text-green-600 flex-shrink-0 animate-pulse" />
+                    <div>
+                      <h4 className="font-extrabold text-sm text-manga-ink uppercase">HỒ SƠ ĐÃ ĐƯỢC PHÊ DUYỆT</h4>
+                      <p className="text-xs text-gray-600 font-bold mt-1">Series này đã được phê duyệt. Bạn không thể thực hiện thêm thao tác duyệt lúc này.</p>
+                    </div>
+                  </div>
+                </div>
+              ) : hasActiveSession(activeSeries.id) ? (
                 <div className="border-t-2 border-manga-ink pt-3 flex flex-col gap-2 flex-shrink-0">
                   <div className="bg-yellow-50 border-4 border-yellow-500 p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-3">
                     <Shield className="w-8 h-8 text-yellow-600 flex-shrink-0 animate-pulse" />

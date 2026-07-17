@@ -26,26 +26,30 @@ export default function RegisterPage() {
     try {
       const data = await authService.loginWithGoogle(response.credential)
       
-      const storedUserData = {
-        ...data.user,
-        token: data.token
-      }
-
-      // Check if this is a first-time Google sign-up (created less than 15s ago)
-      // Force UTC parsing by appending Z if no offset is present
-      const createdAtTime = data.user.createdAt 
-        ? new Date(data.user.createdAt.endsWith('Z') || data.user.createdAt.includes('+') ? data.user.createdAt : `${data.user.createdAt}Z`).getTime()
-        : 0;
-      const isNewUser = createdAtTime > 0 && (new Date().getTime() - createdAtTime < 15000);
-
-      if (isNewUser) {
-        // Save to sessionStorage to verify with OTP before official login
-        sessionStorage.setItem('pending_google_user', JSON.stringify(storedUserData))
-        navigate(`/verify-otp?email=${encodeURIComponent(storedUserData.email)}`)
+      if ('otpSent' in data && data.otpSent) {
+        sessionStorage.setItem('pending_register_email', data.email)
+        navigate(`/verify-otp?email=${encodeURIComponent(data.email)}&type=register`)
       } else {
+        const storedUserData = {
+          ...(data as any).user,
+          token: (data as any).token
+        }
         localStorage.setItem('mangaflow_user', JSON.stringify(storedUserData))
-        setRegisteredUser(storedUserData)
-        setShowSuccess(true)
+        
+        const role = storedUserData.role?.toUpperCase()
+        if (role === 'MANGAKA') {
+          navigate('/dashboard/mangaka')
+        } else if (role === 'ASSISTANT') {
+          navigate('/dashboard/assistant')
+        } else if (role === 'EDITOR') {
+          navigate('/dashboard/tantou-editor')
+        } else if (role === 'ADMIN') {
+          navigate('/dashboard/admin')
+        } else if (['BOARD', 'CHIEF_EDITOR'].includes(role)) {
+          navigate('/dashboard/editorial-board')
+        } else {
+          navigate('/')
+        }
       }
     } catch (err: any) {
       console.error('Google register error:', err)
@@ -226,14 +230,13 @@ export default function RegisterPage() {
         role
       })
       
-      const storedUserData = {
-        ...data.user,
-        token: data.token
+      if (data.otpSent) {
+        sessionStorage.setItem('pending_register_email', data.email)
+        navigate(`/verify-otp?email=${encodeURIComponent(data.email)}&type=register`)
+      } else {
+        setRegisterError('Đăng ký không thành công. Không thể gửi mã OTP.')
+        setLoading(false)
       }
-      
-      localStorage.setItem('mangaflow_user', JSON.stringify(storedUserData))
-      setRegisteredUser(storedUserData)
-      setShowSuccess(true)
     } catch (err: any) {
       console.error('Registration error:', err)
       const errorMsg = err.response?.data?.message || 'Đăng ký thất bại. Vui lòng thử lại.'

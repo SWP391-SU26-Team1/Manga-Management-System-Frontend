@@ -507,9 +507,6 @@ export default function SeriesDetailPage() {
             {/* Box 1: Về Series Này */}
             <div className="bg-white border-[4px] border-black p-6 dark:bg-zinc-800 dark:border-black">
               <h3 className="font-manga text-2xl font-bold uppercase mb-4 dark:text-white">Về Series Này</h3>
-              <p className="text-sm font-bold text-gray-700 leading-relaxed mb-6 dark:text-gray-300">
-                {series.description || 'Trong một tương lai dystopian, nơi công nghệ sinh học và tội phạm mạng đan xen, một cựu cảnh sát đã được cấy ghép máy móc buộc phải trở lại thế giới ngầm để tìm kiếm em gái mất tích. Cuộc hành trình đầy máu và neon bắt đầu.'}
-              </p>
               
               <div className="flex flex-wrap gap-2 mb-6">
                 {series.genres.map(g => (

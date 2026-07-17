@@ -12,16 +12,20 @@ interface SearchOverlayProps {
 export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
   const [searchInput, setSearchInput] = useState('')
   const [activeGenre, setActiveGenre] = useState('Tất cả')
+  const [page, setPage] = useState(1)
   
   const [results, setResults] = useState<SearchResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
 
-  // Fetch results when search input or genre changes, but only after first search or if we want live search
-  // Let's do it on form submit or genre change to save API calls
-  const performSearch = (query: string, genre: string) => {
+  const performSearch = (query: string, genre: string, pageNum: number) => {
     setLoading(true)
-    readerService.searchSeries({ query, genre: genre !== 'Tất cả' ? genre : undefined })
+    readerService.searchSeries({ 
+      query, 
+      genre: genre !== 'Tất cả' ? genre : undefined,
+      page: pageNum,
+      limit: 5
+    })
       .then(res => {
         setResults(res)
         setLoading(false)
@@ -29,16 +33,30 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
       })
   }
 
-  // Trigger search when genre changes
+  // Trigger search when genre, page or isOpen changes
   useEffect(() => {
     if (isOpen) {
-      performSearch(searchInput, activeGenre)
+      performSearch(searchInput, activeGenre, page)
     }
-  }, [activeGenre, isOpen])
+  }, [activeGenre, page, isOpen])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
-    performSearch(searchInput, activeGenre)
+    setPage(1)
+    if (page === 1) {
+      performSearch(searchInput, activeGenre, 1)
+    }
+  }
+
+  const handleGenreChange = (genre: string) => {
+    setActiveGenre(genre)
+    setPage(1)
+  }
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && results && newPage <= results.totalPages) {
+      setPage(newPage)
+    }
   }
 
   if (!isOpen) return null
@@ -89,7 +107,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
           <div className="flex flex-wrap gap-2 mb-4">
             <button
               type="button"
-              onClick={() => setActiveGenre('Tất cả')}
+              onClick={() => handleGenreChange('Tất cả')}
               className={`px-3 py-1.5 border-[2px] border-black font-bold text-xs uppercase transition-all ${
                 activeGenre === 'Tất cả' 
                   ? 'bg-manga-red text-white shadow-[2px_2px_0px_rgba(0,0,0,1)] translate-y-[2px] translate-x-[2px] dark:border-black' 
@@ -102,7 +120,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
               <button
                 key={g.id}
                 type="button"
-                onClick={() => setActiveGenre(g.name)}
+                onClick={() => handleGenreChange(g.name)}
                 className={`px-3 py-1.5 border-[2px] border-black font-bold text-xs uppercase transition-all flex items-center gap-1 ${
                   activeGenre === g.name 
                     ? 'bg-manga-red text-white shadow-[2px_2px_0px_rgba(0,0,0,1)] translate-y-[2px] translate-x-[2px] dark:border-black' 
@@ -175,18 +193,43 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
           )}
 
           {/* Pagination */}
-          {displaySeries.length > 0 && (
+          {results && results.totalPages > 1 && (
             <div className="flex justify-center items-center gap-2 mt-8 mb-4">
-              <button className="w-8 h-8 flex items-center justify-center border-[3px] border-black bg-white shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-[0px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[4px] hover:translate-x-[4px] font-bold transition-all dark:bg-zinc-800 dark:text-white dark:border-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-none">
+              <button 
+                onClick={() => handlePageChange(page - 1)}
+                disabled={page <= 1}
+                className={`w-8 h-8 flex items-center justify-center border-[3px] border-black font-bold transition-all ${
+                  page <= 1 
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed dark:bg-zinc-700 dark:text-zinc-500' 
+                    : 'bg-white shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-[0px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[4px] hover:translate-x-[4px] dark:bg-zinc-800 dark:text-white dark:border-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-none'
+                }`}
+              >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <button className="w-8 h-8 flex items-center justify-center border-[3px] border-black bg-black text-white shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-[0px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[4px] hover:translate-x-[4px] font-bold transition-all dark:bg-white dark:text-black dark:border-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-none">
-                1
-              </button>
-              <button className="w-8 h-8 flex items-center justify-center border-[3px] border-black bg-white shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-[0px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[4px] hover:translate-x-[4px] font-bold transition-all dark:bg-zinc-800 dark:text-white dark:border-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-none">
-                2
-              </button>
-              <button className="w-8 h-8 flex items-center justify-center border-[3px] border-black bg-white shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-[0px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[4px] hover:translate-x-[4px] font-bold transition-all dark:bg-zinc-800 dark:text-white dark:border-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-none">
+
+              {Array.from({ length: results.totalPages }, (_, i) => i + 1).map(p => (
+                <button
+                  key={`page-${p}`}
+                  onClick={() => handlePageChange(p)}
+                  className={`w-8 h-8 flex items-center justify-center border-[3px] border-black font-bold transition-all ${
+                    page === p
+                      ? 'bg-black text-white shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-[0px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[4px] hover:translate-x-[4px] dark:bg-white dark:text-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-none'
+                      : 'bg-white shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-[0px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[4px] hover:translate-x-[4px] dark:bg-zinc-800 dark:text-white dark:border-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-none'
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+
+              <button 
+                onClick={() => handlePageChange(page + 1)}
+                disabled={page >= results.totalPages}
+                className={`w-8 h-8 flex items-center justify-center border-[3px] border-black font-bold transition-all ${
+                  page >= results.totalPages
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed dark:bg-zinc-700 dark:text-zinc-500' 
+                    : 'bg-white shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-[0px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[4px] hover:translate-x-[4px] dark:bg-zinc-800 dark:text-white dark:border-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-none'
+                }`}
+              >
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>

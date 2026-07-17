@@ -7,8 +7,9 @@ import SearchSeriesCard from '@/components/user/SearchSeriesCard'
 
 export default function SearchResultsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const genreQuery = searchParams.get('genre') || 'Action'
+  const genreQuery = searchParams.get('genre') || ''
   const textQuery = searchParams.get('q') || ''
+  const pageQuery = parseInt(searchParams.get('page') || '1')
 
   const [searchInput, setSearchInput] = useState(textQuery)
   const [activeGenre, setActiveGenre] = useState(genreQuery)
@@ -18,18 +19,31 @@ export default function SearchResultsPage() {
 
   useEffect(() => {
     setLoading(true)
-    readerService.searchSeries({ query: textQuery, genre: activeGenre !== 'Tất cả' ? activeGenre : undefined })
+    readerService.searchSeries({ 
+      query: textQuery, 
+      genre: activeGenre !== 'Tất cả' ? activeGenre : undefined,
+      page: pageQuery,
+      limit: 5 
+    })
       .then(res => {
         setResults(res)
         setLoading(false)
       })
-  }, [textQuery, activeGenre])
+  }, [textQuery, activeGenre, pageQuery])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     const newParams = new URLSearchParams()
     if (searchInput) newParams.set('q', searchInput)
     if (activeGenre && activeGenre !== 'Tất cả') newParams.set('genre', activeGenre)
+    newParams.set('page', '1')
+    setSearchParams(newParams)
+  }
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1 || (results && newPage > results.totalPages)) return;
+    const newParams = new URLSearchParams(searchParams.toString())
+    newParams.set('page', newPage.toString())
     setSearchParams(newParams)
   }
 
@@ -148,27 +162,47 @@ export default function SearchResultsPage() {
           )}
 
           {/* Pagination */}
-          <div className="flex justify-center items-center gap-3 mt-12 mb-4">
-            <button className="w-10 h-10 flex items-center justify-center border-[3px] border-black bg-white shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-[0px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[4px] hover:translate-x-[4px] font-bold transition-all dark:bg-zinc-800 dark:text-white dark:border-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-none">
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <button className="w-10 h-10 flex items-center justify-center border-[3px] border-black bg-black text-white shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-[0px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[4px] hover:translate-x-[4px] font-bold transition-all dark:bg-white dark:text-black dark:border-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-none">
-              1
-            </button>
-            <button className="w-10 h-10 flex items-center justify-center border-[3px] border-black bg-white shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-[0px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[4px] hover:translate-x-[4px] font-bold transition-all dark:bg-zinc-800 dark:text-white dark:border-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-none">
-              2
-            </button>
-            <button className="w-10 h-10 flex items-center justify-center border-[3px] border-black bg-white shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-[0px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[4px] hover:translate-x-[4px] font-bold transition-all dark:bg-zinc-800 dark:text-white dark:border-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-none">
-              3
-            </button>
-            <span className="font-bold tracking-widest px-2 dark:text-white">...</span>
-            <button className="w-10 h-10 flex items-center justify-center border-[3px] border-black bg-white shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-[0px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[4px] hover:translate-x-[4px] font-bold transition-all dark:bg-zinc-800 dark:text-white dark:border-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-none">
-              9
-            </button>
-            <button className="w-10 h-10 flex items-center justify-center border-[3px] border-black bg-white shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-[0px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[4px] hover:translate-x-[4px] font-bold transition-all dark:bg-zinc-800 dark:text-white dark:border-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-none">
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </div>
+          {results && results.totalPages > 1 && (
+            <div className="flex justify-center items-center gap-3 mt-12 mb-4">
+              <button 
+                onClick={() => handlePageChange(pageQuery - 1)}
+                disabled={pageQuery <= 1}
+                className={`w-10 h-10 flex items-center justify-center border-[3px] border-black font-bold transition-all ${
+                  pageQuery <= 1 
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed dark:bg-zinc-700 dark:text-zinc-500' 
+                    : 'bg-white shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-[0px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[4px] hover:translate-x-[4px] dark:bg-zinc-800 dark:text-white dark:border-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-none'
+                }`}
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+
+              {Array.from({ length: results.totalPages }, (_, i) => i + 1).map(page => (
+                <button
+                  key={`page-${page}`}
+                  onClick={() => handlePageChange(page)}
+                  className={`w-10 h-10 flex items-center justify-center border-[3px] border-black font-bold transition-all ${
+                    pageQuery === page
+                      ? 'bg-black text-white shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-[0px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[4px] hover:translate-x-[4px] dark:bg-white dark:text-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-none'
+                      : 'bg-white shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-[0px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[4px] hover:translate-x-[4px] dark:bg-zinc-800 dark:text-white dark:border-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-none'
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+
+              <button 
+                onClick={() => handlePageChange(pageQuery + 1)}
+                disabled={pageQuery >= results.totalPages}
+                className={`w-10 h-10 flex items-center justify-center border-[3px] border-black font-bold transition-all ${
+                  pageQuery >= results.totalPages
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed dark:bg-zinc-700 dark:text-zinc-500' 
+                    : 'bg-white shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-[0px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[4px] hover:translate-x-[4px] dark:bg-zinc-800 dark:text-white dark:border-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-none'
+                }`}
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          )}
 
         </div>
       </div>

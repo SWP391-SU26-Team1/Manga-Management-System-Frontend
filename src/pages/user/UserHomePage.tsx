@@ -14,8 +14,8 @@ export default function UserHomePage() {
     readerService.getLatestUpdates(8).then(setLatestUpdates)
   }, [])
   return (
-    <div className="min-h-screen flex flex-col font-sans overflow-hidden">
-      <main className="flex-grow">
+    <div className="min-h-screen flex flex-col font-sans selection:bg-manga-red selection:text-white">
+      <main className="flex-1 bg-white dark:bg-zinc-900 transition-colors">
         {/* 2. Hero Section */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
@@ -146,25 +146,6 @@ export default function UserHomePage() {
           </div>
         </section>
 
-        {/* 6. Section "Duyệt theo thể loại" */}
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <h2 className="font-manga text-3xl font-bold uppercase mb-8 text-center inline-block border-b-4 border-manga-ink pb-2 animate-slide-up dark:text-white dark:border-zinc-700" style={{ animationDelay: '0.2s' }}>
-            <BookOpen className="w-6 h-6 inline-block mr-2" /> Duyệt theo thể loại
-          </h2>
-          
-          <div className="flex flex-wrap justify-center gap-4">
-            {GENRES.map((genre, idx) => (
-              <Link 
-                key={genre.id} 
-                to={`/search?genre=${genre.name}`}
-                className="px-6 py-3 border-2 border-manga-ink bg-white font-bold uppercase hover:bg-manga-ink hover:text-white transition-colors shadow-[4px_4px_0px_rgba(40,40,40,1)] hover:shadow-none hover:translate-y-1 hover:translate-x-1 animate-slide-up dark:bg-zinc-800 dark:border-black dark:text-white dark:hover:bg-zinc-700 dark:shadow-[4px_4px_0px_#000]"
-                style={{ animationDelay: `${0.3 + idx * 0.05}s` }}
-              >
-                {genre.name}
-              </Link>
-            ))}
-          </div>
-        </section>
       </main>
 
       <style>{`

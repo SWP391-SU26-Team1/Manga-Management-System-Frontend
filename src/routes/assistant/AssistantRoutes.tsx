@@ -14,6 +14,7 @@ import DrawingStudioPage from '@/pages/assistant/DrawingStudioPage'
 import AIMangaPage from '@/pages/assistant/AIMangaPage'
 import ProfilePage from '@/pages/assistant/ProfilePage'
 import SettingsPage from '@/pages/assistant/SettingsPage'
+import NotificationsPage from '@/pages/assistant/NotificationsPage'
 
 export default function AssistantRoutes() {
   return (
@@ -31,6 +32,7 @@ export default function AssistantRoutes() {
         <Route path="ai-manga" element={<AIMangaPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
       </Route>
     </Routes>
   )

@@ -60,6 +60,22 @@ export const chapterService = {
     )
     return mapChapter(res.data.data)
   },
+
+  /** PATCH /api/mangaka/series/:seriesId/chapters/:chapterId/submit-review — nộp chapter lên review */
+  submitReview: async (seriesId: string, chapterId: string): Promise<ChapterAPI> => {
+    const res = await api.patch<{ success: boolean; data: any }>(
+      `/api/mangaka/series/${seriesId}/chapters/${chapterId}/submit-review`
+    )
+    return mapChapter(res.data.data)
+  },
+
+  /** PATCH /api/mangaka/series/:seriesId/chapters/:chapterId/publish — xuất bản chapter */
+  publish: async (seriesId: string, chapterId: string): Promise<ChapterAPI> => {
+    const res = await api.patch<{ success: boolean; data: any }>(
+      `/api/mangaka/series/${seriesId}/chapters/${chapterId}/publish`
+    )
+    return mapChapter(res.data.data)
+  },
 }
 
 export default chapterService

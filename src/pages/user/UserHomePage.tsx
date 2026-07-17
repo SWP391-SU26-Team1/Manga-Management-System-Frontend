@@ -34,7 +34,7 @@ export default function UserHomePage() {
               <Bell className="w-5 h-5 text-manga-ink" />
               <span className="absolute top-1 right-1 w-2 h-2 bg-manga-red rounded-full" />
             </button>
-            <Link to="/register" className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+            <Link to="/login" className="p-2 hover:bg-gray-100 rounded-full transition-colors">
               <User className="w-5 h-5 text-manga-ink" />
             </Link>
           </div>

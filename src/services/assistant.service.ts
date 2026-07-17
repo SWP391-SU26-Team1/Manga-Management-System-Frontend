@@ -317,7 +317,7 @@ export const assistantService = {
     return res.data.data
   },
 
-  updateManuscriptDraft: async (manuscriptId: string, payload: { title?: string; content?: string }): Promise<any> => {
+  updateManuscriptDraft: async (manuscriptId: string, payload: { title?: string; content?: string; status?: string }): Promise<any> => {
     const res = await api.patch<{ success: boolean; data: any }>(`/api/assistant/drafts/manuscripts/${manuscriptId}`, payload)
     return res.data.data
   },

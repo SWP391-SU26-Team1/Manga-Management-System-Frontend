@@ -27,7 +27,7 @@ export default function ProposalsListPage() {
       <div className="mb-8">
         <h1 className="font-manga text-4xl md:text-5xl font-black uppercase tracking-tight text-manga-ink flex items-center gap-3">
           <FileText className="w-10 h-10 text-manga-red" />
-          HỘP THƯ CÔNG VIỆC (PROPOSALS)
+          REVIEW SESSION
         </h1>
         <p className="text-sm font-bold text-gray-500 uppercase mt-2">
           Danh sách các bản thảo / tác phẩm đang chờ Hội đồng biên tập xét duyệt

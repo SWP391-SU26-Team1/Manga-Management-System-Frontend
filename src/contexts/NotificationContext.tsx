@@ -1,7 +1,9 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react'
+import { io, Socket } from 'socket.io-client'
 import { Bell, AlertTriangle, RefreshCw, FileText, Star, Vote, AlertCircle, X } from 'lucide-react'
 import { boardService } from '@/services/board.service'
-import { io, Socket } from 'socket.io-client'
+import { editorService } from '@/services/editor.service'
+import api from '@/services/api'
 
 export interface Notification {
   id: string
@@ -31,6 +33,7 @@ interface NotificationContextType {
     category: ToastAlert['category']
   ) => void
   markAllAsRead: () => void
+  markAsRead: (id: string) => void
   dismissToast: (id: string) => void
 }
 
@@ -39,17 +42,105 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [toasts, setToasts] = useState<ToastAlert[]>([])
-  const [token, setToken] = useState<string | null>(() => {
-    const userStr = localStorage.getItem('mangaflow_user')
-    if (userStr) {
+  const [socket, setSocket] = useState<Socket | null>(null)
+  const [readNotifIds, setReadNotifIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('read_notifications_editor')
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  })
+
+  const seenIdsRef = useRef<Set<string>>(new Set())
+  const isFirstLoadRef = useRef(true)
+
+  useEffect(() => {
+    let activeSocket: Socket | null = null
+
+    const checkAndConnect = () => {
+      const userStr = localStorage.getItem('mangaflow_user')
+      if (!userStr) {
+        if (activeSocket) {
+          activeSocket.disconnect()
+          activeSocket = null
+          setSocket(null)
+        }
+        return
+      }
+
       try {
-        return JSON.parse(userStr).token || null
-      } catch {
-        return null
+        const parsed = JSON.parse(userStr)
+        const token = parsed.token
+        if (!token) return
+
+        if (activeSocket && activeSocket.connected) return
+
+        const apiURL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+        activeSocket = io(apiURL, {
+          auth: { token: token }
+        })
+
+        activeSocket.on('connect', () => {
+          console.log('Socket.io connected successfully to notifications server')
+        })
+
+        activeSocket.on('notification:new', (newNotification: any) => {
+          console.log('Received real-time notification:', newNotification)
+
+          const mappedNotif: Notification = {
+            id: newNotification.id || newNotification.notification_id || Math.random().toString(),
+            title: newNotification.title || 'THÔNG BÁO MỚI',
+            message: newNotification.message || newNotification.content || '',
+            time: new Date(newNotification.created_at || Date.now()).toLocaleDateString('vi-VN'),
+            type: newNotification.type || 'REVIEW',
+            category: 'standard' as const,
+            unread: true
+          }
+
+          setNotifications(prev => {
+            if (prev.some(n => n.id === mappedNotif.id)) return prev
+            return [mappedNotif, ...prev]
+          })
+
+          // Dispatch window event so Header and Dashboard components re-fetch list from backend in real-time
+          window.dispatchEvent(new Event('mangaflow_notifications_updated'))
+
+          let category: ToastAlert['category'] = 'rating_success'
+          if (newNotification.type === 'RISK' || newNotification.type === 'OVERDUE') {
+            category = 'rating_failed'
+          }
+
+          setToasts(prev => {
+            const newToast: ToastAlert = {
+              id: mappedNotif.id,
+              title: mappedNotif.title,
+              message: mappedNotif.message,
+              category
+            }
+            setTimeout(() => {
+              setToasts(p => p.filter(t => t.id !== mappedNotif.id))
+            }, 3500)
+            return [...prev, newToast]
+          })
+        })
+
+        setSocket(activeSocket)
+      } catch (err) {
+        console.error('Failed to parse mangaflow_user token for socket connection:', err)
       }
     }
-    return null
-  })
+
+    checkAndConnect()
+    const interval = setInterval(checkAndConnect, 3000)
+
+    return () => {
+      clearInterval(interval)
+      if (activeSocket) {
+        activeSocket.disconnect()
+      }
+    }
+  }, [])
 
   const fetchNotifications = async () => {
     // Only fetch if user is logged in
@@ -57,116 +148,141 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     if (!userStr) return
 
     try {
-      const data = await boardService.getBoardNotifications()
+      let data = []
+      let role = ''
+      try {
+        const parsed = JSON.parse(userStr)
+        role = parsed.role || ''
+      } catch (e) {
+        // ignore
+      }
+
+      if (role === 'BOARD' || role === 'EDITORIAL_BOARD') {
+        data = await boardService.getBoardNotifications()
+      } else {
+        // Fetch general notifications for other roles to avoid 403 Forbidden
+        const res = await api.get('/api/notifications')
+        data = res.data.data
+      }
+
       // Map API data to Notification interface
-      if (data && Array.isArray(data)) {
-        const mapped = data.map((item: any) => ({
-          id: item.id || item.notification_id || Math.random().toString(),
-          title: item.title || 'THÔNG BÁO',
-          message: item.message || item.content,
-          time: new Date(item.created_at || Date.now()).toLocaleDateString(),
-          type: item.type || 'REVIEW',
-          category: 'standard' as const,
-          unread: !item.is_read
-        }))
+      const mapped = data && Array.isArray(data) ? data.map((item: any) => ({
+        id: item.id || item.notification_id || Math.random().toString(),
+        title: item.title || 'THÔNG BÁO',
+        message: item.message || item.content,
+        time: new Date(item.created_at || Date.now()).toLocaleDateString('vi-VN'),
+        type: item.type || 'REVIEW',
+        category: 'standard' as const,
+        unread: !item.is_read
+      })) : []
+
+      if (role === 'EDITOR' || role === 'editor') {
+        try {
+          const savedRead = localStorage.getItem('read_notifications_editor')
+          const currentReadIds = savedRead ? JSON.parse(savedRead) : []
+
+          const [seriesRes, manuscriptsRes] = await Promise.all([
+            editorService.getSeries({ status: 'pending_review' }),
+            editorService.getManuscripts()
+          ])
+
+          const seriesList = seriesRes?.data || seriesRes || []
+          const manuscriptsList = manuscriptsRes?.data || manuscriptsRes || []
+
+          const currentPendingIds = new Set<string>()
+
+          const seriesNotifications = seriesList.map((s: any) => {
+            const id = `series_${s.series_id || s.id}`
+            currentPendingIds.add(id)
+            const isUnread = !currentReadIds.includes(id)
+            return {
+              id,
+              title: 'Series mới cần duyệt',
+              message: `Series "${s.title}" đã được gửi và đang chờ bạn duyệt.`,
+              time: new Date(s.created_at || Date.now()).toLocaleDateString('vi-VN'),
+              type: 'REVIEW' as const,
+              category: 'standard' as const,
+              unread: isUnread
+            }
+          })
+
+          const manuscriptNotifications = manuscriptsList
+            .filter((m: any) => ['submitted', 'in_review'].includes(m.status?.toLowerCase()))
+            .map((m: any) => {
+              const id = `manuscript_${m.manuscript_id || m.id}`
+              currentPendingIds.add(id)
+              const isUnread = !currentReadIds.includes(id)
+              return {
+                id,
+                title: 'Bản thảo mới cần duyệt',
+                message: `Bản thảo "${m.title}" đã được gửi và đang chờ bạn duyệt.`,
+                time: new Date(m.created_at || Date.now()).toLocaleDateString('vi-VN'),
+                type: 'REVIEW' as const,
+                category: 'standard' as const,
+                unread: isUnread
+              }
+            })
+
+          // Detect new items for Toast notification
+          if (isFirstLoadRef.current) {
+            seenIdsRef.current = currentPendingIds
+            isFirstLoadRef.current = false
+          } else {
+            currentPendingIds.forEach(id => {
+              if (!seenIdsRef.current.has(id)) {
+                seenIdsRef.current.add(id)
+                if (id.startsWith('series_')) {
+                  const s = seriesList.find((x: any) => `series_${x.series_id || x.id}` === id)
+                  if (s) {
+                    addNotification(
+                      'Series mới cần duyệt',
+                      `Series "${s.title}" đã được gửi và đang chờ bạn duyệt.`,
+                      'REVIEW',
+                      'voting_success'
+                    )
+                  }
+                } else if (id.startsWith('manuscript_')) {
+                  const m = manuscriptsList.find((x: any) => `manuscript_${x.manuscript_id || x.id}` === id)
+                  if (m) {
+                    addNotification(
+                      'Bản thảo mới cần duyệt',
+                      `Bản thảo "${m.title}" đã được gửi và đang chờ bạn duyệt.`,
+                      'REVIEW',
+                      'voting_success'
+                    )
+                  }
+                }
+              }
+            })
+
+            // Clean up items that are no longer pending
+            seenIdsRef.current.forEach(id => {
+              if (!currentPendingIds.has(id)) {
+                seenIdsRef.current.delete(id)
+              }
+            })
+          }
+
+          setNotifications([...seriesNotifications, ...manuscriptNotifications, ...mapped])
+        } catch (e) {
+          console.error('Failed to load pending series/manuscripts for editor notifications:', e)
+          setNotifications(mapped)
+        }
+      } else {
         setNotifications(mapped)
       }
     } catch (err) {
       console.error('Failed to load notifications from API', err)
-      // Fallback local storage
-      const stored = localStorage.getItem('mf_notifications')
-      if (stored) {
-        setNotifications(JSON.parse(stored))
-      }
+      setNotifications([])
     }
   }
 
   // Fetch notifications once and listen to authentication changes
   useEffect(() => {
     fetchNotifications()
-
-    const handleAuthChange = () => {
-      const userStr = localStorage.getItem('mangaflow_user')
-      if (userStr) {
-        try {
-          const parsed = JSON.parse(userStr)
-          setToken(parsed.token || null)
-          fetchNotifications()
-        } catch {
-          setToken(null)
-        }
-      } else {
-        setToken(null)
-        setNotifications([])
-      }
-    }
-
-    window.addEventListener('mangaflow_profile_updated', handleAuthChange)
-    window.addEventListener('storage', handleAuthChange)
-    return () => {
-      window.removeEventListener('mangaflow_profile_updated', handleAuthChange)
-      window.removeEventListener('storage', handleAuthChange)
-    }
+    const interval = setInterval(fetchNotifications, 5000)
+    return () => clearInterval(interval)
   }, [])
-
-  // Setup Real-time WebSockets connection
-  useEffect(() => {
-    if (!token) return
-
-    let socket: Socket | null = null
-
-    try {
-      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
-      socket = io(baseUrl, {
-        auth: { token }
-      })
-
-      socket.on('connect', () => {
-        console.log('Real-time notifications WebSocket connected')
-      })
-
-      socket.on('notification:new', (newNotif: any) => {
-        console.log('Received real-time notification:', newNotif)
-        
-        const mapped: Notification = {
-          id: newNotif.id || newNotif.notification_id || Math.random().toString(),
-          title: newNotif.title || 'THÔNG BÁO MỚI',
-          message: newNotif.message || newNotif.content,
-          time: 'Vừa xong',
-          type: newNotif.type || 'REVIEW',
-          category: 'standard',
-          unread: true
-        }
-
-        setNotifications(prev => [mapped, ...prev])
-        
-        // Trigger toast overlay
-        const newToast: ToastAlert = {
-          id: mapped.id,
-          title: mapped.title,
-          message: mapped.message,
-          category: 'voting_success'
-        }
-        setToasts(prev => [...prev, newToast])
-        
-        setTimeout(() => {
-          setToasts(prev => prev.filter(t => t.id !== mapped.id))
-        }, 3500)
-      })
-
-      socket.on('connect_error', (err) => {
-        console.error('WebSocket connection error:', err.message)
-      })
-    } catch (e) {
-      console.error('Error initializing WebSocket:', e)
-    }
-
-    return () => {
-      if (socket) {
-        socket.disconnect()
-      }
-    }
-  }, [token])
 
   useEffect(() => {
     if (notifications.length > 0) {
@@ -214,11 +330,34 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const markAllAsRead = async () => {
     try {
       await boardService.markAllNotificationsRead()
-      setNotifications(prev => prev.map(n => ({ ...n, unread: false })))
     } catch (err) {
       console.error('API failed to mark all notifications as read', err)
-      // Optimistic update
-      setNotifications(prev => prev.map(n => ({ ...n, unread: false })))
+    }
+    // Optimistic update for both DB and local notifications
+    const allIds = notifications.map(n => n.id)
+    localStorage.setItem('read_notifications_editor', JSON.stringify(allIds))
+    setReadNotifIds(allIds)
+    setNotifications(prev => prev.map(n => ({ ...n, unread: false })))
+  }
+
+  const markAsRead = async (id: string) => {
+    if (id.startsWith('series_') || id.startsWith('manuscript_')) {
+      const savedRead = localStorage.getItem('read_notifications_editor')
+      const currentReadIds = savedRead ? JSON.parse(savedRead) : []
+      if (!currentReadIds.includes(id)) {
+        currentReadIds.push(id)
+        localStorage.setItem('read_notifications_editor', JSON.stringify(currentReadIds))
+        setReadNotifIds(currentReadIds)
+        setNotifications(prev => prev.map(n => n.id === id ? { ...n, unread: false } : n))
+      }
+    } else {
+      try {
+        await api.patch(`/api/notifications/${id}/read`)
+        setNotifications(prev => prev.map(n => n.id === id ? { ...n, unread: false } : n))
+      } catch (err) {
+        console.error('Failed to mark notification as read in API', err)
+        setNotifications(prev => prev.map(n => n.id === id ? { ...n, unread: false } : n))
+      }
     }
   }
 
@@ -227,7 +366,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <NotificationContext.Provider value={{ notifications, unreadCount, toasts, addNotification, markAllAsRead, dismissToast }}>
+    <NotificationContext.Provider value={{ notifications, unreadCount, toasts, addNotification, markAllAsRead, markAsRead, dismissToast }}>
       {children}
 
       {/* Toast Alert Popups Overlay (Top-Right of screen) */}

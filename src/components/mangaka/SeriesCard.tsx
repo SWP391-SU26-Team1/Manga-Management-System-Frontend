@@ -1,16 +1,17 @@
 
 import React from "react";
 import { Link } from "react-router";
-import { BookOpen, Clock, Tag, PlusCircle, Eye } from "lucide-react";
+import { BookOpen, Clock, Tag, PlusCircle, Eye, CheckCircle } from "lucide-react";
 import { Series } from "@/data/mangakaMockData";
 
 interface SeriesCardProps {
   series: Series;
   chapterCount: number;
   onCreateChapter?: (seriesId: string) => void;
+  onPublish?: (seriesId: string) => void;
 }
 
-export function SeriesCard({ series, chapterCount, onCreateChapter }: SeriesCardProps) {
+export function SeriesCard({ series, chapterCount, onCreateChapter, onPublish }: SeriesCardProps) {
   const statusKey = (series.status || "").toLowerCase();
   
   const statusColors: Record<string, string> = {
@@ -18,7 +19,7 @@ export function SeriesCard({ series, chapterCount, onCreateChapter }: SeriesCard
     "in_production": "bg-yellow-100 text-yellow-800 border-yellow-300",
     "under_review": "bg-blue-100 text-blue-800 border-blue-300",
     "pending_review": "bg-blue-100 text-blue-800 border-blue-300",
-    "approved": "bg-green-100 text-green-800 border-green-300",
+    "approved": "bg-purple-100 text-purple-800 border-purple-300",
     "published": "bg-manga-red text-white border-manga-ink",
     // Fallbacks for mock data
     "in production": "bg-yellow-100 text-yellow-800 border-yellow-300",
@@ -35,9 +36,8 @@ export function SeriesCard({ series, chapterCount, onCreateChapter }: SeriesCard
               statusColors[statusKey] || "bg-white text-manga-ink border-manga-ink"
             }`}
           >
-            {(statusKey === "in_production" || statusKey === "in production") ? "ĐANG VẼ" : 
+            {(statusKey === "in_production" || statusKey === "in production" || statusKey === "approved") ? "ĐANG VẼ" : 
              statusKey === "published" ? "ĐÃ XUẤT BẢN" :
-             statusKey === "approved" ? "ĐÃ DUYỆT" :
              (statusKey === "under_review" || statusKey === "pending_review" || statusKey === "waiting review") ? "CHỜ DUYỆT" : "BẢN NHÁP"}
           </span>
           <div className="flex items-center gap-1 text-xs text-gray-500 font-bold">

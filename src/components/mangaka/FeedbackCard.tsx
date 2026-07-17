@@ -86,9 +86,9 @@ export function FeedbackCard({ feedback, onResolve, onReply }: FeedbackCardProps
               </span>
             )}
           </div>
-          {feedback.chapterNumber && feedback.pageNumber && (
+          {feedback.chapterNumber && (feedback.pageId || feedback.pageNumber) && (
             <Link 
-              to={`/dashboard/mangaka/page-viewer/p_c_${feedback.seriesId}_${feedback.chapterNumber}_${feedback.pageNumber}`}
+              to={feedback.pageId ? `/dashboard/mangaka/page-viewer/${feedback.pageId}` : `/dashboard/mangaka/page-viewer/p_c_${feedback.seriesId}_${feedback.chapterNumber}_${feedback.pageNumber}`}
               className="mt-2 inline-flex items-center gap-1 text-[10px] uppercase font-bold text-manga-ink hover:text-manga-red hover:underline"
             >
               <ExternalLink className="w-3 h-3" /> Mở trang bản thảo
@@ -113,13 +113,15 @@ export function FeedbackCard({ feedback, onResolve, onReply }: FeedbackCardProps
               <CheckCircle className="w-4 h-4" />
               Đánh dấu Đã xử lý
             </button>
-            <button
-              onClick={() => setShowReplyForm(!showReplyForm)}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-white text-manga-ink border-2 border-manga-ink font-bold text-xs uppercase py-2 hover:bg-gray-50 transition-all"
-            >
-              <MessageSquare className="w-4 h-4" />
-              Phản hồi
-            </button>
+            {!feedback.isNotification && (
+              <button
+                onClick={() => setShowReplyForm(!showReplyForm)}
+                className="flex-1 flex items-center justify-center gap-1.5 bg-white text-manga-ink border-2 border-manga-ink font-bold text-xs uppercase py-2 hover:bg-gray-50 transition-all"
+              >
+                <MessageSquare className="w-4 h-4" />
+                Phản hồi
+              </button>
+            )}
           </div>
         ) : (
           <div className="flex items-center gap-1.5 text-green-600 font-bold text-xs uppercase">

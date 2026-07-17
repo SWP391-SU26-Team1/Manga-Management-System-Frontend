@@ -158,7 +158,7 @@ export default function ChiefDashboardPage() {
                     to={`/dashboard/editorial-board/review/${chapter.id}/draft`}
                     className="flex items-center gap-1 bg-manga-ink text-white font-manga font-bold text-xs uppercase px-4 py-1.5 border-2 border-manga-ink shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:bg-manga-red hover:shadow-[1px_1px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] transition-all cursor-pointer"
                   >
-                    <span>REVIEW</span>
+                    <span>ĐÁNH GIÁ</span>
                     <ArrowRight className="w-3 h-3" />
                   </Link>
                 </div>

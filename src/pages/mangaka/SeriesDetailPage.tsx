@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router'
 import {
   BookOpen, Clock, Layers, PlusSquare,
-  FileCheck, ClipboardList, CheckCircle, AlertCircle, BarChart2, AlertTriangle, Users, UserPlus
+  FileCheck, ClipboardList, CheckCircle, AlertCircle, BarChart2, AlertTriangle, Users, UserPlus, X
 } from 'lucide-react'
 import { seriesService, SeriesAPI, getErrorMessage } from '@/services/series.service'
 import { chapterService, ChapterAPI } from '@/services/chapter.service'
 import { pageService, PageAPI } from '@/services/page.service'
 import { taskService } from '@/services/task.service'
+import userService from '@/services/user.service'
 import { MangaPage } from '@/data/mangakaMockData'
 import { ChapterLayerTable } from '@/components/mangaka/ChapterLayerTable'
 
@@ -29,6 +30,28 @@ export default function SeriesDetailPage() {
   const [memberError, setMemberError] = useState('')
   const [memberSuccess, setMemberSuccess] = useState('')
   const [isAddingMember, setIsAddingMember] = useState(false)
+  const [availableAssistants, setAvailableAssistants] = useState<any[]>([])
+
+  // Member Delete Confirmation Modal States
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [memberToDelete, setMemberToDelete] = useState<string | null>(null)
+
+  // Custom Alert Modal States
+  const [alertModal, setAlertModal] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error';
+  }>({
+    show: false,
+    title: '',
+    message: '',
+    type: 'success'
+  })
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' = 'success') => {
+    setAlertModal({ show: true, title, message, type })
+  }
 
   // Page Expansion & Manga Reader States
   const [expandedChapterId, setExpandedChapterId] = useState<string | null>(null)
@@ -163,28 +186,56 @@ export default function SeriesDetailPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [activeReaderChapter, readerCurrentPageIndex, readerPages.length])
 
-  useEffect(() => {
+  const fetchData = async () => {
     if (!seriesId) return
-    const fetchData = async () => {
-      setIsLoading(true)
-      setError('')
-      try {
-        const [s, chs, mems] = await Promise.all([
-          seriesService.getById(seriesId),
-          chapterService.getBySeriesId(seriesId),
-          seriesService.getMembers(seriesId),
-        ])
-        setSeries(s)
-        setChapters([...chs].sort((a, b) => b.chapter_number - a.chapter_number))
-        setMembers(mems)
-      } catch (err) {
-        setError(getErrorMessage(err))
-      } finally {
-        setIsLoading(false)
+    setIsLoading(true)
+    setError('')
+    try {
+      const [s, chs, mems, asts] = await Promise.all([
+        seriesService.getById(seriesId),
+        chapterService.getBySeriesId(seriesId),
+        seriesService.getMembers(seriesId),
+        userService.listAssistants().catch(() => []),
+      ])
+      setSeries(s)
+      setChapters([...chs].sort((a, b) => b.chapter_number - a.chapter_number))
+      setMembers(mems)
+      setAvailableAssistants(asts)
+      if (asts.length > 0) {
+        setNewMemberUserId(asts[0].id)
       }
+    } catch (err) {
+      setError(getErrorMessage(err))
+    } finally {
+      setIsLoading(false)
     }
+  }
+
+  useEffect(() => {
     fetchData()
   }, [seriesId])
+
+  const handlePublishSeries = async () => {
+    if (!seriesId) return
+    try {
+      await seriesService.publish(seriesId)
+      showAlert('Thành công', 'Xuất bản Series thành công!', 'success')
+      await fetchData()
+    } catch (err) {
+      showAlert('Lỗi', getErrorMessage(err), 'error')
+    }
+  }
+
+  const handlePublishChapter = async (chapterId: string) => {
+    if (!seriesId) return
+    try {
+      await chapterService.publish(seriesId, chapterId)
+      showAlert('Thành công', 'Xuất bản Chapter thành công!', 'success')
+      await fetchData()
+    } catch (err) {
+      showAlert('Lỗi', getErrorMessage(err), 'error')
+    }
+  }
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -209,15 +260,23 @@ export default function SeriesDetailPage() {
     }
   }
 
-  const handleRemoveMember = async (seriesMemberId: string) => {
-    if (!window.confirm('Bạn có chắc muốn xóa thành viên này khỏi Series?')) return
+  const handleRemoveMember = (seriesMemberId: string) => {
+    setMemberToDelete(seriesMemberId)
+    setShowDeleteConfirm(true)
+  }
+
+  const confirmRemoveMember = async () => {
+    if (!memberToDelete) return
     try {
-      await seriesService.removeMember(seriesId!, seriesMemberId)
-      alert('Đã xóa thành viên thành công!')
+      await seriesService.removeMember(seriesId!, memberToDelete)
+      showAlert('Thành công', 'Đã xóa thành viên khỏi Series thành công!', 'success')
       const mems = await seriesService.getMembers(seriesId!)
       setMembers(mems)
     } catch (err) {
-      alert(getErrorMessage(err))
+      showAlert('Lỗi', getErrorMessage(err), 'error')
+    } finally {
+      setShowDeleteConfirm(false)
+      setMemberToDelete(null)
     }
   }
 
@@ -226,6 +285,7 @@ export default function SeriesDetailPage() {
       case 'published': return 'bg-blue-100 text-blue-700 border-blue-300'
       case 'under_review': return 'bg-orange-100 text-orange-700 border-orange-300'
       case 'in_production': return 'bg-green-100 text-green-700 border-green-300'
+      case 'approved': return 'bg-purple-100 text-purple-700 border-purple-300'
       case 'draft': return 'bg-gray-100 text-gray-500 border-gray-300'
       default: return 'bg-gray-100 text-gray-500 border-gray-300'
     }
@@ -236,6 +296,7 @@ export default function SeriesDetailPage() {
       draft: 'Bản nháp',
       in_production: 'Đang vẽ',
       under_review: 'Chờ duyệt',
+      approved: 'Đang vẽ',
       published: 'Đã xuất bản',
     }
     return map[status] ?? status
@@ -248,8 +309,23 @@ export default function SeriesDetailPage() {
       case 'in_progress': return 'bg-green-100 text-green-700 border-green-300'
       case 'draft': return 'bg-gray-100 text-gray-500 border-gray-300'
       case 'need_fix': return 'bg-red-100 text-red-700 border-red-300'
+      case 'approved': return 'bg-green-100 text-green-700 border-green-300'
+      case 'published': return 'bg-blue-100 text-blue-700 border-blue-300'
       default: return 'bg-gray-100 text-gray-500 border-gray-300'
     }
+  }
+
+  const getChapterStatusLabel = (status: string) => {
+    const map: Record<string, string> = {
+      draft: 'Bản nháp',
+      in_progress: 'Đang vẽ',
+      pending_review: 'Chờ duyệt',
+      under_review: 'Chờ duyệt',
+      approved: 'Đã duyệt',
+      published: 'Đã xuất bản',
+      need_fix: 'Cần sửa',
+    }
+    return map[status] ?? status.toUpperCase()
   }
 
   if (isLoading) {
@@ -415,7 +491,7 @@ export default function SeriesDetailPage() {
                         </div>
                         <div className="flex items-center gap-3">
                           <span className={`px-3 py-1 font-bold uppercase text-[10px] border-2 ${getChapterStatusClasses(chapter.status)}`}>
-                            {chapter.status}
+                            {getChapterStatusLabel(chapter.status)}
                           </span>
                           
                           <button
@@ -485,7 +561,7 @@ export default function SeriesDetailPage() {
                                     </button>
                                   </div>
                                 </div>
-                                {chapterPages[chapter._id].some(p => p.image_url) && (
+                                 {chapterPages[chapter._id].some(p => p.image_url) && (chapter.status === 'approved' || chapter.status === 'published') && (
                                   <button
                                     onClick={() => openReader(chapter)}
                                     className="flex items-center gap-1.5 px-3 py-1.5 bg-[#E63946] text-white border-2 border-black font-manga font-bold text-[10px] uppercase hover:bg-red-700 transition-colors shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 hover:shadow-none"
@@ -500,15 +576,20 @@ export default function SeriesDetailPage() {
                                 <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-4">
                                   {chapterPages[chapter._id].map((page) => {
                                     const hasImage = !!page.image_url
+                                    const isApproved = chapter.status === 'approved' || chapter.status === 'published'
                                     return (
                                       <div
                                         key={page._id}
-                                        onClick={() => openReader(chapter, page._id)}
-                                        className="bg-white border-2 border-black p-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_rgba(0,0,0,1)] transition-all cursor-pointer flex flex-col group"
+                                        onClick={() => isApproved && openReader(chapter, page._id)}
+                                        className={`bg-white border-2 border-black p-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] ${
+                                          isApproved 
+                                            ? 'hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_rgba(0,0,0,1)] cursor-pointer' 
+                                            : 'cursor-default'
+                                        } transition-all flex flex-col group`}
                                       >
                                         {/* Thumbnail Container */}
                                         <div className="aspect-[3/4] border border-gray-200 bg-gray-50 overflow-hidden relative mb-2 flex items-center justify-center">
-                                          {hasImage ? (
+                                          {hasImage && isApproved ? (
                                             <img
                                               src={page.image_url!}
                                               alt={`Trang ${page.page_number}`}
@@ -517,7 +598,9 @@ export default function SeriesDetailPage() {
                                           ) : (
                                             <div className="w-full h-full flex flex-col items-center justify-center text-center p-2 text-gray-400 bg-gray-50">
                                               <Layers className="w-5 h-5 mb-1 text-gray-300" />
-                                              <span className="text-[8px] font-black uppercase tracking-wider text-gray-400">Đang vẽ lớp</span>
+                                              <span className="text-[8px] font-black uppercase tracking-wider text-gray-400">
+                                                {hasImage ? 'Chờ duyệt' : 'Đang vẽ lớp'}
+                                              </span>
                                             </div>
                                           )}
                                           
@@ -611,16 +694,21 @@ export default function SeriesDetailPage() {
                       )}
 
                       <div>
-                        <label className="block text-xs uppercase tracking-widest mb-1.5">User ID Trợ lý (UUID) *</label>
-                        <input
-                          type="text"
+                        <label className="block text-xs uppercase tracking-widest mb-1.5">Chọn Trợ lý *</label>
+                        <select
                           required
                           value={newMemberUserId}
                           onChange={e => setNewMemberUserId(e.target.value)}
-                          placeholder="Nhập UUID từ Supabase..."
-                          className="w-full border-2 border-manga-ink px-3 py-2 text-sm focus:outline-none focus:border-manga-red bg-white"
-                        />
-                        <p className="text-[10px] text-gray-400 mt-1">Copy mã UUID (User ID) của tài khoản trợ lý</p>
+                          className="w-full border-2 border-manga-ink px-3 py-2 text-sm focus:outline-none focus:border-manga-red bg-white font-bold"
+                        >
+                          <option value="">-- Chọn Trợ lý --</option>
+                          {availableAssistants.map(ast => (
+                            <option key={ast.id} value={ast.id}>
+                              {ast.fullName}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-[10px] text-gray-400 mt-1">Chọn trợ lý hoạt động trong hệ thống</p>
                       </div>
 
                       <div>
@@ -824,6 +912,92 @@ export default function SeriesDetailPage() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Remove Member Confirmation Modal */}
+      {showDeleteConfirm && memberToDelete && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white border-4 border-manga-ink manga-shadow max-w-md w-full animate-in fade-in zoom-in-95 duration-150 text-black">
+            <div className="p-4 border-b-4 border-manga-ink bg-gray-50 flex justify-between items-center">
+              <h2 className="font-manga font-bold text-xl uppercase flex items-center gap-2 text-manga-red">
+                Xác nhận xóa thành viên
+              </h2>
+              <button 
+                onClick={() => {
+                  setShowDeleteConfirm(false)
+                  setMemberToDelete(null)
+                }} 
+                className="hover:text-red-500 cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm font-bold text-gray-700">
+                Bạn có chắc chắn muốn xóa thành viên này khỏi Series?
+              </p>
+              <div className="bg-amber-50 border-2 border-amber-300 p-3 text-xs text-amber-800 font-bold leading-relaxed">
+                ⚠️ Lưu ý: Hành động này chỉ xóa thành viên khỏi Series này. Tài khoản và vai trò của họ trong hệ thống vẫn được giữ nguyên, không bị ảnh hưởng.
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDeleteConfirm(false)
+                    setMemberToDelete(null)
+                  }}
+                  className="px-4 py-2 border-2 border-manga-ink font-bold uppercase text-xs hover:bg-gray-100 transition-colors cursor-pointer"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmRemoveMember}
+                  className="px-4 py-2 bg-manga-red border-2 border-manga-ink text-white font-bold uppercase text-xs hover:bg-red-700 hover:text-white transition-colors cursor-pointer"
+                >
+                  Xác nhận xóa
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Alert Modal */}
+      {alertModal.show && (
+        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white border-4 border-manga-ink manga-shadow max-w-sm w-full animate-in fade-in zoom-in-95 duration-150 text-black">
+            <div className="p-4 border-b-4 border-manga-ink bg-gray-50 flex justify-between items-center">
+              <h2 className={`font-manga font-bold text-xl uppercase flex items-center gap-2 ${
+                alertModal.type === 'success' ? 'text-green-600' : 'text-manga-red'
+              }`}>
+                {alertModal.title}
+              </h2>
+              <button 
+                onClick={() => setAlertModal(prev => ({ ...prev, show: false }))} 
+                className="hover:text-red-500 cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm font-bold text-gray-700 leading-relaxed">
+                {alertModal.message}
+              </p>
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setAlertModal(prev => ({ ...prev, show: false }))}
+                  className={`px-6 py-2 border-2 border-manga-ink text-white font-bold uppercase text-xs hover:bg-opacity-90 transition-colors cursor-pointer ${
+                    alertModal.type === 'success' ? 'bg-green-600' : 'bg-manga-red'
+                  }`}
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

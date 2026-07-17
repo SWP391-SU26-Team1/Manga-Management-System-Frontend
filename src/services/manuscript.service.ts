@@ -16,6 +16,11 @@ export interface ManuscriptAPI {
   status: string
   created_at: string
   updated_at?: string
+  chapter?: {
+    chapter_id: string
+    chapter_number: number
+    title?: string
+  }
 }
 
 export interface CreateManuscriptPayload {
@@ -49,6 +54,11 @@ const mapManuscript = (data: any): ManuscriptAPI => {
     status: data.status,
     created_at: data.created_at,
     updated_at: data.updated_at,
+    chapter: data.chapter ? {
+      chapter_id: data.chapter.chapter_id,
+      chapter_number: data.chapter.chapter_number,
+      title: data.chapter.title,
+    } : undefined,
   }
 }
 
@@ -60,7 +70,8 @@ export const manuscriptService = {
     const res = await api.get<{ success: boolean; data: any[] }>(`/api/manuscripts`, {
       params: { seriesId }
     })
-    return (res.data.data ?? []).map(mapManuscript)
+    const list = (res.data.data ?? []).map(mapManuscript)
+    return list.filter(m => m.series_id === seriesId)
   },
 
   /** POST /api/manuscripts - Tạo manuscript mới */
@@ -87,6 +98,17 @@ export const manuscriptService = {
       `/api/mangaka/series/${seriesId}/manuscripts/${manuscriptId}/revise`
     )
     return mapManuscript(res.data.data)
+  },
+
+  /** PATCH /api/manuscripts/:manuscriptId - Cập nhật bản thảo */
+  update: async (manuscriptId: string, payload: { title?: string; content?: string; file_url?: string }): Promise<ManuscriptAPI> => {
+    const res = await api.patch<{ success: boolean; data: any }>(`/api/manuscripts/${manuscriptId}`, payload)
+    return mapManuscript(res.data.data)
+  },
+
+  /** DELETE /api/manuscripts/:manuscriptId - Xóa bản thảo */
+  delete: async (manuscriptId: string): Promise<void> => {
+    await api.delete(`/api/manuscripts/${manuscriptId}`)
   }
 }
 

@@ -132,10 +132,10 @@ export default function CreateSeriesPage() {
         cover_image: coverUrl.trim() || null,
       })
 
-      // Bước 2: Nộp lên Board
+      // Bước 2: Nộp duyệt
       await seriesService.submitReview(newSeries._id)
 
-      setSuccessMsg('✅ Hồ sơ đã được nộp lên Hội đồng biên tập! Trạng thái: Đang xét duyệt.')
+      setSuccessMsg('✅ Hồ sơ đã được gửi yêu cầu duyệt! Trạng thái: Chờ duyệt.')
       setTimeout(() => navigate('/dashboard/mangaka/series'), 2000)
     } catch (err) {
       setApiError(getErrorMessage(err))
@@ -159,7 +159,7 @@ export default function CreateSeriesPage() {
         </h1>
         <div className="h-1.5 w-24 bg-manga-red mt-3" />
         <p className="text-sm font-bold text-gray-500 mt-2">
-          Tạo hồ sơ series và nộp lên Hội đồng biên tập để xét duyệt xuất bản
+          Tạo hồ sơ series và gửi yêu cầu duyệt xuất bản
         </p>
       </div>
 
@@ -217,8 +217,7 @@ export default function CreateSeriesPage() {
             QUY TRÌNH XÉT DUYỆT
           </h4>
           <p className="text-xs font-bold text-blue-800 leading-relaxed">
-            Series mới được <strong>Lưu nháp</strong> (Draft) trước, sau đó bạn có thể <strong>Nộp lên Hội đồng</strong> để xét duyệt.
-            Sau khi nộp, trạng thái chuyển sang <strong className="text-orange-600">Đang xét duyệt (Under Review)</strong>.
+            Series mới được <strong>Lưu nháp</strong> (Draft) trước, sau đó bạn có thể <strong>Gửi yêu cầu duyệt</strong> để Tantou Editor phụ trách xem xét và phê duyệt.
           </p>
         </div>
       </div>
@@ -530,10 +529,10 @@ export default function CreateSeriesPage() {
               <div className="bg-orange-50 border-2 border-orange-400 p-4 flex gap-3">
                 <AlertTriangle className="w-5 h-5 text-orange-500 flex-shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="font-black text-xs uppercase tracking-wider text-orange-700 mb-1">LƯU Ý KHI NỘP LÊN HỘI ĐỒNG</h4>
+                  <h4 className="font-black text-xs uppercase tracking-wider text-orange-700 mb-1">LƯU Ý KHI GỬI DUYỆT</h4>
                   <p className="text-xs font-bold text-orange-800 leading-relaxed">
-                    Sau khi nộp, trạng thái series sẽ chuyển sang <strong>Đang xét duyệt</strong>.
-                    Hội đồng biên tập sẽ xem xét và bỏ phiếu thông qua.
+                    Sau khi nộp, trạng thái series sẽ chuyển sang <strong>Chờ duyệt</strong>.
+                    Tantou Editor phụ trách của bạn sẽ trực tiếp xem xét phê duyệt hoặc yêu cầu chỉnh sửa lại.
                   </p>
                 </div>
               </div>
@@ -579,7 +578,7 @@ export default function CreateSeriesPage() {
                     ) : (
                       <>
                         <Send className="w-4 h-4" />
-                        Nộp lên Hội đồng
+                        Gửi yêu cầu duyệt
                       </>
                     )}
                   </button>

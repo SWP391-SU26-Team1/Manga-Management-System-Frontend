@@ -1,28 +1,38 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router'
-import { FileText, Clock, AlertTriangle, CheckCircle, Eye, Upload, Send } from 'lucide-react'
+import { FileText, Clock, AlertTriangle, CheckCircle, Eye, Upload, Send, X, BookOpen } from 'lucide-react'
 import { seriesService, SeriesAPI } from '@/services/series.service'
 import { chapterService } from '@/services/chapter.service'
 import { pageService } from '@/services/page.service'
 import { uploadService } from '@/services/upload.service'
 import { manuscriptService, ManuscriptAPI } from '@/services/manuscript.service'
+import { editorService } from '@/services/editor.service'
+import api from '@/services/api'
 
 const getChapterDisplayStatus = (ch: any, m?: any) => {
   if (m) {
+    if (m.title && m.title.includes('[ĐÃ DUYỆT]')) {
+      return 'ĐÃ DUYỆT'
+    }
     switch (m.status) {
       case 'draft':
-        return 'ĐANG SOẠN'
-      case 'needs_revision':
-      case 'rejected':
-        return 'CẦN CHỈNH SỬA'
+      case 'draft':
       case 'submitted':
       case 'in_review':
-        return 'CHỜ BOARD DUYỆT'
+        return 'CHỜ TANTOU DUYỆT'
+      case 'needs_revision':
+        return 'NHẬN XÉT TỪ EDITOR'
+      case 'rejected':
+        return 'TỪ CHỐI'
+
       case 'approved':
-      case 'published':
-      case 'archived':
-      case 'hidden':
         return 'ĐÃ DUYỆT'
+      case 'published':
+        return 'ĐÃ XUẤT BẢN'
+      case 'archived':
+        return 'LƯU TRỮ'
+      case 'hidden':
+        return 'ẨN'
       default:
         return m.status.toUpperCase()
     }
@@ -33,12 +43,13 @@ const getChapterDisplayStatus = (ch: any, m?: any) => {
     case 'draft':
       return 'ĐANG SOẠN'
     case 'pending_review':
-      return 'CHỜ BOARD DUYỆT'
+      return 'CHỜ TANTOU DUYỆT'
     case 'approved':
-    case 'published':
       return 'ĐÃ DUYỆT'
+    case 'published':
+      return 'ĐÃ XUẤT BẢN'
     case 'rejected':
-      return 'CẦN CHỈNH SỬA'
+      return 'TỪ CHỐI'
     default:
       return 'ĐANG VẼ LỚP'
   }
@@ -47,15 +58,23 @@ const getChapterDisplayStatus = (ch: any, m?: any) => {
 const getStatusDisplay = (displayStatus: string) => {
   switch (displayStatus) {
     case 'ĐANG SOẠN':
-      return { label: 'ĐANG SOẠN', classes: 'bg-white text-black border-2 border-black' }
+      return { label: 'ĐANG SOẠN', classes: 'bg-orange-500 text-white border-2 border-black font-extrabold' }
+    case 'GỢI Ý TỪ TRỢ LÝ':
+      return { label: 'GỢI Ý TỪ TRỢ LÝ', classes: 'bg-red-500 text-white border-2 border-black font-extrabold' }
+    case 'NHẬN XÉT TỪ EDITOR':
+      return { label: 'NHẬN XÉT TỪ EDITOR', classes: 'bg-red-500 text-white border-2 border-black font-extrabold' }
+    case 'TỪ CHỐI':
+      return { label: 'TỪ CHỐI', classes: 'bg-red-600 text-white border-2 border-black font-extrabold animate-pulse' }
     case 'CẦN CHỈNH SỬA':
-      return { label: 'CẦN CHỈNH SỬA', classes: 'bg-[#E63946] text-white border-2 border-[#E63946]' }
+      return { label: 'CẦN CHỈNH SỬA', classes: 'bg-red-500 text-white border-2 border-red-500 font-extrabold' }
     case 'ĐANG VẼ LỚP':
-      return { label: 'ĐANG VẼ LỚP', classes: 'bg-black text-white border-2 border-black' }
-    case 'CHỜ BOARD DUYỆT':
-      return { label: 'CHỜ BOARD DUYỆT', classes: 'bg-yellow-400 text-black border-2 border-black' }
+      return { label: 'ĐANG VẼ LỚP', classes: 'bg-black text-white border-2 border-black font-extrabold' }
+    case 'CHỜ TANTOU DUYỆT':
+      return { label: 'CHỜ TANTOU DUYỆT', classes: 'bg-yellow-400 text-black border-2 border-black font-extrabold' }
     case 'ĐÃ DUYỆT':
-      return { label: 'ĐÃ DUYỆT', classes: 'bg-white text-black border-2 border-black' }
+      return { label: 'ĐÃ DUYỆT', classes: 'bg-green-600 text-white border-2 border-black font-extrabold' }
+    case 'ĐÃ XUẤT BẢN':
+      return { label: 'ĐÃ XUẤT BẢN', classes: 'bg-green-600 text-white border-2 border-green-600' }
     default:
       return { label: displayStatus, classes: 'bg-white text-black border-2 border-black' }
   }
@@ -66,6 +85,7 @@ export default function ManuscriptsPage() {
   const [manuscripts, setManuscripts] = useState<ManuscriptAPI[]>([])
   const [chapterPagesMap, setChapterPagesMap] = useState<{ [key: string]: number }>({})
   const [seriesList, setSeriesList] = useState<SeriesAPI[]>([])
+  const [notifications, setNotifications] = useState<any[]>([])
   
   const [activeTab, setActiveTab] = useState('TẤT CẢ')
   const [showSubmitModal, setShowSubmitModal] = useState(false)
@@ -75,11 +95,13 @@ export default function ManuscriptsPage() {
   const [newChapterTitle, setNewChapterTitle] = useState('')
   const [newChapterNum, setNewChapterNum] = useState('')
   const [newChapterPages, setNewChapterPages] = useState('20')
-  const [file, setFile] = useState<File | null>(null)
+  const [files, setFiles] = useState<File[]>([])
 
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+  const [viewingSuggestion, setViewingSuggestion] = useState<any | null>(null)
+  const [viewingEditorComment, setViewingEditorComment] = useState<any | null>(null)
 
   // Load data from services
   const loadData = async () => {
@@ -104,6 +126,14 @@ export default function ManuscriptsPage() {
 
       setChapters(allChs)
       setManuscripts(allMs)
+
+      // Fetch notifications to extract editor feedback notes
+      try {
+        const notifs = await editorService.getNotifications()
+        setNotifications(notifs)
+      } catch (err) {
+        console.error('Failed to load notifications:', err)
+      }
 
       // Fetch page counts for all chapters in parallel
       const pageCountsMap: { [key: string]: number } = {}
@@ -138,6 +168,17 @@ export default function ManuscriptsPage() {
     } catch (err) {
       console.error(err)
       alert('Không thể thực hiện chỉnh sửa trạng thái.')
+    }
+  }
+
+  const handlePublishChapter = async (seriesId: string, chapterId: string) => {
+    try {
+      await chapterService.publish(seriesId, chapterId)
+      alert('Xuất bản chapter thành công!')
+      await loadData()
+    } catch (err) {
+      console.error(err)
+      alert('Không thể xuất bản chapter.')
     }
   }
 
@@ -177,53 +218,120 @@ export default function ManuscriptsPage() {
         chapterNumberStr = String(newCh.chapter_number)
       }
 
-      // 2. Nếu người dùng chọn file tải lên, tiến hành tạo và submit manuscript
-      if (file) {
-        // a. Upload file lên Cloudinary
-        const uploadRes = await uploadService.uploadSingle(file, 'manuscripts')
+      // b. Lấy mangaka_id từ localStorage
+      const userStr = localStorage.getItem('mangaflow_user')
+      let mangakaId = ''
+      if (userStr) {
+        try {
+          const parsed = JSON.parse(userStr)
+          mangakaId = parsed.user?.id || parsed.id || ''
+        } catch {
+          // ignore
+        }
+      }
 
-        // b. Lấy mangaka_id từ localStorage
-        const userStr = localStorage.getItem('mangaflow_user')
-        let mangakaId = ''
-        if (userStr) {
-          try {
-            const parsed = JSON.parse(userStr)
-            mangakaId = parsed.user?.id || parsed.id || ''
-          } catch {
-            // ignore
+      if (!mangakaId) {
+        throw new Error('Không tìm thấy thông tin tài khoản đăng nhập!')
+      }
+
+      // c. Tạo manuscript (backend sẽ lưu với status 'draft'), sau đó tự động submit
+      const createdMs = await manuscriptService.create({
+        mangaka_id: mangakaId,
+        series_id: selectedSeriesId,
+        chapter_id: chapterId,
+        title: `Bản thảo Chương ${chapterNumberStr}: ${chapterTitle}`,
+        file_url: files.length > 0 ? (await Promise.all(files.map(f => uploadService.uploadSingle(f, 'manuscripts'))))[0].secure_url : undefined,
+        status: 'submitted'
+      })
+
+      // d. Gọi workflow submit để chuyển trạng thái từ 'draft' -> 'submitted'
+      try {
+        const msId = createdMs._id || (createdMs as any).manuscript_id
+        if (msId) {
+          await api.patch(`/api/manuscripts/${msId}/submit`)
+        }
+      } catch (submitErr) {
+        console.warn('Auto-submit workflow failed, manuscript may still be in draft:', submitErr)
+      }
+
+      // e. Nếu có file upload, thêm file liên kết
+      if (files.length > 0) {
+        const uploadPromises = files.map(f => uploadService.uploadSingle(f, 'manuscripts'))
+        const uploadResults = await Promise.all(uploadPromises)
+        await Promise.all(
+          uploadResults.map((res, index) => {
+            const f = files[index]
+            return manuscriptService.addFile({
+              manuscript_id: createdMs._id,
+              file_url: res.secure_url,
+              file_name: f.name,
+              file_type: f.name.split('.').pop() || 'psd'
+            })
+          })
+        )
+      }
+
+      // f. Gửi thông báo đến toàn bộ các Tantou Editor phụ trách
+      try {
+        const mems = await seriesService.getMembers(selectedSeriesId)
+        const editors = mems
+          .filter((m: any) => m.users?.role?.toLowerCase() === 'editor')
+          .map((m: any) => m.users.user_id)
+          
+          // Danh sách các Biên tập viên (Tantou Editor) trong hệ thống để tất cả đều nhận được thông báo
+          const systemEditors = [
+            'b29fb935-7a5d-4988-9327-a8e453ba7322', // LuanHuynh296
+            'f9a1ee69-6036-4fd6-bbef-de0e00370309', // editor_akira (Akira Watanabe)
+            '83556777-7c27-4039-ba81-655e58a788a7', // Tantou_Editor
+            '66666666-6666-6666-6666-666666666666', // editor_haru
+            '90000000-0000-0000-0000-000000000004', // editor_mika
+            'dcba68dd-5e62-49e2-a826-d2f5e6941561', // codex_test_1781698003205
+            'usr_editor_001'                        // fallback mock
+          ]
+
+          systemEditors.forEach(id => {
+            if (!editors.includes(id)) {
+              editors.push(id)
+            }
+          })
+
+          const activeSeries = seriesList.find(s => s._id === selectedSeriesId)
+          
+          // Lấy tên của mangaka hiện tại để chèn vào thông báo
+          let mangakaName = 'BiLong'
+          if (userStr) {
+            try {
+              const parsed = JSON.parse(userStr)
+              mangakaName = parsed.fullName || parsed.name || parsed.username || parsed.user?.fullName || parsed.user?.name || parsed.user?.username || 'BiLong'
+            } catch {
+              // ignore
+            }
           }
-        }
 
-        if (!mangakaId) {
-          throw new Error('Không tìm thấy thông tin tài khoản đăng nhập!')
-        }
+          const rfc4122UuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/;
+          const validEditors = editors.filter(id => rfc4122UuidRegex.test(id))
 
-        // c. Tạo manuscript
-        const manuscript = await manuscriptService.create({
-          mangaka_id: mangakaId,
-          series_id: selectedSeriesId,
-          chapter_id: chapterId,
-          title: `Bản thảo Chương ${chapterNumberStr}: ${chapterTitle}`,
-          file_url: uploadRes.secure_url
-        })
-
-        // d. Thêm file liên kết để backend/editor có thể đọc
-        await manuscriptService.addFile({
-          manuscript_id: manuscript._id,
-          file_url: uploadRes.secure_url,
-          file_name: file.name,
-          file_type: file.name.split('.').pop() || 'psd'
-        })
-
-        // e. Submit manuscript lên Board
-        await manuscriptService.submit(manuscript._id)
+          await Promise.all(
+            validEditors.map(editorId =>
+              editorService.sendInternalNotification(
+                editorId,
+                "Cập nhật mới",
+                `Có bản thảo mới từ ${mangakaName} cần duyệt cho bộ truyện [${activeSeries?.title || 'One Piece'}].`,
+                "manuscript_submitted"
+              ).catch(errNotif => {
+                console.error(`Lỗi khi gửi thông báo cho editor ${editorId}:`, errNotif)
+              })
+            )
+          )
+      } catch (errNotifs) {
+        console.error("Lỗi khi xử lý thông báo nộp bản thảo cho Tantou:", errNotifs)
       }
 
       alert('Đã thực hiện thành công!')
       setShowSubmitModal(false)
       setNewChapterTitle('')
       setNewChapterNum('')
-      setFile(null)
+      setFiles([])
       setSelectedChapterId(null)
       
       // Reload page data
@@ -256,6 +364,17 @@ export default function ManuscriptsPage() {
     const displayStatus = getChapterDisplayStatus(ch, latestManuscript)
     const statusDisplay = getStatusDisplay(displayStatus)
 
+    // Find editor feedback from notifications matching type ms_fb:<manuscriptId>
+    let editorComment = ''
+    if (latestManuscript) {
+      const matchNotif = notifications.find(
+        (n) => n.type === `ms_fb:${latestManuscript._id}`
+      )
+      if (matchNotif) {
+        editorComment = matchNotif.content
+      }
+    }
+
     return {
       id: ch._id,
       seriesId: ch.series_id,
@@ -267,20 +386,30 @@ export default function ManuscriptsPage() {
       status: ch.status, // Database chapter status
       displayStatus: displayStatus,
       statusDisplay: statusDisplay,
-      latestManuscript: latestManuscript
+      latestManuscript: latestManuscript,
+      editorComment: editorComment,
+      createdAt: ch.created_at
     }
+  }).filter(ch => ch.status !== 'published')
+
+  // Sort by created_at descending (newest first)
+  const sortedChapters = enrichedChapters.sort((a, b) => {
+    return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
   })
 
   // Filter based on active tab
-  const filteredChapters = enrichedChapters.filter(ch => {
+  const filteredChapters = sortedChapters.filter(ch => {
     if (activeTab === 'TẤT CẢ') return true
+    if (activeTab === 'NHẬN XÉT TỪ EDITOR') {
+      return ch.displayStatus === 'NHẬN XÉT TỪ EDITOR' || ch.displayStatus === 'TỪ CHỐI'
+    }
     return ch.displayStatus === activeTab
   })
 
   // Calculate stats
   const totalChapters = enrichedChapters.length
   const drawingCount = enrichedChapters.filter(ch => ch.displayStatus === 'ĐANG VẼ LỚP').length
-  const needFixCount = enrichedChapters.filter(ch => ch.displayStatus === 'CẦN CHỈNH SỬA').length
+  const needFixCount = enrichedChapters.filter(ch => ch.displayStatus === 'NHẬN XÉT TỪ EDITOR' || ch.displayStatus === 'TỪ CHỐI').length
   const completedCount = enrichedChapters.filter(ch => ch.displayStatus === 'ĐÃ DUYỆT').length
 
   if (isLoading) {
@@ -306,28 +435,30 @@ export default function ManuscriptsPage() {
             {/* Retro Manga Underline */}
             <div className="w-28 h-2 bg-[#E63946] mt-2 mb-4"></div>
             <p className="text-[13px] text-gray-500 font-bold leading-normal">
-              Theo dõi danh sách các chương truyện đang thực hiện, tiến độ ghép file PSD và gửi bản thảo chính thức cho ban biên tập.
+              Theo dõi danh sách các chương truyện đang thực hiện, tiến độ ghép file PSD và gửi bản thảo chính thức cho Tantou Editor.
             </p>
           </div>
-          <button
-            onClick={() => {
-              setSelectedChapterId(null)
-              setNewChapterTitle('')
-              setNewChapterNum('')
-              setFile(null)
-              if (seriesList.length > 0) {
-                setSelectedSeriesId(seriesList[0]._id)
-              }
-              setShowSubmitModal(true)
-            }}
-            className="bg-[#E63946] text-white border-2 border-black font-bold uppercase py-2.5 px-5 shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none transition-all flex items-center gap-2 text-xs"
-          >
-            + TẠO CHAPTER MỚI
-          </button>
+          <div className="flex gap-4">
+            <button
+              onClick={() => {
+                setSelectedChapterId(null)
+                setNewChapterTitle('')
+                setNewChapterNum('')
+                setFiles([])
+                if (seriesList.length > 0) {
+                  setSelectedSeriesId(seriesList[0]._id)
+                }
+                setShowSubmitModal(true)
+              }}
+              className="bg-[#E63946] text-white border-2 border-black font-bold uppercase py-2.5 px-5 shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none transition-all flex items-center gap-2 text-xs cursor-pointer"
+            >
+              + TẠO CHAPTER MỚI
+            </button>
+          </div>
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-4 gap-5 mb-8">
+        <div className="grid grid-cols-3 gap-5 mb-8">
           <div className="border-2 border-black bg-white p-5 flex flex-col items-center justify-center shadow-[4px_4px_0px_rgba(0,0,0,1)]">
             <FileText className="w-6 h-6 mb-2 text-black" />
             <span className="text-3xl font-black font-mono leading-none">{totalChapters}</span>
@@ -343,19 +474,13 @@ export default function ManuscriptsPage() {
           <div className="border-2 border-[#E63946] bg-white p-5 flex flex-col items-center justify-center shadow-[4px_4px_0px_rgba(0,0,0,1)]">
             <AlertTriangle className="w-6 h-6 mb-2 text-[#E63946]" />
             <span className="text-3xl font-black font-mono text-[#E63946] leading-none">{needFixCount}</span>
-            <span className="text-[9px] font-extrabold text-[#E63946] mt-2 uppercase tracking-widest">CẦN CHỈNH SỬA</span>
-          </div>
-
-          <div className="border-2 border-black bg-white p-5 flex flex-col items-center justify-center shadow-[4px_4px_0px_rgba(0,0,0,1)]">
-            <CheckCircle className="w-6 h-6 mb-2 text-black" />
-            <span className="text-3xl font-black font-mono leading-none">{completedCount}</span>
-            <span className="text-[9px] font-extrabold text-gray-400 mt-2 uppercase tracking-widest">ĐÃ HOÀN THÀNH</span>
+            <span className="text-[9px] font-extrabold text-[#E63946] mt-2 uppercase tracking-widest">NHẬN XÉT TỪ EDITOR</span>
           </div>
         </div>
 
         {/* Filters Tabs */}
-        <div className="flex gap-2 mb-6">
-          {['TẤT CẢ', 'ĐANG SOẠN', 'CẦN CHỈNH SỬA', 'ĐANG VẼ LỚP', 'CHỜ BOARD DUYỆT', 'ĐÃ DUYỆT'].map(tab => (
+        <div className="flex gap-2 mb-6 flex-wrap">
+          {['TẤT CẢ', 'ĐANG SOẠN', 'GỢI Ý TỪ TRỢ LÝ', 'NHẬN XÉT TỪ EDITOR', 'CẦN CHỈNH SỬA', 'ĐANG VẼ LỚP', 'CHỜ TANTOU DUYỆT', 'ĐÃ DUYỆT'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -386,7 +511,7 @@ export default function ManuscriptsPage() {
             <tbody>
               {filteredChapters.map((ch) => {
                 const statusDisplay = ch.statusDisplay
-                const isNeedFix = statusDisplay.label === 'CẦN CHỈNH SỬA'
+                const isNeedFix = statusDisplay.label === 'NHẬN XÉT TỪ EDITOR' || statusDisplay.label === 'TỪ CHỐI'
 
                 return (
                   <tr key={ch.id} className="border-b-2 border-black font-semibold text-xs text-black">
@@ -422,7 +547,7 @@ export default function ManuscriptsPage() {
                             setSelectedChapterId(ch.id)
                             setNewChapterNum(String(ch.chapterNumber))
                             setNewChapterTitle(ch.title)
-                            setFile(null)
+                            setFiles([])
                             setShowSubmitModal(true)
                           }}
                           className="flex items-center gap-1.5 text-[10px] font-black text-black uppercase hover:underline text-left whitespace-nowrap"
@@ -430,6 +555,24 @@ export default function ManuscriptsPage() {
                           <Upload className="w-3.5 h-3.5 flex-shrink-0" />
                           NỘP BẢN THẢO MỚI
                         </button>
+                        {ch.displayStatus === 'GỢI Ý TỪ TRỢ LÝ' && ch.latestManuscript && (
+                          <button
+                            onClick={() => setViewingSuggestion(ch)}
+                            className="flex items-center gap-1.5 text-[10px] font-black text-red-600 uppercase hover:underline text-left whitespace-nowrap cursor-pointer"
+                          >
+                            <BookOpen className="w-3.5 h-3.5 flex-shrink-0 text-red-650" />
+                            XEM GỢI Ý TỪ TRỢ LÝ
+                          </button>
+                        )}
+                        {(ch.displayStatus === 'NHẬN XÉT TỪ EDITOR' || ch.displayStatus === 'TỪ CHỐI') && ch.latestManuscript && (
+                          <button
+                            onClick={() => setViewingEditorComment(ch)}
+                            className="flex items-center gap-1.5 text-[10px] font-black text-red-600 uppercase hover:underline text-left whitespace-nowrap cursor-pointer"
+                          >
+                            <BookOpen className="w-3.5 h-3.5 flex-shrink-0 text-red-650" />
+                            XEM NHẬN XÉT TỪ EDITOR
+                          </button>
+                        )}
                         {isNeedFix && ch.latestManuscript && (
                           <button
                             onClick={() => handleUpdateStatus(ch.seriesId, ch.latestManuscript._id)}
@@ -469,7 +612,7 @@ export default function ManuscriptsPage() {
                 1
               </div>
               <p className="text-xs font-bold leading-snug pt-0.5">
-                Mangaka chia khung & giao task
+                Mangaka phác thảo kịch bản
               </p>
             </div>
             <div className="flex gap-3.5 items-start">
@@ -477,7 +620,7 @@ export default function ManuscriptsPage() {
                 2
               </div>
               <p className="text-xs font-bold leading-snug pt-0.5">
-                Trợ lý vẽ và nộp lớp layer
+                Gửi kịch bản cho Tantou Editor duyệt
               </p>
             </div>
             <div className="flex gap-3.5 items-start">
@@ -485,7 +628,7 @@ export default function ManuscriptsPage() {
                 3
               </div>
               <p className="text-xs font-bold leading-snug pt-0.5">
-                Mangaka phê duyệt & ghép file
+                Mangaka vẽ và hoàn thiện bản thảo
               </p>
             </div>
             <div className="flex gap-3.5 items-start">
@@ -493,7 +636,7 @@ export default function ManuscriptsPage() {
                 4
               </div>
               <p className="text-xs font-bold leading-snug pt-0.5">
-                Nộp bản thảo tổng hợp lên Editor
+                Nộp bản thảo chính thức lên Tantou Editor
               </p>
             </div>
             <div className="flex gap-3.5 items-start">
@@ -501,7 +644,7 @@ export default function ManuscriptsPage() {
                 5
               </div>
               <p className="text-xs font-bold leading-snug pt-0.5">
-                Ban biên tập phê duyệt xuất bản
+                Hội đồng phê duyệt xuất bản
               </p>
             </div>
           </div>
@@ -580,20 +723,23 @@ export default function ManuscriptsPage() {
 
             <div className="mb-5">
               <label className="block text-[11px] font-black uppercase mb-1">
-                File đính kèm (PSD/ZIP) {!selectedChapterId && '(Tùy chọn)'}
+                File đính kèm (PSD/ZIP/Ảnh) {!selectedChapterId && '(Tùy chọn)'}
               </label>
               <label className="border-2 border-dashed border-gray-400 p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:border-black bg-gray-50 transition-all rounded-none block">
                 <Upload className="w-7 h-7 mb-2 text-gray-500 mx-auto" />
-                <p className="text-[10px] font-black text-gray-500 uppercase">
-                  {file ? file.name : 'Kéo thả file hoặc click để tải lên'}
+                <p className="text-[10px] font-black text-gray-500 uppercase max-w-xs mx-auto break-all">
+                  {files.length > 0 
+                    ? `Đã chọn ${files.length} file: ${files.map(f => f.name).join(', ')}`
+                    : 'Kéo thả file/ảnh hoặc click để tải lên'}
                 </p>
                 <input
                   type="file"
-                  accept=".psd,.zip,.rar,.pdf"
+                  multiple
+                  accept=".psd,.zip,.rar,.pdf,image/*"
                   className="hidden"
                   onChange={(e) => {
                     if (e.target.files && e.target.files.length > 0) {
-                      setFile(e.target.files[0])
+                      setFiles(Array.from(e.target.files))
                     }
                   }}
                   required={!!selectedChapterId}
@@ -608,7 +754,7 @@ export default function ManuscriptsPage() {
                   setShowSubmitModal(false)
                   setNewChapterTitle('')
                   setNewChapterNum('')
-                  setFile(null)
+                  setFiles([])
                   setSelectedChapterId(null)
                 }}
                 disabled={isSubmitting}
@@ -634,6 +780,103 @@ export default function ManuscriptsPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Viewing Suggestion Modal */}
+      {viewingSuggestion && viewingSuggestion.latestManuscript && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white border-4 border-black w-full max-w-4xl shadow-[8px_8px_0px_rgba(0,0,0,1)] flex flex-col max-h-[90vh]">
+            <div className="bg-black text-white p-4 flex justify-between items-center border-b-2 border-black flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-[#E63946]" />
+                <span className="font-manga text-lg font-bold uppercase tracking-wider">Xem Gợi Ý Từ Trợ Lý</span>
+              </div>
+              <button onClick={() => setViewingSuggestion(null)} className="text-white hover:text-[#E63946] cursor-pointer">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4 overflow-y-auto flex-1 text-black">
+              <div className="flex flex-wrap gap-2 mb-2">
+                <span className="bg-black text-white text-[9px] font-black uppercase px-2 py-0.5">
+                  Tác phẩm: {viewingSuggestion.seriesTitle}
+                </span>
+                <span className="bg-gray-100 border border-black text-black text-[9px] font-black uppercase px-2 py-0.5">
+                  Chương {viewingSuggestion.chapterNumber}: {viewingSuggestion.title}
+                </span>
+              </div>
+
+              <h2 className="font-manga text-2xl font-black text-black border-b-2 border-dashed border-gray-250 pb-2 uppercase">
+                {viewingSuggestion.latestManuscript.title.replace(/^\[ĐÃ DUYỆT\]\s*/i, '').replace(/^\[GỢI Ý\]\s*/i, '')}
+              </h2>
+
+              <div className="bg-red-50/50 border-2 border-red-250 p-4 font-mono text-sm leading-relaxed whitespace-pre-wrap max-h-[50vh] overflow-y-auto">
+                {viewingSuggestion.latestManuscript.content || <em className="text-gray-400">Không có nội dung gợi ý...</em>}
+              </div>
+            </div>
+
+            <div className="p-4 border-t-2 border-dashed border-gray-200 flex gap-4 bg-gray-50 flex-shrink-0">
+              <button
+                onClick={() => setViewingSuggestion(null)}
+                className="flex-1 py-3 border-2 border-black font-bold text-xs uppercase hover:bg-gray-100 transition-colors bg-white cursor-pointer"
+              >
+                Quay lại
+              </button>
+              <Link
+                to="/dashboard/mangaka/drafts"
+                className="flex-1 py-3 bg-[#E63946] text-white border-2 border-black font-black uppercase text-center transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:bg-red-650 text-xs flex items-center justify-center gap-2 cursor-pointer"
+              >
+                Đến trang cộng tác kịch bản
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Viewing Editor Comment Modal */}
+      {viewingEditorComment && viewingEditorComment.latestManuscript && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white border-4 border-black w-full max-w-2xl shadow-[8px_8px_0px_rgba(0,0,0,1)] flex flex-col max-h-[90vh]">
+            <div className="bg-black text-white p-4 flex justify-between items-center border-b-2 border-black flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-[#E63946]" />
+                <span className="font-manga text-lg font-bold uppercase tracking-wider">Xem Nhận Xét Từ Editor</span>
+              </div>
+              <button onClick={() => setViewingEditorComment(null)} className="text-white hover:text-[#E63946] cursor-pointer">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4 overflow-y-auto flex-1 text-black">
+              <div className="flex flex-wrap gap-2 mb-2">
+                <span className="bg-black text-white text-[9px] font-black uppercase px-2 py-0.5">
+                  Tác phẩm: {viewingEditorComment.seriesTitle}
+                </span>
+                <span className="bg-gray-100 border border-black text-black text-[9px] font-black uppercase px-2 py-0.5">
+                  Chương {viewingEditorComment.chapterNumber}: {viewingEditorComment.title}
+                </span>
+              </div>
+
+              <h2 className="font-manga text-2xl font-black text-black border-b-2 border-dashed border-gray-250 pb-2 uppercase">
+                {viewingEditorComment.latestManuscript.title}
+              </h2>
+
+              <div className="bg-red-50 border-2 border-red-500 p-4 font-sans text-sm leading-relaxed whitespace-pre-wrap max-h-[50vh] overflow-y-auto">
+                {viewingEditorComment.editorComment || <em className="text-gray-400">Không có ý kiến nhận xét chi tiết...</em>}
+              </div>
+            </div>
+
+            <div className="p-4 border-t-2 border-dashed border-gray-200 flex gap-4 bg-gray-50 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setViewingEditorComment(null)}
+                className="w-full py-3 bg-[#E63946] text-white border-2 border-black font-black uppercase text-center transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:bg-red-750 text-xs flex items-center justify-center gap-2 cursor-pointer"
+              >
+                Đồng ý và Quay lại
+              </button>
+            </div>
+          </div>
         </div>
       )}
       </div>

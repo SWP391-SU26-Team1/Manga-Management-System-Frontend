@@ -82,6 +82,14 @@ export const seriesService = {
     return mapSeries(res.data.data)
   },
 
+  /** PATCH /api/mangaka/series/:seriesId/publish — xuất bản series */
+  publish: async (seriesId: string): Promise<SeriesAPI> => {
+    const res = await api.patch<{ success: boolean; data: any }>(
+      `/api/mangaka/series/${seriesId}/publish`
+    )
+    return mapSeries(res.data.data)
+  },
+
   /** GET /api/mangaka/series/:seriesId/members — lấy danh sách thành viên dự án */
   getMembers: async (seriesId: string): Promise<any[]> => {
     const res = await api.get<{ success: boolean; data: any[] }>(

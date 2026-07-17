@@ -14,23 +14,22 @@ export default function SeriesApprovalPage() {
   useEffect(() => {
     const fetchSeries = async () => {
       try {
-        const [resSeries, resProposals] = await Promise.all([
-          boardService.getReviewedSeries(),
-          boardService.getPendingProposals()
-        ])
+        // Only fetch proposals that Tantou has submitted to Board (review_session exists)
+        // This ensures series only appear here AFTER Tantou has reviewed and submitted them
+        const resProposals = await boardService.getPendingProposals()
         
-        let data = Array.isArray(resSeries) ? resSeries : []
         let proposals = Array.isArray(resProposals) ? resProposals : []
-        
-        if (data.length > 0) {
-          const enrichedSeries = await Promise.all(data.map(async (s: any) => {
-            const seriesId = s.id || s.series_id
+
+        // Filter to only series proposals (not chapter proposals)
+        const seriesProposals = proposals.filter((p: any) => !p.chapter_id)
+
+        if (seriesProposals.length > 0) {
+          const enrichedSeries = await Promise.all(seriesProposals.map(async (proposal: any) => {
+            const seriesId = proposal.series_id
+            const seriesInfo = proposal.series || {}
             let userVote = undefined
-            let matchedSessionId = undefined
-            
-            const session = proposals.find(p => p.series_id === seriesId)
-            matchedSessionId = session ? session.session_id : `session_${seriesId}`
-            
+            const matchedSessionId = proposal.session_id
+
             if (currentUser) {
               try {
                 const votes = await boardService.getVote(matchedSessionId)
@@ -44,14 +43,14 @@ export default function SeriesApprovalPage() {
 
             return {
               id: seriesId,
-              title: s.title,
-              authorName: s.authorName || s.author_name || 'Tác giả',
-              coverUrl: s.coverUrl || s.cover_image_url || 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=300&auto=format&fit=crop',
-              genre: s.genre,
-              synopsis: s.synopsis || s.description || '',
-              submittedAt: s.submittedAt || s.created_at || new Date().toISOString(),
-              tantouName: s.tantouName || s.editor_name || 'Biên tập viên',
-              tantouOpinion: s.tantouOpinion || s.note || '',
+              title: seriesInfo.title || 'Chưa có tên',
+              authorName: seriesInfo.authorName || seriesInfo.author_name || 'Tác giả',
+              coverUrl: seriesInfo.coverUrl || seriesInfo.cover_image_url || 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=300&auto=format&fit=crop',
+              genre: seriesInfo.genre || '—',
+              synopsis: seriesInfo.synopsis || seriesInfo.description || '',
+              submittedAt: proposal.created_at || new Date().toISOString(),
+              tantouName: seriesInfo.tantouName || seriesInfo.editor_name || 'Biên tập viên',
+              tantouOpinion: seriesInfo.tantouOpinion || seriesInfo.note || '',
               sessionId: matchedSessionId,
               vote: userVote ? {
                 decision: userVote.decision,
@@ -65,7 +64,7 @@ export default function SeriesApprovalPage() {
           setSeriesList([])
         }
       } catch (err) {
-        console.warn('API error fetching reviewed series:', err)
+        console.warn('API error fetching proposals:', err)
         setSeriesList([])
       } finally {
         setLoading(false)
@@ -73,6 +72,7 @@ export default function SeriesApprovalPage() {
     }
     fetchSeries()
   }, [])
+
 
   return (
     <div className="max-w-5xl mx-auto pb-16 font-sans">

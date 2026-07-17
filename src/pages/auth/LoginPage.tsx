@@ -24,6 +24,78 @@ export default function LoginPage() {
   const [loginError, setLoginError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
+  const handleGoogleCallback = async (response: any) => {
+    setLoginError(null)
+    setLoading(true)
+    try {
+      const data = await authService.loginWithGoogle(response.credential)
+      
+      const storedUserData = {
+        ...data.user,
+        token: data.token
+      }
+      localStorage.setItem('mangaflow_user', JSON.stringify(storedUserData))
+
+      if (storedUserData.role === 'MANGAKA') {
+        navigate('/dashboard/mangaka')
+      } else if (storedUserData.role === 'ASSISTANT') {
+        navigate('/dashboard/assistant')
+      } else if (storedUserData.role === 'EDITOR') {
+        navigate('/dashboard/tantou-editor')
+      } else if (storedUserData.role?.toUpperCase() === 'ADMIN') {
+        navigate('/dashboard/admin')
+      } else if (['BOARD', 'CHIEF_EDITOR'].includes(storedUserData.role?.toUpperCase())) {
+        navigate('/dashboard/editorial-board')
+      } else {
+        navigate('/')
+      }
+    } catch (err: any) {
+      console.error('Google login error:', err)
+      const errorMsg = err.response?.data?.message || 'Đăng nhập Google thất bại.'
+      setLoginError(errorMsg)
+      setLoading(false)
+    }
+  }
+
+  React.useEffect(() => {
+    const initGoogleSignIn = () => {
+      const w = window as any
+      if (w.google) {
+        const clientId = import.meta.env.GOOGLE_CLIENT_ID || import.meta.env.VITE_GOOGLE_CLIENT_ID || "1032120760447-placeholder.apps.googleusercontent.com"
+        w.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: handleGoogleCallback,
+        })
+        
+        const btnParent = document.getElementById("google-signin-btn-container")
+        if (btnParent) {
+          w.google.accounts.id.renderButton(
+            btnParent,
+            {
+              theme: "outline",
+              size: "large",
+              width: btnParent.clientWidth || 320,
+              text: "signin_with"
+            }
+          )
+        }
+      }
+    }
+
+    initGoogleSignIn()
+    const timer = setTimeout(initGoogleSignIn, 1000)
+    return () => clearTimeout(timer)
+  }, [])
+
+  const handleGoogleFallbackClick = () => {
+    const w = window as any
+    if (w.google) {
+      w.google.accounts.id.prompt()
+    } else {
+      alert("Google Sign-In SDK đang tải. Vui lòng thử lại sau vài giây.")
+    }
+  }
+
   const getInputClass = (field: 'email' | 'password', extraPaddingRight = 'pr-4') => {
     const isTouched = touched[field]
     const error = errors[field]
@@ -247,19 +319,19 @@ export default function LoginPage() {
             </div>
 
             {/* Social Login */}
-            <div className="mt-6 grid grid-cols-2 gap-4">
-              <button className="flex items-center justify-center gap-2 bg-white text-manga-ink font-bold py-2 px-4 manga-border manga-shadow-sm hover:bg-gray-50 transition-colors">
-                <svg className="w-5 h-5" viewBox="0 0 24 24">
-                  <path fill="currentColor" d="M21.35,11.1H12.18V13.83H18.69C18.36,17.64 15.19,19.27 12.19,19.27C8.36,19.27 5,16.25 5,12C5,7.9 8.2,4.73 12.2,4.73C15.29,4.73 17.1,6.7 17.1,6.7L19,4.72C19,4.72 16.56,2 12.1,2C6.42,2 2.03,6.8 2.03,12C2.03,17.05 6.16,22 12.25,22C17.6,22 21.5,18.33 21.5,12.91C21.5,11.76 21.35,11.1 21.35,11.1V11.1Z" />
-                </svg>
-                Google
-              </button>
-              <button className="flex items-center justify-center gap-2 bg-manga-ink text-white font-bold py-2 px-4 manga-border border-manga-ink manga-shadow-sm hover:bg-gray-900 transition-colors">
-                <svg className="w-5 h-5" viewBox="0 0 24 24">
-                  <path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                </svg>
-                Twitter
-              </button>
+            <div className="mt-6 flex justify-center">
+              <div id="google-signin-btn-container" className="w-full max-w-sm flex justify-center">
+                <button
+                  type="button"
+                  onClick={handleGoogleFallbackClick}
+                  className="w-full flex items-center justify-center gap-2 bg-white text-manga-ink font-bold py-2.5 px-4 manga-border manga-shadow-sm hover:bg-gray-50 transition-colors"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24">
+                    <path fill="currentColor" d="M21.35,11.1H12.18V13.83H18.69C18.36,17.64 15.19,19.27 12.19,19.27C8.36,19.27 5,16.25 5,12C5,7.9 8.2,4.73 12.2,4.73C15.29,4.73 17.1,6.7 17.1,6.7L19,4.72C19,4.72 16.56,2 12.1,2C6.42,2 2.03,6.8 2.03,12C2.03,17.05 6.16,22 12.25,22C17.6,22 21.5,18.33 21.5,12.91C21.5,11.76 21.35,11.1 21.35,11.1V11.1Z" />
+                  </svg>
+                  Google
+                </button>
+              </div>
             </div>
 
             {/* Bottom Link */}
@@ -269,7 +341,7 @@ export default function LoginPage() {
                 to="/register"
                 className="font-bold underline decoration-2 underline-offset-4 hover:text-manga-red transition-colors"
               >
-                Tạo bản thảo mới
+                Đăng ký ngay!
               </Link>
             </div>
           </div>

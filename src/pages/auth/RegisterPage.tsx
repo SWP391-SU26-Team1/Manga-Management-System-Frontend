@@ -20,6 +20,66 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
+  const handleGoogleCallback = async (response: any) => {
+    setRegisterError(null)
+    setLoading(true)
+    try {
+      const data = await authService.loginWithGoogle(response.credential)
+      
+      const storedUserData = {
+        ...data.user,
+        token: data.token
+      }
+      localStorage.setItem('mangaflow_user', JSON.stringify(storedUserData))
+      setRegisteredUser(storedUserData)
+      setShowSuccess(true)
+    } catch (err: any) {
+      console.error('Google register error:', err)
+      const errorMsg = err.response?.data?.message || 'Đăng ký bằng Google thất bại.'
+      setRegisterError(errorMsg)
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    const initGoogleSignIn = () => {
+      const w = window as any
+      if (w.google) {
+        const clientId = import.meta.env.GOOGLE_CLIENT_ID || import.meta.env.VITE_GOOGLE_CLIENT_ID || "1032120760447-placeholder.apps.googleusercontent.com"
+        w.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: handleGoogleCallback,
+        })
+        
+        const btnParent = document.getElementById("google-register-btn-container")
+        if (btnParent) {
+          w.google.accounts.id.renderButton(
+            btnParent,
+            {
+              theme: "outline",
+              size: "large",
+              width: btnParent.clientWidth || 320,
+              text: "signup_with"
+            }
+          )
+        }
+      }
+    }
+
+    initGoogleSignIn()
+    const timer = setTimeout(initGoogleSignIn, 1000)
+    return () => clearTimeout(timer)
+  }, [])
+
+  const handleGoogleFallbackClick = () => {
+    const w = window as any
+    if (w.google) {
+      w.google.accounts.id.prompt()
+    } else {
+      alert("Google Sign-In SDK đang tải. Vui lòng thử lại sau vài giây.")
+    }
+  }
+
   useEffect(() => {
     let timer: any
     if (showSuccess && countdown > 0) {
@@ -426,6 +486,29 @@ export default function RegisterPage() {
               >
                 {loading ? 'Đang xử lý...' : 'Bắt đầu sáng tạo'}
               </button>
+            </div>
+
+            {/* Divider */}
+            <div className="mt-6 flex items-center justify-center gap-4">
+              <div className="h-px bg-manga-ink flex-1" />
+              <span className="font-manga text-sm font-bold uppercase">Hoặc</span>
+              <div className="h-px bg-manga-ink flex-1" />
+            </div>
+
+            {/* Social Register */}
+            <div className="mt-6 flex justify-center">
+              <div id="google-register-btn-container" className="w-full max-w-sm flex justify-center">
+                <button
+                  type="button"
+                  onClick={handleGoogleFallbackClick}
+                  className="w-full flex items-center justify-center gap-2 bg-white text-manga-ink font-bold py-2.5 px-4 manga-border manga-shadow-sm hover:bg-gray-50 transition-colors"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24">
+                    <path fill="currentColor" d="M21.35,11.1H12.18V13.83H18.69C18.36,17.64 15.19,19.27 12.19,19.27C8.36,19.27 5,16.25 5,12C5,7.9 8.2,4.73 12.2,4.73C15.29,4.73 17.1,6.7 17.1,6.7L19,4.72C19,4.72 16.56,2 12.1,2C6.42,2 2.03,6.8 2.03,12C2.03,17.05 6.16,22 12.25,22C17.6,22 21.5,18.33 21.5,12.91C21.5,11.76 21.35,11.1 21.35,11.1V11.1Z" />
+                  </svg>
+                  Google
+                </button>
+              </div>
             </div>
 
             {/* Bottom Link */}

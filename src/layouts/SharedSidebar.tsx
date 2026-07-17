@@ -13,8 +13,10 @@ const getNavConfig = (role: string) => {
   switch (role?.toUpperCase()) {
     case 'MANGAKA': return mangakaNav;
     case 'ASSISTANT': return assistantNav;
-    case 'EDITORIAL_BOARD': return boardNav;
-    case 'TANTOU': return tantouNav;
+    case 'EDITORIAL_BOARD':
+    case 'BOARD': return boardNav;
+    case 'TANTOU':
+    case 'EDITOR': return tantouNav;
     case 'ADMIN': return adminNav;
     default: return [];
   }
@@ -24,8 +26,10 @@ const getRoleText = (role: string) => {
   switch (role?.toUpperCase()) {
     case 'MANGAKA': return 'PHÒNG LÀM VIỆC MANGAKA';
     case 'ASSISTANT': return 'Phòng làm việc Trợ lý';
-    case 'EDITORIAL_BOARD': return 'Editorial Board Panel';
-    case 'TANTOU': return 'Tantou Editor Panel';
+    case 'EDITORIAL_BOARD':
+    case 'BOARD': return 'Editorial Board Panel';
+    case 'TANTOU':
+    case 'EDITOR': return 'Tantou Editor Panel';
     case 'ADMIN': return 'HỆ THỐNG QUẢN TRỊ';
     default: return 'MANGAFLOW PANEL';
   }
@@ -35,8 +39,10 @@ const getDashboardPath = (role: string) => {
   switch (role?.toUpperCase()) {
     case 'MANGAKA': return '/dashboard/mangaka';
     case 'ASSISTANT': return '/dashboard/assistant';
-    case 'EDITORIAL_BOARD': return '/dashboard/board';
-    case 'TANTOU': return '/dashboard/tantou';
+    case 'EDITORIAL_BOARD':
+    case 'BOARD': return '/dashboard/editorial-board';
+    case 'TANTOU':
+    case 'EDITOR': return '/dashboard/tantou-editor';
     case 'ADMIN': return '/dashboard/admin';
     default: return '/';
   }
@@ -75,13 +81,61 @@ export function SharedSidebar() {
   }
 
   const checkIsActive = (item: any) => {
+    // Parse path and query parameters of the navigation item
+    const [itemPathname, itemQuery] = item.path.split('?')
+    const itemSearchParams = new URLSearchParams(itemQuery || '')
+
+    const [currentPathname] = location.pathname.split('?')
+    const currentSearchParams = new URLSearchParams(location.search)
+
     if (item.exact) {
-      return location.pathname === item.path
+      if (currentPathname !== itemPathname) return false
+      for (const [key, value] of itemSearchParams.entries()) {
+        if (currentSearchParams.get(key) !== value) return false
+      }
+      return true
     }
+
     if (item.path === dashboardPath) {
-      return location.pathname === dashboardPath
+      return currentPathname === dashboardPath
     }
-    return location.pathname.startsWith(item.path)
+
+    // Path must start with item's path prefix
+    if (!currentPathname.startsWith(itemPathname)) {
+      return false
+    }
+
+    // If item has specific query params, verify they match in the current search params
+    if (itemQuery) {
+      for (const [key, value] of itemSearchParams.entries()) {
+        if (currentSearchParams.get(key) !== value) return false
+      }
+      return true
+    }
+
+    // If item doesn't have query params, but the current URL has query params that belong
+    // to another specific nav item, we shouldn't highlight this one (more specific matches first).
+    if (!itemQuery && location.search) {
+      const hasMoreSpecificMatch = navItems.some(nav => {
+        if (nav.path === item.path) return false
+        const [navPath, navQuery] = nav.path.split('?')
+        if (navPath === itemPathname && navQuery) {
+          const navSearchParams = new URLSearchParams(navQuery)
+          let match = true
+          for (const [key, value] of navSearchParams.entries()) {
+            if (currentSearchParams.get(key) !== value) {
+              match = false
+              break
+            }
+          }
+          return match
+        }
+        return false
+      })
+      if (hasMoreSpecificMatch) return false
+    }
+
+    return true
   }
 
   return (

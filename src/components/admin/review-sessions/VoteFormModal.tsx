@@ -58,8 +58,9 @@ export function VoteFormModal({
                 onChange={(event) => onChange('decision', event.target.value)}
                 className={inputClass}
               >
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
+                <option value="APPROVE">Approve</option>
+                <option value="REJECT">Reject</option>
+                <option value="REVISE">Revise</option>
               </select>
             </label>
             <label>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation, Link } from 'react-router'
 import { ArrowLeft, Check, Send, FileText, Calendar, User, Plus } from 'lucide-react'
 import { boardService } from '@/services/board.service'
+import { editorService } from '@/services/editor.service'
 
 export default function SendNotificationPage() {
   const { chapterId } = useParams<{ chapterId: string }>()
@@ -53,6 +54,40 @@ export default function SendNotificationPage() {
     } catch (err) {
       console.warn('API error sending notification, using fallback:', err)
     }
+
+    // Gửi thông báo chuông cho toàn bộ Tantou Editor về quyết định của Hội đồng
+    try {
+      const systemEditors = [
+        'b29fb935-7a5d-4988-9327-a8e453ba7322', // LuanHuynh296
+        'f9a1ee69-6036-4fd6-bbef-de0e00370309', // editor_akira (Akira Watanabe)
+        '83556777-7c27-4039-ba81-655e58a788a7', // Tantou_Editor
+        '66666666-6666-6666-6666-666666666666', // editor_haru
+        '90000000-0000-0000-0000-000000000004', // editor_mika
+        'dcba68dd-5e62-49e2-a826-d2f5e6941561', // codex_test_1781698003205
+        'usr_editor_001'                        // fallback mock
+      ]
+
+      const title = template === 'APPROVAL' ? 'Đề xuất Series được phê duyệt' : 'Đề xuất Series bị từ chối / chỉnh sửa'
+      const statusText = template === 'APPROVAL' ? 'được phê duyệt xuất bản' : template === 'REVISION' ? 'yêu cầu chỉnh sửa' : 'bị từ chối phê duyệt'
+      const cleanProjectName = projectName ? projectName.replace(' (Series)', '') : 'Series mới'
+      const content = `Tác phẩm [${cleanProjectName}] đã ${statusText} bởi Hội đồng biên tập.`
+
+      await Promise.all(
+        systemEditors.map(editorId =>
+          editorService.sendInternalNotification(
+            editorId,
+            title,
+            content,
+            "series_decision_result"
+          ).catch(errNotif => {
+            console.error(`Lỗi khi gửi thông báo quyết định cho editor ${editorId}:`, errNotif)
+          })
+        )
+      )
+    } catch (errNotifs) {
+      console.error("Lỗi khi xử lý thông báo quyết định của hội đồng cho Tantou:", errNotifs)
+    }
+
     setShowSuccessToast(true)
     setTimeout(() => {
       setShowSuccessToast(false)

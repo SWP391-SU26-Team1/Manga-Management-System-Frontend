@@ -35,6 +35,7 @@ export interface SeriesDetail extends PublishedSeries {
   teamMembers: SeriesTeamMember[]
   totalViews?: number
   totalLikes?: number
+  chaptersData?: any[]
 }
 
 // ─── Chapter (đã publish) ───────────────────────────────────────────────────

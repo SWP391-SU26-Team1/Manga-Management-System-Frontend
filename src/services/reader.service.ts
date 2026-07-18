@@ -93,7 +93,8 @@ export const readerService = {
         const uniqueUsers = new Set();
         s.chapter.forEach((c: any) => {
           c.chapter_like?.forEach((like: any) => {
-            if (like.user_id) uniqueUsers.add(like.user_id);
+            const uid = typeof like === 'string' ? like : like.user_id;
+            if (uid) uniqueUsers.add(uid);
           });
         });
         uniqueLikes = uniqueUsers.size;
@@ -108,7 +109,8 @@ export const readerService = {
         genres: base.genre ? base.genre.split(',').map((g: string) => g.trim()) : [],
         teamMembers,
         totalViews: s.total_views || 0,
-        totalLikes: totalLikes
+        totalLikes: totalLikes,
+        chaptersData: s.chapter || []
       }
     } catch (error) {
       console.error('Error fetching series detail:', error);
@@ -208,6 +210,16 @@ export const readerService = {
     } catch (error) {
       console.error('Error fetching chapter pages:', error);
       return [];
+    }
+  },
+
+  toggleChapterLike: async (chapterId: string): Promise<boolean> => {
+    try {
+      await api.post('/api/chapter-likes', { chapter_id: chapterId });
+      return true;
+    } catch (error) {
+      console.error('Error toggling chapter like:', error);
+      return false;
     }
   },
 

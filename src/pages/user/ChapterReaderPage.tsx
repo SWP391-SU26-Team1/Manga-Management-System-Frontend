@@ -54,6 +54,29 @@ export default function ChapterReaderPage() {
         const stored = localStorage.getItem(getLikeKey());
         const parsed = stored ? JSON.parse(stored) : {};
         setIsLiked(!!parsed[chapterId]);
+        
+        // Sync with API
+        const userStr = localStorage.getItem('mangaflow_user') || localStorage.getItem('user');
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          if (user.id) {
+            readerService.getSeriesDetail(seriesId).then(detail => {
+              if (detail && detail.chaptersData) {
+                const currentCh = detail.chaptersData.find((c: any) => c.chapter_id === chapterId);
+                if (currentCh && currentCh.chapter_like) {
+                  const hasLiked = currentCh.chapter_like.includes(user.id);
+                  setIsLiked(hasLiked);
+                  if (hasLiked) {
+                    parsed[chapterId] = true;
+                  } else {
+                    delete parsed[chapterId];
+                  }
+                  localStorage.setItem(getLikeKey(), JSON.stringify(parsed));
+                }
+              }
+            });
+          }
+        }
       } catch (err) {}
     }
   }, [chapterId, seriesId])
@@ -106,6 +129,8 @@ export default function ChapterReaderPage() {
         }
         localStorage.setItem(getLikeKey(), JSON.stringify(parsed));
         window.dispatchEvent(new Event('mangaflow_like_update'));
+        
+        await readerService.toggleChapterLike(chapterId);
       } catch (err) {}
     }
   }

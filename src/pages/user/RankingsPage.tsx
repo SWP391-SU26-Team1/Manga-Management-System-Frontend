@@ -14,8 +14,27 @@ export default function RankingsPage() {
     const fetchRankings = async () => {
       setIsLoading(true)
       try {
+        // Fetch periods to get the correct periodId
+        const periods = await rankingService.getRankingPeriods()
+        
+        let targetPeriodId: string | undefined = undefined;
+        if (periods && periods.length > 0) {
+          // Find period by period_type ('week', 'month') or just the latest one
+          const matched = periods.find(p => 
+             p.period_type === period || 
+             (period === 'week' && p.name.toLowerCase().includes('tuần')) ||
+             (period === 'month' && p.name.toLowerCase().includes('tháng'))
+          );
+          if (matched) {
+            targetPeriodId = matched.period_id;
+          } else {
+            // Fallback to the first period if not found
+            targetPeriodId = periods[0].period_id;
+          }
+        }
+
         let data: BackendSeriesRanking[] = []
-        data = await rankingService.getTopSeries(50)
+        data = await rankingService.getTopSeries(50, targetPeriodId)
         
         const sortedData = [...data].sort((a, b) => {
           if (rankingType === 'view') {
@@ -123,14 +142,17 @@ export default function RankingsPage() {
               <div className="flex flex-col md:flex-row items-end justify-center gap-4 mt-28 mb-16 px-4">
                 {/* Rank 2 */}
                 {top3[1] && (
-                  <div className="order-2 md:order-1 w-full md:w-1/3 flex flex-col items-center">
-                    <div className="font-manga text-5xl font-bold mb-2">2</div>
+                  <div className="order-2 md:order-1 w-full md:w-[32%] flex flex-col items-center">
+                    <div className="font-manga text-6xl font-bold mb-2">2</div>
                     <div className="bg-white border-2 border-gray-400 p-2 w-full shadow-[4px_4px_0px_#a3a3a3] relative transform hover:-translate-y-2 transition-transform">
+                      <div className="bg-gray-100 text-center font-black uppercase text-sm py-1 mb-2 border-b border-gray-200">
+                        BẢNG XẾP HẠNG
+                      </div>
                       <Link to={`/series/${top3[1].seriesId}`}>
                         <div className="aspect-[3/4] overflow-hidden mb-3 border border-gray-200">
                           <img src={top3[1].coverImageUrl} alt={top3[1].title} className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all" />
                         </div>
-                        <h3 className="font-bold text-center uppercase text-sm truncate px-2 hover:text-manga-red">{top3[1].title}</h3>
+                        <h3 className="font-bold text-center uppercase text-base truncate px-2 hover:text-manga-red">{top3[1].title}</h3>
                       </Link>
                       <div className="text-manga-red font-bold text-center mt-1">~ {top3[1].score}{rankingType === 'view' ? ' LƯỢT ĐỌC' : ' THEO DÕI'}</div>
                     </div>
@@ -143,7 +165,7 @@ export default function RankingsPage() {
                     <div className="absolute -top-16 text-yellow-400">
                       <Trophy className="w-12 h-12 fill-yellow-400 drop-shadow-[2px_2px_0px_#000]" />
                     </div>
-                    <div className="bg-yellow-400 border-4 border-black text-black font-manga text-6xl font-bold px-6 py-2 shadow-[4px_4px_0px_#000] -mb-6 z-20 relative">
+                    <div className="bg-yellow-400 border-4 border-black text-black font-manga text-7xl font-bold px-6 py-2 shadow-[4px_4px_0px_#000] -mb-6 z-20 relative">
                       1
                     </div>
                     <div className="bg-white border-4 border-yellow-400 p-3 w-full shadow-[8px_8px_0px_rgba(250,204,21,1)] relative transform hover:-translate-y-2 transition-transform">
@@ -170,9 +192,9 @@ export default function RankingsPage() {
 
                 {/* Rank 3 */}
                 {top3[2] && (
-                  <div className="order-3 md:order-3 w-full md:w-1/3 flex flex-col items-center">
+                  <div className="order-3 md:order-3 w-full md:w-[28%] flex flex-col items-center">
                     <div className="font-manga text-5xl font-bold mb-2">3</div>
-                    <div className="bg-white border-2 border-[#cd7f32] p-2 w-full shadow-[4px_4px_0px_#cd7f32] relative transform hover:-translate-y-2 transition-transform">
+                    <div className="bg-white border-2 border-[#cd7f32] p-2 w-[95%] shadow-[4px_4px_0px_#cd7f32] relative transform hover:-translate-y-2 transition-transform">
                       <div className="bg-gray-100 text-center font-black uppercase text-xs py-1 mb-2 border-b border-gray-200">
                         BẢNG XẾP HẠNG
                       </div>
@@ -182,7 +204,7 @@ export default function RankingsPage() {
                         </div>
                         <h3 className="font-bold text-center uppercase text-sm truncate px-2 hover:text-manga-red">{top3[2].title}</h3>
                       </Link>
-                      <div className="text-manga-red font-bold text-center mt-1">~ {top3[2].score}{rankingType === 'view' ? ' LƯỢT ĐỌC' : ' THEO DÕI'}</div>
+                      <div className="text-manga-red font-bold text-center mt-1 text-sm">~ {top3[2].score}{rankingType === 'view' ? ' LƯỢT ĐỌC' : ' THEO DÕI'}</div>
                     </div>
                   </div>
                 )}

@@ -111,17 +111,37 @@ export default function SeriesDetailPage() {
         
         let backendLikes = seriesData ? seriesData.totalLikes || 0 : 0;
         
-        // Đồng bộ đếm Like từ localStorage cho các chapter của series này
+        // Đồng bộ đếm Like từ localStorage và API
         try {
           const stored = localStorage.getItem(getLikeKey());
           const parsed = stored ? JSON.parse(stored) : {};
           
-          // Lọc 1 user = 1 like ở local: Chỉ cần like ít nhất 1 chapter thì tính là 1 like
-          const hasLikedAny = chaps.some(c => parsed[c.id]);
-          
-          // Nếu backend chưa lưu lượt like của user này (hoặc user chưa login), cộng thêm 1 từ local
-          // Giả định tạm: ta cứ cộng thêm local nếu có để người dùng thấy UI phản hồi ngay
-          setLocalTotalLikes(backendLikes + (hasLikedAny ? 1 : 0));
+          // Sync with API
+          const userStr = localStorage.getItem('mangaflow_user') || localStorage.getItem('user');
+          let updated = false;
+          if (userStr && seriesData && seriesData.chaptersData) {
+            const user = JSON.parse(userStr);
+            if (user.id) {
+              seriesData.chaptersData.forEach((c: any) => {
+                if (c.chapter_like && c.chapter_like.includes(user.id)) {
+                  parsed[c.chapter_id] = true;
+                  updated = true;
+                } else if (c.chapter_like && !c.chapter_like.includes(user.id)) {
+                  if (parsed[c.chapter_id]) {
+                    delete parsed[c.chapter_id];
+                    updated = true;
+                  }
+                }
+              });
+              if (updated) {
+                localStorage.setItem(getLikeKey(), JSON.stringify(parsed));
+                window.dispatchEvent(new Event('mangaflow_like_update'));
+              }
+            }
+          }
+
+          // Dùng trực tiếp backendLikes vì API getSeriesDetail đã lọc uniqueUsers rất chính xác
+          setLocalTotalLikes(backendLikes);
         } catch (err) {
           setLocalTotalLikes(backendLikes);
         }

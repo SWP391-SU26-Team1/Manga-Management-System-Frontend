@@ -1,6 +1,7 @@
 import React, { FormEvent } from 'react'
 import { Save, X } from 'lucide-react'
 import type { Vote } from '@/services/admin/admin.types'
+import { AdminButton } from '@/components/admin/AdminButton'
 import type { VoteFormValues } from './types'
 
 type VoteFormModalProps = {
@@ -15,8 +16,8 @@ type VoteFormModalProps = {
 }
 
 const inputClass =
-  'h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
-const labelClass = 'mb-2 block text-sm font-semibold text-slate-700'
+  'h-11 w-full border-2 border-manga-ink bg-white px-3 text-sm text-manga-ink font-bold outline-none focus:bg-amber-50 disabled:bg-gray-100 disabled:opacity-70'
+const labelClass = 'mb-2 block text-sm font-black uppercase text-manga-ink'
 
 export function VoteFormModal({
   open,
@@ -32,18 +33,20 @@ export function VoteFormModal({
   const isCreate = mode === 'create'
 
   return (
-    <div className="fixed inset-0 z-[65] flex items-center justify-center bg-slate-950/50 p-4">
-      <div className="w-full max-w-xl rounded-lg bg-white shadow-2xl ring-1 ring-slate-200">
-        <div className="flex items-start justify-between border-b border-slate-200 p-6">
+    <div className="fixed inset-0 z-[65] flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-xl border-2 border-manga-ink bg-white shadow-[8px_8px_0_rgba(0,0,0,1)]">
+        <div className="flex items-start justify-between border-b-2 border-manga-ink p-6">
           <div>
-            <p className="text-sm font-semibold text-blue-600">Vote</p>
-            <h2 className="mt-1 text-xl font-semibold text-slate-950">{isCreate ? 'Create vote' : 'Edit vote'}</h2>
+            <p className="text-xs font-black uppercase tracking-wider text-manga-red">Biểu quyết</p>
+            <h2 className="font-manga text-3xl font-black uppercase text-manga-ink mt-1">
+              {isCreate ? 'Tạo biểu quyết' : 'Chỉnh sửa biểu quyết'}
+            </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-            aria-label="Close vote modal"
+            className="flex h-11 w-11 shrink-0 items-center justify-center border-2 border-manga-ink bg-white shadow-[2px_2px_0_rgba(0,0,0,1)] hover:bg-gray-100"
+            aria-label="Đóng"
           >
             <X className="h-5 w-5" />
           </button>
@@ -51,20 +54,20 @@ export function VoteFormModal({
 
         <form onSubmit={onSubmit} className="space-y-5 p-6">
           <div className="grid gap-4 md:grid-cols-2">
-            <label>
-              <span className={labelClass}>Decision</span>
+            <label className="block">
+              <span className={labelClass}>Quyết định</span>
               <select
                 value={values.decision}
                 onChange={(event) => onChange('decision', event.target.value)}
                 className={inputClass}
               >
-                <option value="APPROVE">Approve</option>
-                <option value="REJECT">Reject</option>
-                <option value="REVISE">Revise</option>
+                <option value="APPROVE">Đồng ý</option>
+                <option value="REJECT">Từ chối</option>
+                <option value="REVISE">Cần sửa</option>
               </select>
             </label>
-            <label>
-              <span className={labelClass}>Score</span>
+            <label className="block">
+              <span className={labelClass}>Điểm số</span>
               <input
                 type="number"
                 min={1}
@@ -77,44 +80,49 @@ export function VoteFormModal({
             </label>
           </div>
 
-          <label>
-            <span className={labelClass}>Status</span>
-            <select value={values.status} onChange={(event) => onChange('status', event.target.value)} className={inputClass}>
-              <option value="submitted">Submitted</option>
-              <option value="verified">Verified</option>
+          <label className="block">
+            <span className={labelClass}>Trạng thái</span>
+            <select
+              value={values.status}
+              onChange={(event) => onChange('status', event.target.value)}
+              className={inputClass}
+            >
+              <option value="submitted">Đã gửi (Chờ duyệt)</option>
+              <option value="verified">Đã xác minh</option>
             </select>
           </label>
 
-          <label>
-            <span className={labelClass}>Note</span>
+          <label className="block">
+            <span className={labelClass}>Ghi chú</span>
             <textarea
               value={values.note}
               onChange={(event) => onChange('note', event.target.value)}
               className={`${inputClass} min-h-28 py-3`}
-              placeholder="Vote note"
+              placeholder="Nhập ghi chú biểu quyết..."
             />
           </label>
 
-          <div className="flex justify-end gap-3 border-t border-slate-200 pt-5">
-            <button
+          <div className="flex justify-end gap-3 border-t-2 border-manga-ink pt-5 bg-gray-50 -mx-6 -mb-6 p-6">
+            <AdminButton
               type="button"
+              variant="white"
               onClick={onClose}
               disabled={loading}
-              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
             >
-              Cancel
-            </button>
-            <button
+              Hủy
+            </AdminButton>
+            <AdminButton
               type="submit"
+              variant="red"
+              icon={Save}
               disabled={loading}
-              className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
             >
-              <Save className="h-4 w-4" />
-              {loading ? 'Saving...' : isCreate ? 'Create vote' : 'Save vote'}
-            </button>
+              {loading ? 'Đang lưu...' : isCreate ? 'Tạo biểu quyết' : 'Lưu thay đổi'}
+            </AdminButton>
           </div>
         </form>
       </div>
     </div>
   )
 }
+

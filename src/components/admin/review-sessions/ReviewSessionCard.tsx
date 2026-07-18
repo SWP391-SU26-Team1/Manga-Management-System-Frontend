@@ -11,7 +11,7 @@ import {
   resultSummary,
 } from './helpers'
 import { ReviewSessionWorkflowActions } from './ReviewSessionWorkflowActions'
-import { StatusBadge } from './StatusBadge'
+import { AdminStatusBadge } from '@/components/admin/AdminStatusBadge'
 import type {
   SessionActionHandler,
   SessionHandler,
@@ -34,7 +34,8 @@ type ReviewSessionCardProps = {
   onProcessResult: SessionProcessHandler
 }
 
-const actionClass = 'inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600'
+const actionClass =
+  'inline-flex h-9 w-9 items-center justify-center border-2 border-manga-ink shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_rgba(0,0,0,1)]'
 
 export function ReviewSessionCard({
   session,
@@ -54,39 +55,39 @@ export function ReviewSessionCard({
   const isTerminal = ['finished', 'cancelled'].includes(session.status)
 
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:hidden">
+    <article className="border-2 border-manga-ink bg-white p-4 shadow-[4px_4px_0px_rgba(0,0,0,1)] md:hidden">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-base font-semibold text-slate-950">{getSessionName(session)}</h3>
-          <p className="mt-1 text-xs text-slate-500">{session.description || 'No description provided'}</p>
+          <h3 className="font-manga text-xl font-black uppercase text-manga-ink">{getSessionName(session)}</h3>
+          <p className="mt-1 text-xs font-bold text-gray-500">{session.description || 'Không có mô tả.'}</p>
         </div>
-        <StatusBadge status={session.status} />
+        <AdminStatusBadge status={session.status} />
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+      <div className="mt-4 grid grid-cols-2 gap-3 text-xs font-bold">
         <div>
-          <p className="font-semibold text-slate-500">Series</p>
-          <p className="mt-1 text-slate-900">{getSeriesLabel(session)}</p>
+          <p className="text-gray-400 uppercase tracking-wider text-[10px]">Bộ truyện</p>
+          <p className="mt-1 text-manga-ink font-black">{getSeriesLabel(session)}</p>
         </div>
         <div>
-          <p className="font-semibold text-slate-500">Chapter</p>
-          <p className="mt-1 text-slate-900">{getChapterLabel(session)}</p>
+          <p className="text-gray-400 uppercase tracking-wider text-[10px]">Chương</p>
+          <p className="mt-1 text-manga-ink font-black">{getChapterLabel(session)}</p>
         </div>
         <div>
-          <p className="font-semibold text-slate-500">Created by</p>
-          <p className="mt-1 text-slate-900">{getCreatedByLabel(session)}</p>
+          <p className="text-gray-400 uppercase tracking-wider text-[10px]">Tạo bởi</p>
+          <p className="mt-1 text-manga-ink">{getCreatedByLabel(session)}</p>
         </div>
         <div>
-          <p className="font-semibold text-slate-500">Created at</p>
-          <p className="mt-1 text-slate-900">{formatDateTime(session.created_at || session.createdAt)}</p>
+          <p className="text-gray-400 uppercase tracking-wider text-[10px]">Ngày tạo</p>
+          <p className="mt-1 text-manga-ink">{formatDateTime(session.created_at || session.createdAt)}</p>
         </div>
         <div>
-          <p className="font-semibold text-slate-500">Votes</p>
-          <p className="mt-1 text-slate-900">{voteCounts[sessionId] ?? 'Not loaded'}</p>
+          <p className="text-gray-400 uppercase tracking-wider text-[10px]">Số phiếu</p>
+          <p className="mt-1 text-manga-ink">{voteCounts[sessionId] ?? 'Chưa tải'}</p>
         </div>
         <div>
-          <p className="font-semibold text-slate-500">Avg score</p>
-          <p className="mt-1 text-slate-900">{summary?.avgScore ?? 'N/A'}</p>
+          <p className="text-gray-400 uppercase tracking-wider text-[10px]">Điểm TB</p>
+          <p className="mt-1 text-manga-ink font-black">{summary?.avgScore ?? 'N/A'}</p>
         </div>
       </div>
 
@@ -102,21 +103,31 @@ export function ReviewSessionCard({
         />
       </div>
 
-      <div className="mt-4 flex justify-end gap-2 border-t border-slate-100 pt-4">
-        <button type="button" title="View detail" onClick={() => onViewDetail(session)} className={actionClass}>
+      <div className="mt-4 flex justify-end gap-2 border-t-2 border-manga-ink pt-4">
+        <button
+          type="button"
+          title="Xem chi tiết"
+          onClick={() => onViewDetail(session)}
+          className={`${actionClass} bg-white text-manga-ink`}
+        >
           <Eye className="h-4 w-4" />
         </button>
         {!isTerminal && (
-          <button type="button" title="Edit session" onClick={() => onEdit(session)} className={actionClass}>
+          <button
+            type="button"
+            title="Chỉnh sửa phiên"
+            onClick={() => onEdit(session)}
+            className={`${actionClass} bg-white text-manga-ink`}
+          >
             <Edit3 className="h-4 w-4" />
           </button>
         )}
         {!isTerminal && (
           <button
             type="button"
-            title="Delete session"
+            title="Xóa phiên"
             onClick={() => onDelete(session)}
-            className={`${actionClass} border-red-200 text-red-600`}
+            className={`${actionClass} bg-manga-red text-white`}
           >
             <Trash2 className="h-4 w-4" />
           </button>
@@ -125,3 +136,4 @@ export function ReviewSessionCard({
     </article>
   )
 }
+

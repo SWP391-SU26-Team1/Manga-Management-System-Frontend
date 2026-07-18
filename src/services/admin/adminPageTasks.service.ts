@@ -2,7 +2,7 @@ import { adminDelete, adminGet, adminList, adminPatch, adminPost } from './admin
 import type { PageTask, PageTaskStatus } from './admin.types'
 
 export const adminPageTasksService = {
-  list: (params?: { status?: PageTaskStatus; page?: number; limit?: number; sort?: string; order?: 'asc' | 'desc' }) =>
+  list: (params?: { status?: PageTaskStatus; page?: number; limit?: number; sort?: string; order?: 'asc' | 'desc'; keyword?: string }) =>
     adminList<PageTask>('/api/admin/page-tasks', params),
   getById: (taskId: string) => adminGet<PageTask>(`/api/admin/page-tasks/${taskId}`),
   create: (body: Partial<PageTask> & { page_id: string; task_type: string }) =>

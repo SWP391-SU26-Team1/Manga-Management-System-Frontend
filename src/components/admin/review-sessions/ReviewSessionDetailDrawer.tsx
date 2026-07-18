@@ -9,8 +9,9 @@ import {
   getSeriesLabel,
   getSessionName,
 } from './helpers'
-import { StatusBadge } from './StatusBadge'
+import { AdminStatusBadge } from '@/components/admin/AdminStatusBadge'
 import { VotePanel } from './VotePanel'
+import { AdminButton } from '@/components/admin/AdminButton'
 import type { DetailTab, VoteHandler, VoteStatusFilter } from './types'
 
 type ReviewSessionDetailDrawerProps = {
@@ -34,7 +35,7 @@ type ReviewSessionDetailDrawerProps = {
   onApplyDecision?: (session: ReviewSession, status: string, note: string) => Promise<void>
 }
 
-const infoClass = 'rounded-lg border border-slate-200 bg-white p-4'
+const infoClass = 'border-2 border-manga-ink bg-white p-4 shadow-[3px_3px_0_rgba(0,0,0,1)]'
 
 export function ReviewSessionDetailDrawer({
   open,
@@ -80,41 +81,41 @@ export function ReviewSessionDetailDrawer({
   }
 
   return (
-    <div className="fixed inset-0 z-40 bg-slate-950/40">
-      <div className="ml-auto flex h-full w-full max-w-5xl flex-col bg-slate-50 shadow-2xl">
-        <div className="border-b border-slate-200 bg-white p-5">
+    <div className="fixed inset-0 z-40 bg-black/60 flex justify-end">
+      <div className="flex h-full w-full max-w-5xl flex-col border-l-2 border-manga-ink bg-[#fafafa] shadow-2xl">
+        <div className="border-b-2 border-manga-ink bg-white p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="flex flex-wrap items-center gap-3">
-                <StatusBadge status={session.status} />
-                {detailLoading && <span className="text-sm font-medium text-blue-600">Loading detail...</span>}
+                <AdminStatusBadge status={session.status} />
+                {detailLoading && <span className="text-xs font-black uppercase text-manga-red animate-pulse">Đang tải chi tiết...</span>}
               </div>
-              <h2 className="mt-3 text-2xl font-semibold text-slate-950">{getSessionName(session)}</h2>
-              <p className="mt-1 max-w-3xl text-sm text-slate-500">{session.description || 'No description provided.'}</p>
+              <h2 className="font-manga text-3xl font-black uppercase text-manga-ink mt-3">{getSessionName(session)}</h2>
+              <p className="mt-1 max-w-3xl text-sm font-bold text-gray-500">{session.description || 'Không có mô tả.'}</p>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-              aria-label="Close detail drawer"
+              className="flex h-11 w-11 shrink-0 items-center justify-center border-2 border-manga-ink bg-white shadow-[2px_2px_0_rgba(0,0,0,1)] hover:bg-gray-100"
+              aria-label="Đóng"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
 
-          <div className="mt-5 flex border-b border-slate-200">
+          <div className="mt-5 flex border-b-2 border-manga-ink">
             {[
-              { label: 'Overview', value: 'overview' as DetailTab },
-              { label: `Votes (${votes.length})`, value: 'votes' as DetailTab },
+              { label: 'Tổng quan', value: 'overview' as DetailTab },
+              { label: `Biểu quyết (${votes.length})`, value: 'votes' as DetailTab },
             ].map((tab) => (
               <button
                 key={tab.value}
                 type="button"
                 onClick={() => onTabChange(tab.value)}
-                className={`border-b-2 px-4 py-3 text-sm font-semibold ${
+                className={`border-b-4 px-4 py-3 text-sm font-black uppercase tracking-wider transition-all -mb-[2px] ${
                   activeTab === tab.value
-                    ? 'border-blue-600 text-blue-700'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                    ? 'border-manga-red text-manga-red'
+                    : 'border-transparent text-slate-500 hover:text-manga-ink'
                 }`}
               >
                 {tab.label}
@@ -128,143 +129,143 @@ export function ReviewSessionDetailDrawer({
             <div className="space-y-5">
               <div className="grid gap-4 md:grid-cols-3">
                 <div className={infoClass}>
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-500">
-                    <FileText className="h-4 w-4" />
-                    Series
+                  <div className="flex items-center gap-2 text-xs font-black uppercase text-gray-400">
+                    <FileText className="h-4 w-4 text-manga-ink" />
+                    Bộ truyện
                   </div>
-                  <p className="mt-2 font-semibold text-slate-950">{getSeriesLabel(session)}</p>
-                  <p className="mt-1 text-xs text-slate-500">Linked manga series</p>
+                  <p className="mt-2 font-black text-manga-ink text-base">{getSeriesLabel(session)}</p>
+                  <p className="mt-1 text-xs font-bold text-gray-500">Bộ truyện được liên kết</p>
                 </div>
                 <div className={infoClass}>
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-500">
-                    <FileText className="h-4 w-4" />
-                    Chapter
+                  <div className="flex items-center gap-2 text-xs font-black uppercase text-gray-400">
+                    <FileText className="h-4 w-4 text-manga-ink" />
+                    Chương truyện
                   </div>
-                  <p className="mt-2 font-semibold text-slate-950">{getChapterLabel(session)}</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {session.chapter_id || session.chapterId ? 'Linked chapter' : 'Optional chapter not attached'}
+                  <p className="mt-2 font-black text-manga-ink text-base">{getChapterLabel(session)}</p>
+                  <p className="mt-1 text-xs font-bold text-gray-500">
+                    {session.chapter_id || session.chapterId ? 'Chương liên kết' : 'Không có chương đính kèm'}
                   </p>
                 </div>
                 <div className={infoClass}>
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-500">
-                    <UserRound className="h-4 w-4" />
-                    Created by
+                  <div className="flex items-center gap-2 text-xs font-black uppercase text-gray-400">
+                    <UserRound className="h-4 w-4 text-manga-ink" />
+                    Tạo bởi
                   </div>
-                  <p className="mt-2 font-semibold text-slate-950">{getCreatedByLabel(session)}</p>
-                  <p className="mt-1 text-xs text-slate-500">Session owner</p>
+                  <p className="mt-2 font-black text-manga-ink text-base">{getCreatedByLabel(session)}</p>
+                  <p className="mt-1 text-xs font-bold text-gray-500">Chủ sở hữu phiên</p>
                 </div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-3">
                 <div className={infoClass}>
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-500">
-                    <CalendarClock className="h-4 w-4" />
-                    Created at
+                  <div className="flex items-center gap-2 text-xs font-black uppercase text-gray-400">
+                    <CalendarClock className="h-4 w-4 text-manga-ink" />
+                    Ngày khởi tạo
                   </div>
-                  <p className="mt-2 font-semibold text-slate-950">{formatDateTime(session.created_at || session.createdAt)}</p>
+                  <p className="mt-2 font-black text-manga-ink">{formatDateTime(session.created_at || session.createdAt)}</p>
                 </div>
                 <div className={infoClass}>
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-500">
-                    <CalendarClock className="h-4 w-4" />
-                    Started at
+                  <div className="flex items-center gap-2 text-xs font-black uppercase text-gray-400">
+                    <CalendarClock className="h-4 w-4 text-manga-ink" />
+                    Ngày bắt đầu
                   </div>
-                  <p className="mt-2 font-semibold text-slate-950">{formatDateTime(session.started_at || session.startedAt)}</p>
+                  <p className="mt-2 font-black text-manga-ink">{formatDateTime(session.started_at || session.startedAt)}</p>
                 </div>
                 <div className={infoClass}>
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-500">
-                    <CalendarClock className="h-4 w-4" />
-                    Ended at
+                  <div className="flex items-center gap-2 text-xs font-black uppercase text-gray-400">
+                    <CalendarClock className="h-4 w-4 text-manga-ink" />
+                    Ngày kết thúc
                   </div>
-                  <p className="mt-2 font-semibold text-slate-950">{formatDateTime(session.ended_at || session.endedAt)}</p>
+                  <p className="mt-2 font-black text-manga-ink">{formatDateTime(session.ended_at || session.endedAt)}</p>
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-200 bg-white p-5">
-                <h3 className="text-base font-semibold text-slate-950">Processed Result & Recommendation</h3>
+              <div className="border-2 border-manga-ink bg-white p-5 shadow-[4px_4px_0_rgba(0,0,0,1)]">
+                <h3 className="font-manga text-xl font-black uppercase text-manga-ink">Kết quả xử lý & Khuyến nghị</h3>
                 {result ? (
                   <div className="mt-4 space-y-4">
                     {result.recommendation && (
-                      <div className={`rounded-lg border p-4 ${
+                      <div className={`border-2 border-manga-ink p-4 shadow-[3px_3px_0_rgba(0,0,0,1)] font-bold ${
                         result.recommendation === 'publish'
-                          ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                          : 'border-amber-200 bg-amber-50 text-amber-800'
+                          ? 'bg-emerald-100 text-emerald-950'
+                          : 'bg-amber-100 text-amber-950'
                       }`}>
-                        <h4 className="font-semibold text-sm capitalize">
-                          System Recommendation: {result.recommendation}
+                        <h4 className="font-black text-sm uppercase tracking-wider">
+                          Khuyến nghị hệ thống: {result.recommendation === 'publish' ? 'Xuất bản (Publish)' : 'Xem xét lại (Review)'}
                         </h4>
-                        <p className="mt-1 text-xs">
+                        <p className="mt-2 text-xs leading-relaxed">
                           {result.recommendation_reason}
                         </p>
                       </div>
                     )}
 
                     <div className="grid gap-4 md:grid-cols-3">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-500">Total votes</p>
-                        <p className="mt-1 text-2xl font-semibold text-slate-950">{result.total_votes}</p>
+                      <div className="border border-manga-ink bg-[#fafafa] p-3 shadow-[2px_2px_0_rgba(0,0,0,1)]">
+                        <p className="text-xs font-black uppercase text-gray-400">Tổng số biểu quyết</p>
+                        <p className="mt-1 text-2xl font-black text-manga-ink">{result.total_votes}</p>
                       </div>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-500">Average score</p>
-                        <p className="mt-1 text-2xl font-semibold text-slate-950">{formatScore(result.avg_score)}</p>
+                      <div className="border border-manga-ink bg-[#fafafa] p-3 shadow-[2px_2px_0_rgba(0,0,0,1)]">
+                        <p className="text-xs font-black uppercase text-gray-400">Điểm trung bình</p>
+                        <p className="mt-1 text-2xl font-black text-manga-ink">{formatScore(result.avg_score)}</p>
                       </div>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-500">Dominant decision</p>
-                        <p className="mt-1 text-2xl font-semibold capitalize text-slate-950">{result.dominant_decision}</p>
+                      <div className="border border-manga-ink bg-[#fafafa] p-3 shadow-[2px_2px_0_rgba(0,0,0,1)]">
+                        <p className="text-xs font-black uppercase text-gray-400">Quyết định chủ đạo</p>
+                        <p className="mt-1 text-2xl font-black capitalize text-manga-ink">{result.dominant_decision}</p>
                       </div>
                     </div>
 
                     {session.status === 'completed' && onApplyDecision && (
-                      <div className="mt-6 border-t border-slate-200 pt-6">
-                        <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Chairman Decision</h4>
-                        <p className="mt-1 text-xs text-slate-500">Review the details and input the final publishing decision. This will notify all group members.</p>
+                      <div className="mt-6 border-t-2 border-manga-ink pt-6">
+                        <h4 className="font-manga text-lg font-black uppercase text-manga-ink tracking-wider">Quyết định của Trưởng ban biên tập</h4>
+                        <p className="mt-1 text-xs font-bold text-gray-500">Xem xét chi tiết các đánh giá và đưa ra quyết định xuất bản cuối cùng. Việc này sẽ thông báo cho các thành viên liên quan.</p>
                         
                         <form onSubmit={handleDecisionSubmit} className="mt-4 space-y-4">
                           <div>
-                            <label className="block text-xs font-semibold text-slate-700">Publish / Approval Status</label>
+                            <label className="block text-xs font-black uppercase text-manga-ink">Trạng thái phê duyệt / Xuất bản</label>
                             <select
                               value={decisionStatus}
                               onChange={(e) => setDecisionStatus(e.target.value)}
-                              className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                              className="mt-1 block w-full border-2 border-manga-ink bg-white px-3 py-2 text-sm font-bold outline-none focus:bg-amber-50"
                               required
                             >
-                              <option value="">-- Select Decision --</option>
-                              <option value="published">Publish (Make publicly visible)</option>
-                              <option value="approved">Approve (Approved but not published)</option>
-                              <option value="rejected">Reject (Reject content)</option>
+                              <option value="">-- Chọn quyết định --</option>
+                              <option value="published">Xuất bản (Hiển thị công khai)</option>
+                              <option value="approved">Phê duyệt (Duyệt nhưng chưa xuất bản)</option>
+                              <option value="rejected">Từ chối (Từ chối nội dung)</option>
                             </select>
                           </div>
 
                           <div>
-                            <label className="block text-xs font-semibold text-slate-700">Decision Note / Feedback</label>
+                            <label className="block text-xs font-black uppercase text-manga-ink">Ghi chú quyết định / Phản hồi</label>
                             <textarea
                               rows={3}
                               value={decisionNote}
                               onChange={(e) => setDecisionNote(e.target.value)}
-                              placeholder="Provide notes or feedback explaining the decision..."
-                              className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                              placeholder="Nhập phản hồi hoặc ghi chú lý giải quyết định..."
+                              className="mt-1 block w-full border-2 border-manga-ink bg-white px-3 py-2 text-sm font-bold outline-none focus:bg-amber-50"
                             />
                           </div>
 
-                          <button
+                          <AdminButton
                             type="submit"
+                            variant="red"
                             disabled={formSubmitting || !decisionStatus}
-                            className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                           >
-                            {formSubmitting ? 'Applying Decision...' : 'Apply Final Decision'}
-                          </button>
+                            {formSubmitting ? 'Đang áp dụng...' : 'Áp dụng quyết định cuối cùng'}
+                          </AdminButton>
                         </form>
                       </div>
                     )}
 
                     {session.status === 'finished' && (
-                      <div className="mt-6 border-t border-slate-200 pt-4 text-emerald-800 font-semibold text-sm flex items-center gap-2">
-                        <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                        Chairman decision has been applied. The session is closed.
+                      <div className="mt-6 border-t-2 border-manga-ink pt-4 text-emerald-800 font-bold text-sm flex items-center gap-2">
+                        <span className="inline-block h-3.5 w-3.5 border-2 border-manga-ink bg-emerald-400" />
+                        Quyết định của Trưởng ban biên tập đã được áp dụng. Phiên đánh giá đã kết thúc.
                       </div>
                     )}
                   </div>
                 ) : (
-                  <p className="mt-2 text-sm text-slate-500">No results calculated. You must finalize the session first.</p>
+                  <p className="mt-2 text-sm font-bold text-slate-500">Chưa có kết quả xử lý. Bạn cần hoàn tất (Finalize) phiên đánh giá trước.</p>
                 )}
               </div>
             </div>
@@ -288,3 +289,4 @@ export function ReviewSessionDetailDrawer({
     </div>
   )
 }
+

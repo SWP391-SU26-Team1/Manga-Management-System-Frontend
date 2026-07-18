@@ -11,7 +11,7 @@ import {
   resultSummary,
 } from './helpers'
 import { ReviewSessionWorkflowActions } from './ReviewSessionWorkflowActions'
-import { StatusBadge } from './StatusBadge'
+import { AdminStatusBadge } from '@/components/admin/AdminStatusBadge'
 import type {
   SessionActionHandler,
   SessionHandler,
@@ -35,7 +35,7 @@ type ReviewSessionTableProps = {
 }
 
 const iconButtonClass =
-  'inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50'
+  'inline-flex h-9 w-9 items-center justify-center border-2 border-manga-ink shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_rgba(0,0,0,1)]'
 
 export function ReviewSessionTable({
   sessions,
@@ -51,52 +51,52 @@ export function ReviewSessionTable({
   onProcessResult,
 }: ReviewSessionTableProps) {
   return (
-    <div className="hidden overflow-x-auto rounded-lg border border-slate-200 bg-white md:block">
+    <div className="hidden overflow-x-auto border-2 border-manga-ink bg-white shadow-[6px_6px_0px_rgba(0,0,0,1)] md:block">
       <table className="w-full min-w-[1180px] border-collapse text-left">
-        <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
-          <tr>
-            <th className="px-5 py-4">Review session</th>
-            <th className="px-5 py-4">Series / Chapter</th>
-            <th className="px-5 py-4">Status</th>
-            <th className="px-5 py-4">Timeline</th>
-            <th className="px-5 py-4">Votes / Result</th>
-            <th className="px-5 py-4">Workflow</th>
-            <th className="px-5 py-4 text-right">Actions</th>
+        <thead className="bg-[#282828] text-white">
+          <tr className="text-xs font-black uppercase tracking-wider">
+            <th className="border-r-2 border-black px-5 py-4">Phiên đánh giá</th>
+            <th className="border-r-2 border-black px-5 py-4">Bộ truyện / Chương</th>
+            <th className="border-r-2 border-black px-5 py-4">Trạng thái</th>
+            <th className="border-r-2 border-black px-5 py-4">Thời gian</th>
+            <th className="border-r-2 border-black px-5 py-4">Biểu quyết / Kết quả</th>
+            <th className="border-r-2 border-black px-5 py-4">Quy trình</th>
+            <th className="px-5 py-4 text-right">Thao tác</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100 text-sm">
+        <tbody className="text-sm font-bold text-manga-ink">
           {sessions.map((session) => {
             const sessionId = getSessionId(session)
             const summary = resultSummary(results[sessionId])
             const isTerminal = ['finished', 'cancelled'].includes(session.status)
 
             return (
-              <tr key={sessionId} className="align-top hover:bg-slate-50/70">
-                <td className="px-5 py-4">
-                  <p className="font-semibold text-slate-950">{getSessionName(session)}</p>
-                  <p className="mt-1 max-w-[240px] truncate text-xs text-slate-500">
-                    {session.description || 'No description provided'}
+              <tr key={sessionId} className="align-top border-b-2 border-manga-ink last:border-b-0 hover:bg-[#fafafa]">
+                <td className="border-r-2 border-manga-ink px-5 py-4">
+                  <p className="font-black text-manga-ink text-base">{getSessionName(session)}</p>
+                  <p className="mt-1 max-w-[240px] truncate text-xs font-bold text-gray-500">
+                    {session.description || 'Không có mô tả.'}
                   </p>
-                  <p className="mt-2 text-xs text-slate-500">Created by {getCreatedByLabel(session)}</p>
+                  <p className="mt-2 text-xs font-black uppercase text-gray-400">Tạo bởi {getCreatedByLabel(session)}</p>
                 </td>
-                <td className="px-5 py-4">
-                  <p className="font-medium text-slate-800">{getSeriesLabel(session)}</p>
-                  <p className="mt-1 text-xs text-slate-500">{getChapterLabel(session)}</p>
+                <td className="border-r-2 border-manga-ink px-5 py-4">
+                  <p className="font-black text-manga-ink">{getSeriesLabel(session)}</p>
+                  <p className="mt-1 text-xs text-gray-500 font-bold">{getChapterLabel(session)}</p>
                 </td>
-                <td className="px-5 py-4">
-                  <StatusBadge status={session.status} />
+                <td className="border-r-2 border-manga-ink px-5 py-4">
+                  <AdminStatusBadge status={session.status} />
                 </td>
-                <td className="px-5 py-4 text-xs text-slate-600">
-                  <p>Created: {formatDateTime(session.created_at || session.createdAt)}</p>
-                  <p className="mt-1">Started: {formatDateTime(session.started_at || session.startedAt)}</p>
-                  <p className="mt-1">Ended: {formatDateTime(session.ended_at || session.endedAt)}</p>
+                <td className="border-r-2 border-manga-ink px-5 py-4 text-xs font-bold text-gray-600 space-y-1">
+                  <p><span className="text-gray-400 uppercase tracking-wider text-[10px]">Tạo:</span> {formatDateTime(session.created_at || session.createdAt)}</p>
+                  <p><span className="text-gray-400 uppercase tracking-wider text-[10px]">Bắt đầu:</span> {formatDateTime(session.started_at || session.startedAt)}</p>
+                  <p><span className="text-gray-400 uppercase tracking-wider text-[10px]">Kết thúc:</span> {formatDateTime(session.ended_at || session.endedAt)}</p>
                 </td>
-                <td className="px-5 py-4 text-xs text-slate-600">
-                  <p className="font-semibold text-slate-800">Votes: {voteCounts[sessionId] ?? 'Not loaded'}</p>
-                  <p className="mt-1">Avg score: {summary?.avgScore ?? 'N/A'}</p>
-                  <p className="mt-1">Decision: {summary?.dominantDecision ?? 'N/A'}</p>
+                <td className="border-r-2 border-manga-ink px-5 py-4 text-xs text-gray-700 space-y-1">
+                  <p className="font-black text-manga-ink">Biểu quyết: {voteCounts[sessionId] ?? 'Chưa tải'}</p>
+                  <p><span className="text-gray-400 uppercase tracking-wider text-[10px]">Điểm TB:</span> {summary?.avgScore ?? 'N/A'}</p>
+                  <p><span className="text-gray-400 uppercase tracking-wider text-[10px]">Quyết định:</span> {summary?.dominantDecision ?? 'N/A'}</p>
                 </td>
-                <td className="px-5 py-4">
+                <td className="border-r-2 border-manga-ink px-5 py-4">
                   <ReviewSessionWorkflowActions
                     session={session}
                     busyKey={busyKey}
@@ -111,18 +111,18 @@ export function ReviewSessionTable({
                   <div className="flex justify-end gap-2">
                     <button
                       type="button"
-                      title="View detail"
+                      title="Xem chi tiết"
                       onClick={() => onViewDetail(session)}
-                      className={iconButtonClass}
+                      className={`${iconButtonClass} bg-white text-manga-ink`}
                     >
                       <Eye className="h-4 w-4" />
                     </button>
                     {!isTerminal && (
                       <button
                         type="button"
-                        title="Edit session"
+                        title="Chỉnh sửa"
                         onClick={() => onEdit(session)}
-                        className={iconButtonClass}
+                        className={`${iconButtonClass} bg-white text-manga-ink`}
                       >
                         <Edit3 className="h-4 w-4" />
                       </button>
@@ -130,9 +130,9 @@ export function ReviewSessionTable({
                     {!isTerminal && (
                       <button
                         type="button"
-                        title="Delete session"
+                        title="Xóa phiên"
                         onClick={() => onDelete(session)}
-                        className={`${iconButtonClass} border-red-200 text-red-600 hover:bg-red-50`}
+                        className={`${iconButtonClass} bg-manga-red text-white`}
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -147,3 +147,4 @@ export function ReviewSessionTable({
     </div>
   )
 }
+

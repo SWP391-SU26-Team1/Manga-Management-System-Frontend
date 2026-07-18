@@ -29,6 +29,7 @@ export default function TeamManagementPage() {
   
   // Toast state
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [confirmDeleteMember, setConfirmDeleteMember] = useState<{ id: string, name: string } | null>(null)
 
   const loadTeam = async () => {
     try {
@@ -99,7 +100,7 @@ export default function TeamManagementPage() {
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formName || !formSeriesId) {
-      alert('Vui lòng điền đầy đủ Tên và chọn Series!')
+      showToast('Vui lòng điền đầy đủ Tên và chọn Series!')
       return
     }
     try {
@@ -115,7 +116,7 @@ export default function TeamManagementPage() {
       loadTeam()
     } catch (err: any) {
       console.error(err)
-      alert(`Thêm thành viên thất bại: ${err.response?.data?.message || err.message || 'Lỗi hệ thống'}`)
+      showToast(`Thêm thành viên thất bại: ${err.response?.data?.message || err.message || 'Lỗi hệ thống'}`)
     }
   }
 
@@ -156,21 +157,12 @@ export default function TeamManagementPage() {
       loadTeam()
     } catch (err: any) {
       console.error(err)
-      alert(`Cập nhật thất bại: ${err.response?.data?.message || err.message || 'Lỗi hệ thống'}`)
+      showToast(`Cập nhật thất bại: ${err.response?.data?.message || err.message || 'Lỗi hệ thống'}`)
     }
   }
 
-  const handleDeleteMember = async (id: string, name: string) => {
-    if (window.confirm(`Bạn có chắc chắn muốn xóa thành viên ${name} khỏi nhóm?`)) {
-      try {
-        await editorService.deleteTeamMember(id)
-        showToast(`Đã xóa thành viên ${name} khỏi nhóm.`)
-        loadTeam()
-      } catch (err: any) {
-        console.error(err)
-        showToast(`Xóa thành viên thất bại: ${err.message}`)
-      }
-    }
+  const handleDeleteMemberClick = (id: string, name: string) => {
+    setConfirmDeleteMember({ id, name })
   }
 
   const handleNudge = async (userId: string, name: string) => {
@@ -193,7 +185,7 @@ export default function TeamManagementPage() {
   const handleScheduleMeeting = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedMember || !meetingDate || !meetingTime) {
-      alert('Vui lòng nhập đầy đủ ngày và giờ họp!')
+      showToast('Vui lòng nhập đầy đủ ngày và giờ họp!')
       return
     }
     try {
@@ -207,7 +199,7 @@ export default function TeamManagementPage() {
       showToast(`Đã lên lịch họp thành công với Mangaka ${selectedMember.name} vào ${meetingTime} ngày ${meetingDate}!`)
     } catch (err: any) {
       console.error(err)
-      alert(`Lên lịch họp thất bại: ${err.response?.data?.message || err.message || 'Lỗi hệ thống'}`)
+      showToast(`Lên lịch họp thất bại: ${err.response?.data?.message || err.message || 'Lỗi hệ thống'}`)
     }
   }
 
@@ -339,7 +331,7 @@ export default function TeamManagementPage() {
                   <Edit2 className="w-3.5 h-3.5" />
                 </button>
                 <button 
-                  onClick={() => handleDeleteMember(member.user_id, member.name)}
+                  onClick={() => handleDeleteMemberClick(member.user_id, member.name)}
                   className="p-1.5 bg-white border border-manga-ink text-red-600 hover:bg-red-50 rounded-sm"
                   title="Xóa thành viên"
                 >
@@ -731,6 +723,41 @@ export default function TeamManagementPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Custom Confirm Delete Modal */}
+      {confirmDeleteMember && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white border-4 border-manga-ink p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] text-center animate-in fade-in duration-100">
+            <h4 className="text-sm font-black uppercase tracking-wider mb-2">Xác nhận xóa</h4>
+            <p className="text-xs text-gray-500 font-bold mb-6">Bạn có chắc chắn muốn xóa thành viên {confirmDeleteMember.name} khỏi nhóm?</p>
+            <div className="flex gap-4">
+              <button
+                onClick={async () => {
+                  const { id, name } = confirmDeleteMember
+                  setConfirmDeleteMember(null)
+                  try {
+                    await editorService.deleteTeamMember(id)
+                    showToast(`Đã xóa thành viên ${name} khỏi nhóm.`)
+                    loadTeam()
+                  } catch (err: any) {
+                    console.error(err)
+                    showToast(`Xóa thành viên thất bại: ${err.message}`)
+                  }
+                }}
+                className="flex-1 py-2 bg-manga-red text-white border-2 border-manga-ink font-extrabold text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] transition-all cursor-pointer"
+              >
+                Đồng ý
+              </button>
+              <button
+                onClick={() => setConfirmDeleteMember(null)}
+                className="flex-1 py-2 bg-white border-2 border-manga-ink font-extrabold text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] transition-all cursor-pointer"
+              >
+                Hủy
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

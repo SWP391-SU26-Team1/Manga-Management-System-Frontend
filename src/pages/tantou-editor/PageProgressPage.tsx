@@ -294,7 +294,7 @@ export default function PageProgressPage() {
       showToast(`Đã DUYỆT trang ${page.page} thành công!`)
     } catch (err: any) {
       console.error(err)
-      alert('Không thể duyệt trang: ' + (err.message || ''))
+      showToast('Không thể duyệt trang: ' + (err.message || ''))
     }
   }
 
@@ -305,7 +305,7 @@ export default function PageProgressPage() {
 
   const handleConfirmReject = async (page: any) => {
     if (!rejectReason.trim()) {
-      alert('Vui lòng nhập lý do cần sửa!')
+      showToast('Vui lòng nhập lý do cần sửa!')
       return
     }
     try {
@@ -325,7 +325,7 @@ export default function PageProgressPage() {
       setRejectReason('')
     } catch (err: any) {
       console.error(err)
-      alert('Không thể gửi yêu cầu sửa: ' + (err.message || ''))
+      showToast('Không thể gửi yêu cầu sửa: ' + (err.message || ''))
     }
   }
 

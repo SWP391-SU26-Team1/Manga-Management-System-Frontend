@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router'
 import { ArrowLeft, AlertTriangle, Send, Save, BookOpen, Tag, Calendar, FileText, Info, CheckCircle, X, Upload, Trash2 } from 'lucide-react'
 import { seriesService, getErrorMessage } from '@/services/series.service'
 import { uploadService } from '@/services/upload.service'
+import { editorService } from '@/services/editor.service'
 
 export default function CreateSeriesPage() {
   const navigate = useNavigate()
@@ -142,6 +143,40 @@ export default function CreateSeriesPage() {
 
       // Bước 2: Nộp duyệt
       await seriesService.submitReview(newSeries._id)
+
+      // Gửi thông báo đến toàn bộ các Tantou Editor phụ trách (vì series mới chưa phân editor)
+      try {
+        const storedUser = localStorage.getItem('mangaflow_user')
+        let mangakaName = 'Họa sĩ'
+        if (storedUser) {
+          const parsed = JSON.parse(storedUser)
+          mangakaName = parsed.fullName || parsed.name || parsed.username || parsed.user?.fullName || parsed.user?.name || parsed.user?.username || 'Họa sĩ'
+        }
+
+        const systemEditors = [
+          'b29fb935-7a5d-4988-9327-a8e453ba7322', // LuanHuynh296
+          'f9a1ee69-6036-4fd6-bbef-de0e00370309', // editor_akira (Akira Watanabe)
+          '83556777-7c27-4039-ba81-655e58a788a7', // Tantou_Editor
+          '66666666-6666-6666-6666-666666666666', // editor_haru
+          '90000000-0000-0000-0000-000000000004', // editor_mika
+          'dcba68dd-5e62-49e2-a826-d2f5e6941561'  // codex_test_1781698003205
+        ]
+
+        await Promise.all(
+          systemEditors.map(editorId =>
+            editorService.sendInternalNotification(
+              editorId,
+              "Cập nhật mới",
+              `Có tác phẩm mới [${title.trim()}] từ ${mangakaName} đang chờ duyệt đưa vào sản xuất.`,
+              "series_submitted"
+            ).catch(errNotif => {
+              console.error(`Lỗi gửi thông báo cho editor ${editorId}:`, errNotif)
+            })
+          )
+        )
+      } catch (errNotifs) {
+        console.error("Lỗi khi xử lý thông báo nộp series:", errNotifs)
+      }
 
       setSuccessMsg('✅ Hồ sơ đã được gửi yêu cầu duyệt! Trạng thái: Chờ duyệt.')
       setTimeout(() => navigate('/dashboard/mangaka/series'), 2000)

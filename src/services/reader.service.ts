@@ -336,15 +336,6 @@ export const readerService = {
     }
   },
 
-  toggleChapterLike: async (chapterId: string): Promise<boolean> => {
-    try {
-      await api.post('/api/chapter-likes', { chapter_id: chapterId });
-      return true;
-    } catch (error) {
-      console.error('Error toggling chapter like:', error);
-      return false;
-    }
-  },
 
   getSeriesComments: async (seriesId: string): Promise<any[]> => {
     try {

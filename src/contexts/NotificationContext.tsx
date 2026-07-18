@@ -53,6 +53,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   })
 
   const seenIdsRef = useRef<Set<string>>(new Set())
+  const seenToastIdsRef = useRef<Set<string>>(new Set())
   const isFirstLoadRef = useRef(true)
 
   useEffect(() => {
@@ -88,8 +89,14 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         activeSocket.on('notification:new', (newNotification: any) => {
           console.log('Received real-time notification:', newNotification)
 
+          const notifId = newNotification.id || newNotification.notification_id || Math.random().toString()
+          if (seenToastIdsRef.current.has(notifId)) {
+            return
+          }
+          seenToastIdsRef.current.add(notifId)
+
           const mappedNotif: Notification = {
-            id: newNotification.id || newNotification.notification_id || Math.random().toString(),
+            id: notifId,
             title: newNotification.title || 'THÔNG BÁO MỚI',
             message: newNotification.message || newNotification.content || '',
             time: new Date(newNotification.created_at || Date.now()).toLocaleDateString('vi-VN'),
@@ -121,7 +128,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             setTimeout(() => {
               setToasts(p => p.filter(t => t.id !== mappedNotif.id))
             }, 3500)
-            return [...prev, newToast]
+            const next = [...prev, newToast]
+            if (next.length > 3) {
+              return next.slice(next.length - 3)
+            }
+            return next
           })
         })
 
@@ -319,7 +330,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       message,
       category
     }
-    setToasts(prev => [...prev, newToast])
+    setToasts(prev => {
+      const next = [...prev, newToast]
+      if (next.length > 3) {
+        return next.slice(next.length - 3)
+      }
+      return next
+    })
 
     // Auto dismiss toast after 3.5 seconds
     setTimeout(() => {

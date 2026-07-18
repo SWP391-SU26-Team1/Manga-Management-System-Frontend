@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef, MouseEvent as ReactMouseEvent } fro
 import { useNavigate, useSearchParams } from 'react-router';
 import { useToast } from '@/contexts/ToastContext';
 import {
-  Pen, Eraser, MousePointer2, Square, Circle, ArrowUpRight, Type, 
-  MapPin, Undo2, Redo2, Trash2, Hand, ZoomIn, ZoomOut, Maximize, 
-  FileDown, Save, Upload, Send, CheckCircle2, X, AlertTriangle, 
+  Pen, Eraser, MousePointer2, Square, Circle, ArrowUpRight, Type,
+  MapPin, Undo2, Redo2, Trash2, Hand, ZoomIn, ZoomOut, Maximize,
+  FileDown, Save, Upload, Send, CheckCircle2, X, AlertTriangle,
   Layers, MessageSquare, ListTodo, FileImage, Grid, ImagePlus, Loader2,
   ArrowLeft
 } from 'lucide-react';
@@ -56,35 +56,35 @@ export default function DrawingStudioPage() {
   const [loading, setLoading] = useState(true);
   const [pageDetail, setPageDetail] = useState<any>(null);
   const [activeTask, setActiveTask] = useState<any>(null);
-  
+
   // Workspace layout states
   const [activeTab, setActiveTab] = useState<'regions' | 'layers' | 'feedback' | 'submit'>('regions');
-  
+
   // Canvas & Drawing states
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  
+
   const [scale, setScale] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
   const [lastPan, setLastPan] = useState({ x: 0, y: 0 });
-  
+
   const [tool, setTool] = useState<ToolType>('pen');
   const [color, setColor] = useState('#E63946');
   const [brushSize, setBrushSize] = useState(3);
   const [showGrid, setShowGrid] = useState(false);
   const [bgImage, setBgImage] = useState<string>("https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?q=80&w=600&auto=format&fit=crop");
   const [canvasSize, setCanvasSize] = useState({ width: 600, height: 850 });
-  
+
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [history, setHistory] = useState<Stroke[][]>([]);
   const [currentStroke, setCurrentStroke] = useState<Stroke | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  
+
   // Dynamic features state
   const [regions, setRegions] = useState<MappedRegion[]>([]);
   const [activeRegionId, setActiveRegionId] = useState<string | null>(null);
   const [regionFilter, setRegionFilter] = useState('Tất cả');
-  
+
   const [layers, setLayers] = useState({
     original: true,
     mangaka: true,
@@ -101,7 +101,21 @@ export default function DrawingStudioPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showLeaveConfirmModal, setShowLeaveConfirmModal] = useState(false);
   const [pendingPageId, setPendingPageId] = useState<string | null>(null);
-  
+
+  // Custom manga-style prompt modal state
+  const [promptModal, setPromptModal] = useState<{
+    isOpen: boolean;
+    type: 'text' | 'pin';
+    pos: { x: number; y: number } | null;
+    title: string;
+  }>({
+    isOpen: false,
+    type: 'text',
+    pos: null,
+    title: ''
+  });
+  const [promptValue, setPromptValue] = useState('');
+
   // Feedbacks
   const [feedbacks, setFeedbacks] = useState<MappedFeedback[]>([]);
 
@@ -109,7 +123,7 @@ export default function DrawingStudioPage() {
   const [selectorSeriesList, setSelectorSeriesList] = useState<any[]>([]);
   const [selectorChaptersMap, setSelectorChaptersMap] = useState<Record<string, any[]>>({}); // series_id -> chapters
   const [selectorPagesMap, setSelectorPagesMap] = useState<Record<string, any[]>>({}); // chapter_id -> pages
-  
+
   // Selected IDs states
   const [selSeriesId, setSelSeriesId] = useState<string>('');
   const [selChapterId, setSelChapterId] = useState<string>('');
@@ -127,7 +141,7 @@ export default function DrawingStudioPage() {
         const seriesMap: Record<string, { series_id: string; title: string }> = {};
         const chaptersMap: Record<string, Record<string, { chapter_id: string; title: string; chapter_number: number }>> = {};
         const pagesMap: Record<string, Record<string, { page_id: string; page_number: number }>> = {};
-        
+
         res.data.forEach((task: any) => {
           const page = task.page;
           if (!page) return;
@@ -135,12 +149,12 @@ export default function DrawingStudioPage() {
           if (!chapter) return;
           const series = chapter.series;
           if (!series) return;
-          
+
           seriesMap[series.series_id] = {
             series_id: series.series_id,
             title: series.title
           };
-          
+
           if (!chaptersMap[series.series_id]) {
             chaptersMap[series.series_id] = {};
           }
@@ -149,7 +163,7 @@ export default function DrawingStudioPage() {
             title: chapter.title,
             chapter_number: chapter.chapter_number || 0
           };
-          
+
           if (!pagesMap[chapter.chapter_id]) {
             pagesMap[chapter.chapter_id] = {};
           }
@@ -158,19 +172,19 @@ export default function DrawingStudioPage() {
             page_number: page.page_number
           };
         });
-        
+
         const seriesList = Object.values(seriesMap);
-        
+
         const finalChaptersMap: Record<string, any[]> = {};
         Object.keys(chaptersMap).forEach(seriesId => {
           finalChaptersMap[seriesId] = Object.values(chaptersMap[seriesId]).sort((a, b) => a.chapter_number - b.chapter_number);
         });
-        
+
         const finalPagesMap: Record<string, any[]> = {};
         Object.keys(pagesMap).forEach(chapterId => {
           finalPagesMap[chapterId] = Object.values(pagesMap[chapterId]).sort((a, b) => a.page_number - b.page_number);
         });
-        
+
         setSelectorSeriesList(seriesList);
         setSelectorChaptersMap(finalChaptersMap);
         setSelectorPagesMap(finalPagesMap);
@@ -222,13 +236,13 @@ export default function DrawingStudioPage() {
 
   const handlePageSwitch = (newPageId: string) => {
     if (!newPageId || newPageId === pageId) return;
-    
+
     if (checkUnsavedStrokes()) {
       setPendingPageId(newPageId);
       setShowLeaveConfirmModal(true);
       return;
     }
-    
+
     executePageSwitch(newPageId);
   };
 
@@ -254,7 +268,7 @@ export default function DrawingStudioPage() {
     if (chapters.length > 0) {
       const firstChapterId = chapters[0].chapter_id;
       setSelChapterId(firstChapterId);
-      
+
       const pages = selectorPagesMap[firstChapterId] || [];
       if (pages.length > 0) {
         const firstPageId = pages[0].page_id;
@@ -291,7 +305,7 @@ export default function DrawingStudioPage() {
     const list = [...selectorSeriesList];
     const currentSeriesId = pageDetail?.chapter?.series_id;
     const currentSeriesTitle = pageDetail?.chapter?.series?.title || 'Bộ truyện hiện tại';
-    
+
     if (currentSeriesId && !list.some(s => s.series_id === currentSeriesId)) {
       list.push({ series_id: currentSeriesId, title: currentSeriesTitle });
     }
@@ -303,7 +317,7 @@ export default function DrawingStudioPage() {
     const currentChapterId = pageDetail?.chapter_id;
     const currentChapterTitle = pageDetail?.chapter?.title || 'Chương hiện tại';
     const currentChapterNumber = pageDetail?.chapter?.chapter_number || 0;
-    
+
     if (currentChapterId && !list.some(c => c.chapter_id === currentChapterId)) {
       list.push({ chapter_id: currentChapterId, title: currentChapterTitle, chapter_number: currentChapterNumber });
     }
@@ -314,7 +328,7 @@ export default function DrawingStudioPage() {
     const list = selectorPagesMap[selChapterId] ? [...selectorPagesMap[selChapterId]] : [];
     const currentPageId = pageDetail?.page_id;
     const currentPageNumber = pageDetail?.page_number || 0;
-    
+
     if (currentPageId && !list.some(p => p.page_id === currentPageId)) {
       list.push({ page_id: currentPageId, page_number: currentPageNumber });
     }
@@ -362,7 +376,7 @@ export default function DrawingStudioPage() {
           const matchText = t.content && t.content.toLowerCase().includes(regionLabel.toLowerCase());
           return matchId || matchText;
         });
-        
+
         // Việt hóa trạng thái nhiệm vụ tương ứng của vùng vẽ
         const getStatusLabel = (status?: string) => {
           if (!status) return 'Chưa làm';
@@ -443,14 +457,57 @@ export default function DrawingStudioPage() {
         setSelPageId(detail.page_id || '');
       }
 
-      // Load draft strokes from LocalStorage for this specific page
-      const draft = localStorage.getItem(`mangaflow_drawing_draft_${pageId}`);
-      if (draft) {
+      // Load draft from Backend API (with LocalStorage fallback/sync)
+      if (myTask && myTask.task_id) {
         try {
-          const parsed = JSON.parse(draft);
-          if (parsed.strokes) setStrokes(parsed.strokes);
-        } catch (e) {
-          console.error('Lỗi đọc bản nháp nét vẽ:', e);
+          const res = await api.get(`/api/page-tasks/${myTask.task_id}/draft`);
+          const dbDraft = res.data?.data;
+          
+          const localDraftStr = localStorage.getItem(`mangaflow_drawing_draft_${pageId}`);
+          let localDraft = null;
+          if (localDraftStr) {
+            try {
+              localDraft = JSON.parse(localDraftStr);
+            } catch (e) {}
+          }
+
+          if (dbDraft && localDraft) {
+            const localTime = new Date(localDraft.updatedAt || 0).getTime();
+            const dbTime = new Date(dbDraft.updatedAt || dbDraft.created_at || 0).getTime();
+
+            if (localTime > dbTime + 2000) {
+              if (window.confirm("Phát hiện bản vẽ nháp cục bộ mới hơn bản lưu trên máy chủ. Bạn có muốn phục hồi từ trình duyệt không?")) {
+                if (localDraft.strokes) setStrokes(localDraft.strokes);
+              } else {
+                if (dbDraft.canvasState?.strokes) setStrokes(dbDraft.canvasState.strokes);
+              }
+            } else {
+              if (dbDraft.canvasState?.strokes) setStrokes(dbDraft.canvasState.strokes);
+            }
+          } else if (dbDraft) {
+            if (dbDraft.canvasState?.strokes) setStrokes(dbDraft.canvasState.strokes);
+          } else if (localDraft) {
+            if (localDraft.strokes) setStrokes(localDraft.strokes);
+          }
+        } catch (dbErr) {
+          console.error('Lỗi khi tải bản nháp từ server:', dbErr);
+          // Fallback to local storage
+          const localDraftStr = localStorage.getItem(`mangaflow_drawing_draft_${pageId}`);
+          if (localDraftStr) {
+            try {
+              const parsed = JSON.parse(localDraftStr);
+              if (parsed.strokes) setStrokes(parsed.strokes);
+            } catch (e) {}
+          }
+        }
+      } else {
+        // Fallback to local storage if no active task
+        const localDraftStr = localStorage.getItem(`mangaflow_drawing_draft_${pageId}`);
+        if (localDraftStr) {
+          try {
+            const parsed = JSON.parse(localDraftStr);
+            if (parsed.strokes) setStrokes(parsed.strokes);
+          } catch (e) {}
         }
       }
 
@@ -470,7 +527,7 @@ export default function DrawingStudioPage() {
   };
 
   // --- Canvas Logic ---
-  
+
   const getMousePos = (e: ReactMouseEvent | MouseEvent) => {
     if (!canvasRef.current) return { x: 0, y: 0 };
     const rect = canvasRef.current.getBoundingClientRect();
@@ -498,7 +555,7 @@ export default function DrawingStudioPage() {
           const rw = (r.w / 100) * canvasW;
           const rh = (r.h / 100) * canvasH;
           return pos.x >= rx && pos.x <= rx + rw &&
-                 pos.y >= ry && pos.y <= ry + rh;
+            pos.y >= ry && pos.y <= ry + rh;
         });
         if (clickedRegion) {
           setActiveRegionId(clickedRegion.id);
@@ -523,34 +580,24 @@ export default function DrawingStudioPage() {
 
     // Xử lý vẽ nhãn chữ (Text) và Ghim bình luận (Pin)
     if (tool === 'text') {
-      const textVal = prompt('Nhập văn bản ghi chú:');
-      if (!textVal) return;
-      const newStroke: Stroke = {
-        id: Date.now().toString(),
-        tool: 'text',
-        color,
-        size: brushSize,
-        points: [pos],
-        text: textVal
-      };
-      setStrokes([...strokes, newStroke]);
-      setHistory([...history, strokes]);
+      setPromptModal({
+        isOpen: true,
+        type: 'text',
+        pos,
+        title: 'Nhập văn bản ghi chú'
+      });
+      setPromptValue('');
       return;
     }
 
     if (tool === 'pin') {
-      const pinNote = prompt('Nhập nội dung ghim chú thích:');
-      if (!pinNote) return;
-      const newStroke: Stroke = {
-        id: Date.now().toString(),
-        tool: 'pin',
-        color: '#E63946', // Ghim có màu đỏ nổi bật
-        size: brushSize,
-        points: [pos],
-        text: pinNote
-      };
-      setStrokes([...strokes, newStroke]);
-      setHistory([...history, strokes]);
+      setPromptModal({
+        isOpen: true,
+        type: 'pin',
+        pos,
+        title: 'Nhập nội dung ghim chú thích'
+      });
+      setPromptValue('');
       return;
     }
 
@@ -558,7 +605,7 @@ export default function DrawingStudioPage() {
     const newStroke: Stroke = {
       id: Date.now().toString(),
       tool,
-      color, 
+      color,
       size: brushSize,
       points: [pos],
     };
@@ -569,7 +616,7 @@ export default function DrawingStudioPage() {
     const eraseRadius = Math.max(20, brushSize * 6); // forgiving erase radius
     const remainingStrokes = strokes.filter(stroke => {
       if (stroke.points.length === 0) return false;
-      
+
       // For pen: check distance to any segment/point
       if (stroke.tool === 'pen') {
         const isNear = stroke.points.some(pt => {
@@ -578,7 +625,7 @@ export default function DrawingStudioPage() {
         });
         return !isNear;
       }
-      
+
       // For text, pin, rect, circle, arrow: check bounding box or start/end points
       let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
       stroke.points.forEach(pt => {
@@ -591,8 +638,8 @@ export default function DrawingStudioPage() {
       // Pad the bounding box slightly
       const padding = eraseRadius;
       const insideBox = pos.x >= minX - padding && pos.x <= maxX + padding &&
-                         pos.y >= minY - padding && pos.y <= maxY + padding;
-                         
+        pos.y >= minY - padding && pos.y <= maxY + padding;
+
       return !insideBox;
     });
 
@@ -620,7 +667,7 @@ export default function DrawingStudioPage() {
     }
 
     if (!currentStroke) return;
-    
+
     const pos = getMousePos(e);
 
     // Vẽ trực tiếp nét vẽ phân đoạn lên canvas ở thời gian thực (Zero-latency drawing feedback)
@@ -633,14 +680,14 @@ export default function DrawingStudioPage() {
       ctx.lineWidth = currentStroke.size;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      
+
       if (currentStroke.tool === 'eraser') {
         ctx.globalCompositeOperation = 'destination-out';
         ctx.lineWidth = currentStroke.size * 2;
       } else {
         ctx.globalCompositeOperation = 'source-over';
       }
-      
+
       if (currentStroke.tool === 'pen' || currentStroke.tool === 'eraser') {
         ctx.moveTo(prevPos.x, prevPos.y);
         ctx.lineTo(pos.x, pos.y);
@@ -656,12 +703,12 @@ export default function DrawingStudioPage() {
   const stopDrawing = () => {
     setIsPanning(false);
     if (!isDrawing) return;
-    
+
     setIsDrawing(false);
     if (tool === 'eraser') return;
 
     if (!currentStroke) return;
-    
+
     const newStrokes = [...strokes, currentStroke];
     setStrokes(newStrokes);
     setHistory([...history, strokes]); // Lưu trạng thái phục vụ Undo
@@ -745,9 +792,9 @@ export default function DrawingStudioPage() {
         ctx.strokeStyle = r.id === activeRegionId ? '#E63946' : 'rgba(230, 57, 70, 0.5)';
         ctx.lineWidth = r.id === activeRegionId ? 4 : 2;
         ctx.setLineDash(r.id === activeRegionId ? [] : [5, 5]);
-        
+
         ctx.strokeRect(rx, ry, rw, rh);
-        
+
         // Background for active
         if (r.id === activeRegionId) {
           ctx.fillStyle = 'rgba(230, 57, 70, 0.1)';
@@ -766,10 +813,10 @@ export default function DrawingStudioPage() {
     // Draw Assistant Quick Edits (Strokes)
     if (layers.assistantQuickEdit) {
       const allStrokes = currentStroke ? [...strokes, currentStroke] : strokes;
-      
+
       allStrokes.forEach(stroke => {
         if (stroke.points.length === 0) return;
-        
+
         ctx.beginPath();
         ctx.strokeStyle = stroke.color;
         ctx.lineWidth = stroke.size;
@@ -848,23 +895,53 @@ export default function DrawingStudioPage() {
   }, [strokes, currentStroke, regions, activeRegionId, layers, showGrid, pageDetail]);
 
   // --- Handlers ---
-  const handleSaveDraft = () => {
+  const handleSaveDraft = async () => {
     const draftData = {
       pageId,
       updatedAt: new Date().toISOString(),
       strokes
     };
-    
+
     // Save draft strokes to localStorage
     localStorage.setItem(`mangaflow_drawing_draft_${pageId}`, JSON.stringify(draftData));
-    showToast('Đã lưu nét vẽ nháp thành công!');
+
+    // Sync draft to backend database
+    if (activeTask && activeTask.task_id) {
+      try {
+        const canvas = canvasRef.current;
+        let uploadedUrl = null;
+        if (canvas) {
+          // Convert canvas to blob
+          const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+          if (blob) {
+            const file = new File([blob], `draft_${pageId}.png`, { type: 'image/png' });
+            // Upload to Cloudinary using existing frontend uploadService
+            const uploadResult = await uploadService.uploadSingle(file, 'page-task-drafts');
+            uploadedUrl = uploadResult.secure_url;
+          }
+        }
+
+        await api.put(`/api/page-tasks/${activeTask.task_id}/draft`, {
+          imageUrl: uploadedUrl,
+          canvasState: {
+            strokes
+          }
+        });
+        showToast('Đồng bộ bản nháp lên đám mây thành công!');
+      } catch (err: any) {
+        console.error('Lỗi khi đồng bộ bản nháp lên server:', err);
+        showToast(`Đã lưu cục bộ. Lỗi đồng bộ đám mây: ${err?.response?.data?.message || err?.message || 'Không có phản hồi từ máy chủ'}`);
+      }
+    } else {
+      showToast('Đã lưu nét vẽ nháp cục bộ thành công!');
+    }
   };
 
   const drawStrokesToCtx = (ctx: CanvasRenderingContext2D) => {
     const allStrokes = strokes;
     allStrokes.forEach(stroke => {
       if (stroke.points.length === 0) return;
-      
+
       ctx.beginPath();
       ctx.strokeStyle = stroke.color;
       ctx.lineWidth = stroke.size;
@@ -957,7 +1034,7 @@ export default function DrawingStudioPage() {
       try {
         tempCtx.drawImage(img, 0, 0, tempCanvas.width, tempCanvas.height);
         drawStrokesToCtx(tempCtx);
-        
+
         const dataURL = tempCanvas.toDataURL('image/png');
         const link = document.createElement('a');
         link.download = `page_${pageDetail?.page_number || 'draft'}_edited.png`;
@@ -1027,6 +1104,41 @@ export default function DrawingStudioPage() {
       return;
     }
     setShowSubmitModal(true);
+  };
+
+  const handleConfirmPrompt = () => {
+    if (!promptModal.pos || !promptValue.trim()) {
+      setPromptModal({ isOpen: false, type: 'text', pos: null, title: '' });
+      setPromptValue('');
+      return;
+    }
+
+    const { type, pos } = promptModal;
+    const newStroke: Stroke = {
+      id: Date.now().toString(),
+      tool: type,
+      color: type === 'pin' ? '#E63946' : color,
+      size: brushSize,
+      points: [pos],
+      text: promptValue.trim()
+    };
+
+    setStrokes([...strokes, newStroke]);
+    setHistory([...history, strokes]);
+    setPromptModal({ isOpen: false, type: 'text', pos: null, title: '' });
+    setPromptValue('');
+  };
+
+  const handlePromptKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleConfirmPrompt();
+    }
+  };
+
+  const handleCancelPrompt = () => {
+    setPromptModal({ isOpen: false, type: 'text', pos: null, title: '' });
+    setPromptValue('');
   };
 
   const confirmSubmit = async () => {
@@ -1109,7 +1221,7 @@ export default function DrawingStudioPage() {
 
   return (
     <div className="flex flex-col h-full w-full font-sans overflow-hidden">
-      
+
       {/* Top Banner Note */}
       <div className="bg-amber-50 border-b border-amber-200 p-2 text-center text-xs font-bold text-amber-700 flex justify-center items-center gap-2 shrink-0">
         <AlertTriangle className="w-4 h-4" />
@@ -1132,7 +1244,7 @@ export default function DrawingStudioPage() {
             <span className="font-manga text-xl font-bold uppercase text-manga-red tracking-wide shrink-0">
               KHÔNG GIAN LÀM VIỆC —
             </span>
-            
+
             <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm font-bold text-manga-ink">
               {/* Series Select */}
               <select
@@ -1144,9 +1256,9 @@ export default function DrawingStudioPage() {
                   <option key={s.series_id} value={s.series_id}>{s.title}</option>
                 ))}
               </select>
-              
+
               <span className="text-gray-400 font-bold shrink-0">/</span>
-              
+
               {/* Chapter Select */}
               <select
                 value={selChapterId}
@@ -1158,9 +1270,9 @@ export default function DrawingStudioPage() {
                   <option key={c.chapter_id} value={c.chapter_id}>CH.{c.chapter_number}: {c.title}</option>
                 ))}
               </select>
-              
+
               <span className="text-gray-400 font-bold shrink-0">/</span>
-              
+
               {/* Page Select */}
               <select
                 value={selPageId}
@@ -1187,7 +1299,7 @@ export default function DrawingStudioPage() {
           <label className="flex items-center gap-1.5 px-3 py-2 bg-white border-2 border-manga-ink text-manga-ink font-bold text-xs uppercase hover:bg-gray-100 transition cursor-pointer animate-pulse" title="Tải ảnh máy bạn lên Canvas">
             <ImagePlus className="w-4 h-4" /> Đổi hình nền
             <input type="file" className="hidden" accept="image/*" onChange={(e) => {
-              if(e.target.files?.[0]) {
+              if (e.target.files?.[0]) {
                 const url = URL.createObjectURL(e.target.files[0]);
                 setBgImage(url);
                 showToast('Đã đổi hình nền tạm thời.');
@@ -1195,7 +1307,7 @@ export default function DrawingStudioPage() {
             }} />
           </label>
 
-          <a 
+          <a
             href={getImageUrl(bgImage)}
             target="_blank"
             rel="noopener noreferrer"
@@ -1203,15 +1315,15 @@ export default function DrawingStudioPage() {
           >
             <FileDown className="w-4 h-4" /> Tải file gốc
           </a>
-          
-          <button 
+
+          <button
             onClick={handleSaveDraft}
             className="flex items-center gap-1.5 px-3 py-2 bg-white border-2 border-manga-ink text-manga-ink font-bold text-xs uppercase hover:bg-gray-100 transition cursor-pointer"
           >
             <Save className="w-4 h-4" /> Lưu bản nháp nét vẽ
           </button>
 
-          <button 
+          <button
             onClick={handleDownloadEditedImage}
             className="flex items-center gap-1.5 px-3 py-2 bg-[#457B9D] border-2 border-black text-white font-bold text-xs uppercase hover:bg-[#356280] transition cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 hover:shadow-[1px_1px_0px_rgba(0,0,0,1)]"
           >
@@ -1223,7 +1335,7 @@ export default function DrawingStudioPage() {
             <input type="file" disabled={isUploading} className="hidden" accept="image/*,.psd" onChange={handleFileUpload} />
           </label>
 
-          <button 
+          <button
             onClick={handleSubmit}
             disabled={!uploadedFileUrl}
             className="flex items-center gap-1.5 px-4 py-2 bg-[#E63946] border-2 border-black text-white font-bold text-xs uppercase hover:bg-red-600 transition shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
@@ -1235,7 +1347,7 @@ export default function DrawingStudioPage() {
 
       {/* Main Workspace */}
       <div className="flex flex-1 overflow-hidden">
-        
+
         {/* Left Toolbar */}
         <div className="w-16 bg-[#18181b] border-r-4 border-black flex flex-col items-center py-4 shrink-0 gap-2 z-10 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {/* Tools */}
@@ -1285,7 +1397,7 @@ export default function DrawingStudioPage() {
 
         {/* Center Canvas */}
         <div className="flex-1 bg-[#27272a] relative flex flex-col min-w-0">
-          
+
           {/* Zoom Controls Overlay (Fixed relative to the canvas area) */}
           <div className="absolute bottom-4 left-4 bg-zinc-900 border-2 border-black rounded shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-white flex items-center z-30">
             <button onClick={() => setScale(s => Math.max(0.5, s - 0.2))} className="p-2 hover:bg-zinc-800 border-r border-zinc-700 cursor-pointer bg-transparent text-white border-none"><ZoomOut className="w-4 h-4" /></button>
@@ -1296,7 +1408,7 @@ export default function DrawingStudioPage() {
           </div>
 
           {/* Scrollable Container */}
-          <div 
+          <div
             className={`flex-1 overflow-auto outline-none ${tool === 'hand' ? (isPanning ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-crosshair'}`}
             ref={containerRef}
             onWheel={(e) => {
@@ -1308,28 +1420,28 @@ export default function DrawingStudioPage() {
           >
             {/* Wrapper to ensure scaling has padding and triggers scrollbars */}
             <div className="min-w-full min-h-full flex items-center justify-center p-12">
-              
+
               {/* Sized container that matches the scaled canvas size */}
-              <div 
-                style={{ width: canvasSize.width * scale, height: canvasSize.height * scale }} 
+              <div
+                style={{ width: canvasSize.width * scale, height: canvasSize.height * scale }}
                 className="relative shadow-[0_0_20px_rgba(0,0,0,0.5)] bg-white"
               >
                 {/* Inner element that applies the CSS scale transform */}
-                <div 
+                <div
                   className="absolute top-0 left-0 origin-top-left"
                   style={{ transform: `scale(${scale})`, width: canvasSize.width, height: canvasSize.height }}
                 >
                   {/* Manga Page Background */}
                   {layers.original && (
-                    <img 
-                      src={getImageUrl(bgImage)} 
+                    <img
+                      src={getImageUrl(bgImage)}
                       alt="Manga Page"
                       className="absolute inset-0 w-full h-full object-contain opacity-80 select-none pointer-events-none grayscale"
                     />
                   )}
 
                   {/* Interactive Canvas */}
-                   <canvas
+                  <canvas
                     ref={canvasRef}
                     width={canvasSize.width}
                     height={canvasSize.height}
@@ -1351,7 +1463,7 @@ export default function DrawingStudioPage() {
 
         {/* Right Panel */}
         <div className="w-80 bg-white border-l-4 border-black flex flex-col shrink-0 z-20">
-          
+
           {/* Tabs */}
           <div className="flex border-b-2 border-gray-200 bg-white">
             <button onClick={() => setActiveTab('regions')} className={`flex-1 py-3 text-[10px] font-black uppercase flex flex-col items-center justify-center gap-1 cursor-pointer border-none transition ${activeTab === 'regions' ? 'bg-manga-ink text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
@@ -1371,11 +1483,11 @@ export default function DrawingStudioPage() {
 
           {/* Panel Content */}
           <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
-            
+
             {/* --- REGIONS TAB --- */}
             {activeTab === 'regions' && (
               <div className="space-y-4">
-                <select 
+                <select
                   className="w-full border-2 border-black p-2 text-xs font-bold uppercase cursor-pointer focus:outline-none focus:border-[#E63946]"
                   value={regionFilter}
                   onChange={(e) => setRegionFilter(e.target.value)}
@@ -1388,24 +1500,23 @@ export default function DrawingStudioPage() {
 
                 <div className="space-y-3">
                   {filteredRegions.map(r => (
-                    <div 
-                      key={r.id} 
+                    <div
+                      key={r.id}
                       className={`border-2 p-3 bg-white cursor-pointer transition ${activeRegionId === r.id ? 'border-[#E63946] shadow-[2px_2px_0px_0px_#E63946]' : 'border-black hover:border-gray-500 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'}`}
                       onClick={() => zoomToRegion(r)}
                     >
                       <div className="flex justify-between items-start mb-2">
                         <h4 className="font-extrabold text-xs text-manga-ink uppercase leading-tight">{r.name}</h4>
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 border ${
-                          r.status === 'Đã xong' ? 'bg-emerald-100 text-emerald-700 border-emerald-300' :
-                          r.status === 'Đang làm' ? 'bg-blue-100 text-blue-700 border-blue-300' :
-                          'bg-amber-100 text-amber-700 border-amber-300'
-                        }`}>{r.status}</span>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 border ${r.status === 'Đã xong' ? 'bg-emerald-100 text-emerald-700 border-emerald-300' :
+                            r.status === 'Đang làm' ? 'bg-blue-100 text-blue-700 border-blue-300' :
+                              'bg-amber-100 text-amber-700 border-amber-300'
+                          }`}>{r.status}</span>
                       </div>
                       <p className="text-[10px] text-gray-500 font-bold uppercase mb-2 border-b border-gray-100 pb-2">{r.type}</p>
                       <p className="text-xs text-gray-700 mb-3 leading-snug">{r.desc}</p>
-                      
+
                       {/* Change Status */}
-                      <select 
+                      <select
                         className="w-full border border-gray-300 p-1.5 text-xs font-bold cursor-pointer hover:border-[#E63946] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                         value={r.status}
                         disabled={r.status === 'Đã xong'}
@@ -1424,16 +1535,25 @@ export default function DrawingStudioPage() {
 
                           if (task) {
                             try {
+                              let apiCalled = false;
                               if (newStatus === 'Đang làm') {
-                                await assistantService.startTask(task.task_id);
+                                if (task.status === 'assigned') {
+                                  await assistantService.startTask(task.task_id);
+                                  apiCalled = true;
+                                }
                                 showToast(`Đã bắt đầu làm nhiệm vụ [${regionLabel}]!`);
                               } else if (newStatus === 'Chưa làm') {
-                                await assistantService.holdTaskWorkflow(task.task_id);
+                                if (task.status === 'in_progress') {
+                                  await assistantService.holdTaskWorkflow(task.task_id);
+                                  apiCalled = true;
+                                }
                                 showToast(`Đã tạm dừng nhiệm vụ [${regionLabel}].`);
                               }
-                              // Refresh details to sync all states
-                              const detail = await assistantService.getDrawingPageDetail(pageId);
-                              setPageDetail(detail);
+                              // Refresh details to sync all states only if API was called
+                              if (apiCalled) {
+                                const detail = await assistantService.getDrawingPageDetail(pageId);
+                                setPageDetail(detail);
+                              }
                             } catch (err: any) {
                               console.error(err);
                               showToast('Không thể cập nhật trạng thái nhiệm vụ lên máy chủ.');
@@ -1460,15 +1580,15 @@ export default function DrawingStudioPage() {
                     <h4 className="font-bold text-sm uppercase">Bản thảo truyện gốc</h4>
                     <p className="text-[10px] text-gray-500">Original Manuscript</p>
                   </div>
-                  <input type="checkbox" checked={layers.original} onChange={(e) => setLayers({...layers, original: e.target.checked})} className="w-4 h-4 accent-[#E63946] cursor-pointer" />
+                  <input type="checkbox" checked={layers.original} onChange={(e) => setLayers({ ...layers, original: e.target.checked })} className="w-4 h-4 accent-[#E63946] cursor-pointer" />
                 </div>
-                
+
                 <div className="border-2 border-black bg-white p-3 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] flex justify-between items-center hover:border-gray-600 transition">
                   <div>
                     <h4 className="font-bold text-sm uppercase text-[#E63946]">Vùng được giao</h4>
                     <p className="text-[10px] text-gray-500">Mangaka Annotation</p>
                   </div>
-                  <input type="checkbox" checked={layers.mangaka} onChange={(e) => setLayers({...layers, mangaka: e.target.checked})} className="w-4 h-4 accent-[#E63946] cursor-pointer" />
+                  <input type="checkbox" checked={layers.mangaka} onChange={(e) => setLayers({ ...layers, mangaka: e.target.checked })} className="w-4 h-4 accent-[#E63946] cursor-pointer" />
                 </div>
 
                 <div className="border-2 border-black bg-white p-3 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] flex justify-between items-center hover:border-gray-600 transition">
@@ -1476,15 +1596,15 @@ export default function DrawingStudioPage() {
                     <h4 className="font-bold text-sm uppercase text-[#3B82F6]">Nét vẽ chỉnh sửa</h4>
                     <p className="text-[10px] text-gray-500">Assistant Quick Edit</p>
                   </div>
-                  <input type="checkbox" checked={layers.assistantQuickEdit} onChange={(e) => setLayers({...layers, assistantQuickEdit: e.target.checked})} className="w-4 h-4 accent-[#E63946] cursor-pointer" />
+                  <input type="checkbox" checked={layers.assistantQuickEdit} onChange={(e) => setLayers({ ...layers, assistantQuickEdit: e.target.checked })} className="w-4 h-4 accent-[#E63946] cursor-pointer" />
                 </div>
-                
+
                 <div className="border-2 border-black bg-white p-3 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] flex justify-between items-center opacity-50">
                   <div>
                     <h4 className="font-bold text-sm uppercase text-[#F59E0B]">Ghi chú Pin</h4>
                     <p className="text-[10px] text-gray-500">Assistant Notes</p>
                   </div>
-                  <input type="checkbox" disabled checked={layers.assistantNotes} onChange={(e) => setLayers({...layers, assistantNotes: e.target.checked})} className="w-4 h-4 accent-[#E63946] cursor-not-allowed" />
+                  <input type="checkbox" disabled checked={layers.assistantNotes} onChange={(e) => setLayers({ ...layers, assistantNotes: e.target.checked })} className="w-4 h-4 accent-[#E63946] cursor-not-allowed" />
                 </div>
               </div>
             )}
@@ -1503,13 +1623,13 @@ export default function DrawingStudioPage() {
                       </div>
                       <h4 className="font-bold text-xs uppercase mb-2">Vùng: {f.region}</h4>
                       <p className="text-sm italic text-gray-700 bg-gray-50 p-2 border border-gray-200 mb-3">{f.text}</p>
-                      <button 
+                      <button
                         onClick={async () => {
                           try {
                             if (!f.id.startsWith('fb-')) {
                               await api.patch(`/api/annotations/${f.id}/status`, { status: 'resolved' })
                             }
-                            setFeedbacks(feedbacks.map(fb => fb.id === f.id ? {...fb, resolved: true} : fb))
+                            setFeedbacks(feedbacks.map(fb => fb.id === f.id ? { ...fb, resolved: true } : fb))
                           } catch (err) {
                             console.error('Failed to resolve annotation status:', err)
                           }
@@ -1530,11 +1650,11 @@ export default function DrawingStudioPage() {
               <div className="space-y-4">
                 <div className="bg-white border-2 border-black p-4 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
                   <h3 className="font-bold text-sm uppercase mb-3 border-b-2 border-manga-ink pb-2">File Chỉnh Sửa</h3>
-                  
+
                   {uploadedFileUrl ? (
                     <div className="mb-4">
                       <div className="border border-dashed border-gray-300 bg-gray-50 h-32 flex items-center justify-center text-xs text-gray-500 mb-2 overflow-hidden">
-                         <img src={getImageUrl(uploadedFileUrl)} alt="preview" className="max-w-full max-h-full object-contain" />
+                        <img src={getImageUrl(uploadedFileUrl)} alt="preview" className="max-w-full max-h-full object-contain" />
                       </div>
                       <p className="text-[10px] font-bold text-emerald-600 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> {uploadedFile?.name || 'file_edit.psd'}</p>
                       <button onClick={() => {
@@ -1554,7 +1674,7 @@ export default function DrawingStudioPage() {
                   )}
 
                   <h3 className="font-bold text-sm uppercase mb-2">Ghi chú gửi Sensei</h3>
-                  <textarea 
+                  <textarea
                     value={submitNote}
                     onChange={(e) => setSubmitNote(e.target.value)}
                     className="w-full border-2 border-black p-2 text-sm h-24 mb-3 focus:outline-none focus:border-[#E63946] font-sans"
@@ -1566,7 +1686,7 @@ export default function DrawingStudioPage() {
                     <span className="text-xs font-bold text-gray-600 leading-tight">Tôi xác nhận đã hoàn thành các vùng được giao và kiểm tra kỹ chất lượng.</span>
                   </label>
 
-                  <button 
+                  <button
                     onClick={handleSubmit}
                     disabled={!confirmChecked || !uploadedFileUrl}
                     className="w-full bg-[#E63946] text-white border-2 border-black font-black uppercase py-3 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer"
@@ -1599,8 +1719,8 @@ export default function DrawingStudioPage() {
               </div>
               <div className="flex gap-4">
                 <button onClick={() => setShowSubmitModal(false)} className="flex-1 py-3 border-2 border-black font-bold text-xs uppercase hover:bg-gray-150 transition">Hủy</button>
-                <button 
-                  onClick={confirmSubmit} 
+                <button
+                  onClick={confirmSubmit}
                   disabled={isSubmitting}
                   className="flex-1 py-3 bg-[#E63946] text-white border-2 border-black font-black uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-red-600 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
                 >
@@ -1618,8 +1738,8 @@ export default function DrawingStudioPage() {
           <div className="bg-white border-4 border-black w-full max-w-md shadow-[8px_8px_0px_0px_rgba(230,57,70,1)] animate-zoom-in text-manga-ink font-bold">
             <div className="bg-manga-ink p-4 text-white flex justify-between items-center">
               <h3 className="font-manga text-xl uppercase font-bold tracking-wide">Xác nhận chuyển trang</h3>
-              <button 
-                onClick={handleCancelLeave} 
+              <button
+                onClick={handleCancelLeave}
                 className="hover:text-[#E63946] transition cursor-pointer bg-transparent border-none text-white"
               >
                 <X className="w-6 h-6" />
@@ -1631,13 +1751,13 @@ export default function DrawingStudioPage() {
               </p>
               <p className="mb-6 text-manga-red font-black">Bạn có chắc chắn muốn chuyển trang không?</p>
               <div className="flex gap-4">
-                <button 
-                  onClick={handleCancelLeave} 
+                <button
+                  onClick={handleCancelLeave}
                   className="flex-1 py-3 border-2 border-black font-bold text-xs uppercase hover:bg-gray-150 transition cursor-pointer"
                 >
                   Hủy / Ở lại
                 </button>
-                <button 
+                <button
                   onClick={() => {
                     handleSaveDraft();
                     setShowLeaveConfirmModal(false);
@@ -1648,6 +1768,52 @@ export default function DrawingStudioPage() {
                   className="flex-1 py-3 bg-[#E63946] text-white border-2 border-black font-black uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-red-600 transition cursor-pointer flex items-center justify-center"
                 >
                   Đồng ý chuyển
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Manga-Style Prompt Modal */}
+      {promptModal.isOpen && (
+        <div className="fixed inset-0 bg-black/60 z-[999] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white border-4 border-black w-full max-w-md shadow-[8px_8px_0px_0px_#000000] text-manga-ink font-bold animate-zoom-in">
+            <div className="bg-manga-ink p-4 text-white flex justify-between items-center">
+              <h3 className="font-manga text-lg uppercase font-bold tracking-wide">{promptModal.title}</h3>
+              <button
+                onClick={handleCancelPrompt}
+                className="hover:text-[#E63946] transition cursor-pointer bg-transparent border-none text-white"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="mb-6">
+                <label className="text-xs font-black uppercase tracking-wider mb-2 block">Nội dung ghi chú</label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={promptValue}
+                  onChange={(e) => setPromptValue(e.target.value)}
+                  onKeyDown={handlePromptKeyDown}
+                  placeholder={promptModal.type === 'pin' ? "Ví dụ: Vẽ lại nét nhân vật..." : "Nhập văn bản..."}
+                  className="w-full border-2 border-black p-3 text-sm font-bold bg-white focus:outline-none focus:border-[#E63946] focus:shadow-[2px_2px_0px_0px_#E63946] transition-all"
+                />
+              </div>
+              <div className="flex gap-4">
+                <button
+                  onClick={handleCancelPrompt}
+                  className="flex-1 py-3 border-2 border-black font-bold text-xs uppercase hover:bg-gray-150 transition cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleConfirmPrompt}
+                  disabled={!promptValue.trim()}
+                  className="flex-1 py-3 bg-[#E63946] text-white border-2 border-black font-black uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-red-600 transition cursor-pointer flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Xác nhận
                 </button>
               </div>
             </div>

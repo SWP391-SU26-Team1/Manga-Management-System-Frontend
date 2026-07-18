@@ -1,4 +1,5 @@
 import api from './api'
+import { readerService } from './reader.service'
 
 export interface BackendSeriesRanking {
   series_ranking_id: string
@@ -53,18 +54,90 @@ export interface RankingEntry {
 }
 
 export const rankingService = {
-  /** GET /api/rankings/series/top - Lấy danh sách xếp hạng series */
-  getTopSeries: async (limit: number = 20): Promise<BackendSeriesRanking[]> => {
-    const response = await api.get<{ success: boolean; data: BackendSeriesRanking[] }>(
-      '/api/rankings/series/top',
-      { params: { limit } }
-    )
-    return response.data.data ?? []
+  /** GET /api/ranking-periods - Lấy danh sách kỳ xếp hạng */
+  getRankingPeriods: async (): Promise<any[]> => {
+    try {
+      const response = await api.get('/api/ranking-periods')
+      return response.data.data?.data || response.data.data || []
+    } catch (error) {
+      console.error('Error fetching ranking periods:', error)
+      return []
+    }
+  },
+
+  /** GET /api/ranking-periods/:periodId/series-rankings - Lấy bảng xếp hạng theo kỳ */
+  getSeriesRankingsByPeriod: async (periodId: string): Promise<BackendSeriesRanking[]> => {
+    try {
+      const response = await api.get(`/api/ranking-periods/${periodId}/series-rankings`)
+      return response.data.data?.data || response.data.data || []
+    } catch (error) {
+      console.error('Error fetching series rankings for period:', error)
+      return []
+    }
+  },
+
+  /** GET /api/rankings/public/series/top - Lấy danh sách xếp hạng series */
+  getTopSeries: async (limit: number = 20, period_id?: string): Promise<BackendSeriesRanking[]> => {
+    try {
+      // 1. Lấy danh sách series published từ /api/series thay vì dựa vào series_ranking
+      const res = await api.get('/api/series', { 
+        params: { limit, sort: 'view_count', order: 'desc', status: 'published' } 
+      });
+      const seriesList = res.data?.data?.data || res.data?.data || [];
+      
+      const topSeries = seriesList.slice(0, limit);
+      
+      // 2. Map sang cấu trúc BackendSeriesRanking và gọi API để lấy totalLikes và totalViews
+      const detailedSeriesPromises = topSeries.map(async (s: any, idx: number) => {
+        try {
+          const detail = await readerService.getSeriesDetail(s.series_id);
+          const actualViews = detail?.totalViews || s.view_count || 0;
+          return {
+            series_ranking_id: s.series_id,
+            period_id: period_id || 'all-time',
+            series_id: s.series_id,
+            rank_position: idx + 1,
+            score: actualViews,
+            total_vote: detail?.totalLikes || 0,
+            created_at: new Date().toISOString(),
+            series: {
+              title: s.title,
+              genre: s.genre,
+              status: s.status,
+              cover_image_url: s.cover_image_url,
+              view_count: actualViews
+            }
+          };
+        } catch (err) {
+          return {
+            series_ranking_id: s.series_id,
+            period_id: period_id || 'all-time',
+            series_id: s.series_id,
+            rank_position: idx + 1,
+            score: s.view_count || 0,
+            total_vote: 0,
+            created_at: new Date().toISOString(),
+            series: {
+              title: s.title,
+              genre: s.genre,
+              status: s.status,
+              cover_image_url: s.cover_image_url,
+              view_count: s.view_count || 0
+            }
+          };
+        }
+      });
+      
+      return await Promise.all(detailedSeriesPromises);
+    } catch (error) {
+      console.error('Error in fallback ranking', error);
+      return [];
+    }
   },
 
   /** Alias cho getTopSeries — dùng cho Dashboard widget */
   getWeekly: async (): Promise<RankingEntry[]> => {
-    const response = await api.get('/api/rankings/series/top')
+    const response = await api.get('/api/rankings/public/series/top')
     return response.data.data ?? []
   },
 

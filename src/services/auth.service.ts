@@ -85,12 +85,20 @@ export const authService = {
     }
   },
 
-  register: async (payload: { username: string; email: string; password: string; role: string }): Promise<AuthResponse> => {
+  register: async (payload: { username: string; email: string; password: string; role: string }): Promise<{ otpSent: boolean; email: string }> => {
     const normalizedPayload = {
       ...payload,
       email: payload.email.toLowerCase().trim()
     }
-    const response = await api.post<BackendAuthResponse>('/api/auth/register', normalizedPayload)
+    const response = await api.post<any>('/api/auth/register', normalizedPayload)
+    return response.data.data
+  },
+
+  verifyRegisterOtp: async (email: string, otp: string): Promise<AuthResponse> => {
+    const response = await api.post<BackendAuthResponse>('/api/auth/verify-register-otp', {
+      email: email.toLowerCase().trim(),
+      otp
+    })
     const { token, user } = response.data.data
     return {
       token,
@@ -98,12 +106,15 @@ export const authService = {
     }
   },
 
-  loginWithGoogle: async (idToken: string): Promise<AuthResponse> => {
-    const response = await api.post<BackendAuthResponse>('/api/auth/login-google', { idToken })
-    const { token, user } = response.data.data
+  loginWithGoogle: async (idToken: string): Promise<AuthResponse | { otpSent: boolean; email: string }> => {
+    const response = await api.post<any>('/api/auth/login-google', { idToken })
+    const data = response.data.data
+    if (data.otpSent) {
+      return data
+    }
     return {
-      token,
-      user: mapBackendUser(user)
+      token: data.token,
+      user: mapBackendUser(data.user)
     }
   },
 
@@ -120,6 +131,10 @@ export const authService = {
       ...payload,
       email: payload.email.toLowerCase().trim()
     })
+  },
+
+  resendRegisterOtp: async (email: string): Promise<any> => {
+    return api.post('/api/auth/resend-register-otp', { email: email.toLowerCase().trim() })
   },
 }
 

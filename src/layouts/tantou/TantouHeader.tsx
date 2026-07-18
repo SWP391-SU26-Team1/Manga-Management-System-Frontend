@@ -112,8 +112,12 @@ export default function TantouHeader() {
     
     // Redirect logic
     const t = (notif.type || '').toLowerCase()
-    if (t.includes('manuscript')) {
-      navigate('/dashboard/tantou-editor/manuscript-review')
+    if (notif.link) {
+      navigate(notif.link)
+    } else if (t.includes('manuscript')) {
+      navigate('/dashboard/tantou-editor/manuscript-review?tab=manuscript')
+    } else if (t.includes('series')) {
+      navigate('/dashboard/tantou-editor/manuscript-review?tab=series')
     } else if (t.includes('feedback')) {
       navigate('/dashboard/tantou-editor/notifications')
     } else if (t.includes('vote') || t.includes('decision')) {

@@ -17,6 +17,14 @@ export default function CreateSeriesPage() {
   const [proposedStartDate, setProposedStartDate] = useState('')
   const [editorNote, setEditorNote] = useState('')
 
+  const getTodayString = () => {
+    const today = new Date()
+    const yyyy = today.getFullYear()
+    const mm = String(today.getMonth() + 1).padStart(2, '0')
+    const dd = String(today.getDate()).padStart(2, '0')
+    return `${yyyy}-${mm}-${dd}`
+  }
+
   // UI state
   const [errors, setErrors] = useState<{ title?: string; genres?: string; description?: string }>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -438,6 +446,7 @@ export default function CreateSeriesPage() {
                   <input
                     type="date"
                     value={proposedStartDate}
+                    min={getTodayString()}
                     onChange={e => setProposedStartDate(e.target.value)}
                     className="w-full px-4 py-3 border-2 border-manga-ink focus:outline-none focus:border-manga-red font-bold text-sm bg-white"
                   />

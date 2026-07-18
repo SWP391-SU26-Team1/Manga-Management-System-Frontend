@@ -208,7 +208,7 @@ export const assistantService = {
   // --- Submissions ---
   createSubmission: async (
     taskId: string,
-    payload: { file_url: string; submission_notes?: string }
+    payload: { file_url: string; submission_notes?: string; suggestion_id?: string }
   ): Promise<AssistantSubmission> => {
     const res = await api.post<{ success: boolean; data: AssistantSubmission }>(
       `/api/assistant/page-tasks/${taskId}/submissions`,
@@ -355,6 +355,22 @@ export const assistantService = {
   updatePageDrawingStatus: async (pageId: string, status: string): Promise<any> => {
     const res = await api.patch<{ success: boolean; data: any }>(`/api/assistant/drawing/pages/${pageId}/status`, { status })
     return res.data.data
+  },
+
+  // --- AI Manga (Smart Coloring) ---
+  startAiColoring: async (taskId: string, payload?: { prompt?: string; reference_image_url?: string }): Promise<any> => {
+    const res = await api.post(`/api/page-tasks/${taskId}/ai/coloring`, payload || {})
+    return res.data
+  },
+
+  getAiSuggestion: async (suggestionId: string): Promise<any> => {
+    const res = await api.get(`/api/ai/suggestions/${suggestionId}`)
+    return res.data
+  },
+
+  rejectAiSuggestion: async (suggestionId: string): Promise<any> => {
+    const res = await api.patch(`/api/ai/suggestions/${suggestionId}/reject`)
+    return res.data
   },
 }
 

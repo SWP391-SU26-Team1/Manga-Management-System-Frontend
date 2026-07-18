@@ -11,8 +11,10 @@ import ReportsPage from '@/pages/assistant/ReportsPage'
 import AssistantFeedbackPage from '@/pages/assistant/FeedbackPage'
 import DrawingPage from '@/pages/assistant/DrawingPage'
 import DrawingStudioPage from '@/pages/assistant/DrawingStudioPage'
+import AIMangaPage from '@/pages/assistant/AIMangaPage'
 import ProfilePage from '@/pages/assistant/ProfilePage'
 import SettingsPage from '@/pages/assistant/SettingsPage'
+import NotificationsPage from '@/pages/assistant/NotificationsPage'
 
 export default function AssistantRoutes() {
   return (
@@ -27,8 +29,10 @@ export default function AssistantRoutes() {
         <Route path="feedback" element={<AssistantFeedbackPage />} />
         <Route path="drawing" element={<DrawingPage />} />
         <Route path="drawing-studio" element={<DrawingStudioPage />} />
+        <Route path="ai-manga" element={<AIMangaPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
       </Route>
     </Routes>
   )

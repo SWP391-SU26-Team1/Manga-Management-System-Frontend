@@ -13,8 +13,7 @@ export default function SeriesReviewDetailPage() {
 
   // User checking
   const storedUser = localStorage.getItem('mangaflow_user')
-  const currentUser = storedUser ? JSON.parse(storedUser) : { id: '', fullName: 'Unknown', isChief: false, email: '' }
-  const isChief = currentUser?.isChief || currentUser?.email === 'chiefeditor@mangaflow.com'
+  const currentUser = storedUser ? JSON.parse(storedUser) : { id: '', fullName: 'Unknown', email: '' }
 
   const [series, setSeries] = useState<any | undefined>(undefined)
   const [decision, setDecision] = useState<'APPROVE' | 'REJECT'>('APPROVE')
@@ -23,33 +22,10 @@ export default function SeriesReviewDetailPage() {
   const [showSavedToast, setShowSavedToast] = useState(false)
   const [existingVoteId, setExistingVoteId] = useState<string | null>(null)
 
-  const [grade, setGrade] = useState<{ [key: string]: number }>({
-    plot: 0,
-    art: 0,
-    market: 0
-  })
 
-  const seriesCriteria = [
-    { key: 'plot', label: '1. Cốt truyện & Thế giới', desc: 'Sáng tạo, logic, độ hấp dẫn' },
-    { key: 'art', label: '2. Tạo hình & Concept', desc: 'Thiết kế nhân vật, phong cách' },
-    { key: 'market', label: '3. Tiềm năng Thương mại', desc: 'Phù hợp xu hướng độc giả' }
-  ]
 
-  const handleSelectScore = (key: string, score: number) => {
-    setGrade(prev => ({ ...prev, [key]: score }))
-  }
-
-  const calculateAverageScore = () => {
-    const scores = Object.values(grade).filter(v => v > 0)
-    if (scores.length === 0) return 0
-    const avg = scores.reduce((a, b) => a + b, 0) / scores.length
-    return Math.round(avg * 10) / 10
-  }
-
-  const [comments, setComments] = useState<any[]>([
-    { id: 1, author: 'MINH K. (ART DIRECTOR)', text: 'Cốt truyện cổ trang này có hướng khai thác mới lạ, nét vẽ minh họa của tác giả rất vững.', time: '2 giờ trước', isChief: false },
-    { id: 2, author: 'LAN PHƯƠNG (EDITOR)', text: 'Tôi đồng tình với đề xuất chạy thử Pilot của Biên tập viên phụ trách. Bản thảo có tiềm năng đạt lượng đọc cao.', time: '1 giờ trước', isChief: false }
-  ])
+  const [sessionStatus, setSessionStatus] = useState<string>('open')
+  const [comments, setComments] = useState<any[]>([])
   const [newComment, setNewComment] = useState('')
 
   // Mock member voting stats for this series
@@ -118,6 +94,15 @@ export default function SeriesReviewDetailPage() {
 
       try {
         if (urlSessionId) {
+          try {
+            const proposal = await boardService.getProposalById(urlSessionId)
+            if (proposal && proposal.status) {
+              setSessionStatus(proposal.status)
+            }
+          } catch (err) {
+            console.warn('API error fetching proposal status:', err)
+          }
+
           const resList = await boardService.getVote(urlSessionId)
           const userVote = resList && resList.length > 0 ? resList.find(v => v.voter_id === currentUser.id || v.users?.username === currentUser.fullName) : null
           
@@ -126,6 +111,16 @@ export default function SeriesReviewDetailPage() {
             setDecision(userVote.decision === 'APPROVE' || userVote.decision === 'APPROVED' ? 'APPROVE' : 'REJECT')
             setNote(userVote.note || '')
           }
+
+          const boardComments = resList
+            .filter((v: any) => v.note && v.note.trim() !== '')
+            .map((v: any) => ({
+              id: v.vote_id,
+              author: (v.users?.fullName || v.users?.username || 'MEMBER').toUpperCase() + ' (EDITOR)',
+              text: v.note,
+              time: new Date(v.created_at || new Date()).toLocaleString('vi-VN')
+            }))
+          setComments(boardComments)
         }
       } catch (err) {
         console.warn('API error fetching user votes:', err)
@@ -140,11 +135,19 @@ export default function SeriesReviewDetailPage() {
       if (!urlSessionId) {
         throw new Error("Missing official Review Session. Cannot vote.");
       }
+      if (sessionStatus !== 'open' && sessionStatus !== 'pending' && sessionStatus !== 'in_progress') {
+        addNotification(
+          'VOTE FAILED',
+          'Phiên duyệt này đã đóng, bạn không thể gửi hoặc sửa phiếu biểu quyết nữa!',
+          'RISK',
+          'voting_failed'
+        )
+        return
+      }
       const sessionId = urlSessionId
       const payload = {
         decision,
-        note,
-        score: calculateAverageScore()
+        note
       }
       if (existingVoteId) {
         await boardService.updateVote(existingVoteId, payload)
@@ -200,63 +203,19 @@ export default function SeriesReviewDetailPage() {
     }
   }
 
-  const handleSubmitChiefDecision = async () => {
-    if (!seriesId || !series || !certify) return
-    
-    // Call real API with fallback
-    try {
-      const sessionId = urlSessionId || `session_${seriesId}`
-      await boardService.processReviewSessionResult(sessionId, { 
-        decision: decision === 'APPROVE' ? 'APPROVED' : 'REJECTED', 
-        note 
-      })
-    } catch (err) {
-      console.warn('API error saving chief series decision:', err)
-    }
-    
-    // Trigger toast
-    setShowSavedToast(true)
-    
-    // Dispatch custom event to notify update
-    window.dispatchEvent(new Event('mangaflow_vote_submitted'));
 
-    addNotification(
-      'DECISION SUBMITTED',
-      `Phán quyết cuối cùng của Trưởng ban cho bộ truyện '${series.title}' đã được ban hành thành công`,
-      'VOTE',
-      'voting_success'
-    )
-    
-    setTimeout(() => {
-      setShowSavedToast(false)
-      // Redirect to Screen 4 (Send Notification) with pre-filled state
-      navigate('/dashboard/editorial-board/send-notification', {
-        state: {
-          templateType: decision === 'APPROVE' ? 'APPROVAL' : 'CANCELLATION',
-          projectName: `${series.title} (Series)`,
-          resolution: `Quyết định phán quyết của Trưởng ban: ${
-            decision === 'APPROVE' 
-              ? 'PHÊ DUYỆT XUẤT BẢN THỬ NGHIỆM (PILOT APPROVED)' 
-              : 'BÁC BỎ / TỪ CHỐI ĐẦU TRUYỆN (REJECTED/CANCELLED)'
-          }. Ghi chú chỉ đạo: ${note}`
-        }
-      })
-    }, 2000)
-  }
 
   const handleSendComment = (e: React.FormEvent) => {
     e.preventDefault()
     if (!newComment.trim()) return
     const storedUser = localStorage.getItem('mangaflow_user')
     const userObj = storedUser ? JSON.parse(storedUser) : { fullName: 'Minamoto Shizuka', role: 'BOARD' }
-    const isChiefUser = userObj.isChief || userObj.email === 'chiefeditor@mangaflow.com'
     
     setComments([...comments, {
       id: Date.now(),
-      author: userObj.fullName.toUpperCase() + (isChiefUser ? ' (TRƯỞNG BAN)' : ' (MEMBER EDITOR)'),
+      author: userObj.fullName.toUpperCase() + ' (MEMBER EDITOR)',
       text: newComment,
-      time: 'Vừa xong',
-      isChief: isChiefUser
+      time: 'Vừa xong'
     }])
     setNewComment('')
   }
@@ -306,48 +265,12 @@ export default function SeriesReviewDetailPage() {
           </span>
         </div>
         <h1 className="font-manga text-3xl md:text-4xl font-bold uppercase text-manga-ink">
-          {isChief ? 'TRƯỞNG BAN PHÁN QUYẾT SERIES' : 'XEM CHI TIẾT & BIỂU QUYẾT SERIES'}
+          XEM CHI TIẾT & BIỂU QUYẾT SERIES
         </h1>
         <div className="h-1.5 w-24 bg-manga-red mt-2" />
       </div>
 
-      {/* If Chief, show Extended Actions Panel */}
-      {isChief && (
-        <div className="bg-white border-4 border-manga-red p-6 shadow-[6px_6px_0px_rgba(220,38,38,1)] mb-8">
-          <h3 className="font-manga text-xl font-black uppercase border-b-2 border-manga-red pb-2 mb-4 text-manga-red">
-            QUYỀN LỰC TRƯỞNG BAN: CHUYỂN TRẠNG THÁI GỐC TÁC PHẨM
-          </h3>
-          <p className="text-xs font-bold text-gray-500 mb-4 uppercase">
-            Thay vì thông qua biểu quyết, bạn có quyền cưỡng chế thay đổi trạng thái của toàn bộ Series này ngay lập tức.
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <button
-              onClick={() => handleUpdateSeriesStatus('publish')}
-              className="py-3 font-manga font-bold text-xs uppercase bg-emerald-100 text-emerald-800 border-2 border-emerald-500 hover:bg-emerald-500 hover:text-white transition-colors shadow-[2px_2px_0px_rgba(0,0,0,1)]"
-            >
-              🚀 PUBLISH (ĐĂNG)
-            </button>
-            <button
-              onClick={() => handleUpdateSeriesStatus('archive')}
-              className="py-3 font-manga font-bold text-xs uppercase bg-gray-100 text-gray-800 border-2 border-gray-500 hover:bg-gray-600 hover:text-white transition-colors shadow-[2px_2px_0px_rgba(0,0,0,1)]"
-            >
-              📦 ARCHIVE (LƯU TRỮ)
-            </button>
-            <button
-              onClick={() => handleUpdateSeriesStatus('hide')}
-              className="py-3 font-manga font-bold text-xs uppercase bg-yellow-100 text-yellow-800 border-2 border-yellow-500 hover:bg-yellow-600 hover:text-white transition-colors shadow-[2px_2px_0px_rgba(0,0,0,1)]"
-            >
-              👁 HIDE (ẨN)
-            </button>
-            <button
-              onClick={() => handleUpdateSeriesStatus('ban')}
-              className="py-3 font-manga font-bold text-xs uppercase bg-red-100 text-red-800 border-2 border-red-500 hover:bg-red-600 hover:text-white transition-colors shadow-[2px_2px_0px_rgba(0,0,0,1)]"
-            >
-              🚫 BAN (CẤM)
-            </button>
-          </div>
-        </div>
-      )}
+
 
       {/* Main Review Section Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8 items-start">
@@ -397,226 +320,10 @@ export default function SeriesReviewDetailPage() {
               </div>
             </div>
           </div>
-
-          {/* Member Voting Summary (Chief Only) */}
-          {isChief && (
-            <div className="bg-white border-4 border-manga-ink p-6 shadow-[6px_6px_0px_rgba(15,15,15,1)]">
-              <div className="flex justify-between items-center border-b-2 border-manga-ink pb-3 mb-6">
-                <h3 className="font-manga text-lg font-black uppercase text-manga-ink">
-                  TỔNG HỢP BIỂU QUYẾT CỦA THÀNH VIÊN
-                </h3>
-                <span className="bg-[#fff1f2] text-manga-red font-manga font-bold text-[10px] px-2.5 py-1 border-2 border-manga-ink uppercase shadow-sm">
-                  SỐ LIỆU HỘI ĐỒNG
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div className="border-2 border-manga-ink p-3 bg-zinc-50 shadow-sm text-center">
-                  <span className="block text-[10px] text-gray-400 font-bold uppercase">Tổng số phiếu bầu</span>
-                  <strong className="font-manga text-3xl text-manga-ink">
-                    {mockVotingStats.totalVotes} / {mockVotingStats.maxVotes}
-                  </strong>
-                </div>
-                <div className="border-2 border-manga-ink p-3 bg-[#e8f5e9] shadow-sm text-center">
-                  <span className="block text-[10px] text-gray-400 font-bold uppercase">Tỉ lệ Phê Duyệt</span>
-                  <strong className="font-manga text-3xl text-emerald-600">
-                    {mockVotingStats.percentApprove}%
-                  </strong>
-                </div>
-                <div className="border-2 border-manga-ink p-3 bg-zinc-50 shadow-sm text-center">
-                  <span className="block text-[10px] text-gray-400 font-bold uppercase">Quorum tối thiểu</span>
-                  <strong className="font-manga text-3xl text-emerald-600">ĐẠT</strong>
-                </div>
-              </div>
-
-              {/* Bar charts distribution */}
-              <div className="space-y-4 mb-6">
-                <h4 className="text-xs font-black uppercase text-gray-400">Biểu đồ phân bố phiếu bầu</h4>
-                
-                {/* Phê duyệt */}
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs font-bold">
-                    <span className="text-emerald-600">✔ ĐỒNG Ý PHÁT HÀNH (APPROVE)</span>
-                    <span>{mockVotingStats.approveVotes} phiếu ({mockVotingStats.percentApprove}%)</span>
-                  </div>
-                  <div className="w-full h-4 bg-gray-100 border-2 border-manga-ink rounded-none overflow-hidden relative">
-                    <div 
-                      className="h-full bg-emerald-500 border-r-2 border-manga-ink" 
-                      style={{ width: `${mockVotingStats.percentApprove}%` }} 
-                    />
-                  </div>
-                </div>
-
-                {/* Bác bỏ */}
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs font-bold">
-                    <span className="text-manga-red">✖ BÁC BỎ / TỪ CHỐI (REJECT)</span>
-                    <span>{mockVotingStats.rejectVotes} phiếu ({mockVotingStats.percentReject}%)</span>
-                  </div>
-                  <div className="w-full h-4 bg-gray-100 border-2 border-manga-ink rounded-none overflow-hidden relative">
-                    <div 
-                      className="h-full bg-manga-red border-r-2 border-manga-ink" 
-                      style={{ width: `${mockVotingStats.percentReject}%` }} 
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Detailed remarks */}
-              <div className="border-t-2 border-manga-ink pt-4">
-                <h4 className="text-xs font-black uppercase text-gray-500 mb-3">Ý kiến đóng góp từ các thành viên</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {mockVotingStats.details.map((item, idx) => (
-                    <div key={idx} className="border-2 border-manga-ink p-3 bg-zinc-50 shadow-[2px_2px_0px_rgba(0,0,0,1)]">
-                      <div className="flex justify-between items-baseline mb-1">
-                        <span className="text-xs font-black uppercase text-manga-ink">
-                          {item.name} <span className="text-[9px] text-gray-400 font-bold">({item.role})</span>
-                        </span>
-                        <span className={`text-[9px] font-black border-2 px-1.5 py-0.2 uppercase ${
-                          item.vote === 'APPROVE' 
-                            ? 'border-emerald-500 text-emerald-600 bg-emerald-50' 
-                            : 'border-manga-red text-manga-red bg-red-50'
-                        }`}>
-                          {item.vote === 'APPROVE' ? 'Duyệt' : 'Bác bỏ'}
-                        </span>
-                      </div>
-                      <p className="text-[11px] font-medium text-gray-600 italic">
-                        "{item.comment}"
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Right Col: Grading & Decision / Vote Box */}
-        <div className="space-y-6">
-          {/* Grading Board */}
-          {!isChief && (
-            <div className="bg-white border-4 border-manga-ink p-6 shadow-[6px_6px_0px_rgba(15,15,15,1)]">
-              <div className="inline-block px-3 py-1 bg-manga-ink text-white font-bold uppercase text-[9px] border-2 border-manga-ink shadow-sm mb-4">
-                BẢNG ĐIỂM CHUYÊN MÔN
-              </div>
-              <div className="space-y-5">
-                {seriesCriteria.map((crit) => (
-                  <div key={crit.key} className="border-b-2 border-gray-100 pb-4">
-                    <div className="flex flex-col mb-2">
-                      <h4 className="text-xs font-black uppercase text-manga-ink leading-tight">
-                        {crit.label}
-                      </h4>
-                      <p className="text-[10px] text-gray-400 font-semibold mt-0.5">
-                        {crit.desc}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1 bg-zinc-50 border-2 border-manga-ink p-1 shadow-sm w-fit">
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => (
-                        <button
-                          key={star}
-                          onClick={() => handleSelectScore(crit.key, star)}
-                          className="text-manga-ink hover:scale-110 active:scale-95 cursor-pointer bg-transparent border-0 p-0.5"
-                        >
-                          {star <= grade[crit.key] ? (
-                            <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                          ) : (
-                            <Star className="w-4 h-4 text-gray-300" />
-                          )}
-                        </button>
-                      ))}
-                      <span className="font-manga text-sm font-black ml-2 w-6 text-center">
-                        {grade[crit.key]}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-        {isChief ? (
-          /* Trưởng ban Phán Quyết panel */
-          <div className="bg-[#fff1f2] border-4 border-manga-ink p-6 shadow-[6px_6px_0px_rgba(15,15,15,1)]">
-            <div className="inline-block px-3 py-1 bg-manga-red text-white font-bold uppercase text-[9px] border-2 border-manga-ink shadow-sm mb-4">
-              QUYẾT ĐỊNH CỦA TRƯỞNG BAN
-            </div>
-
-            <div className="space-y-5">
-              <p className="text-xs font-bold leading-relaxed text-gray-700">
-                Trưởng ban biên tập có quyền đưa ra phán quyết phê duyệt xuất bản hoặc bác bỏ đầu truyện pilot này.
-              </p>
-
-              <div>
-                <label className="block text-[10px] font-black uppercase text-gray-400 mb-2">Quyết định phê duyệt</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setDecision('APPROVE')}
-                    className={`py-2.5 font-manga font-bold text-xs uppercase transition-all border-2 cursor-pointer text-center ${
-                      decision === 'APPROVE'
-                        ? 'bg-emerald-500 text-white border-manga-ink shadow-[2px_2px_0px_rgba(0,0,0,1)]'
-                        : 'bg-white text-black border-gray-300 hover:bg-zinc-50'
-                    }`}
-                  >
-                    Phê duyệt (Pilot)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDecision('REJECT')}
-                    className={`py-2.5 font-manga font-bold text-xs uppercase transition-all border-2 cursor-pointer text-center ${
-                      decision === 'REJECT'
-                        ? 'bg-manga-red text-white border-manga-ink shadow-[2px_2px_0px_rgba(0,0,0,1)]'
-                        : 'bg-white text-black border-gray-300 hover:bg-zinc-50'
-                    }`}
-                  >
-                    Bác bỏ / Từ chối
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5">Ghi chú / Nhận xét lý do quyết định</label>
-                <textarea
-                  value={note}
-                  onChange={e => setNote(e.target.value)}
-                  placeholder="Nhập lý do phán quyết và chỉ đạo chuyên môn..."
-                  className="w-full border-2 border-manga-ink p-3 text-xs font-bold outline-none focus:border-manga-red bg-zinc-50 h-28"
-                />
-              </div>
-
-              <div className="pt-2 border-t border-gray-100">
-                <label className="flex items-start gap-2 text-[10px] font-bold text-gray-500 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={certify}
-                    onChange={e => setCertify(e.target.checked)}
-                    className="w-4 h-4 shrink-0 border-2 border-manga-ink"
-                  />
-                  <span>TÔI XÁC NHẬN ĐÂY LÀ QUYẾT ĐỊNH CUỐI CÙNG THAY MẶT BAN BIÊN TẬP.</span>
-                </label>
-              </div>
-
-              <div className="border-t-2 border-dashed border-gray-200 pt-4 flex flex-col gap-2">
-                {showSavedToast && (
-                  <div className="bg-emerald-50 text-emerald-600 border border-emerald-500 p-2 text-center text-[10px] font-bold uppercase animate-fade-in flex items-center justify-center gap-1">
-                    <CheckCircle className="w-3.5 h-3.5" />
-                    <span>Quyết định đã được ban hành. Đang chuẩn bị gửi thông báo...</span>
-                  </div>
-                )}
-                
-                <button
-                  type="button"
-                  onClick={handleSubmitChiefDecision}
-                  disabled={!certify}
-                  className="w-full bg-manga-ink text-white font-manga font-bold text-xs uppercase py-3 border-2 border-manga-ink shadow-[3px_3px_0px_rgba(0,0,0,1)] hover:bg-manga-red hover:shadow-[1px_1px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] active:translate-y-[2px] active:shadow-none disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-manga-ink disabled:shadow-[3px_3px_0px_rgba(0,0,0,1)] disabled:translate-y-0 transition-all cursor-pointer text-center animate-pulse"
-                >
-                  BAN HÀNH QUYẾT ĐỊNH &gt;
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : (
-          /* Normal Member Editor Vote panel */
+        {/* Normal Member Editor Vote panel */}
+        <div className="lg:col-span-1">
           <div className="bg-white border-4 border-manga-ink p-6 shadow-[6px_6px_0px_rgba(15,15,15,1)]">
             <div className="inline-block px-3 py-1 bg-manga-ink text-white font-bold uppercase text-[9px] border-2 border-manga-ink shadow-sm mb-4">
               BỎ PHIẾU HỘI ĐỒNG
@@ -672,14 +379,20 @@ export default function SeriesReviewDetailPage() {
                 <button
                   type="button"
                   onClick={handleSubmitVote}
-                  className="w-full bg-manga-ink text-white font-manga font-bold text-xs uppercase py-3 border-2 border-manga-ink shadow-[3px_3px_0px_rgba(0,0,0,1)] hover:bg-manga-red hover:shadow-[1px_1px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer text-center"
+                  disabled={sessionStatus !== 'open' && sessionStatus !== 'pending' && sessionStatus !== 'in_progress'}
+                  className={`w-full font-manga font-bold text-xs uppercase py-3 border-2 transition-all text-center ${
+                    sessionStatus !== 'open' && sessionStatus !== 'pending' && sessionStatus !== 'in_progress'
+                      ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed shadow-none'
+                      : 'bg-manga-ink text-white border-manga-ink shadow-[3px_3px_0px_rgba(0,0,0,1)] hover:bg-manga-red hover:shadow-[1px_1px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] active:translate-y-[2px] active:shadow-none cursor-pointer'
+                  }`}
                 >
-                  {existingVoteId ? 'SỬA PHIẾU CỦA BẠN' : 'GỬI PHIẾU BIỂU QUYẾT'}
+                  {sessionStatus !== 'open' && sessionStatus !== 'pending' && sessionStatus !== 'in_progress'
+                    ? 'PHIÊN DUYỆT ĐÃ ĐÓNG'
+                    : existingVoteId ? 'SỬA PHIẾU CỦA BẠN' : 'GỬI PHIẾU BIỂU QUYẾT'}
                 </button>
               </div>
             </div>
           </div>
-        )}
         </div>
       </div>
 
@@ -691,17 +404,14 @@ export default function SeriesReviewDetailPage() {
 
         <div className="space-y-4 mb-6">
           {comments.map((comment) => {
-            const commentIsChief = comment.isChief || comment.author.includes('CHIEF') || comment.author.includes('TRƯỞNG BAN')
             return (
               <div 
                 key={comment.id} 
-                className={`pl-4 py-2 border-l-4 flex justify-between items-start ${
-                  commentIsChief ? 'border-manga-red bg-[#fff5f5]' : 'border-manga-ink bg-zinc-50/50'
-                }`}
+                className="pl-4 py-2 border-l-4 flex justify-between items-start border-manga-ink bg-zinc-50/50"
               >
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className={`text-[10px] font-black uppercase ${commentIsChief ? 'text-manga-red' : 'text-manga-ink'}`}>
+                    <span className="text-[10px] font-black uppercase text-manga-ink">
                       {comment.author}
                     </span>
                     <span className="text-[8px] text-gray-400 font-bold uppercase">{comment.time}</span>
@@ -713,25 +423,6 @@ export default function SeriesReviewDetailPage() {
                   </div>
                   <p className="text-xs font-bold text-zinc-700 leading-normal">{comment.text}</p>
                 </div>
-
-                {isChief && (
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handlePinComment(comment.id)}
-                      className="text-gray-400 hover:text-manga-ink text-[10px] font-bold uppercase bg-transparent border-0 cursor-pointer"
-                    >
-                      📌 Ghim
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteComment(comment.id)}
-                      className="text-gray-400 hover:text-manga-red text-[10px] font-bold uppercase bg-transparent border-0 cursor-pointer"
-                    >
-                      ✕ Xóa
-                    </button>
-                  </div>
-                )}
               </div>
             )
           })}

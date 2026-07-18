@@ -4,7 +4,9 @@ import {
   FileText,
   MessageSquare,
   PenTool,
-  FileEdit
+  FileEdit,
+  Sparkles,
+  Bell
 } from 'lucide-react'
 
 export const assistantNav = [
@@ -18,6 +20,11 @@ export const assistantNav = [
     label: "Nhiệm Vụ",
     path: "/dashboard/assistant/tasks",
     icon: ClipboardList
+  },
+  {
+    label: "Thông báo",
+    path: "/dashboard/assistant/notifications",
+    icon: Bell
   },
   {
     label: "Báo Cáo",
@@ -38,5 +45,10 @@ export const assistantNav = [
     label: "Vẽ & Chỉnh Sửa",
     path: "/dashboard/assistant/drawing-studio",
     icon: PenTool
+  },
+  {
+    label: "AI Manga",
+    path: "/dashboard/assistant/ai-manga",
+    icon: Sparkles
   }
 ]

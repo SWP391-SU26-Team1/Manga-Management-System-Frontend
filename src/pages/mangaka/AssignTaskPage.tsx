@@ -53,6 +53,14 @@ function AssignTaskContent() {
   const [taskSuccessMsg, setTaskSuccessMsg] = useState('')
   const [taskWarningMsg, setTaskWarningMsg] = useState('')
 
+  const getTodayString = () => {
+    const today = new Date()
+    const yyyy = today.getFullYear()
+    const mm = String(today.getMonth() + 1).padStart(2, '0')
+    const dd = String(today.getDate()).padStart(2, '0')
+    return `${yyyy}-${mm}-${dd}`
+  }
+
   // Pre-fill layerType and note from query parameters
   useEffect(() => {
     const paramLayer = searchParams.get('layerType')
@@ -929,6 +937,7 @@ function AssignTaskContent() {
                   type="date"
                   required
                   value={deadline}
+                  min={getTodayString()}
                   onChange={e => setDeadline(e.target.value)}
                   className="w-full border-2 border-manga-ink px-3 py-2 text-sm focus:outline-none focus:border-manga-red"
                 />

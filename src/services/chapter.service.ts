@@ -18,6 +18,7 @@ export interface ChapterAPI {
 export interface CreateChapterPayload {
   title: string
   chapter_number: number
+  editor_id?: string
 }
 
 const mapChapter = (data: any): ChapterAPI => {

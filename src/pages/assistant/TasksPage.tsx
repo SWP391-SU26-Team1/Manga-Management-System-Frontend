@@ -239,7 +239,8 @@ export default function TasksPage() {
       if (res && res.success) {
         const mapped = res.data.map(mapBackendTaskToAssistantTask)
         setTasks(mapped)
-        loadAvatars(mapped)
+        // Skip fetching detailed user profiles to avoid HTTP 403 Forbidden console errors
+        // loadAvatars(mapped)
       } else {
         setTasks([])
       }

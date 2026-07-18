@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router'
 import { ShieldCheck, Mail, ArrowRight, RotateCcw, ArrowLeft } from 'lucide-react'
+import authService from '@/services/auth.service'
 
 export default function OtpPage() {
   const navigate = useNavigate()
@@ -16,6 +17,13 @@ export default function OtpPage() {
   const [loading, setLoading] = useState(false)
   const [timer, setTimer] = useState(59)
   const [canResend, setCanResend] = useState(false)
+  const [modal, setModal] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'info' | 'error';
+    onConfirm?: () => void;
+  }>({ show: false, title: '', message: '', type: 'success' })
   
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
 
@@ -89,17 +97,32 @@ export default function OtpPage() {
     }
   }
 
-  const handleResend = () => {
+  const handleResend = async () => {
     if (!canResend) return
-    setTimer(59)
-    setCanResend(false)
-    setOtp(new Array(6).fill(''))
-    setActiveInput(0)
+    setLoading(true)
     setError(null)
-    alert(`Một mã OTP mới đã được gửi lại vào địa chỉ: ${email}`)
+    try {
+      await authService.resendRegisterOtp(email)
+      setTimer(59)
+      setCanResend(false)
+      setOtp(new Array(6).fill(''))
+      setActiveInput(0)
+      setModal({
+        show: true,
+        title: 'Đã gửi lại OTP',
+        message: `Một mã OTP mới đã được gửi lại vào địa chỉ: ${email}`,
+        type: 'info'
+      })
+    } catch (err: any) {
+      console.error('Resend OTP error:', err)
+      const errorMsg = err.response?.data?.message || 'Không thể gửi lại mã OTP. Vui lòng thử lại.'
+      setError(errorMsg)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const otpCode = otp.join('')
     
@@ -111,44 +134,78 @@ export default function OtpPage() {
     setLoading(true)
     setError(null)
 
-    // Simulate OTP verification
-    setTimeout(() => {
-      setLoading(false)
-      
-      // Let's accept any 6 digit OTP for simulated testing (e.g. 123456 or other)
-      // Check if user has pending temp session to auto-login
-      const pendingUserStr = sessionStorage.getItem('pending_google_user')
-      if (pendingUserStr) {
-        try {
-          const parsed = JSON.parse(pendingUserStr)
-          localStorage.setItem('mangaflow_user', JSON.stringify(parsed))
-          sessionStorage.removeItem('pending_google_user')
-          
-          // Redirect to appropriate dashboard based on role
-          const role = parsed.role?.toUpperCase()
-          if (role === 'MANGAKA') {
-            navigate('/dashboard/mangaka')
-          } else if (role === 'ASSISTANT') {
-            navigate('/dashboard/assistant')
-          } else if (role === 'EDITOR') {
-            navigate('/dashboard/tantou-editor')
-          } else if (role === 'ADMIN') {
-            navigate('/dashboard/admin')
-          } else if (['BOARD', 'CHIEF_EDITOR'].includes(role)) {
-            navigate('/dashboard/editorial-board')
-          } else {
+    const pendingRegisterEmail = sessionStorage.getItem('pending_register_email')
+    const pendingUserStr = sessionStorage.getItem('pending_google_user')
+
+    try {
+      if (pendingRegisterEmail) {
+        const data = await authService.verifyRegisterOtp(pendingRegisterEmail, otpCode)
+        const storedUserData = {
+          ...data.user,
+          token: data.token
+        }
+        localStorage.setItem('mangaflow_user', JSON.stringify(storedUserData))
+        sessionStorage.removeItem('pending_register_email')
+        
+        setModal({
+          show: true,
+          title: 'Thành Công!',
+          message: 'Xác thực OTP đăng ký thành công! Hãy bắt đầu hành trình của bạn.',
+          type: 'success',
+          onConfirm: () => {
+            const role = data.user.role?.toUpperCase()
+            if (role === 'MANGAKA') {
+              navigate('/dashboard/mangaka')
+            } else if (role === 'ASSISTANT') {
+              navigate('/dashboard/assistant')
+            } else if (role === 'EDITOR') {
+              navigate('/dashboard/tantou-editor')
+            } else if (role === 'ADMIN') {
+              navigate('/dashboard/admin')
+            } else if (['BOARD', 'CHIEF_EDITOR'].includes(role)) {
+              navigate('/dashboard/editorial-board')
+            } else {
+              navigate('/')
+            }
+          }
+        })
+      } else if (pendingUserStr) {
+        const parsed = JSON.parse(pendingUserStr)
+        localStorage.setItem('mangaflow_user', JSON.stringify(parsed))
+        sessionStorage.removeItem('pending_google_user')
+        
+        const role = parsed.role?.toUpperCase()
+        if (role === 'MANGAKA') {
+          navigate('/dashboard/mangaka')
+        } else if (role === 'ASSISTANT') {
+          navigate('/dashboard/assistant')
+        } else if (role === 'EDITOR') {
+          navigate('/dashboard/tantou-editor')
+        } else if (role === 'ADMIN') {
+          navigate('/dashboard/admin')
+        } else if (['BOARD', 'CHIEF_EDITOR'].includes(role)) {
+          navigate('/dashboard/editorial-board')
+        } else {
+          navigate('/')
+        }
+      } else {
+        setModal({
+          show: true,
+          title: 'Thành Công!',
+          message: 'Xác thực OTP thành công (Chế độ mô phỏng)!',
+          type: 'success',
+          onConfirm: () => {
             navigate('/')
           }
-          return
-        } catch (e) {
-          // Fallback if JSON parse fails
-        }
+        })
       }
-      
-      // Default fallback redirect to home page
-      alert('Xác thực OTP thành công!')
-      navigate('/')
-    }, 1200)
+    } catch (err: any) {
+      console.error('OTP verification error:', err)
+      const errorMsg = err.response?.data?.message || 'Mã OTP không chính xác hoặc đã hết hạn.'
+      setError(errorMsg)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const isOtpComplete = otp.every(val => val !== '')
@@ -265,6 +322,48 @@ export default function OtpPage() {
           </div>
         </div>
       </div>
+
+      {/* Manga-style Success/Info Modal */}
+      {modal.show && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border-[4px] border-manga-ink manga-shadow p-6 max-w-sm w-full relative transform scale-100 transition-all animate-bounce-short">
+            {/* Manga accent corner tag */}
+            <div className="absolute -top-3.5 left-4 bg-manga-ink text-white text-[10px] font-extrabold uppercase px-3 py-1 tracking-widest border-2 border-white">
+              Thông báo
+            </div>
+            
+            <div className="flex flex-col items-center text-center space-y-4 pt-2">
+              {/* Type Badge icon */}
+              <div className={`w-14 h-14 rounded-none border-2 border-manga-ink flex items-center justify-center font-bold text-2xl manga-shadow-sm
+                ${modal.type === 'success' ? 'bg-[#e8f5e9] text-green-600' : ''}
+                ${modal.type === 'info' ? 'bg-[#e3f2fd] text-blue-600' : ''}
+                ${modal.type === 'error' ? 'bg-manga-red/10 text-manga-red' : ''}
+              `}>
+                {modal.type === 'success' ? '✨' : modal.type === 'info' ? 'ℹ️' : '⚠️'}
+              </div>
+              
+              <h2 className="font-manga text-xl font-bold uppercase tracking-tight text-manga-ink">
+                {modal.title}
+              </h2>
+              
+              <p className="text-xs font-bold text-gray-500 leading-relaxed">
+                {modal.message}
+              </p>
+              
+              {/* Comic action buttons */}
+              <button
+                onClick={() => {
+                  setModal(prev => ({ ...prev, show: false }))
+                  if (modal.onConfirm) modal.onConfirm()
+                }}
+                className="w-full mt-4 bg-manga-red hover:bg-manga-ink text-white font-extrabold uppercase tracking-widest py-3 border-2 border-manga-ink manga-shadow-sm hover:translate-y-0.5 hover:manga-shadow-none transition-all duration-150 cursor-pointer"
+              >
+                Đồng ý (OK)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

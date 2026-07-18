@@ -737,61 +737,7 @@ export default function PageProgressPage() {
                                 </div>
                               )}
 
-                              {/* Approval Actions Inside Popup */}
-                              <div className="mt-2 border-t border-gray-150 pt-2 flex flex-col gap-2">
-                                {rejectingPageId === page.task_id ? (
-                                  <div className="flex flex-col gap-1.5 w-full bg-gray-50 p-2 border border-orange-200">
-                                    <textarea
-                                      value={rejectReason}
-                                      onChange={(e) => setRejectReason(e.target.value)}
-                                      placeholder="Nhập lý do phải sửa..."
-                                      rows={2}
-                                      className="w-full border border-gray-300 p-1 text-[10px] font-bold focus:outline-none focus:border-manga-red bg-white resize-none"
-                                    />
-                                    <div className="flex gap-1.5 w-full">
-                                      <button 
-                                        onClick={() => handleConfirmReject(page)} 
-                                        className="flex-1 py-1 bg-manga-red text-white text-[9px] font-extrabold uppercase hover:bg-red-700 transition-colors cursor-pointer"
-                                      >
-                                        Gửi
-                                      </button>
-                                      <button 
-                                        onClick={() => { setRejectingPageId(null); setRejectReason(''); }} 
-                                        className="flex-1 py-1 bg-white border border-gray-300 text-gray-500 text-[9px] font-extrabold uppercase hover:bg-gray-50 transition-colors cursor-pointer"
-                                      >
-                                        Hủy
-                                      </button>
-                                    </div>
-                                  </div>
-                                ) : currentStatus === 'APPROVED' || currentStatus === 'COMPLETED' ? (
-                                  <span className="w-full px-2 py-1 bg-green-100 border border-green-500 text-green-700 text-[10px] font-bold uppercase flex items-center justify-center gap-1">
-                                    <CheckCircle2 className="w-3.5 h-3.5" /> Đã duyệt
-                                  </span>
-                                ) : currentStatus === 'NEED_FIX' || currentStatus === 'REJECTED' || currentStatus === 'NEEDS_REVISION' ? (
-                                  <span className="w-full px-2 py-1 bg-orange-100 border border-orange-500 text-orange-700 text-[10px] font-bold uppercase flex items-center justify-center gap-1">
-                                    <AlertCircle className="w-3.5 h-3.5" /> Yêu cầu sửa
-                                  </span>
-                                ) : page.image_url ? (
-                                  <div className="flex gap-2 w-full">
-                                    <button 
-                                      onClick={() => handleApprovePage(selectedProgressChapter.id, page)} 
-                                      className="flex-1 py-1.5 bg-white border border-green-500 text-green-600 text-[10px] font-bold uppercase hover:bg-green-50 transition-colors flex items-center justify-center gap-1 cursor-pointer"
-                                    >
-                                      <CheckCircle2 className="w-3 h-3" /> Duyệt
-                                    </button>
-                                    <button 
-                                      onClick={() => handleRejectPage(page.task_id)} 
-                                      className="flex-1 py-1.5 bg-white border border-orange-500 text-orange-600 text-[10px] font-bold uppercase hover:bg-orange-50 transition-colors flex items-center justify-center gap-1 cursor-pointer"
-                                    >
-                                      <AlertCircle className="w-3 h-3" /> Sửa
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <span className="w-full px-2 py-1 bg-gray-100 text-gray-400 text-[10px] font-bold uppercase flex items-center justify-center gap-1">
-                                    Đang vẽ
-                                  </span>
-                                )}
-                              </div>
+
                             </div>
                           </div>
                         )

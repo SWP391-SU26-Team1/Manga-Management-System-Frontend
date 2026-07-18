@@ -358,7 +358,7 @@ export const assistantService = {
   },
 
   // --- AI Manga (Smart Coloring) ---
-  startAiColoring: async (taskId: string, payload?: { prompt?: string; reference_image_url?: string }): Promise<any> => {
+  startAiColoring: async (taskId: string, payload?: { prompt?: string; reference_image_url?: string; ai_model?: string }): Promise<any> => {
     const res = await api.post(`/api/page-tasks/${taskId}/ai/coloring`, payload || {})
     return res.data
   },

@@ -55,9 +55,9 @@ const translateStatus = (status: string) => {
 
 const AI_MODEL_OPTIONS = [
   {
-    id: 'stabilityai/stable-diffusion-xl-base-1.0',
+    id: 'sharky172/manga-light-colorizer',
     name: 'Tính năng 1: Tô màu đè lên nét vẽ gốc (Image-to-Image)',
-    desc: 'Dựa trên cấu trúc nét vẽ của bản thảo gốc để đắp màu đè lên. Phù hợp nhất cho việc tô màu giữ đúng khung tranh.',
+    desc: 'Kết nối trực tiếp đến mô hình chuyên dụng để tô màu tự động và giữ trọn vẹn nét vẽ gốc của bản thảo.',
     type: 'Tô màu theo nét'
   },
   {
@@ -99,7 +99,7 @@ export default function AIMangaPage() {
   const [selectedTask, setSelectedTask] = useState<any>(null)
   
   const [prompt, setPrompt] = useState<string>('')
-  const [model, setModel] = useState<string>('stabilityai/stable-diffusion-xl-base-1.0')
+  const [model, setModel] = useState<string>('sharky172/manga-light-colorizer')
   const [refImageUrl, setRefImageUrl] = useState<string>('')
 
   // UI state
@@ -303,7 +303,8 @@ export default function AIMangaPage() {
     try {
       const payload = {
         prompt: prompt.trim() || undefined,
-        reference_image_url: refImageUrl.trim() || undefined
+        reference_image_url: refImageUrl.trim() || undefined,
+        ai_model: model
       }
       
       const response = await assistantService.startAiColoring(selectedTaskId, payload)

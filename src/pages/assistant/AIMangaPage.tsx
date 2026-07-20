@@ -56,14 +56,20 @@ const translateStatus = (status: string) => {
 const AI_MODEL_OPTIONS = [
   {
     id: 'sharky172/manga-light-colorizer',
-    name: 'Tính năng 1: Tô màu đè lên nét vẽ gốc (Image-to-Image)',
-    desc: 'Kết nối trực tiếp đến mô hình chuyên dụng để tô màu tự động và giữ trọn vẹn nét vẽ gốc của bản thảo.',
+    name: 'Tính năng 1: Tô màu tự động giữ nét thô (Auto-Colorizer)',
+    desc: 'Tự động đổ màu và giữ trọn vẹn từng nét vẽ thô của bản thảo gốc (Không sử dụng mô tả Prompt).',
     type: 'Tô màu theo nét'
   },
   {
+    id: 'stabilityai/stable-diffusion-xl-base-1.0',
+    name: 'Tính năng 2: Tô màu theo Prompt + Nét vẽ (Image-to-Image)',
+    desc: 'Sử dụng nét vẽ gốc của trang truyện làm khung, tô màu và tạo bóng chi tiết theo chỉ dẫn Prompt của bạn (màu mắt, tóc, bối cảnh...).',
+    type: 'Tô màu theo Prompt + Nét'
+  },
+  {
     id: 'black-forest-labs/FLUX.1-schnell',
-    name: 'Tính năng 2: Sinh ảnh mới hoàn toàn bằng AI (Text-to-Image)',
-    desc: 'Tự động vẽ và tạo ra bức ảnh mới hoàn toàn từ nội dung mô tả prompt của bạn, không giữ nét vẽ gốc.',
+    name: 'Tính năng 3: Sinh ảnh tự do theo Prompt (Text-to-Image)',
+    desc: 'Vẽ mới hoàn toàn một bức tranh chất lượng cao từ mô tả prompt của bạn, không bị ràng buộc bởi nét vẽ cũ.',
     type: 'Sinh ảnh tự do'
   }
 ]
@@ -579,7 +585,7 @@ export default function AIMangaPage() {
                                       setAiStatus('completed')
                                       setSuggestionId(item.suggestion_id)
                                       setPrompt(item.prompt || '')
-                                      setModel(item.ai_model || 'stabilityai/stable-diffusion-xl-base-1.0')
+                                      setModel(item.ai_model || 'sharky172/manga-light-colorizer')
                                       showToast('Đã tải lại kết quả này!')
                                     }}
                                     className="px-2 py-1 bg-black text-white hover:bg-zinc-800 text-[9px] font-black uppercase tracking-wider cursor-pointer shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] border border-black active:translate-y-0.5 active:shadow-none"

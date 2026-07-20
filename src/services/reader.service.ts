@@ -410,20 +410,25 @@ export const readerService = {
 
   logView: async (seriesId: string, chapterId: string): Promise<void> => {
     try {
-      // Chống duplicate: chỉ log view 1 lần mỗi chapter trong 30 phút
-      const VIEW_COOLDOWN_MS = 30 * 60 * 1000; // 30 phút
-      const storageKey = `mangaflow_view_logged`;
+      // Chống duplicate: reload hay qua lại chương 'Đã Đọc' không tăng view trong 24h, sau 1 ngày mới cộng lại
+      const VIEW_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 giờ
+      const storageKey = `mangaflow_viewed_chapters`;
       const now = Date.now();
 
       let viewedMap: Record<string, number> = {};
       try {
-        const stored = sessionStorage.getItem(storageKey);
-        if (stored) viewedMap = JSON.parse(stored);
+        const stored = localStorage.getItem(storageKey);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            viewedMap = parsed;
+          }
+        }
       } catch (e) { /* ignore parse errors */ }
 
       const lastViewed = viewedMap[chapterId];
-      if (lastViewed && (now - lastViewed) < VIEW_COOLDOWN_MS) {
-        // Đã log view chapter này trong vòng 30 phút, bỏ qua
+      if (lastViewed && typeof lastViewed === 'number' && (now - lastViewed) < VIEW_COOLDOWN_MS) {
+        // Đã log view chapter này trong vòng 1 ngày (Đã đọc), bỏ qua
         return;
       }
 
@@ -432,13 +437,13 @@ export const readerService = {
       // Ghi nhận thời điểm đã log
       viewedMap[chapterId] = now;
 
-      // Dọn dẹp các entry cũ hơn 30 phút để không phình sessionStorage
+      // Dọn dẹp các entry cũ hơn 1 ngày để không phình localStorage
       for (const key of Object.keys(viewedMap)) {
         if ((now - viewedMap[key]) >= VIEW_COOLDOWN_MS) {
           delete viewedMap[key];
         }
       }
-      sessionStorage.setItem(storageKey, JSON.stringify(viewedMap));
+      localStorage.setItem(storageKey, JSON.stringify(viewedMap));
     } catch (error) {
       console.error('Error logging view:', error);
     }

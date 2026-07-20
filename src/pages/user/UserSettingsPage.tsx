@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { Save, Check } from 'lucide-react'
+import { Save, Check, ShieldAlert, Loader2 } from 'lucide-react'
+import { useToast } from '@/contexts/ToastContext'
+import api from '@/services/api'
 
 export default function UserSettingsPage() {
   const [user, setUser] = useState<any>(null)
@@ -8,6 +10,10 @@ export default function UserSettingsPage() {
   const [bio, setBio] = useState('')
   const [notificationsEnabled, setNotificationsEnabled] = useState(true)
   const [saved, setSaved] = useState(false)
+
+  const [selectedRole, setSelectedRole] = useState('mangaka')
+  const [isSubmittingRole, setIsSubmittingRole] = useState(false)
+  const { showToast } = useToast()
 
   useEffect(() => {
     const storedUser = localStorage.getItem('mangaflow_user')
@@ -40,6 +46,26 @@ export default function UserSettingsPage() {
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
   }
+
+  const handleRequestRole = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmittingRole(true)
+    try {
+      await api.post('/api/users/request-role', { role: selectedRole })
+      showToast('Đã gửi yêu cầu thành công, vui lòng chờ Admin duyệt', 'success')
+    } catch (error: any) {
+      if (error.response?.status === 429) {
+        showToast('Bạn đã gửi một yêu cầu gần đây rồi, xin vui lòng đợi thêm', 'warning')
+      } else if (error.response?.status === 400) {
+        showToast('Bạn đã sở hữu quyền này rồi', 'error')
+      } else {
+        showToast('Đã có lỗi xảy ra, vui lòng thử lại sau', 'error')
+      }
+    } finally {
+      setIsSubmittingRole(false)
+    }
+  }
+
 
   if (!user) {
     return <div className="p-8 text-center text-red-500 font-bold">Đang tải cấu hình...</div>
@@ -129,6 +155,42 @@ export default function UserSettingsPage() {
           </div>
         </form>
       </div>
+
+      {/* Request Role Section */}
+      <div className="bg-white border-4 border-manga-ink p-6 shadow-[8px_8px_0px_rgba(15,15,15,1)] mt-8">
+        <h2 className="text-lg font-black uppercase text-manga-ink mb-4 flex items-center gap-2">
+          <ShieldAlert className="w-5 h-5 text-manga-red" />
+          Xin cấp quyền đặc biệt
+        </h2>
+        <p className="text-xs font-bold text-gray-500 mb-6">
+          Bạn có thể gửi yêu cầu cấp quyền đặc biệt trên hệ thống. Admin sẽ xem xét hồ sơ của bạn.
+        </p>
+        
+        <form onSubmit={handleRequestRole} className="flex flex-col md:flex-row items-end gap-4">
+          <div className="flex-1 w-full">
+            <label className="block text-xs font-black uppercase text-manga-ink mb-2">Vai trò muốn nâng cấp</label>
+            <select
+              value={selectedRole}
+              onChange={(e) => setSelectedRole(e.target.value)}
+              className="w-full border-2 border-manga-ink p-3 text-sm font-bold outline-none focus:border-manga-red bg-zinc-50"
+              disabled={isSubmittingRole}
+            >
+              <option value="mangaka">Mangaka (Tác giả)</option>
+              <option value="assistant">Assistant (Trợ lý)</option>
+              <option value="editor">Editor (Biên tập viên)</option>
+              <option value="board">Board (Ban biên tập)</option>
+            </select>
+          </div>
+          <button
+            type="submit"
+            disabled={isSubmittingRole}
+            className="flex items-center justify-center gap-2 bg-manga-ink text-white font-manga font-bold text-sm uppercase px-8 py-3 h-[52px] border-2 border-manga-ink shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:bg-manga-red hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmittingRole ? <Loader2 className="w-5 h-5 animate-spin" /> : 'GỬI YÊU CẦU'}
+          </button>
+        </form>
+      </div>
+
     </div>
   )
 }

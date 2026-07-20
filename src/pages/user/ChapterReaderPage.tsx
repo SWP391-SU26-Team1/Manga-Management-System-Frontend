@@ -48,6 +48,9 @@ export default function ChapterReaderPage() {
 
   useEffect(() => {
     if (chapterId && seriesId) {
+      // Scroll to top when chapter changes
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+
       readerService.getChapterPages(chapterId).then(setPages)
       readerService.getPublishedChapters(seriesId).then(chapters => {
         setAllChapters(chapters)

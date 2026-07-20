@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react'
-import { User, Mail, Award, BookOpen, Clock, Heart } from 'lucide-react'
+import { User, Mail, Award, BookOpen, Clock, Heart, Edit2 } from 'lucide-react'
+import { useNavigate } from 'react-router'
 import { readerService, ReadingHistoryItem } from '@/services/reader.service'
 
 export default function UserProfilePage() {
   const [profile, setProfile] = useState<any>(null)
   const [history, setHistory] = useState<ReadingHistoryItem[]>([])
-  const [viewedChaptersCount, setViewedChaptersCount] = useState(0)
+  const navigate = useNavigate()
 
   useEffect(() => {
     const storedUser = localStorage.getItem('mangaflow_user')
@@ -17,14 +18,6 @@ export default function UserProfilePage() {
     readerService.getReadingHistory().then(data => {
       setHistory(data)
     })
-
-    // Count viewed chapters from localStorage
-    try {
-      const viewedMap = JSON.parse(localStorage.getItem('mangaflow_viewed_chapters') || '{}')
-      setViewedChaptersCount(Object.keys(viewedMap).length)
-    } catch (e) {
-      setViewedChaptersCount(0)
-    }
   }, [])
 
   if (!profile) {
@@ -34,13 +27,6 @@ export default function UserProfilePage() {
   const userInitials = profile.fullName
     ? profile.fullName.split(' ').pop()?.slice(0, 2).toUpperCase()
     : 'U'
-
-  // User stats (Real data)
-  const stats = [
-    { label: 'Truyện đã đọc', value: history.length, icon: BookOpen, color: 'text-blue-500' },
-    { label: 'Chương đã đọc', value: viewedChaptersCount, icon: Clock, color: 'text-green-500' },
-    { label: 'Đang theo dõi', value: 0, icon: Heart, color: 'text-manga-red' },
-  ]
 
   // Favorite genres from reading history
   const allGenres = history.flatMap(h => (h.seriesGenre || '').split(',').map(g => g.trim())).filter(Boolean)
@@ -90,6 +76,14 @@ export default function UserProfilePage() {
               {profile.role || 'MEMBER USER'}
             </div>
 
+            <button 
+              onClick={() => navigate('/dashboard/user/settings')}
+              className="mt-2 mb-4 w-full flex items-center justify-center gap-2 bg-white text-manga-ink font-bold uppercase text-sm py-2.5 border-2 border-manga-ink shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:bg-manga-ink hover:text-white hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none transition-all dark:bg-zinc-700 dark:border-black dark:text-white dark:shadow-[4px_4px_0px_#000]"
+            >
+              <Edit2 className="w-4 h-4" />
+              CHỈNH SỬA HỒ SƠ
+            </button>
+
             <div className="w-full space-y-3 mt-2 text-left">
               <div className="flex items-center gap-3 text-sm font-bold text-gray-700 p-2 bg-gray-50 border-2 border-dashed border-gray-300 dark:bg-zinc-900 dark:border-zinc-700 dark:text-gray-300">
                 <User className="w-4 h-4 text-manga-red shrink-0" />
@@ -113,19 +107,9 @@ export default function UserProfilePage() {
           </div>
         </div>
 
-        {/* Right Column: Stats & Activities */}
+        {/* Right Column: Activities & Preferences */}
         <div className="lg:col-span-2 space-y-8">
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {stats.map((stat, idx) => (
-              <div key={idx} className="bg-white border-4 border-manga-ink p-4 flex flex-col items-center text-center shadow-[4px_4px_0px_rgba(15,15,15,1)] dark:bg-zinc-800 dark:border-black dark:shadow-[4px_4px_0px_#000]">
-                <stat.icon className={`w-8 h-8 ${stat.color} mb-2`} />
-                <span className="text-3xl font-black font-manga dark:text-white">{stat.value}</span>
-                <span className="text-xs font-bold uppercase text-gray-500 mt-1 dark:text-gray-400">{stat.label}</span>
-              </div>
-            ))}
-          </div>
-
+          
           {/* Reading Preferences / Genres */}
           <div className="bg-white border-4 border-manga-ink p-6 shadow-[6px_6px_0px_rgba(15,15,15,1)] dark:bg-zinc-800 dark:border-black dark:shadow-[6px_6px_0px_#000]">
             <h3 className="font-manga text-2xl font-bold uppercase border-b-4 border-manga-ink pb-3 mb-6 flex items-center gap-3 dark:border-zinc-700 dark:text-white">

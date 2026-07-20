@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
-import { Bell, Search, AlertTriangle, RefreshCw, FileText, Star, Vote, AlertCircle, X, ExternalLink, User, Settings, LogOut } from 'lucide-react'
+import { Bell, Search, AlertTriangle, RefreshCw, FileText, Star, Vote, AlertCircle, X, User, Settings, LogOut } from 'lucide-react'
 import { useNotifications, Notification } from '@/contexts/NotificationContext'
 
 export default function BoardHeader() {
@@ -170,14 +170,7 @@ export default function BoardHeader() {
 
       {/* Actions section */}
       <div className="flex items-center gap-6">
-        {/* Temporary Return to User Page Button */}
-        <Link 
-          to="/"
-          className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-white bg-manga-red hover:bg-red-600 transition-colors border-2 border-transparent hover:border-black rounded-lg"
-          title="Về trang dành cho Độc giả"
-        >
-          <ExternalLink className="w-4 h-4" /> Về trang Độc giả
-        </Link>
+
 
         {/* Search Bar */}
         <div className="relative w-64">

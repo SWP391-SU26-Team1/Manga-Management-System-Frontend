@@ -13,6 +13,7 @@ export interface PublishedSeries {
   latestChapterDate: string
   rating: number
   ratingCount: number
+  totalLikes?: number
   authorName: string
   authorAvatarUrl: string | null
   createdAt: string

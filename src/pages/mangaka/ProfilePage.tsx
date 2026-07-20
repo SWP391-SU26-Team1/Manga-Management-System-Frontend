@@ -4,6 +4,7 @@ import { User, Mail, Award, BookOpen, Star, Users, Briefcase, Edit3, Save, X, Ca
 import { userService, UserProfileAPI } from '@/services/user.service'
 import { seriesService } from '@/services/series.service'
 import { uploadService } from '@/services/upload.service'
+import { calculateMangakaLevel } from '@/utils/ratingUtils'
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<UserProfileAPI | null>(null)
@@ -19,6 +20,7 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null)
   const [totalSeries, setTotalSeries] = useState(0)
   const [activeSeries, setActiveSeries] = useState(0)
+  const [mangakaLevel, setMangakaLevel] = useState(1)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -54,6 +56,15 @@ export default function ProfilePage() {
         const seriesList = await seriesService.getAll()
         setTotalSeries(seriesList.length)
         setActiveSeries(seriesList.filter(s => s.status === 'ongoing' || s.status === 'draft').length)
+        
+        let totalViews = 0;
+        let totalLikes = 0;
+        seriesList.forEach((s: any) => {
+          totalViews += (s.view_count || s.viewCount || s.totalViews || 0);
+          totalLikes += (s.total_likes || s.likeCount || s.totalLikes || s.likes || 0);
+        });
+        
+        setMangakaLevel(calculateMangakaLevel(totalViews, totalLikes, seriesList.length));
       } catch (err: any) {
         console.error('ProfilePage fetch error:', err)
         // Fallback: try localStorage
@@ -361,32 +372,16 @@ export default function ProfilePage() {
         {/* Right Column: Stats & Publications */}
         <div className="lg:col-span-2 space-y-8">
           {/* Stats Grid — pulled from real series data */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-white border-4 border-manga-ink p-4 flex flex-col items-center text-center shadow-[4px_4px_0px_rgba(0,0,0,1)]">
-              <Star className="w-8 h-8 text-yellow-400 mb-2" fill="currentColor" />
-              <span className="text-3xl font-black font-manga">
-                {profile.stats?.rating?.toFixed(1) ?? '—'}
-              </span>
-              <span className="text-xs font-bold uppercase text-gray-500 mt-1">Đánh giá</span>
+              <BookOpen className="w-8 h-8 text-manga-red mb-2" />
+              <span className="text-3xl font-black font-manga">{totalSeries}</span>
+              <span className="text-xs font-bold uppercase text-gray-500 mt-1">Tác phẩm</span>
             </div>
             <div className="bg-white border-4 border-manga-ink p-4 flex flex-col items-center text-center shadow-[4px_4px_0px_rgba(0,0,0,1)]">
-              <Users className="w-8 h-8 text-blue-500 mb-2" />
-              <span className="text-3xl font-black font-manga">
-                {profile.stats?.followers
-                  ? (profile.stats.followers / 1000).toFixed(1) + 'k'
-                  : '—'}
-              </span>
-              <span className="text-xs font-bold uppercase text-gray-500 mt-1">Người theo dõi</span>
-            </div>
-            <div className="bg-white border-4 border-manga-ink p-4 flex flex-col items-center text-center shadow-[4px_4px_0px_rgba(0,0,0,1)]">
-              <Briefcase className="w-8 h-8 text-manga-red mb-2" />
-              <span className="text-3xl font-black font-manga">{activeSeries}</span>
-              <span className="text-xs font-bold uppercase text-gray-500 mt-1">Series đang làm</span>
-            </div>
-            <div className="bg-white border-4 border-manga-ink p-4 flex flex-col items-center text-center shadow-[4px_4px_0px_rgba(0,0,0,1)]">
-              <BookOpen className="w-8 h-8 text-green-500 mb-2" />
-              <span className="text-3xl font-black font-manga">{completedSeries}</span>
-              <span className="text-xs font-bold uppercase text-gray-500 mt-1">Đã hoàn thành</span>
+              <Award className="w-8 h-8 text-blue-500 mb-2" />
+              <span className="text-3xl font-black font-manga">Lv.{mangakaLevel}</span>
+              <span className="text-xs font-bold uppercase text-gray-500 mt-1">Cấp độ</span>
             </div>
           </div>
 

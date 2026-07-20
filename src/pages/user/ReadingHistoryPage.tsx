@@ -6,6 +6,7 @@ import { ReadingHistoryItem } from '@/types/reader.types'
 
 export default function ReadingHistoryPage() {
   const [history, setHistory] = useState<ReadingHistoryItem[]>([])
+  const [upcoming, setUpcoming] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('TẤT CẢ')
   const navigate = useNavigate()
@@ -15,6 +16,7 @@ export default function ReadingHistoryPage() {
       setHistory(data)
       setLoading(false)
     })
+    readerService.getUpcomingChapters().then(data => setUpcoming(data))
   }, [])
 
   const tabs = ['TẤT CẢ', 'ĐANG ĐỌC', 'ĐÃ HOÀN THÀNH', 'YÊU THÍCH']
@@ -222,38 +224,48 @@ export default function ReadingHistoryPage() {
               <RotateCcw className="w-6 h-6" /> Sắp có chương mới
             </div>
             <div className="flex flex-col">
-              {[
-                { title: 'Neon Samurai', date: 'NGÀY MAI', chapter: 'Chương 43', img: 'https://fakeimg.pl/100x150/282828/eae0d0/?text=NS' },
-                { title: 'Whispers of Mana', date: 'THỨ 6, 24/10', chapter: 'Chương 89', img: 'https://fakeimg.pl/100x150/282828/eae0d0/?text=WM' }
-              ].map((update, idx) => (
-                <div key={idx} className="flex gap-4 p-4 border-b-[3px] border-black last:border-b-0 hover:bg-gray-50 transition-colors cursor-pointer dark:border-black dark:hover:bg-zinc-700">
-                  <div className="w-16 h-16 border-[2px] border-black overflow-hidden shrink-0 dark:border-black">
-                    <img src={update.img} alt={update.title} className="w-full h-full object-cover grayscale-[30%] hover:grayscale-0" />
+              {upcoming.length > 0 ? (
+                upcoming.map((update, idx) => (
+                  <div key={idx} className="flex gap-4 p-4 border-b-[3px] border-black last:border-b-0 dark:border-black">
+                    <div className="w-16 h-16 border-[2px] border-black overflow-hidden shrink-0 dark:border-black">
+                      <img src={update.seriesCover || 'https://fakeimg.pl/100x150/282828/eae0d0/?text=NA'} alt={update.seriesTitle} className="w-full h-full object-cover grayscale-[30%] hover:grayscale-0" />
+                    </div>
+                    <div className="flex flex-col justify-center">
+                      <p className="text-manga-red font-bold text-xs uppercase mb-1">
+                        Coming Soon
+                      </p>
+                      <h4 className="font-manga font-bold uppercase leading-tight line-clamp-1 dark:text-white">{update.seriesTitle}</h4>
+                      <p className="text-gray-600 font-bold text-sm dark:text-gray-400">
+                        Chương {update.chapter_number} {update.title ? `- ${update.title}` : ''}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex flex-col justify-center">
-                    <p className="text-manga-red font-bold text-xs uppercase mb-1">{update.date}</p>
-                    <h4 className="font-manga font-bold uppercase leading-tight line-clamp-1 dark:text-white">{update.title}</h4>
-                    <p className="text-gray-600 font-bold text-sm dark:text-gray-400">{update.chapter}</p>
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <div className="p-4 text-center text-sm font-bold text-gray-500 uppercase">Chưa có chương mới</div>
+              )}
             </div>
           </div>
 
           {/* Stats Box */}
           <div className="border-[4px] border-black bg-white shadow-[8px_8px_0px_rgba(0,0,0,1)] p-6 animate-slide-up dark:bg-zinc-800 dark:border-black dark:shadow-[8px_8px_0px_#000] dark:text-white" style={{ animationDelay: '0.5s' }}>
-            <h3 className="font-manga text-xl font-bold uppercase mb-4 text-center">Thống kê đọc (Tuần này)</h3>
+            <h3 className="font-manga text-xl font-bold uppercase mb-4 text-center">Thống kê đọc</h3>
             
-            <div className="flex gap-4">
-              <div className="flex-1 border-[4px] border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] p-4 flex flex-col items-center justify-center bg-white hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[8px_8px_0px_rgba(0,0,0,1)] transition-all dark:bg-zinc-700 dark:border-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-[8px_8px_0px_#000]">
-                <span className="font-manga text-5xl font-bold text-manga-red">42</span>
-                <span className="font-bold text-[10px] uppercase text-gray-500 mt-2 text-center dark:text-gray-300">Chương đã đọc</span>
+            {(localStorage.getItem('mangaflow_user') || localStorage.getItem('user')) ? (
+              <div className="flex gap-4">
+                <div className="flex-1 border-[4px] border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] p-4 flex flex-col items-center justify-center bg-white hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[8px_8px_0px_rgba(0,0,0,1)] transition-all dark:bg-zinc-700 dark:border-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-[8px_8px_0px_#000]">
+                  <span className="font-manga text-5xl font-bold text-manga-red">{history.length}</span>
+                  <span className="font-bold text-[10px] uppercase text-gray-500 mt-2 text-center dark:text-gray-300">Chương đã đọc</span>
+                </div>
               </div>
-              <div className="flex-1 border-[4px] border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] p-4 flex flex-col items-center justify-center bg-white hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[8px_8px_0px_rgba(0,0,0,1)] transition-all dark:bg-zinc-700 dark:border-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-[8px_8px_0px_#000]">
-                <span className="font-manga text-5xl font-bold text-black dark:text-white">12</span>
-                <span className="font-bold text-[10px] uppercase text-gray-500 mt-2 text-center dark:text-gray-300">Giờ đọc</span>
+            ) : (
+              <div className="border-[4px] border-black p-4 text-center bg-gray-50 dark:bg-zinc-700 dark:border-black">
+                <p className="font-bold text-sm uppercase text-gray-500 dark:text-gray-300 mb-4">Vui lòng đăng nhập để xem thống kê</p>
+                <Link to="/login" className="inline-block bg-manga-red text-white font-bold text-xs uppercase border-[3px] border-black px-4 py-2 hover:bg-red-600 transition-colors dark:border-black">
+                  Đăng nhập
+                </Link>
               </div>
-            </div>
+            )}
           </div>
 
         </div>

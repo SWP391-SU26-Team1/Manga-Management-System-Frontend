@@ -122,7 +122,7 @@ export default function RecoveryProposalPage() {
       }
 
       if (!title) {
-        alert('Vui lòng điền các thông tin bắt buộc!')
+        showToast('Vui lòng điền các thông tin bắt buộc!')
         return
       }
 
@@ -154,7 +154,7 @@ export default function RecoveryProposalPage() {
       loadProposals()
     } catch (err: any) {
       console.error(err)
-      alert(`Gửi đề xuất thất bại: ${err.response?.data?.message || err.message || 'Lỗi hệ thống'}`)
+      showToast(`Gửi đề xuất thất bại: ${err.response?.data?.message || err.message || 'Lỗi hệ thống'}`)
     }
   }
 

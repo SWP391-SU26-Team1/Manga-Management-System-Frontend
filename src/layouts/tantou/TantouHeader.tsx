@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useLocation, Link, useNavigate } from 'react-router'
-import { Search, Bell, ChevronRight, User, Settings, LogOut } from 'lucide-react'
+import { Bell, ChevronRight, User, Settings, LogOut } from 'lucide-react'
 import { editorService } from '@/services/editor.service'
 
 const BASE = '/dashboard/tantou-editor'
@@ -28,23 +28,31 @@ export default function TantouHeader() {
   const [showNotifications, setShowNotifications] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [notifications, setNotifications] = useState<any[]>([])
-  const [lastSeenNotifId, setLastSeenNotifId] = useState<string | null>(() => {
-    return localStorage.getItem('mangaflow_last_seen_notif_id')
+  const [lastSeenTime, setLastSeenTime] = useState<string | null>(() => {
+    return localStorage.getItem('mangaflow_last_seen_time')
   })
 
-  const updateLastSeenNotif = (id: string) => {
-    setLastSeenNotifId(id)
-    localStorage.setItem('mangaflow_last_seen_notif_id', id)
+  const updateLastSeenTime = () => {
+    const now = new Date().toISOString()
+    setLastSeenTime(now)
+    localStorage.setItem('mangaflow_last_seen_time', now)
+  }
+
+  const parseDateSafe = (dateStr: string) => {
+    if (!dateStr) return new Date()
+    let formattedStr = dateStr
+    if (!dateStr.endsWith('Z') && !dateStr.includes('+') && !dateStr.match(/-\d{2}:\d{2}$/)) {
+      formattedStr = dateStr.replace(' ', 'T') + 'Z'
+    }
+    const d = new Date(formattedStr)
+    return isNaN(d.getTime()) ? new Date(dateStr) : d
   }
 
   const getBadgeCount = () => {
     const unread = notifications.filter(n => !n.is_read)
-    if (!lastSeenNotifId) return unread.length
-    const lastSeenIndex = notifications.findIndex(n => n.notification_id === lastSeenNotifId)
-    if (lastSeenIndex === -1) return unread.length
-    
-    const newerUnread = notifications.slice(0, lastSeenIndex).filter(n => !n.is_read).length
-    return newerUnread
+    if (!lastSeenTime) return unread.length
+    const lastSeenDate = new Date(lastSeenTime)
+    return unread.filter(n => parseDateSafe(n.created_at) > lastSeenDate).length
   }
 
   const badgeCount = getBadgeCount()
@@ -52,8 +60,8 @@ export default function TantouHeader() {
   const handleBellClick = () => {
     const nextShow = !showNotifications
     setShowNotifications(nextShow)
-    if (nextShow && notifications.length > 0) {
-      updateLastSeenNotif(notifications[0].notification_id)
+    if (nextShow) {
+      updateLastSeenTime()
     }
   }
   
@@ -130,7 +138,7 @@ export default function TantouHeader() {
 
   const formatTimeAgo = (dateStr: string) => {
     if (!dateStr) return ''
-    const date = new Date(dateStr)
+    const date = parseDateSafe(dateStr)
     const now = new Date()
     const diffMs = now.getTime() - date.getTime()
     const diffMins = Math.floor(diffMs / 60000)
@@ -151,7 +159,7 @@ export default function TantouHeader() {
     let viTitle = title
     let viContent = content
 
-    if (t === 'manuscript_submitted' || lowerTitle.includes('manuscript submitted') || lowerTitle.includes('nộp bản thảo')) {
+    if (t === 'manuscript_submitted' || t === 'series_submitted' || lowerTitle.includes('manuscript submitted') || lowerTitle.includes('nộp bản thảo')) {
       viTitle = 'Cập nhật mới'
       viContent = content || 'Tác giả đã nộp bản thảo mới cần duyệt.'
     } else if (t === 'editor_feedback' || lowerTitle.includes('feedback') || lowerTitle.includes('nhận xét')) {
@@ -222,15 +230,7 @@ export default function TantouHeader() {
 
       {/* Right Side Actions */}
       <div className="flex items-center gap-6">
-        {/* Search Bar */}
-        <div className="relative w-64">
-          <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Tìm kiếm (ask.../Enter)"
-            className="w-full pl-9 pr-4 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#E63946] focus:bg-white font-sans transition-all duration-200 text-gray-700"
-          />
-        </div>
+
 
         {/* Notification Bell */}
         <div className="relative" ref={notificationRef}>

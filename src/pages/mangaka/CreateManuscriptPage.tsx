@@ -127,25 +127,20 @@ export default function CreateManuscriptPage() {
       // Gửi thông báo đến toàn bộ các Tantou Editor phụ trách
       try {
         const mems = await seriesService.getMembers(selectedSeriesId)
-        const editors = mems
+        let editors = mems
           .filter((m: any) => m.users?.role?.toLowerCase() === 'editor')
           .map((m: any) => m.users.user_id)
         
-        // Danh sách các Biên tập viên (Tantou Editor) trong hệ thống để tất cả đều nhận được thông báo
-        const systemEditors = [
-          'b29fb935-7a5d-4988-9327-a8e453ba7322', // LuanHuynh296
-          'f9a1ee69-6036-4fd6-bbef-de0e00370309', // editor_akira (Akira Watanabe)
-          '83556777-7c27-4039-ba81-655e58a788a7', // Tantou_Editor
-          '66666666-6666-6666-6666-666666666666', // editor_haru
-          '90000000-0000-0000-0000-000000000004', // editor_mika
-          'dcba68dd-5e62-49e2-a826-d2f5e6941561'  // codex_test_1781698003205
-        ]
-
-        systemEditors.forEach(id => {
-          if (!editors.includes(id)) {
-            editors.push(id)
-          }
-        })
+        if (editors.length === 0) {
+          editors = [
+            'b29fb935-7a5d-4988-9327-a8e453ba7322', // LuanHuynh296
+            'f9a1ee69-6036-4fd6-bbef-de0e00370309', // editor_akira (Akira Watanabe)
+            '83556777-7c27-4039-ba81-655e58a788a7', // Tantou_Editor
+            '66666666-6666-6666-6666-666666666666', // editor_haru
+            '90000000-0000-0000-0000-000000000004', // editor_mika
+            'dcba68dd-5e62-49e2-a826-d2f5e6941561'  // codex_test_1781698003205
+          ]
+        }
 
         const activeSeries = seriesList.find(s => s._id === selectedSeriesId)
         

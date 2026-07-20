@@ -19,6 +19,15 @@ export default function NotificationsPage() {
   const [filter, setFilter] = useState<'All' | 'Unread' | 'Mangaka' | 'Board' | 'System'>('All')
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('success')
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+
+  const showToast = (msg: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToastMessage(msg)
+    setToastType(type)
+    setTimeout(() => setToastMessage(null), 3000)
+  }
 
   const translateNotification = (title: string, content: string, type: string) => {
     const t = (type || '').toLowerCase();
@@ -27,7 +36,7 @@ export default function NotificationsPage() {
     let viTitle = title;
     let viContent = content;
 
-    if (t === 'manuscript_submitted' || lowerTitle.includes('manuscript submitted') || lowerTitle.includes('nộp bản thảo')) {
+    if (t === 'manuscript_submitted' || t === 'series_submitted' || lowerTitle.includes('manuscript submitted') || lowerTitle.includes('nộp bản thảo')) {
       viTitle = 'Cập nhật mới';
       viContent = content || 'Tác giả đã nộp bản thảo mới cần duyệt.';
     } else if (t === 'editor_feedback' || lowerTitle.includes('feedback') || lowerTitle.includes('nhận xét')) {
@@ -112,9 +121,10 @@ export default function NotificationsPage() {
       await editorService.markAllNotificationsRead()
       window.dispatchEvent(new Event('mangaflow_notifications_updated'))
       await loadNotifications()
+      showToast('Đã đánh dấu đọc tất cả thông báo!', 'success')
     } catch (err) {
       console.error(err)
-      alert('Không thể đánh dấu đã đọc tất cả thông báo.')
+      showToast('Không thể đánh dấu đọc tất cả thông báo.', 'error')
     }
   }
 
@@ -124,23 +134,16 @@ export default function NotificationsPage() {
       await editorService.markNotificationRead(id)
       window.dispatchEvent(new Event('mangaflow_notifications_updated'))
       await loadNotifications()
+      showToast('Đã đánh dấu đã đọc thông báo!', 'success')
     } catch (err) {
       console.error(err)
-      alert('Không thể đánh dấu thông báo đã đọc.')
+      showToast('Không thể đánh dấu thông báo đã đọc.', 'error')
     }
   }
 
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
+  const handleDeleteClick = (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!confirm('Bạn có chắc chắn muốn xóa thông báo này?')) return
-    try {
-      await editorService.deleteNotification(id)
-      window.dispatchEvent(new Event('mangaflow_notifications_updated'))
-      await loadNotifications()
-    } catch (err) {
-      console.error(err)
-      alert('Không thể xóa thông báo.')
-    }
+    setConfirmDeleteId(id)
   }
 
   const handleNotifClick = async (notif: LocalNotification) => {
@@ -330,7 +333,7 @@ export default function NotificationsPage() {
                   </button>
                 )}
                 <button
-                  onClick={(e) => handleDelete(n.id, e)}
+                  onClick={(e) => handleDeleteClick(n.id, e)}
                   title="Xóa thông báo"
                   className="p-2 border-2 border-black bg-white hover:bg-red-50 hover:text-[#E63946] transition-colors cursor-pointer"
                 >
@@ -339,6 +342,55 @@ export default function NotificationsPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Custom Confirm Delete Modal */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white border-4 border-black p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] text-center animate-fade-in">
+            <h4 className="text-sm font-black uppercase tracking-wider mb-2">Xác nhận xóa</h4>
+            <p className="text-xs text-gray-500 font-bold mb-6">Bạn có chắc chắn muốn xóa thông báo này?</p>
+            <div className="flex gap-4">
+              <button
+                onClick={async () => {
+                  const id = confirmDeleteId
+                  setConfirmDeleteId(null)
+                  try {
+                    await editorService.deleteNotification(id)
+                    window.dispatchEvent(new Event('mangaflow_notifications_updated'))
+                    await loadNotifications()
+                    showToast('Đã xóa thông báo thành công!', 'success')
+                  } catch (err) {
+                    console.error(err)
+                    showToast('Không thể xóa thông báo.', 'error')
+                  }
+                }}
+                className="flex-1 py-2 bg-[#FF9898] border-2 border-black font-extrabold text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] transition-all cursor-pointer"
+              >
+                Đồng ý
+              </button>
+              <button
+                onClick={() => setConfirmDeleteId(null)}
+                className="flex-1 py-2 bg-white border-2 border-black font-extrabold text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] transition-all cursor-pointer"
+              >
+                Hủy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Neo-brutalist Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-6 right-6 z-50 animate-bounce-in">
+          <div className={`border-4 border-black p-4 font-bold text-xs uppercase tracking-wider flex items-center gap-3 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] ${
+            toastType === 'success' ? 'bg-[#98FF98] text-black' : 
+            toastType === 'error' ? 'bg-[#FF9898] text-black' : 'bg-yellow-200 text-black'
+          }`}>
+            <span>{toastType === 'success' ? '✅' : toastType === 'error' ? '❌' : 'ℹ️'}</span>
+            <span>{toastMessage}</span>
+          </div>
         </div>
       )}
     </div>

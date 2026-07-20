@@ -25,6 +25,7 @@ interface DisplaySeries {
   description: string
   coverImageUrl: string
   mangaka: string
+  mangakaId?: string
   createdAt: string
 }
 
@@ -33,7 +34,7 @@ const mapApiStatusToDisplay = (s: string): DisplayManuscript['status'] => {
     case 'submitted': return 'SUBMITTED'
     case 'in_review': case 'in review': return 'IN_REVIEW'
     case 'approved': return 'APPROVED'
-    case 'rejected': return 'REJECTED'
+    case 'rejected': case 'needs_revision': case 'needs revision': return 'REJECTED'
     default: return 'SUBMITTED'
   }
 }
@@ -144,6 +145,7 @@ export default function ManuscriptReviewPage() {
 
   // Toast notification
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [isScriptModalOpen, setIsScriptModalOpen] = useState(false)
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
@@ -166,7 +168,7 @@ export default function ManuscriptReviewPage() {
       const data = res.data || res
       const list: ApiManuscript[] = Array.isArray(data) ? data : (data.manuscripts || data.items || [])
 
-      const filteredList = list.filter(m => ['draft', 'submitted', 'in_review'].includes(m.status?.toLowerCase()))
+      const filteredList = list.filter(m => ['draft', 'submitted', 'in_review', 'approved', 'rejected', 'needs_revision'].includes(m.status?.toLowerCase()))
 
       // Fetch full details for each filtered manuscript to get series, chapter, and mangaka info
       const detailedList = await Promise.all(
@@ -293,6 +295,7 @@ export default function ManuscriptReviewPage() {
             const owner = detail.series_member?.find((m: any) => m.role_in_series === 'owner')
             if (owner?.users) {
               s.mangaka = owner.users.name || owner.users.username || 'Tác giả ẩn danh'
+              s.mangakaId = owner.users.user_id || owner.user_id
             }
             finalFilteredList.push(s)
           }
@@ -396,27 +399,14 @@ export default function ManuscriptReviewPage() {
     return errorMsg
   }
 
-  const removeManuscriptFromList = (mId: string) => {
-    setManuscripts(prev => {
-      const filtered = prev.filter(m => m.id !== mId)
-      if (filtered.length > 0) {
-        const nextSelected = filtered[0]
-        setSelectedManuscriptId(nextSelected.id)
-        const hasDetail = nextSelected.content
-        if (!hasDetail) {
-          fetchManuscriptDetail(nextSelected.id, filtered)
-        }
-      } else {
-        setSelectedManuscriptId('')
-      }
-      return filtered
-    })
+  const updateManuscriptStatusInList = (mId: string, newStatus: DisplayManuscript['status']) => {
+    setManuscripts(prev => prev.map(m => m.id === mId ? { ...m, status: newStatus } : m))
   }
 
   const handleRejectChapterFlow = async (mId: string) => {
     if (!activeManuscript) return
     if (!rejectionReason.trim()) {
-      alert('Vui lòng nhập lý do từ chối!')
+      showToast('Vui lòng nhập lý do từ chối!')
       return
     }
     try {
@@ -442,7 +432,7 @@ export default function ManuscriptReviewPage() {
         )
       }
 
-      removeManuscriptFromList(mId)
+      updateManuscriptStatusInList(mId, 'REJECTED')
       setRejectionReason('')
       showToast(`Đã từ chối bản thảo với lý do gửi tới Mangaka!`)
     } catch (err: any) {
@@ -469,7 +459,19 @@ export default function ManuscriptReviewPage() {
         await editorService.updateChapterStatus(activeManuscript.chapterId, 'approved')
       }
 
-      removeManuscriptFromList(mId)
+      // Gửi thông báo đến Mangaka
+      if (activeManuscript.mangakaId) {
+        await editorService.sendInternalNotification(
+          activeManuscript.mangakaId,
+          "Duyệt bản thảo thành công",
+          `Bản thảo [${activeManuscript.chapter}] thuộc bộ truyện [${activeManuscript.series}] đã được phê duyệt thành công.`,
+          `ms_approved:${mId}`
+        ).catch(errNotif => {
+          console.error('Failed to notify mangaka of manuscript approval:', errNotif)
+        })
+      }
+
+      updateManuscriptStatusInList(mId, 'APPROVED')
       showToast(`Đã phê duyệt bản thảo thành công!`)
     } catch (err: any) {
       console.error('Failed to approve:', err)
@@ -496,27 +498,25 @@ export default function ManuscriptReviewPage() {
 
   const handleBulkApprove = async () => {
     if (selectedIds.length === 0) {
-      alert('Chưa chọn chương truyện nào để duyệt!')
+      showToast('Chưa chọn chương truyện nào để duyệt!')
       return
     }
     try {
       for (const id of selectedIds) {
         await editorService.approveManuscript(id)
-      }
-      setManuscripts(prev => {
-        const filtered = prev.filter(m => !selectedIds.includes(m.id))
-        if (filtered.length > 0) {
-          const nextSelected = filtered[0]
-          setSelectedManuscriptId(nextSelected.id)
-          const hasDetail = nextSelected.content
-          if (!hasDetail) {
-            fetchManuscriptDetail(nextSelected.id, filtered)
-          }
-        } else {
-          setSelectedManuscriptId('')
+        
+        // Gửi thông báo đến Mangaka
+        const ms = manuscripts.find(m => m.id === id)
+        if (ms && ms.mangakaId) {
+          await editorService.sendInternalNotification(
+            ms.mangakaId,
+            "Duyệt bản thảo thành công",
+            `Bản thảo [${ms.chapter}] thuộc bộ truyện [${ms.series}] đã được phê duyệt thành công.`,
+            `ms_approved:${id}`
+          ).catch(e => console.error('Failed to notify bulk approve:', e))
         }
-        return filtered
-      })
+      }
+      setManuscripts(prev => prev.map(m => selectedIds.includes(m.id) ? { ...m, status: 'APPROVED' } : m))
       showToast(`Đã duyệt hàng loạt ${selectedIds.length} chương truyện thành công!`)
       setSelectedIds([])
     } catch (err: any) {
@@ -527,27 +527,25 @@ export default function ManuscriptReviewPage() {
 
   const handleBulkReject = async () => {
     if (selectedIds.length === 0) {
-      alert('Chưa chọn chương truyện nào để từ chối!')
+      showToast('Chưa chọn chương truyện nào để từ chối!')
       return
     }
     try {
       for (const id of selectedIds) {
         await editorService.rejectManuscript(id)
-      }
-      setManuscripts(prev => {
-        const filtered = prev.filter(m => !selectedIds.includes(m.id))
-        if (filtered.length > 0) {
-          const nextSelected = filtered[0]
-          setSelectedManuscriptId(nextSelected.id)
-          const hasDetail = nextSelected.content
-          if (!hasDetail) {
-            fetchManuscriptDetail(nextSelected.id, filtered)
-          }
-        } else {
-          setSelectedManuscriptId('')
+        
+        // Gửi thông báo đến Mangaka
+        const ms = manuscripts.find(m => m.id === id)
+        if (ms && ms.mangakaId) {
+          await editorService.sendInternalNotification(
+            ms.mangakaId,
+            `Từ chối bản thảo ${ms.chapter}`,
+            "Chương truyện bị từ chối duyệt theo yêu cầu của Biên tập viên.",
+            `ms_fb:${id}`
+          ).catch(e => console.error('Failed to notify bulk reject:', e))
         }
-        return filtered
-      })
+      }
+      setManuscripts(prev => prev.map(m => selectedIds.includes(m.id) ? { ...m, status: 'REJECTED' } : m))
       showToast(`Đã từ chối hàng loạt ${selectedIds.length} chương truyện!`)
       setSelectedIds([])
     } catch (err: any) {
@@ -592,11 +590,23 @@ export default function ManuscriptReviewPage() {
       await editorService.updateSeriesStatus(sId, 'approved')
       showToast(`Đã phê duyệt Series thành công! Trạng thái hiện tại: Đang vẽ.`)
 
+      const targetSeries = seriesList.find(s => s.id === sId)
+      const seriesTitle = targetSeries ? targetSeries.title : 'Series mới'
+
+      // Gửi thông báo đến Mangaka
+      if (targetSeries && targetSeries.mangakaId) {
+        await editorService.sendInternalNotification(
+          targetSeries.mangakaId,
+          "Duyệt tác phẩm mới",
+          `Chúc mừng! Đề xuất tác phẩm mới [${seriesTitle}] của bạn đã được phê duyệt đưa vào sản xuất (Trạng thái: Đang vẽ).`,
+          "series_approved"
+        ).catch(errNotif => {
+          console.error('Failed to notify mangaka of series approval:', errNotif)
+        })
+      }
+
       // Gửi thông báo đến toàn bộ các Admin và Board member trong hệ thống
       try {
-        const targetSeries = seriesList.find(s => s.id === sId)
-        const seriesTitle = targetSeries ? targetSeries.title : 'Series mới'
-
         const systemAdminsAndBoard = [
           '8915af7c-1825-43cb-bce8-614abf1143c7', // phat123 (admin)
           '11111111-1111-1111-1111-111111111111', // admin01 (admin)
@@ -643,6 +653,22 @@ export default function ManuscriptReviewPage() {
     try {
       await editorService.updateSeriesStatus(sId, 'draft')
       showToast(`Đã gửi yêu cầu chỉnh sửa hồ sơ Series về cho Mangaka.`)
+
+      const targetSeries = seriesList.find(s => s.id === sId)
+      const seriesTitle = targetSeries ? targetSeries.title : 'Series mới'
+
+      // Gửi thông báo đến Mangaka
+      if (targetSeries && targetSeries.mangakaId) {
+        await editorService.sendInternalNotification(
+          targetSeries.mangakaId,
+          "Yêu cầu chỉnh sửa Series",
+          `Hồ sơ tác phẩm [${seriesTitle}] của bạn cần chỉnh sửa thêm theo yêu cầu của Biên tập viên.`,
+          "series_revision_requested"
+        ).catch(errNotif => {
+          console.error('Failed to notify mangaka of series revision:', errNotif)
+        })
+      }
+
       fetchSeriesToReview()
     } catch (err: any) {
       console.error('Failed to request revision:', err)
@@ -654,6 +680,22 @@ export default function ManuscriptReviewPage() {
     try {
       await editorService.updateSeriesStatus(sId, 'draft')
       showToast(`Đã từ chối duyệt hồ sơ Series (đã chuyển về bản nháp).`)
+
+      const targetSeries = seriesList.find(s => s.id === sId)
+      const seriesTitle = targetSeries ? targetSeries.title : 'Series mới'
+
+      // Gửi thông báo đến Mangaka
+      if (targetSeries && targetSeries.mangakaId) {
+        await editorService.sendInternalNotification(
+          targetSeries.mangakaId,
+          "Từ chối hồ sơ Series",
+          `Yêu cầu đề xuất tác phẩm [${seriesTitle}] của bạn đã bị từ chối duyệt.`,
+          "series_rejected"
+        ).catch(errNotif => {
+          console.error('Failed to notify mangaka of series rejection:', errNotif)
+        })
+      }
+
       fetchSeriesToReview()
     } catch (err: any) {
       console.error('Failed to reject series:', err)
@@ -972,12 +1014,21 @@ export default function ManuscriptReviewPage() {
           {activeManuscript ? (
             <div className="flex-1 bg-white border-4 border-manga-ink flex flex-col overflow-hidden relative">
               {/* Header */}
-              <div className="bg-gray-50 border-b-2 border-manga-ink py-2 px-4 text-center flex-shrink-0 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm text-manga-ink tracking-wide uppercase">{activeManuscript.series}</span>
-                  <span className="text-gray-400">|</span>
-                  <span className="font-bold text-sm text-manga-red">{activeManuscript.chapter} - Kịch bản chữ</span>
+              <div className="bg-gray-50 border-b-2 border-manga-ink p-3 flex-shrink-0 flex flex-col gap-2">
+                <div className="flex items-center gap-2 flex-wrap text-[11px] leading-tight">
+                  <span className="font-extrabold text-gray-500 uppercase tracking-wide">{activeManuscript.series}</span>
+                  <span className="text-gray-300 font-bold">|</span>
+                  <span className="font-extrabold text-manga-red uppercase">{activeManuscript.chapter} - Kịch bản chữ</span>
                 </div>
+
+                {activeManuscript.content && (
+                  <button
+                    onClick={() => setIsScriptModalOpen(true)}
+                    className="w-full py-1.5 bg-manga-ink text-white font-extrabold text-[10px] uppercase tracking-wider hover:bg-[#E63946] border-2 border-black transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none cursor-pointer text-center"
+                  >
+                    Đọc kịch bản
+                  </button>
+                )}
               </div>
 
               {/* Script Content Viewer Area */}
@@ -990,7 +1041,7 @@ export default function ManuscriptReviewPage() {
                         Tác giả: <span className="text-manga-red">{activeManuscript.mangaka}</span>
                       </p>
                     </div>
-                    <div className="whitespace-pre-wrap text-sm text-gray-800 font-medium leading-relaxed font-sans">
+                    <div className="whitespace-pre-wrap break-words break-all text-sm text-gray-800 font-medium leading-relaxed font-sans">
                       {activeManuscript.content}
                     </div>
                   </div>
@@ -1034,43 +1085,76 @@ export default function ManuscriptReviewPage() {
 
                   <div className="border-t border-dashed border-gray-300 my-1" />
 
-                  {/* Rejection input */}
-                  <div className="flex flex-col gap-1.5">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase">Lý do từ chối (nếu từ chối)</span>
-                    <textarea
-                      className="w-full h-20 border-2 border-gray-300 focus:border-red-500 p-2 text-xs font-semibold focus:outline-none focus:bg-white bg-white resize-none transition-all shadow-[1px_1px_0px_0px_rgba(0,0,0,0.1)] focus:shadow-[2px_2px_0px_0px_rgba(239,68,68,1)] leading-relaxed text-gray-800"
-                      placeholder="Nhập lý do từ chối..."
-                      value={rejectionReason}
-                      onChange={(e) => setRejectionReason(e.target.value)}
-                    />
-                  </div>
+                                    {activeManuscript.status === 'APPROVED' ? (
+                    <div className="flex flex-col items-center justify-center py-4 bg-green-50 border-2 border-green-500 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-green-700 rounded gap-2 p-3 text-center my-2">
+                      <Check className="w-8 h-8 text-green-600 bg-green-100 rounded-full p-1" />
+                      <span className="font-manga text-xs font-bold uppercase tracking-wider">ĐÃ PHÊ DUYỆT</span>
+                      <span className="text-[10px] text-gray-600 font-bold leading-normal">
+                        Bản thảo này đã được phê duyệt thành công. Bạn không thể thực hiện thêm thao tác duyệt lúc này.
+                      </span>
+                    </div>
+                  ) : activeManuscript.status === 'REJECTED' ? (
+                    <div className="flex flex-col items-center justify-center py-4 bg-red-50 border-2 border-red-500 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-red-700 rounded gap-2 p-3 text-center my-2">
+                      <XCircle className="w-8 h-8 text-red-600 bg-red-100 rounded-full p-1" />
+                      <span className="font-manga text-xs font-bold uppercase tracking-wider">ĐÃ TỪ CHỐI</span>
+                      <span className="text-[10px] text-gray-600 font-bold leading-normal">
+                        Bản thảo này đã bị từ chối phê duyệt. Bạn không thể thực hiện thêm thao tác duyệt lúc này.
+                      </span>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Rejection input */}
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase">Lý do từ chối (nếu từ chối)</span>
+                        <textarea
+                          className="w-full h-20 border-2 border-gray-300 focus:border-red-500 p-2 text-xs font-semibold focus:outline-none focus:bg-white bg-white resize-none transition-all shadow-[1px_1px_0px_0px_rgba(0,0,0,0.1)] focus:shadow-[2px_2px_0px_0px_rgba(239,68,68,1)] leading-relaxed text-gray-800"
+                          placeholder="Nhập lý do từ chối..."
+                          value={rejectionReason}
+                          onChange={(e) => setRejectionReason(e.target.value)}
+                        />
+                      </div>
 
-                  <div className="flex flex-col gap-2">
-                    <button
-                      onClick={() => handleApproveChapterFlow(activeManuscript.id)}
-                      className="w-full bg-green-500 hover:bg-green-600 border-2 border-black text-white h-9 flex items-center justify-center gap-2 font-bold transition-all text-xs uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
-                    >
-                      <Check className="w-4 h-4" /> Đồng ý Duyệt
-                    </button>
-                    <button
-                      onClick={() => handleRejectChapterFlow(activeManuscript.id)}
-                      disabled={!rejectionReason.trim()}
-                      className={`w-full h-9 flex items-center justify-center gap-2 font-bold transition-all text-xs uppercase tracking-wider border-2 ${
-                        rejectionReason.trim()
-                          ? 'bg-red-600 hover:bg-red-700 text-white border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer'
-                          : 'bg-gray-150 text-gray-400 border-gray-300 cursor-not-allowed shadow-none'
-                      }`}
-                    >
-                      <XCircle className="w-4 h-4" /> Từ chối bản thảo
-                    </button>
-                  </div>
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={() => handleApproveChapterFlow(activeManuscript.id)}
+                          className="w-full bg-green-500 hover:bg-green-600 border-2 border-black text-white h-9 flex items-center justify-center gap-2 font-bold transition-all text-xs uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
+                        >
+                          <Check className="w-4 h-4" /> Đồng ý Duyệt
+                        </button>
+                        <button
+                          onClick={() => handleRejectChapterFlow(activeManuscript.id)}
+                          disabled={!rejectionReason.trim()}
+                          className={`w-full h-9 flex items-center justify-center gap-2 font-bold transition-all text-xs uppercase tracking-wider border-2 ${
+                            rejectionReason.trim()
+                              ? 'bg-red-600 hover:bg-red-700 text-white border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer'
+                              : 'bg-gray-150 text-gray-400 border-gray-300 cursor-not-allowed shadow-none'
+                          }`}
+                        >
+                          <XCircle className="w-4 h-4" /> Từ chối bản thảo
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <button
                   onClick={async () => {
                     try {
                       await editorService.archiveManuscript(activeManuscript.id);
-                      removeManuscriptFromList(activeManuscript.id);
+                      setManuscripts(prev => {
+                        const filtered = prev.filter(m => m.id !== activeManuscript.id)
+                        if (filtered.length > 0) {
+                          const nextSelected = filtered[0]
+                          setSelectedManuscriptId(nextSelected.id)
+                          const hasDetail = nextSelected.content
+                          if (!hasDetail) {
+                            fetchManuscriptDetail(nextSelected.id, filtered)
+                          }
+                        } else {
+                          setSelectedManuscriptId('')
+                        }
+                        return filtered
+                      })
                       showToast(`Đã LƯU TRỮ bản thảo ${activeManuscript.chapter}!`);
                     } catch (e) {
                       showToast('Lỗi khi lưu trữ bản thảo!');
@@ -1218,6 +1302,59 @@ export default function ManuscriptReviewPage() {
             <p className="text-gray-400 font-bold text-base">Vui lòng chọn đề xuất ở cột bên trái để duyệt.</p>
           </div>
         )
+      )}
+
+      {/* Script Modal Popup */}
+      {isScriptModalOpen && activeManuscript && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white border-4 border-manga-ink w-full max-w-5xl h-[85vh] flex flex-col shadow-[8px_8px_0px_rgba(0,0,0,1)] animate-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="bg-gray-50 border-b-4 border-manga-ink py-4 px-6 flex justify-between items-center flex-shrink-0">
+              <div>
+                <h3 className="font-manga text-lg font-black uppercase text-manga-ink leading-none">
+                  {activeManuscript.series}
+                </h3>
+                <p className="text-xs text-manga-red font-bold uppercase mt-1.5">
+                  {activeManuscript.chapter} — Kịch bản chi tiết
+                </p>
+              </div>
+              <button
+                onClick={() => setIsScriptModalOpen(false)}
+                className="p-1 bg-white border-2 border-manga-ink hover:bg-red-50 hover:text-manga-red transition-all cursor-pointer"
+                title="Đóng"
+              >
+                <XSquare className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-8 md:p-12 bg-[#FAF9F6] select-text">
+              <div className="max-w-3xl mx-auto">
+                <div className="border-b-2 border-dashed border-manga-ink/20 pb-4 mb-6">
+                  <h1 className="text-3xl font-black text-manga-ink mb-2">
+                    {activeManuscript.chapter}
+                  </h1>
+                  <p className="text-xs text-gray-500 font-extrabold uppercase tracking-wide">
+                    Tác giả: <span className="text-manga-red">{activeManuscript.mangaka}</span>
+                  </p>
+                </div>
+                <div className="whitespace-pre-wrap break-words break-all text-base md:text-lg text-gray-800 font-medium leading-loose font-sans">
+                  {activeManuscript.content}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="border-t-4 border-manga-ink p-4 bg-gray-50 flex justify-end flex-shrink-0">
+              <button
+                onClick={() => setIsScriptModalOpen(false)}
+                className="px-6 py-2.5 bg-manga-ink text-white font-extrabold text-xs uppercase tracking-wider hover:bg-black border-2 border-black transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none cursor-pointer"
+              >
+                Đóng kịch bản
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

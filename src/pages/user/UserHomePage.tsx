@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router'
-import { Search, Bell, User, Edit3, Users, Send, TrendingUp, BookOpen, Star } from 'lucide-react'
+import { Search, Bell, User, Edit3, Users, Send, TrendingUp, BookOpen, Star, ChevronLeft, ChevronRight } from 'lucide-react'
 import { readerService } from '@/services/reader.service'
 import { PublishedSeries, GENRES } from '@/types/reader.types'
 import SeriesCard from '@/components/user/SeriesCard'
@@ -8,11 +8,16 @@ import SeriesCard from '@/components/user/SeriesCard'
 export default function UserHomePage() {
   const [featured, setFeatured] = useState<PublishedSeries[]>([])
   const [latestUpdates, setLatestUpdates] = useState<PublishedSeries[]>([])
+  const [topViews, setTopViews] = useState<PublishedSeries[]>([])
+  const [topLikes, setTopLikes] = useState<PublishedSeries[]>([])
 
   useEffect(() => {
     readerService.getFeatured().then(setFeatured)
-    readerService.getLatestUpdates(8).then(setLatestUpdates)
+    readerService.getLatestUpdates(5).then(setLatestUpdates)
+    readerService.getTopViews(5).then(setTopViews)
+    readerService.getTopLikes(5).then(setTopLikes)
   }, [])
+
   return (
     <div className="min-h-screen flex flex-col font-sans selection:bg-manga-red selection:text-white">
       <main className="flex-1 bg-white dark:bg-zinc-900 transition-colors">
@@ -136,9 +141,53 @@ export default function UserHomePage() {
               </div>
             </div>
 
-            <div className="flex overflow-x-auto gap-6 pb-4 snap-x">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
               {latestUpdates.map((series, idx) => (
-                <div key={`latest-${series.id}`} className="min-w-[240px] max-w-[240px] snap-start animate-slide-up" style={{ animationDelay: `${0.3 + idx * 0.1}s` }}>
+                <div key={`latest-${series.id}`} className="animate-slide-up" style={{ animationDelay: `${0.3 + idx * 0.1}s` }}>
+                  <SeriesCard series={series} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* 6. Section "Lượt xem cao nhất" */}
+        <section className="bg-white border-b-2 border-manga-ink py-16 dark:bg-zinc-800 dark:border-black">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-end mb-8 border-b-4 border-manga-ink pb-2 animate-slide-up dark:border-zinc-700" style={{ animationDelay: '0.2s' }}>
+              <div>
+                <h2 className="font-manga text-3xl font-bold uppercase mb-2 flex items-center gap-2 dark:text-white">
+                  <BookOpen className="w-6 h-6 text-manga-red" /> Lượt xem cao nhất
+                </h2>
+                <p className="text-gray-600 dark:text-gray-400">Những tác phẩm thu hút sự chú ý lớn từ cộng đồng.</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+              {topViews.map((series, idx) => (
+                <div key={`views-${series.id}`} className="animate-slide-up" style={{ animationDelay: `${0.3 + idx * 0.1}s` }}>
+                  <SeriesCard series={series} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* 7. Section "Được yêu thích nhất" */}
+        <section className="bg-gray-50 border-b-2 border-manga-ink py-16 dark:bg-zinc-900/50 dark:border-black">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-end mb-8 border-b-4 border-manga-ink pb-2 animate-slide-up dark:border-zinc-700" style={{ animationDelay: '0.2s' }}>
+              <div>
+                <h2 className="font-manga text-3xl font-bold uppercase mb-2 flex items-center gap-2 dark:text-white">
+                  <Star className="w-6 h-6 text-manga-red" /> Được yêu thích nhất
+                </h2>
+                <p className="text-gray-600 dark:text-gray-400">Các tác phẩm có lượng theo dõi và đánh giá tuyệt vời.</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+              {topLikes.map((series, idx) => (
+                <div key={`likes-${series.id}`} className="animate-slide-up" style={{ animationDelay: `${0.3 + idx * 0.1}s` }}>
                   <SeriesCard series={series} />
                 </div>
               ))}

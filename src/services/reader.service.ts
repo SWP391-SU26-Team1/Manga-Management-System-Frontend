@@ -1,5 +1,14 @@
 import api from './api'
+import { rankingService } from './ranking.service'
 import { PublishedSeries, PublishedChapter, MangaPage, ReadingHistoryItem, SearchParams, SearchResult, SeriesDetail } from '@/types/reader.types'
+
+const mapStatus = (status: string | undefined): 'PUBLISHING' | 'COMPLETED' | 'HIATUS' => {
+  if (!status) return 'PUBLISHING';
+  const s = status.toLowerCase();
+  if (s === 'completed') return 'COMPLETED';
+  if (s === 'hiatus') return 'HIATUS';
+  return 'PUBLISHING';
+};
 
 const mapSeries = (s: any): PublishedSeries => {
   // If the backend returns chapter array, we can calculate these, otherwise default to 0
@@ -26,8 +35,9 @@ const mapSeries = (s: any): PublishedSeries => {
     description: s.description || '',
     genre: s.genre || 'Uncategorized',
     coverImageUrl: s.cover_image_url || null,
-    status: 'PUBLISHING', // Map to frontend enum
-    viewCount: s.view_count || 0,
+    status: mapStatus(s.status),
+    viewCount: s.view_count || s.total_views || 0,
+    totalLikes: s.total_likes || s.like_count || s.likes || 0,
     totalChapters,
     latestChapterNumber,
     latestChapterDate: s.updated_at,
@@ -63,6 +73,76 @@ export const readerService = {
       return (res.data.data || []).map(mapSeries);
     } catch (error) {
       console.error('Error fetching latest updates:', error);
+      return [];
+    }
+  },
+
+  getTopViews: async (limit: number = 5): Promise<PublishedSeries[]> => {
+    try {
+      const data = await rankingService.getTopSeries(50);
+      const sorted = data.sort((a, b) => (b.series?.view_count || 0) - (a.series?.view_count || 0)).slice(0, limit);
+      return sorted.map(r => ({
+        id: r.series_id,
+        title: r.series?.title || '',
+        description: '',
+        genre: r.series?.genre || 'Uncategorized',
+        coverImageUrl: r.series?.cover_image_url || null,
+        status: mapStatus(r.series?.status as string),
+        viewCount: r.series?.view_count || 0,
+        totalLikes: r.total_vote || 0,
+        totalChapters: 0,
+        latestChapterNumber: 0,
+        latestChapterDate: r.created_at,
+        rating: 0,
+        ratingCount: 0,
+        authorName: r.series?.author || 'Đang cập nhật',
+        authorAvatarUrl: null,
+        createdAt: r.created_at,
+        updatedAt: r.created_at
+      }));
+    } catch (error) {
+      console.error('Error fetching top views series:', error);
+      return [];
+    }
+  },
+
+  getTopLikes: async (limit: number = 5): Promise<PublishedSeries[]> => {
+    try {
+      const data = await rankingService.getTopSeries(50);
+      const sorted = data.sort((a, b) => (b.total_vote || 0) - (a.total_vote || 0)).slice(0, limit);
+      return sorted.map(r => ({
+        id: r.series_id,
+        title: r.series?.title || '',
+        description: '',
+        genre: r.series?.genre || 'Uncategorized',
+        coverImageUrl: r.series?.cover_image_url || null,
+        status: mapStatus(r.series?.status as string),
+        viewCount: r.series?.view_count || 0,
+        totalLikes: r.total_vote || 0,
+        totalChapters: 0,
+        latestChapterNumber: 0,
+        latestChapterDate: r.created_at,
+        rating: 0,
+        ratingCount: 0,
+        authorName: r.series?.author || 'Đang cập nhật',
+        authorAvatarUrl: null,
+        createdAt: r.created_at,
+        updatedAt: r.created_at
+      }));
+    } catch (error) {
+      console.error('Error fetching top likes series:', error);
+      return [];
+    }
+  },
+
+  getSeriesByUser: async (userId: string, limit: number = 10): Promise<PublishedSeries[]> => {
+    try {
+      const res = await api.get('/api/series', {
+        params: { user_id: userId, status: 'published', limit }
+      });
+      return (res.data.data || []).map(mapSeries);
+    } catch (error) {
+      console.error('Error fetching series by user:', error);
       return [];
     }
   },
@@ -336,15 +416,7 @@ export const readerService = {
     }
   },
 
-  toggleChapterLike: async (chapterId: string): Promise<boolean> => {
-    try {
-      await api.post('/api/chapter-likes', { chapter_id: chapterId });
-      return true;
-    } catch (error) {
-      console.error('Error toggling chapter like:', error);
-      return false;
-    }
-  },
+
 
   getSeriesComments: async (seriesId: string): Promise<any[]> => {
     try {
@@ -373,6 +445,31 @@ export const readerService = {
     } catch (error) {
       console.error('Error posting chapter comment:', error);
       return false;
+    }
+  },
+
+  getUpcomingChapters: async (): Promise<any[]> => {
+    try {
+      const res = await api.get('/api/chapters?status=approved&limit=5&sort=created_at&order=desc');
+      const chapters = res.data.data || [];
+      
+      const seriesPromises = chapters.map(async (ch: any) => {
+        try {
+           const seriesRes = await api.get(`/api/series/${ch.series_id}`);
+           return {
+             ...ch,
+             seriesTitle: seriesRes.data.data?.title || 'Unknown',
+             seriesCover: seriesRes.data.data?.cover_image_url || ''
+           };
+        } catch (e) {
+           return { ...ch, seriesTitle: 'Unknown', seriesCover: '' };
+        }
+      });
+      
+      return Promise.all(seriesPromises);
+    } catch (error) {
+      console.error('Error fetching upcoming chapters:', error);
+      return [];
     }
   }
 }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Send, User } from 'lucide-react';
 import { readerService } from '@/services/reader.service';
+import { useToast } from '@/contexts/ToastContext';
 
 interface Comment {
   id?: string;
@@ -74,6 +75,7 @@ export default function ChapterCommentsPanel({ isOpen, onClose, chapterId, chapt
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{id: string, name: string} | null>(null);
+  const { showToast } = useToast();
 
   const fetchComments = async () => {
     setLoading(true);
@@ -95,7 +97,7 @@ export default function ChapterCommentsPanel({ isOpen, onClose, chapterId, chapt
     
     const userStr = localStorage.getItem('mangaflow_user') || localStorage.getItem('user');
     if (!userStr) {
-      alert('Vui lòng đăng nhập để bình luận!');
+      showToast('Vui lòng đăng nhập để bình luận!', 'error');
       return;
     }
 
@@ -106,7 +108,7 @@ export default function ChapterCommentsPanel({ isOpen, onClose, chapterId, chapt
       setReplyingTo(null);
       fetchComments();
     } else {
-      alert('Đã có lỗi xảy ra, vui lòng thử lại sau.');
+      showToast('Đã có lỗi xảy ra, vui lòng thử lại sau.', 'error');
     }
   };
 

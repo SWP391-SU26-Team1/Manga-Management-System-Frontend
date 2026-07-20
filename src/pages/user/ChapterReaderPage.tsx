@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router'
-import { ArrowLeft, Menu, Settings, ChevronLeft, ChevronRight, MessageCircle, Heart } from 'lucide-react'
+import { MessageSquare, MessageCircle, Heart, Share2, ArrowLeft, ChevronLeft, ChevronRight, Settings, Menu } from 'lucide-react'
 import { readerService } from '@/services/reader.service'
 import { MangaPage, PublishedChapter } from '@/types/reader.types'
 import ChapterCommentsPanel from '@/components/user/ChapterCommentsPanel'
+import { useToast } from '@/contexts/ToastContext'
 
 const getLikeKey = () => {
   try {
@@ -19,6 +20,7 @@ const getLikeKey = () => {
 export default function ChapterReaderPage() {
   const { seriesId, chapterId } = useParams()
   const navigate = useNavigate()
+  const { showToast } = useToast()
   
   const [pages, setPages] = useState<MangaPage[]>([])
   const [chapter, setChapter] = useState<PublishedChapter | null>(null)
@@ -113,7 +115,7 @@ export default function ChapterReaderPage() {
     e.stopPropagation();
     const userStr = localStorage.getItem('mangaflow_user') || localStorage.getItem('user');
     if (!userStr) {
-      alert('Vui lòng đăng nhập để theo dõi (like) chương này!');
+      showToast('Vui lòng đăng nhập để theo dõi (like) chương này!', 'error');
       return;
     }
     if (chapterId) {

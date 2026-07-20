@@ -25,13 +25,6 @@ const getStatusDetails = (status: string) => {
   }
 }
 
-// Static cover images for visual variety
-const COVER_IMAGES = [
-  'https://images.unsplash.com/photo-1601850494422-3cf14624b0b3?q=80&w=800&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?q=80&w=800&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800&auto=format&fit=crop',
-]
-
 export function ManuscriptManager({ seriesList = [], allChapters = [] }: ManuscriptManagerProps) {
   const isLoading = seriesList.length === 0
 
@@ -69,9 +62,8 @@ export function ManuscriptManager({ seriesList = [], allChapters = [] }: Manuscr
             Chưa có bản thảo chương nào.
           </div>
         ) : (
-          recentChapters.map((chapter, idx) => {
+          recentChapters.map((chapter) => {
             const { label: statusLabel, icon: StatusIcon, color: iconColor, badgeStyle } = getStatusDetails(chapter.status)
-            const coverImg = COVER_IMAGES[idx % COVER_IMAGES.length]
             const series = seriesMap[chapter.series_id]
 
             return (
@@ -92,14 +84,11 @@ export function ManuscriptManager({ seriesList = [], allChapters = [] }: Manuscr
 
                 {/* Visual Preview */}
                 <div className="aspect-[4/3] bg-gray-200 border-2 border-manga-ink mb-4 relative overflow-hidden group-hover:manga-shadow-sm transition-shadow">
-                  {chapter.status === 'completed' || chapter.status === 'in_progress' ? (
+                  {series?.cover_image ? (
                     <img
-                      src={series?.cover_image || coverImg}
+                      src={series.cover_image}
                       alt={`Chương ${chapter.chapter_number}`}
                       className="w-full h-full object-cover grayscale contrast-125"
-                      onError={(e) => {
-                        ;(e.target as HTMLImageElement).src = coverImg
-                      }}
                     />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 border-2 border-dashed border-gray-300">

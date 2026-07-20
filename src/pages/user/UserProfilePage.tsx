@@ -3,10 +3,10 @@ import { User, Mail, Award, BookOpen, Clock, Heart, Camera } from 'lucide-react'
 
 export default function UserProfilePage() {
   const [profile, setProfile] = useState<any>(null)
-  
+
   // Note: we can keep it read-only or use edit mode similar to Board. The user asked for it to look like the image.
   // The image shows the profile with "CHỈNH SỬA HỒ SƠ" button, "THỐNG KÊ", "HOẠT ĐỘNG GẦN ĐÂY", etc.
-  
+
   useEffect(() => {
     const storedUser = localStorage.getItem('mangaflow_user')
     if (storedUser) {
@@ -18,8 +18,8 @@ export default function UserProfilePage() {
     return <div className="p-8 text-center font-bold text-red-500">Đang tải hồ sơ...</div>
   }
 
-  const userInitials = profile.fullName 
-    ? profile.fullName.split(' ').pop()?.slice(0, 2).toUpperCase() 
+  const userInitials = profile.fullName
+    ? profile.fullName.split(' ').pop()?.slice(0, 2).toUpperCase()
     : 'U'
 
   // User stats
@@ -50,7 +50,7 @@ export default function UserProfilePage() {
           {/* Main Card */}
           <div className="bg-white border-4 border-manga-ink shadow-[8px_8px_0px_rgba(0,0,0,1)] p-6 flex flex-col items-center text-center dark:bg-zinc-800 dark:border-black dark:shadow-[8px_8px_0px_#000]">
             <div className="relative mb-6">
-              <div 
+              <div
                 className={`w-32 h-32 rounded-full border-4 border-manga-ink bg-zinc-900 overflow-hidden flex items-center justify-center text-white font-extrabold text-4xl shadow-[4px_4px_0px_rgba(0,0,0,1)] relative dark:border-black dark:shadow-[4px_4px_0px_#000]`}
               >
                 {profile.avatarUrl ? (
@@ -61,7 +61,7 @@ export default function UserProfilePage() {
               </div>
               <div className="absolute bottom-0 right-0 w-8 h-8 bg-green-400 border-2 border-manga-ink rounded-full dark:border-black" title="Đang hoạt động"></div>
             </div>
-            
+
             <h2 className="font-manga text-3xl font-bold uppercase text-manga-ink leading-none mb-2 dark:text-white">
               {profile.fullName || profile.username}
             </h2>
@@ -69,7 +69,7 @@ export default function UserProfilePage() {
             <div className="inline-block px-3 py-1 bg-manga-red text-white font-bold uppercase text-xs border-2 border-manga-ink mb-4 dark:border-black">
               {profile.role || 'MEMBER USER'}
             </div>
-            
+
             <div className="w-full space-y-3 mt-2 text-left">
               <div className="flex items-center gap-3 text-sm font-bold text-gray-700 p-2 bg-gray-50 border-2 border-dashed border-gray-300 dark:bg-zinc-900 dark:border-zinc-700 dark:text-gray-300">
                 <User className="w-4 h-4 text-manga-red shrink-0" />
@@ -112,11 +112,11 @@ export default function UserProfilePage() {
               <BookOpen className="w-6 h-6 text-manga-red" />
               Thể loại yêu thích
             </h3>
-            
+
             <div className="flex flex-wrap gap-3">
               {['Action', 'Adventure', 'Fantasy', 'Romance', 'Comedy'].map((item, idx) => (
-                <div 
-                  key={idx} 
+                <div
+                  key={idx}
                   className="px-4 py-2 bg-gray-50 border-2 border-manga-ink font-bold text-sm uppercase shadow-[2px_2px_0px_rgba(15,15,15,1)] hover:bg-manga-red hover:text-white transition-colors cursor-default dark:bg-zinc-900 dark:border-black dark:shadow-[2px_2px_0px_#000] dark:text-gray-300"
                 >
                   {item}
@@ -124,7 +124,7 @@ export default function UserProfilePage() {
               ))}
             </div>
           </div>
-          
+
           {/* Recent Activity */}
           <div className="bg-white border-4 border-manga-ink p-6 shadow-[6px_6px_0px_rgba(15,15,15,1)] dark:bg-zinc-800 dark:border-black dark:shadow-[6px_6px_0px_#000]">
             <h3 className="font-manga text-2xl font-bold uppercase border-b-4 border-manga-ink pb-3 mb-6 dark:border-zinc-700 dark:text-white">

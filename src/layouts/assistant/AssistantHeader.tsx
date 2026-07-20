@@ -75,12 +75,16 @@ export function Header() {
         created_at: new Date().toISOString()
       }))
 
-      const combined = [...localOverdueNotifs, ...(notifsRes?.data || [])].slice(0, 6)
+      const localNotifsStr = localStorage.getItem('mangaflow_local_notifications')
+      const customLocalNotifs = localNotifsStr ? JSON.parse(localNotifsStr) : []
+
+      const combined = [...localOverdueNotifs, ...customLocalNotifs, ...(notifsRes?.data || [])].slice(0, 6)
       setNotifications(combined)
 
-      // Calculate unread count (unread database notifs + local overdue notifs)
+      // Calculate unread count (unread database notifs + local overdue notifs + custom local unread)
       const dbUnreadCount = notifsRes?.data?.filter((n: any) => !n.is_read).length || 0
-      setUnreadCount(dbUnreadCount + localOverdueNotifs.length)
+      const customUnreadCount = customLocalNotifs.filter((n: any) => !n.is_read).length
+      setUnreadCount(dbUnreadCount + localOverdueNotifs.length + customUnreadCount)
     } catch (e) {
       console.error('Error loading header notifications:', e)
     }
@@ -91,6 +95,15 @@ export function Header() {
       if (id.startsWith('local_overdue_')) {
         const taskId = id.replace('local_overdue_', '')
         localStorage.setItem(`mangaflow_read_local_notification_${taskId}`, 'true')
+      } else if (id.startsWith('local_report_')) {
+        const localNotifsStr = localStorage.getItem('mangaflow_local_notifications')
+        if (localNotifsStr) {
+          const localNotifs = JSON.parse(localNotifsStr)
+          const updated = localNotifs.map((n: any) => 
+            n.notification_id === id ? { ...n, is_read: true } : n
+          )
+          localStorage.setItem('mangaflow_local_notifications', JSON.stringify(updated))
+        }
       } else {
         await assistantService.markRead(id)
       }
@@ -110,6 +123,12 @@ export function Header() {
           localStorage.setItem(`mangaflow_read_local_notification_${taskId}`, 'true')
         }
       })
+      const localNotifsStr = localStorage.getItem('mangaflow_local_notifications')
+      if (localNotifsStr) {
+        const localNotifs = JSON.parse(localNotifsStr)
+        const updated = localNotifs.map((n: any) => ({ ...n, is_read: true }))
+        localStorage.setItem('mangaflow_local_notifications', JSON.stringify(updated))
+      }
       loadNotifications()
       window.dispatchEvent(new Event('mangaflow_notifications_updated'))
     } catch (e) {

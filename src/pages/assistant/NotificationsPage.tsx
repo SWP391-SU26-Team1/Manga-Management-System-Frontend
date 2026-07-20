@@ -89,7 +89,11 @@ export default function NotificationsPage() {
       setLoading(true)
       setError(null)
       const res = await assistantService.listNotifications({ limit: 100 })
-      setNotifications(res.data || [])
+      
+      const localNotifsStr = localStorage.getItem('mangaflow_local_notifications')
+      const customLocalNotifs = localNotifsStr ? JSON.parse(localNotifsStr) : []
+
+      setNotifications([...customLocalNotifs, ...(res.data || [])])
     } catch (err: any) {
       console.error(err)
       setError('Không thể tải danh sách thông báo.')
@@ -109,6 +113,12 @@ export default function NotificationsPage() {
   const handleMarkAllRead = async () => {
     try {
       await assistantService.markAllRead()
+      const localNotifsStr = localStorage.getItem('mangaflow_local_notifications')
+      if (localNotifsStr) {
+        const localNotifs = JSON.parse(localNotifsStr)
+        const updated = localNotifs.map((n: any) => ({ ...n, is_read: true }))
+        localStorage.setItem('mangaflow_local_notifications', JSON.stringify(updated))
+      }
       await loadNotifications()
       window.dispatchEvent(new Event('mangaflow_notifications_updated'))
     } catch (err) {
@@ -120,7 +130,18 @@ export default function NotificationsPage() {
   const handleMarkRead = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
     try {
-      await assistantService.markRead(id)
+      if (id.startsWith('local_report_')) {
+        const localNotifsStr = localStorage.getItem('mangaflow_local_notifications')
+        if (localNotifsStr) {
+          const localNotifs = JSON.parse(localNotifsStr)
+          const updated = localNotifs.map((n: any) => 
+            n.notification_id === id ? { ...n, is_read: true } : n
+          )
+          localStorage.setItem('mangaflow_local_notifications', JSON.stringify(updated))
+        }
+      } else {
+        await assistantService.markRead(id)
+      }
       await loadNotifications()
       window.dispatchEvent(new Event('mangaflow_notifications_updated'))
     } catch (err) {
@@ -137,7 +158,16 @@ export default function NotificationsPage() {
   const handleConfirmDelete = async () => {
     if (!deleteConfirmId) return
     try {
-      await assistantService.deleteNotification(deleteConfirmId)
+      if (deleteConfirmId.startsWith('local_report_')) {
+        const localNotifsStr = localStorage.getItem('mangaflow_local_notifications')
+        if (localNotifsStr) {
+          const localNotifs = JSON.parse(localNotifsStr)
+          const filtered = localNotifs.filter((n: any) => n.notification_id !== deleteConfirmId)
+          localStorage.setItem('mangaflow_local_notifications', JSON.stringify(filtered))
+        }
+      } else {
+        await assistantService.deleteNotification(deleteConfirmId)
+      }
       await loadNotifications()
       window.dispatchEvent(new Event('mangaflow_notifications_updated'))
     } catch (err) {
@@ -151,7 +181,18 @@ export default function NotificationsPage() {
   const handleNotifClick = async (notif: AssistantNotification) => {
     if (!notif.is_read) {
       try {
-        await assistantService.markRead(notif.notification_id)
+        if (notif.notification_id.startsWith('local_report_')) {
+          const localNotifsStr = localStorage.getItem('mangaflow_local_notifications')
+          if (localNotifsStr) {
+            const localNotifs = JSON.parse(localNotifsStr)
+            const updated = localNotifs.map((n: any) => 
+              n.notification_id === notif.notification_id ? { ...n, is_read: true } : n
+            )
+            localStorage.setItem('mangaflow_local_notifications', JSON.stringify(updated))
+          }
+        } else {
+          await assistantService.markRead(notif.notification_id)
+        }
         window.dispatchEvent(new Event('mangaflow_notifications_updated'))
       } catch (err) {
         console.error(err)
@@ -159,7 +200,7 @@ export default function NotificationsPage() {
     }
     // Navigate to tasks or feedbacks based on type
     const t = notif.type.toLowerCase()
-    if (t.includes('task') || t.includes('submission') || t.includes('revision')) {
+    if (t.includes('task') || t.includes('submission') || t.includes('revision') || t.includes('success')) {
       navigate('/dashboard/assistant/tasks')
     } else {
       await loadNotifications()

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { Calendar, Download, FileText, BarChart2, CheckCircle, Loader2, AlertCircle } from 'lucide-react'
+import { Calendar, Download, FileText, BarChart2, CheckCircle, Loader2, AlertCircle, X } from 'lucide-react'
 import assistantService, { DashboardPerformance, DashboardOverview } from '@/services/assistant.service'
+import { jsPDF } from 'jspdf'
+import html2canvas from 'html2canvas'
 
 interface MonthlyReport {
   month: string
@@ -20,6 +22,185 @@ export default function ReportsPage() {
   
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+  const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  const [user] = useState<any>(() => {
+    const storedUser = localStorage.getItem('mangaflow_user')
+    return storedUser ? JSON.parse(storedUser) : null
+  })
+
+  const showToast = (type: 'success' | 'error', text: string) => {
+    setToastMessage({ type, text })
+    setTimeout(() => setToastMessage(null), 3000)
+  }
+
+  const handleDownloadPDF = async (report: MonthlyReport) => {
+    try {
+      showToast('success', `Đang kết xuất file PDF báo cáo cho ${report.month}...`)
+
+      // Create a temporary container for the report rendering
+      const container = document.createElement('div')
+      container.style.position = 'absolute'
+      container.style.left = '-9999px'
+      container.style.top = '-9999px'
+      container.style.width = '700px'
+      container.style.backgroundColor = '#FFFFFF'
+      container.style.padding = '40px'
+      container.style.fontFamily = 'system-ui, -apple-system, sans-serif'
+      container.style.color = '#1A1A1A'
+
+      const completionRate = report.tasks > 0 ? Math.round((report.approved / report.tasks) * 100) : 0
+      const assistantName = user?.fullName || user?.username || 'Trợ lý Manga'
+      const email = user?.email || 'assistant@mangaflow.com'
+
+      // Manga-style themed PDF layout
+      container.innerHTML = `
+        <div style="border: 4px solid #1A1A1A; padding: 30px; background-color: #FFFFFF; position: relative;">
+          <!-- Header Banner -->
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 4px solid #1A1A1A; padding-bottom: 20px; margin-bottom: 25px;">
+            <div>
+              <h1 style="font-size: 32px; font-weight: 900; margin: 0; color: #E63946; letter-spacing: 1px; font-family: Impact, sans-serif;">MangaFlow</h1>
+              <p style="font-size: 10px; font-weight: 800; text-transform: uppercase; margin: 5px 0 0 0; color: #718096; letter-spacing: 2px;">Creator Workspace Platform</p>
+            </div>
+            <div style="text-align: right;">
+              <h2 style="font-size: 16px; font-weight: 800; margin: 0; color: #1A1A1A; text-transform: uppercase;">Báo Cáo Hiệu Suất Tháng</h2>
+              <p style="font-size: 14px; font-weight: 800; margin: 5px 0 0 0; background-color: #1A1A1A; color: #FFFFFF; padding: 3px 10px; display: inline-block;">${report.month}</p>
+            </div>
+          </div>
+
+          <!-- Info Grid -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; border: 2px solid #1A1A1A; padding: 15px; background-color: #F7FAFC;">
+            <div>
+              <p style="margin: 0; font-size: 10px; font-weight: 800; color: #A0AEC0; text-transform: uppercase;">Nhân viên (Assistant)</p>
+              <p style="margin: 3px 0 0 0; font-size: 16px; font-weight: 800; color: #1A1A1A;">${assistantName}</p>
+              <p style="margin: 2px 0 0 0; font-size: 11px; font-weight: 600; color: #718096;">${email}</p>
+            </div>
+            <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end;">
+              <p style="margin: 0; font-size: 10px; font-weight: 800; color: #A0AEC0; text-transform: uppercase;">Ngày kết xuất (Export Date)</p>
+              <p style="margin: 3px 0 0 0; font-size: 14px; font-weight: 700; color: #1A1A1A;">${new Date().toLocaleDateString('vi-VN')}</p>
+              <p style="margin: 2px 0 0 0; font-size: 11px; font-weight: 600; color: #718096;">Hệ thống MangaFlow</p>
+            </div>
+          </div>
+
+          <!-- Main Table -->
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; border: 3px solid #1A1A1A;">
+            <thead>
+              <tr style="background-color: #1A1A1A; color: #FFFFFF; text-align: left; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">
+                <th style="padding: 12px 15px; border: 1px solid #1A1A1A;">Chỉ số đo lường (Metrics)</th>
+                <th style="padding: 12px 15px; border: 1px solid #1A1A1A; text-align: center; width: 150px;">Số lượng / Tỷ lệ</th>
+              </tr>
+            </thead>
+            <tbody style="font-size: 13px; font-weight: 700; color: #2D3748;">
+              <tr style="border-bottom: 2px solid #1A1A1A;">
+                <td style="padding: 12px 15px; border-right: 2px solid #1A1A1A;">Tổng số trang vẽ đã được duyệt (Approved Pages)</td>
+                <td style="padding: 12px 15px; text-align: center; color: #E63946; font-size: 16px;">${report.pages} trang</td>
+              </tr>
+              <tr style="border-bottom: 2px solid #1A1A1A; background-color: #F7FAFC;">
+                <td style="padding: 12px 15px; border-right: 2px solid #1A1A1A;">Tổng số nhiệm vụ được giao (Total Tasks)</td>
+                <td style="padding: 12px 15px; text-align: center;">${report.tasks}</td>
+              </tr>
+              <tr style="border-bottom: 2px solid #1A1A1A;">
+                <td style="padding: 12px 15px; border-right: 2px solid #1A1A1A;">Số nhiệm vụ đã hoàn thành (Approved Tasks)</td>
+                <td style="padding: 12px 15px; text-align: center; color: #48BB78;">${report.approved}</td>
+              </tr>
+              <tr style="border-bottom: 2px solid #1A1A1A; background-color: #F7FAFC;">
+                <td style="padding: 12px 15px; border-right: 2px solid #1A1A1A;">Số nhiệm vụ đang chờ duyệt (Pending Tasks)</td>
+                <td style="padding: 12px 15px; text-align: center; color: #F6AD55;">${report.pending}</td>
+              </tr>
+              <tr style="background-color: #FFF5F5;">
+                <td style="padding: 12px 15px; border-right: 2px solid #1A1A1A;">Tỷ lệ hoàn thành nhiệm vụ (Completion Rate)</td>
+                <td style="padding: 12px 15px; text-align: center; color: #E63946; font-size: 16px;">${completionRate}%</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Graphic Progress Indicator -->
+          <div style="margin-bottom: 40px; border: 2px solid #1A1A1A; padding: 15px; background-color: #FFFFFF;">
+            <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 800; text-transform: uppercase; margin-bottom: 8px;">
+              <span>Tiến độ hoàn thành nhiệm vụ</span>
+              <span>${completionRate}%</span>
+            </div>
+            <div style="height: 16px; background-color: #E2E8F0; border: 2px solid #1A1A1A; position: relative;">
+              <div style="height: 100%; width: ${completionRate}%; background-color: #48BB78; border-right: 2px solid #1A1A1A;"></div>
+            </div>
+          </div>
+
+          <!-- Signatures Section -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 50px; border-top: 2px dashed #A0AEC0; padding-top: 25px;">
+            <div>
+              <p style="margin: 0; font-size: 10px; font-weight: 800; color: #A0AEC0; text-transform: uppercase;">Người báo cáo (Trợ lý)</p>
+              <div style="height: 60px;"></div>
+              <p style="margin: 0; font-size: 13px; font-weight: 800; color: #1A1A1A;">${assistantName}</p>
+            </div>
+            <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end;">
+              <p style="margin: 0; font-size: 10px; font-weight: 800; color: #A0AEC0; text-transform: uppercase;">Ban Biên Tập (Gangan Press)</p>
+              <div style="height: 60px;"></div>
+              <p style="margin: 0; font-size: 13px; font-weight: 800; color: #718096; font-style: italic;">Hệ thống phê duyệt tự động</p>
+            </div>
+          </div>
+
+          <!-- Bottom Footer -->
+          <div style="margin-top: 40px; text-align: center; border-top: 2px solid #1A1A1A; padding-top: 15px; font-size: 9px; font-weight: 700; color: #A0AEC0; text-transform: uppercase; letter-spacing: 1px;">
+            © 2026 MangaFlow System. Gangan Press Co. Ltd. All rights reserved.
+          </div>
+        </div>
+      `
+
+      document.body.appendChild(container)
+
+      // Convert HTML elements to Canvas
+      const canvas = await html2canvas(container, {
+        scale: 2, // Double scale for high-quality text resolution
+        useCORS: true,
+        backgroundColor: '#FFFFFF',
+      })
+
+      const imgData = canvas.toDataURL('image/png')
+
+      // A4 format dimensions: 210mm x 297mm
+      const pdf = new jsPDF({
+        orientation: 'p',
+        unit: 'mm',
+        format: 'a4',
+      })
+
+      const imgWidth = 210
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight)
+
+      // Save PDF file
+      const fileName = `MangaFlow_Bao_Cao_${report.month.replace(/\s+/g, '_').replace(/,/g, '')}.pdf`
+      pdf.save(fileName)
+
+      // Remove temp container from DOM
+      document.body.removeChild(container)
+
+      showToast('success', `Báo cáo ${report.month} đã được tải xuống thành công!`)
+
+      // Add report generation notification to local storage
+      const localNotifsStr = localStorage.getItem('mangaflow_local_notifications')
+      const localNotifs = localNotifsStr ? JSON.parse(localNotifsStr) : []
+      const newNotif = {
+        notification_id: `local_report_${Date.now()}`,
+        user_id: '',
+        title: 'Báo cáo đã xuất',
+        content: `Báo cáo hiệu suất ${report.month} của bạn đã được tải xuống dưới dạng PDF thành công.`,
+        type: 'SUCCESS',
+        is_read: false,
+        created_at: new Date().toISOString()
+      }
+      localNotifs.unshift(newNotif)
+      localStorage.setItem('mangaflow_local_notifications', JSON.stringify(localNotifs))
+
+      // Trigger socket/ui update event
+      window.dispatchEvent(new Event('mangaflow_notifications_updated'))
+
+    } catch (err) {
+      console.error('Lỗi khi tạo và tải xuống PDF báo cáo:', err)
+      showToast('error', 'Có lỗi xảy ra khi tạo báo cáo PDF. Vui lòng thử lại!')
+    }
+  }
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -154,7 +335,9 @@ export default function ReportsPage() {
   const monthlyTasksLabels = last5Reports.map(r => r.month.split(',')[0].replace('Tháng ', 'Th'))
   
   const maxWeeklyPages = Math.max(...weeklyPages, 1)
+  const weeklyChartMax = Math.ceil(maxWeeklyPages / 5) * 5
   const maxMonthlyTasks = Math.max(...monthlyTasksValues, 1)
+  const monthlyChartMax = Math.max(maxMonthlyTasks, 100)
 
   // Current month label helper
   const currentMonthLabel = reports[0]?.month || 'Tháng này'
@@ -172,7 +355,23 @@ export default function ReportsPage() {
     : 'Tháng đầu tiên'
 
   return (
-    <div className="max-w-[1200px] mx-auto pb-12 font-sans">
+    <div className="max-w-[1200px] mx-auto pb-12 font-sans relative">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-4 right-4 z-[60] animate-bounce duration-300">
+          <div className="border-2 border-manga-ink p-4 flex items-center gap-3 bg-white shadow-[4px_4px_0px_rgba(0,0,0,1)] border-emerald-500 text-emerald-800">
+            <CheckCircle className="w-6 h-6 text-emerald-500 shrink-0" />
+            <div>
+              <p className="font-manga text-sm font-black uppercase tracking-wider text-manga-ink">THÀNH CÔNG!</p>
+              <p className="text-xs font-bold text-gray-700 mt-0.5">{toastMessage.text}</p>
+            </div>
+            <button onClick={() => setToastMessage(null)} className="ml-2 hover:bg-gray-100 p-1 bg-transparent border-none cursor-pointer">
+              <X className="w-4 h-4 text-gray-400" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>
@@ -267,25 +466,27 @@ export default function ReportsPage() {
           <div className="relative h-[200px] flex items-end justify-between gap-2 border-l border-b border-gray-200 pb-2 pl-2">
             {/* Y-axis labels */}
             <div className="absolute -left-6 bottom-0 top-0 flex flex-col justify-between text-[10px] text-gray-400 font-bold py-2">
-              <span>{Math.round(maxWeeklyPages)}-</span>
-              <span>{Math.round(maxWeeklyPages * 0.75)}-</span>
-              <span>{Math.round(maxWeeklyPages * 0.5)}-</span>
-              <span>{Math.round(maxWeeklyPages * 0.25)}-</span>
+              <span>{Math.round(weeklyChartMax)}-</span>
+              <span>{Math.round(weeklyChartMax * 0.8)}-</span>
+              <span>{Math.round(weeklyChartMax * 0.6)}-</span>
+              <span>{Math.round(weeklyChartMax * 0.4)}-</span>
+              <span>{Math.round(weeklyChartMax * 0.2)}-</span>
               <span>0-</span>
             </div>
             
             {/* Grid lines */}
-            <div className="absolute left-0 right-0 bottom-[25%] h-px border-t border-dashed border-gray-200"></div>
-            <div className="absolute left-0 right-0 bottom-[50%] h-px border-t border-dashed border-gray-200"></div>
-            <div className="absolute left-0 right-0 bottom-[75%] h-px border-t border-dashed border-gray-200"></div>
+            <div className="absolute left-0 right-0 bottom-[20%] h-px border-t border-dashed border-gray-200"></div>
+            <div className="absolute left-0 right-0 bottom-[40%] h-px border-t border-dashed border-gray-200"></div>
+            <div className="absolute left-0 right-0 bottom-[60%] h-px border-t border-dashed border-gray-200"></div>
+            <div className="absolute left-0 right-0 bottom-[80%] h-px border-t border-dashed border-gray-200"></div>
             <div className="absolute left-0 right-0 top-0 h-px border-t border-dashed border-gray-200"></div>
 
             {/* Bars */}
             {weeklyPages.map((val, i) => (
-              <div key={i} className="relative flex flex-col items-center flex-1 group z-10">
+              <div key={i} className="relative flex flex-col items-center flex-1 group z-10 h-full justify-end">
                 <div 
                   className="w-full max-w-[40px] bg-[#E63946] border border-[#B02A35] transition-all group-hover:opacity-80 flex items-end justify-center"
-                  style={{ height: `${(val / maxWeeklyPages) * 100}%` }}
+                  style={{ height: `${(val / weeklyChartMax) * 100}%` }}
                 >
                   {val > 0 && <span className="text-[9px] font-bold text-white mb-1">{val}</span>}
                 </div>
@@ -309,25 +510,27 @@ export default function ReportsPage() {
           <div className="relative h-[200px] flex items-end justify-between gap-2 border-l border-b border-gray-200 pb-2 pl-2">
             {/* Y-axis labels */}
             <div className="absolute -left-6 bottom-0 top-0 flex flex-col justify-between text-[10px] text-gray-400 font-bold py-2">
-              <span>{Math.round(maxMonthlyTasks)}-</span>
-              <span>{Math.round(maxMonthlyTasks * 0.75)}-</span>
-              <span>{Math.round(maxMonthlyTasks * 0.5)}-</span>
-              <span>{Math.round(maxMonthlyTasks * 0.25)}-</span>
+              <span>{Math.round(monthlyChartMax)}-</span>
+              <span>{Math.round(monthlyChartMax * 0.8)}-</span>
+              <span>{Math.round(monthlyChartMax * 0.6)}-</span>
+              <span>{Math.round(monthlyChartMax * 0.4)}-</span>
+              <span>{Math.round(monthlyChartMax * 0.2)}-</span>
               <span>0-</span>
             </div>
             
             {/* Grid lines */}
-            <div className="absolute left-0 right-0 bottom-[25%] h-px border-t border-dashed border-gray-200"></div>
-            <div className="absolute left-0 right-0 bottom-[50%] h-px border-t border-dashed border-gray-200"></div>
-            <div className="absolute left-0 right-0 bottom-[75%] h-px border-t border-dashed border-gray-200"></div>
+            <div className="absolute left-0 right-0 bottom-[20%] h-px border-t border-dashed border-gray-200"></div>
+            <div className="absolute left-0 right-0 bottom-[40%] h-px border-t border-dashed border-gray-200"></div>
+            <div className="absolute left-0 right-0 bottom-[60%] h-px border-t border-dashed border-gray-200"></div>
+            <div className="absolute left-0 right-0 bottom-[80%] h-px border-t border-dashed border-gray-200"></div>
             <div className="absolute left-0 right-0 top-0 h-px border-t border-dashed border-gray-200"></div>
 
             {/* Bars */}
             {monthlyTasksValues.map((val, i) => (
-              <div key={i} className="relative flex flex-col items-center flex-1 group z-10">
+              <div key={i} className="relative flex flex-col items-center flex-1 group z-10 h-full justify-end">
                 <div 
                   className="w-full max-w-[40px] bg-[#48BB78] border border-[#38A169] transition-all group-hover:opacity-80 flex items-end justify-center"
-                  style={{ height: `${(val / maxMonthlyTasks) * 100}%` }}
+                  style={{ height: `${(val / monthlyChartMax) * 100}%` }}
                 >
                   {val > 0 && <span className="text-[9px] font-bold text-white mb-1">{val}</span>}
                 </div>
@@ -381,7 +584,7 @@ export default function ReportsPage() {
                   <td className="py-5 px-6 text-center font-bold text-[#F6AD55] text-sm">{report.pending}</td>
                   <td className="py-5 px-6 text-right">
                     <button 
-                      onClick={() => alert(`Đang chuẩn bị tạo file PDF báo cáo cho ${report.month}...`)}
+                      onClick={() => handleDownloadPDF(report)}
                       className="bg-[#E63946] hover:bg-[#B02A35] transition-colors text-white px-4 py-2 border-2 border-[#1A1A1A] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center gap-2 text-[10px] font-bold ml-auto active:translate-y-[2px] active:shadow-none cursor-pointer"
                     >
                       <Download className="w-3 h-3" /> PDF

@@ -307,16 +307,19 @@ export const readerService = {
 
   getReadingHistory: async (): Promise<ReadingHistoryItem[]> => {
     try {
-      const token = localStorage.getItem('token');
+      let token = null;
+      try {
+        const userStr = localStorage.getItem('mangaflow_user');
+        if (userStr) token = JSON.parse(userStr).token;
+      } catch (e) {}
+
       if (!token) {
         // Fallback to localStorage for unauthenticated users
         const local = localStorage.getItem('localReadingHistory');
         return local ? JSON.parse(local) : [];
       }
 
-      const res = await api.get('/api/bookmarks?limit=100', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await api.get('/api/bookmarks?limit=100');
       return (res.data.data || []).map((b: any) => ({
         seriesId: b.series_id,
         seriesTitle: b.series?.title || 'Unknown Series',
@@ -339,7 +342,12 @@ export const readerService = {
 
   saveReadingProgress: async (data: { series_id: string, chapter_id: string, page_number: number }) => {
     try {
-      const token = localStorage.getItem('token');
+      let token = null;
+      try {
+        const userStr = localStorage.getItem('mangaflow_user');
+        if (userStr) token = JSON.parse(userStr).token;
+      } catch (e) {}
+
       if (!token) {
         // Save to localStorage for unauthenticated users
         const local = localStorage.getItem('localReadingHistory');
@@ -389,8 +397,6 @@ export const readerService = {
       await api.post('/api/bookmarks', {
         series_id: data.series_id,
         last_read_chapter_id: data.chapter_id,
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
       });
       window.dispatchEvent(new Event('mangaflow_history_update'));
       return true;

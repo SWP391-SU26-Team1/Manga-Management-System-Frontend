@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { User, Mail, Award, BookOpen, Clock, Heart, Edit2 } from 'lucide-react'
+import { User, Mail, Award, BookOpen, Clock, Heart, Edit2, Home } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { readerService, ReadingHistoryItem } from '@/services/reader.service'
 
@@ -76,13 +76,23 @@ export default function UserProfilePage() {
               {profile.role || 'MEMBER USER'}
             </div>
 
-            <button 
-              onClick={() => navigate('/dashboard/user/settings')}
-              className="mt-2 mb-4 w-full flex items-center justify-center gap-2 bg-white text-manga-ink font-bold uppercase text-sm py-2.5 border-2 border-manga-ink shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:bg-manga-ink hover:text-white hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none transition-all dark:bg-zinc-700 dark:border-black dark:text-white dark:shadow-[4px_4px_0px_#000]"
-            >
-              <Edit2 className="w-4 h-4" />
-              CHỈNH SỬA HỒ SƠ
-            </button>
+            <div className="flex w-full gap-3 mt-2 mb-4">
+              <button 
+                onClick={() => navigate('/dashboard/user/settings')}
+                className="flex-1 flex flex-col items-center justify-center gap-1 bg-white text-manga-ink font-bold uppercase text-xs py-2 border-2 border-manga-ink shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:bg-manga-ink hover:text-white hover:translate-y-[2px] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none transition-all dark:bg-zinc-700 dark:border-black dark:text-white dark:shadow-[4px_4px_0px_#000]"
+              >
+                <Edit2 className="w-4 h-4" />
+                SỬA HỒ SƠ
+              </button>
+              
+              <button 
+                onClick={() => navigate('/')}
+                className="flex-1 flex flex-col items-center justify-center gap-1 bg-manga-red text-white font-bold uppercase text-xs py-2 border-2 border-manga-ink shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:bg-manga-ink hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-y-[2px] active:translate-y-[4px] active:shadow-none transition-all dark:border-black dark:shadow-[4px_4px_0px_#000]"
+              >
+                <Home className="w-4 h-4" />
+                TRANG CHỦ
+              </button>
+            </div>
 
             <div className="w-full space-y-3 mt-2 text-left">
               <div className="flex items-center gap-3 text-sm font-bold text-gray-700 p-2 bg-gray-50 border-2 border-dashed border-gray-300 dark:bg-zinc-900 dark:border-zinc-700 dark:text-gray-300">

@@ -96,7 +96,7 @@ const inputClass =
   'w-full border-2 border-manga-ink bg-white px-4 py-3 text-sm font-bold outline-none focus:shadow-[3px_3px_0_rgba(232,23,63,1)]'
 const labelClass = 'mb-2 block text-xs font-black uppercase text-gray-600'
 const iconButtonClass =
-  'flex h-10 w-10 items-center justify-center border-2 border-manga-ink bg-white transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-45'
+  'flex h-10 w-10 items-center justify-center border-2 border-manga-ink transition-colors disabled:cursor-not-allowed disabled:opacity-45'
 
 const getErrorMessage = (error: unknown) => {
   const apiError = error as { response?: { data?: { message?: string } }; message?: string }
@@ -646,10 +646,10 @@ export default function AdminSeriesPage() {
                 </select>
               </label>
               <div className="flex gap-2 self-end">
-                <button type="button" onClick={() => loadSeries()} disabled={loading} className={iconButtonClass} title="Tải lại">
+                <button type="button" onClick={() => loadSeries()} disabled={loading} className={`${iconButtonClass} bg-white hover:bg-gray-100`} title="Tải lại">
                   <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
                 </button>
-                <button type="button" onClick={resetFilters} className={iconButtonClass} title="Xóa bộ lọc">
+                <button type="button" onClick={resetFilters} className={`${iconButtonClass} bg-white hover:bg-gray-100`} title="Xóa bộ lọc">
                   <X className="h-5 w-5" />
                 </button>
               </div>
@@ -734,18 +734,18 @@ export default function AdminSeriesPage() {
                     </td>
                     <td className="px-5 py-5">
                       <div className="flex justify-end gap-2">
-                        <button type="button" onClick={() => openDetail(item)} className={`${iconButtonClass} bg-[#282828] text-white`} title="Xem chi tiết">
+                        <button type="button" onClick={() => openDetail(item)} className={`${iconButtonClass} bg-[#282828] text-white hover:bg-gray-800`} title="Xem chi tiết">
                           <Eye className="h-5 w-5" />
                         </button>
-                        <button type="button" onClick={() => openEdit(item)} className={iconButtonClass} title="Chỉnh sửa">
+                        <button type="button" onClick={() => openEdit(item)} className={`${iconButtonClass} bg-white hover:bg-gray-100`} title="Chỉnh sửa">
                           <Edit3 className="h-5 w-5" />
                         </button>
                         {item.status === 'pending_review' && (
-                          <button type="button" disabled={busy} onClick={() => updateStatus(item, 'approved')} className={`${iconButtonClass} bg-emerald-500 text-white`} title="Duyệt">
+                          <button type="button" disabled={busy} onClick={() => updateStatus(item, 'approved')} className={`${iconButtonClass} bg-emerald-500 text-white hover:bg-emerald-600`} title="Duyệt">
                             <CheckCircle2 className="h-5 w-5" />
                           </button>
                         )}
-                        <button type="button" disabled={busy} onClick={() => deleteSeries(item)} className={`${iconButtonClass} bg-manga-red text-white`} title="Xóa">
+                        <button type="button" disabled={busy} onClick={() => deleteSeries(item)} className={`${iconButtonClass} bg-manga-red text-white hover:bg-red-600`} title="Xóa">
                           <Trash2 className="h-5 w-5" />
                         </button>
                       </div>

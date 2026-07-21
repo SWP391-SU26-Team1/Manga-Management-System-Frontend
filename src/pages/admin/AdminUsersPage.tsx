@@ -1,4 +1,5 @@
 import React, { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import {
   AlertCircle,
   Ban,
@@ -102,7 +103,7 @@ const inputClass =
   'w-full border-2 border-manga-ink bg-white px-4 py-3 text-sm font-bold outline-none focus:shadow-[3px_3px_0_rgba(232,23,63,1)]'
 const labelClass = 'mb-2 block text-xs font-black uppercase tracking-widest text-gray-600'
 const iconButtonClass =
-  'flex h-11 w-11 items-center justify-center border-2 border-manga-ink bg-white shadow-[3px_3px_0_rgba(0,0,0,1)] transition-all hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-[2px_2px_0_rgba(0,0,0,1)]'
+  'flex h-11 w-11 items-center justify-center border-2 border-manga-ink shadow-[3px_3px_0_rgba(0,0,0,1)] transition-all hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-[2px_2px_0_rgba(0,0,0,1)]'
 
 const formatDate = (date?: string | null) => {
   if (!date) return 'N/A'
@@ -314,9 +315,31 @@ interface UserDetailsModalProps {
   user: User
   loading: boolean
   onClose: () => void
+  onRoleUpdate: (user: User, newRole: UserRole) => Promise<void>
 }
 
-function UserDetailsModal({ user, loading, onClose }: UserDetailsModalProps) {
+function UserDetailsModal({ user, loading, onClose, onRoleUpdate }: UserDetailsModalProps) {
+  const [selectedRole, setSelectedRole] = useState<UserRole>(user.role)
+  const [savingRole, setSavingRole] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
+
+  useEffect(() => {
+    setSelectedRole(user.role)
+  }, [user.role])
+
+  const handleSaveRole = async () => {
+    if (selectedRole === user.role) return
+    setSavingRole(true)
+    setSaveSuccess(false)
+    try {
+      await onRoleUpdate(user, selectedRole)
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 3000)
+    } finally {
+      setSavingRole(false)
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className="w-full max-w-3xl border-2 border-manga-ink bg-white shadow-[8px_8px_0_rgba(0,0,0,1)]">
@@ -345,10 +368,40 @@ function UserDetailsModal({ user, loading, onClose }: UserDetailsModalProps) {
               <p className="text-xs font-black uppercase text-gray-500">Email</p>
               <p className="mt-2 font-bold">{user.email}</p>
             </div>
-            <div className="border-2 border-manga-ink p-4">
-              <p className="text-xs font-black uppercase text-gray-500">Vai trò</p>
-              <p className="mt-2 font-black uppercase">{roleLabel[user.role]}</p>
+            
+            {/* Role selection & approval section */}
+            <div className="border-2 border-manga-ink p-4 bg-zinc-50">
+              <p className="text-xs font-black uppercase text-gray-500">Vai trò / Phân quyền</p>
+              <div className="mt-2 flex flex-col gap-2">
+                <select
+                  value={selectedRole}
+                  onChange={(e) => setSelectedRole(e.target.value as UserRole)}
+                  className="w-full border-2 border-manga-ink bg-white px-3 py-1.5 text-xs font-black uppercase outline-none"
+                >
+                  {USER_ROLES.map((role) => (
+                    <option key={role} value={role}>
+                      {roleLabel[role]}
+                    </option>
+                  ))}
+                </select>
+
+                <AdminButton
+                  type="button"
+                  variant={selectedRole !== user.role ? 'red' : 'white'}
+                  icon={Save}
+                  disabled={savingRole || selectedRole === user.role}
+                  onClick={handleSaveRole}
+                  className="w-full !py-1 text-xs"
+                >
+                  {savingRole ? 'Đang lưu...' : selectedRole !== user.role ? 'Lưu (Save)' : 'Đã lưu'}
+                </AdminButton>
+
+                {saveSuccess && (
+                  <p className="text-[10px] font-black text-emerald-600 uppercase">✓ Cập nhật vai trò thành công!</p>
+                )}
+              </div>
             </div>
+
             <div className="border-2 border-manga-ink p-4">
               <p className="text-xs font-black uppercase text-gray-500">Họ tên</p>
               <p className="mt-2 font-bold">{user.name || 'N/A'}</p>
@@ -382,6 +435,7 @@ function UserDetailsModal({ user, loading, onClose }: UserDetailsModalProps) {
 }
 
 export default function AdminUsersPage() {
+  const [searchParams] = useSearchParams()
   const [users, setUsers] = useState<User[]>([])
   const [pagination, setPagination] = useState<PaginationMeta>(emptyPagination)
   const [page, setPage] = useState(1)
@@ -399,6 +453,24 @@ export default function AdminUsersPage() {
   const [form, setForm] = useState<UserFormState>(emptyForm)
   const [detailUser, setDetailUser] = useState<User | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+
+  useEffect(() => {
+    const targetUserId = searchParams.get('userId') || searchParams.get('id') || searchParams.get('requester_id')
+    if (targetUserId) {
+      const fetchAndOpenUser = async () => {
+        setDetailLoading(true)
+        try {
+          const detail = await adminUsersService.getById(targetUserId)
+          setDetailUser(detail)
+        } catch (error) {
+          console.error('Không thể tải thông tin người dùng từ URL search param:', error)
+        } finally {
+          setDetailLoading(false)
+        }
+      }
+      fetchAndOpenUser()
+    }
+  }, [searchParams])
 
   const loadUsers = useCallback(async () => {
     setLoading(true)
@@ -544,11 +616,13 @@ export default function AdminUsersPage() {
     setActionUserId(user.user_id)
     setFeedback(null)
     try {
-      await adminUsersService.updateRole(user.user_id, role)
+      await adminUsersService.update(user.user_id, { role })
       setUsers((current) => current.map((item) => (item.user_id === user.user_id ? { ...item, role } : item)))
+      setDetailUser((current) => (current && current.user_id === user.user_id ? { ...current, role } : current))
       setFeedback({ type: 'success', message: `Đã đổi vai trò của ${user.username} thành ${roleLabel[role]}.` })
     } catch (error) {
       setFeedback({ type: 'error', message: getErrorMessage(error) })
+      throw error
     } finally {
       setActionUserId(null)
     }
@@ -821,7 +895,7 @@ export default function AdminUsersPage() {
                             type="button"
                             aria-label={`Sửa ${user.username}`}
                             onClick={() => openEditModal(user)}
-                            className={iconButtonClass}
+                            className={`${iconButtonClass} bg-white`}
                           >
                             <Edit3 className="h-5 w-5" />
                           </button>
@@ -830,7 +904,7 @@ export default function AdminUsersPage() {
                             aria-label={`Vô hiệu hóa ${user.username}`}
                             disabled={isBusy || user.status === 'inactive'}
                             onClick={() => handleSoftDelete(user)}
-                            className={`${iconButtonClass} ${user.status === 'inactive' ? 'border-gray-300 text-gray-300 shadow-none' : 'bg-manga-red text-white'}`}
+                            className={`${iconButtonClass} ${user.status === 'inactive' ? 'bg-gray-50 border-gray-300 text-gray-300 shadow-none' : 'bg-manga-red text-white'}`}
                           >
                             <Trash2 className="h-5 w-5" />
                           </button>
@@ -904,6 +978,7 @@ export default function AdminUsersPage() {
           user={detailUser}
           loading={detailLoading}
           onClose={() => setDetailUser(null)}
+          onRoleUpdate={handleRoleChange}
         />
       )}
     </div>

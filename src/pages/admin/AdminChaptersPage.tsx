@@ -18,7 +18,7 @@ const statusLabel: Record<ChapterStatus, string> = {
 const emptyPagination: PaginationMeta = { page: 1, limit: 10, total: 0, totalPages: 1 }
 const inputClass = 'w-full border-2 border-manga-ink bg-white px-4 py-3 text-sm font-bold outline-none focus:shadow-[3px_3px_0_rgba(232,23,63,1)]'
 const labelClass = 'mb-2 block text-xs font-black uppercase text-gray-600'
-const iconClass = 'flex h-10 w-10 items-center justify-center border-2 border-manga-ink bg-white hover:bg-gray-100 disabled:opacity-50'
+const iconClass = 'flex h-10 w-10 items-center justify-center border-2 border-manga-ink disabled:opacity-50'
 type FormState = { series_id: string; chapter_number: string; title: string; thumbnail_image_url: string; status: ChapterStatus }
 const emptyForm: FormState = { series_id: '', chapter_number: '1', title: '', thumbnail_image_url: '', status: 'draft' }
 
@@ -168,12 +168,12 @@ export default function AdminChaptersPage() {
             <span className={labelClass}>Tìm kiếm</span>
             <div className="flex gap-2">
               <input value={keywordInput} onChange={(e) => setKeywordInput(e.target.value)} className={inputClass} placeholder="Tên chương..." />
-              <button className={iconClass}><Search /></button>
+              <button className={`${iconClass} bg-white hover:bg-gray-100`}><Search /></button>
             </div>
           </form>
           <div className="flex gap-2">
-            <button onClick={load} className={iconClass} title="Tải lại"><RefreshCw className={loading ? 'animate-spin' : ''} /></button>
-            <button onClick={resetFilters} className={iconClass} title="Xóa bộ lọc"><X className="h-5 w-5" /></button>
+            <button onClick={load} className={`${iconClass} bg-white hover:bg-gray-100`} title="Tải lại"><RefreshCw className={loading ? 'animate-spin' : ''} /></button>
+            <button onClick={resetFilters} className={`${iconClass} bg-white hover:bg-gray-100`} title="Xóa bộ lọc"><X className="h-5 w-5" /></button>
           </div>
         </div>
         <div className="overflow-x-auto"><table className="w-full min-w-[1000px] text-left"><thead className="bg-[#282828] text-xs font-black uppercase text-white"><tr>
@@ -204,7 +204,7 @@ export default function AdminChaptersPage() {
             <td className="px-6 py-5"><div className="flex items-center gap-4">{item.thumbnail_image_url ? <img src={item.thumbnail_image_url} alt="" className="h-16 w-12 border-2 border-manga-ink object-cover" /> : <div className="flex h-16 w-12 items-center justify-center border-2 border-manga-ink bg-gray-100"><ImageOff className="h-4 w-4" /></div>}<div><p className="font-black">Chương {item.chapter_number}</p><p className="text-sm text-gray-500">{item.title || 'Chưa đặt tên'}</p></div></div></td>
             <td className="px-5 py-5 font-bold">{item.series?.title || item.series_id}</td><td className="px-5 py-5 font-black">{(item.view_count || 0).toLocaleString('vi-VN')}</td>
             <td className="px-5 py-5"><div className="space-y-2"><AdminStatusBadge status={item.status} /><select value={item.status} disabled={busyId === item.chapter_id} onChange={(e) => changeStatus(item, e.target.value as ChapterStatus)} className="block border-2 border-manga-ink px-2 py-2 text-xs font-black">{STATUSES.map((value) => <option key={value} value={value}>{statusLabel[value]}</option>)}</select></div></td>
-            <td className="px-5 py-5 font-semibold text-gray-600">{formatDate(item.created_at)}</td><td className="px-5 py-5"><div className="flex justify-end gap-2"><button onClick={() => showDetail(item)} className={`${iconClass} bg-[#282828] text-white`}><Eye /></button><button onClick={() => openEdit(item)} className={iconClass}><Edit3 /></button><button disabled={busyId === item.chapter_id} onClick={() => remove(item)} className={`${iconClass} bg-manga-red text-white`}><Trash2 /></button></div></td>
+            <td className="px-5 py-5 font-semibold text-gray-600">{formatDate(item.created_at)}</td><td className="px-5 py-5"><div className="flex justify-end gap-2"><button onClick={() => showDetail(item)} className={`${iconClass} bg-[#282828] text-white hover:bg-gray-800`}><Eye /></button><button onClick={() => openEdit(item)} className={`${iconClass} bg-white hover:bg-gray-100`}><Edit3 /></button><button disabled={busyId === item.chapter_id} onClick={() => remove(item)} className={`${iconClass} bg-manga-red text-white hover:bg-red-600`}><Trash2 /></button></div></td>
           </tr>)}
         </tbody></table></div>
         <div className="flex flex-col gap-4 border-t-2 border-manga-ink px-6 py-5 md:flex-row md:items-center md:justify-between"><p className="text-sm font-black uppercase">Hiển thị {start}-{end} / {pagination.total}</p><AdminPagination page={pagination.page} totalPages={pagination.totalPages} onPageChange={setPage} disabled={loading} /></div>

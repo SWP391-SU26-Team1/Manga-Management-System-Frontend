@@ -10,6 +10,7 @@ export interface DisplayTask {
   pageNumber?: number | string;
   layerType: string;
   assignedTo: string;
+  assignedToId?: string;
   deadline: string;
   status: string;
   note: string;
@@ -22,9 +23,10 @@ interface TaskTableProps {
   onDeleteTask?: (taskId: string) => void;
   onEditTask?: (task: DisplayTask) => void;
   onAssignTask?: (taskId: string, chapterId: string, pageId: string) => void | Promise<any>;
+  onRemindTask?: (task: DisplayTask) => void | Promise<any>;
 }
 
-export function TaskTable({ tasks, onDeleteTask, onEditTask, onAssignTask }: TaskTableProps) {
+export function TaskTable({ tasks, onDeleteTask, onEditTask, onAssignTask, onRemindTask }: TaskTableProps) {
   const [selectedTask, setSelectedTask] = React.useState<DisplayTask | null>(null);
   const [assigningIds, setAssigningIds] = React.useState<Record<string, boolean>>({});
 
@@ -251,8 +253,14 @@ export function TaskTable({ tasks, onDeleteTask, onEditTask, onAssignTask }: Tas
                 <ExternalLink className="w-4 h-4" /> Mở trang
               </Link>
               <button 
-                onClick={() => { alert('Đã gửi thông báo nhắc nhở trợ lý!'); setSelectedTask(null); }}
-                className="flex items-center gap-2 px-4 py-2 border-2 border-orange-500 text-orange-600 font-bold hover:bg-orange-50 uppercase text-sm bg-white"
+                onClick={async () => {
+                  const target = selectedTask;
+                  setSelectedTask(null);
+                  if (onRemindTask && target) {
+                    await onRemindTask(target);
+                  }
+                }}
+                className="flex items-center gap-2 px-4 py-2 border-2 border-orange-500 text-orange-600 font-bold hover:bg-orange-50 uppercase text-sm bg-white cursor-pointer"
               >
                 <BellRing className="w-4 h-4" /> Nhắc nhở
               </button>

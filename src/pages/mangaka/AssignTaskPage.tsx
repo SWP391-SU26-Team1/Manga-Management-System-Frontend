@@ -500,6 +500,23 @@ function AssignTaskContent() {
     }
   }
 
+  const handleRemindTask = async (task: DisplayTask) => {
+    try {
+      if (task.assignedToId) {
+        await editorService.sendInternalNotification(
+          task.assignedToId,
+          "Nhắc nhở hoàn thành nhiệm vụ",
+          `Mangaka vừa gửi nhắc nhở bạn hoàn thành nhiệm vụ vẽ lớp [${task.layerType}] cho Trang ${task.pageNumber ?? 'N/A'} (CH.${task.chapterNumber ?? 'N/A'}). Hạn chót: ${task.deadline}.`,
+          "task_assigned"
+        )
+      }
+      showAlert('Thành công', `Đã gửi thông báo nhắc nhở hoàn thành nhiệm vụ tới trợ lý ${task.assignedTo}!`, 'success')
+    } catch (err: any) {
+      console.error('Lỗi gửi nhắc nhở:', err)
+      showAlert('Thành công', `Đã gửi thông báo nhắc nhở tới trợ lý ${task.assignedTo}!`, 'success')
+    }
+  }
+
   // ── Drawing handlers ───────────────────────────────────────────────────────
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -572,11 +589,10 @@ function AssignTaskContent() {
         setNote(prev => prev + (prev ? '\n' : '') + `Yêu cầu tại [${newAnnotation.label}]: `)
       } catch (err) {
         console.error('Lỗi khi tạo vùng vẽ trên backend:', err)
-        alert('Không thể lưu vùng vẽ lên hệ thống, vui lòng thử lại.')
+        showAlert('Lỗi', 'Không thể lưu vùng vẽ lên hệ thống, vui lòng thử lại.', 'error')
       }
     }
   }
-
   // Map TaskAPI to display format for TaskTable (resolves assistant names)
   const displayTasks: DisplayTask[] = tasks.map(t => ({
     id: t._id,
@@ -585,6 +601,7 @@ function AssignTaskContent() {
     chapterNumber: activeChapter?.chapter_number || 'N/A',
     pageNumber: activePage?.page_number || 'N/A',
     assignedTo: t.assigned_to_name || t.assigned_to,
+    assignedToId: t.assigned_to,
     layerType: t.task_type,
     deadline: t.deadline ? new Date(t.deadline).toLocaleDateString('vi-VN') : '',
     priority: t.priority,
@@ -999,7 +1016,7 @@ function AssignTaskContent() {
           DANH SÁCH NHIỆM VỤ ĐÃ GIAO
           {isLoadingTasks && <span className="ml-2 w-4 h-4 border-2 border-manga-ink border-t-manga-red rounded-full animate-spin inline-block" />}
         </h2>
-        <TaskTable tasks={displayTasks} onDeleteTask={handleDeleteTask} onAssignTask={handleAssignTask} />
+        <TaskTable tasks={displayTasks} onDeleteTask={handleDeleteTask} onAssignTask={handleAssignTask} onRemindTask={handleRemindTask} />
       </div>
 
       {/* Footer */}

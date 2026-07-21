@@ -135,6 +135,7 @@ export interface RiskAlert {
   message: string;
   createdAt: string;
   isRead: boolean;
+  isAcknowledged?: boolean;
 }
 
 export interface RecoveryProposal {

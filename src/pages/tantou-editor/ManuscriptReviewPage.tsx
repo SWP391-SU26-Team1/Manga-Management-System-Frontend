@@ -259,9 +259,10 @@ export default function ManuscriptReviewPage() {
   const fetchSeriesToReview = async () => {
     try {
       setLoadingSeries(true)
-      const [pendingRes, approvedRes, sessionsRes] = await Promise.all([
+      const [pendingRes, approvedRes, rejectedRes, sessionsRes] = await Promise.all([
         editorService.getSeries({ status: 'pending_review' }),
         editorService.getSeries({ status: 'approved' }),
+        editorService.getSeries({ status: 'rejected' }),
         editorService.getReviewSessions({ limit: 100 })
       ])
 
@@ -271,7 +272,10 @@ export default function ManuscriptReviewPage() {
       const aData = approvedRes.data || approvedRes
       const aList = Array.isArray(aData) ? aData : (aData.series || aData.items || [])
 
-      const combinedList = [...pList, ...aList]
+      const rData = rejectedRes.data || rejectedRes
+      const rList = Array.isArray(rData) ? rData : (rData.series || rData.items || [])
+
+      const combinedList = [...pList, ...aList, ...rList]
 
       const displayList: DisplaySeries[] = combinedList.map((s: any) => ({
         id: s.series_id,
@@ -290,15 +294,12 @@ export default function ManuscriptReviewPage() {
         try {
           const rawDetail = await editorService.getSeriesDetail(s.id)
           const detail = rawDetail.data || rawDetail
-          const hasAssignedEditor = detail.series_member?.some((m: any) => m.role_in_series === 'editor')
-          if (!hasAssignedEditor) {
-            const owner = detail.series_member?.find((m: any) => m.role_in_series === 'owner')
-            if (owner?.users) {
-              s.mangaka = owner.users.name || owner.users.username || 'Tác giả ẩn danh'
-              s.mangakaId = owner.users.user_id || owner.user_id
-            }
-            finalFilteredList.push(s)
+          const owner = detail.series_member?.find((m: any) => m.role_in_series === 'owner')
+          if (owner?.users) {
+            s.mangaka = owner.users.name || owner.users.username || 'Tác giả ẩn danh'
+            s.mangakaId = owner.users.user_id || owner.user_id
           }
+          finalFilteredList.push(s)
         } catch (e) {
           console.error('Failed to get series owner/members for:', s.id, e)
           finalFilteredList.push(s)
@@ -599,7 +600,7 @@ export default function ManuscriptReviewPage() {
           targetSeries.mangakaId,
           "Duyệt tác phẩm mới",
           `Chúc mừng! Đề xuất tác phẩm mới [${seriesTitle}] của bạn đã được phê duyệt đưa vào sản xuất (Trạng thái: Đang vẽ).`,
-          "series_approved"
+          `series_approved:${sId}`
         ).catch(errNotif => {
           console.error('Failed to notify mangaka of series approval:', errNotif)
         })
@@ -650,25 +651,31 @@ export default function ManuscriptReviewPage() {
 
 
   const handleRequestRevisionSeries = async (sId: string) => {
+    if (!rejectionReason.trim()) {
+      showToast('Vui lòng nhập lý do yêu cầu sửa đổi ở ô phía dưới!')
+      return
+    }
     try {
-      await editorService.updateSeriesStatus(sId, 'draft')
+      await editorService.updateSeriesStatus(sId, 'rejected')
       showToast(`Đã gửi yêu cầu chỉnh sửa hồ sơ Series về cho Mangaka.`)
 
       const targetSeries = seriesList.find(s => s.id === sId)
       const seriesTitle = targetSeries ? targetSeries.title : 'Series mới'
+      const reasonText = rejectionReason.trim()
 
       // Gửi thông báo đến Mangaka
       if (targetSeries && targetSeries.mangakaId) {
         await editorService.sendInternalNotification(
           targetSeries.mangakaId,
           "Yêu cầu chỉnh sửa Series",
-          `Hồ sơ tác phẩm [${seriesTitle}] của bạn cần chỉnh sửa thêm theo yêu cầu của Biên tập viên.`,
-          "series_revision_requested"
+          `Hồ sơ tác phẩm [${seriesTitle}] của bạn cần chỉnh sửa thêm theo yêu cầu của Biên tập viên. Lý do: ${reasonText}`,
+          `series_revision_requested:${sId}`
         ).catch(errNotif => {
           console.error('Failed to notify mangaka of series revision:', errNotif)
         })
       }
 
+      setRejectionReason('')
       fetchSeriesToReview()
     } catch (err: any) {
       console.error('Failed to request revision:', err)
@@ -677,25 +684,31 @@ export default function ManuscriptReviewPage() {
   }
 
   const handleRejectSeries = async (sId: string) => {
+    if (!rejectionReason.trim()) {
+      showToast('Vui lòng nhập lý do từ chối ở ô phía dưới!')
+      return
+    }
     try {
-      await editorService.updateSeriesStatus(sId, 'draft')
-      showToast(`Đã từ chối duyệt hồ sơ Series (đã chuyển về bản nháp).`)
+      await editorService.updateSeriesStatus(sId, 'rejected')
+      showToast(`Đã từ chối duyệt hồ sơ Series.`)
 
       const targetSeries = seriesList.find(s => s.id === sId)
       const seriesTitle = targetSeries ? targetSeries.title : 'Series mới'
+      const reasonText = rejectionReason.trim()
 
       // Gửi thông báo đến Mangaka
       if (targetSeries && targetSeries.mangakaId) {
         await editorService.sendInternalNotification(
           targetSeries.mangakaId,
           "Từ chối hồ sơ Series",
-          `Yêu cầu đề xuất tác phẩm [${seriesTitle}] của bạn đã bị từ chối duyệt.`,
-          "series_rejected"
+          `Yêu cầu đề xuất tác phẩm [${seriesTitle}] của bạn đã bị từ chối duyệt. Lý do: ${reasonText}`,
+          `series_rejected:${sId}`
         ).catch(errNotif => {
           console.error('Failed to notify mangaka of series rejection:', errNotif)
         })
       }
 
+      setRejectionReason('')
       fetchSeriesToReview()
     } catch (err: any) {
       console.error('Failed to reject series:', err)
@@ -926,25 +939,27 @@ export default function ManuscriptReviewPage() {
                   onClick={() => setSelectedSeriesId(s.id)}
                   className={`p-3 border-2 cursor-pointer transition-all flex items-start gap-2 group relative ${selectedSeriesId === s.id
                     ? 'border-manga-ink bg-red-50/50 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
-                    : (viewedIds.includes(s.id) || s.status === 'approved')
+                    : (viewedIds.includes(s.id) || s.status === 'approved' || s.status === 'rejected')
                       ? 'border-gray-200 bg-zinc-50/50 opacity-70 hover:opacity-100 hover:border-gray-300'
                       : 'border-manga-ink bg-white hover:border-black font-extrabold shadow-sm'
                     }`}
                 >
                   <div className="flex-1 min-w-0 pr-6">
                     <div className="flex items-center justify-between mb-1">
-                      <span className={`text-sm truncate pr-2 ${(viewedIds.includes(s.id) || s.status === 'approved') ? 'font-semibold text-gray-500' : 'font-extrabold text-gray-900'}`}>{s.title}</span>
+                      <span className={`text-sm truncate pr-2 ${(viewedIds.includes(s.id) || s.status === 'approved' || s.status === 'rejected') ? 'font-semibold text-gray-500' : 'font-extrabold text-gray-900'}`}>{s.title}</span>
                       {hasActiveSession(s.id) ? (
                         <span className="bg-yellow-100 text-yellow-700 text-[10px] font-bold border border-yellow-700 px-2 py-0.5">CHỜ HỘI ĐỒNG</span>
                       ) : s.status === 'approved' ? (
                         <span className="bg-green-100 text-green-700 text-[10px] font-bold border border-green-700 px-2 py-0.5">ĐÃ DUYỆT</span>
+                      ) : s.status === 'rejected' ? (
+                        <span className="bg-red-100 text-red-700 text-[10px] font-bold border border-red-700 px-2 py-0.5">ĐÃ TỪ CHỐI</span>
                       ) : (
                         <span className="bg-orange-100 text-orange-700 text-[10px] font-bold border border-orange-700 px-2 py-0.5">ĐÃ NỘP</span>
                       )}
                     </div>
                     <div className="flex justify-between items-center text-xs">
-                      <span className={`font-bold ${(viewedIds.includes(s.id) || s.status === 'approved') ? 'text-manga-red/70' : 'text-manga-red'}`}>{s.genre}</span>
-                      <span className={`font-bold truncate max-w-[120px] ${(viewedIds.includes(s.id) || s.status === 'approved') ? 'text-gray-400' : 'text-gray-600'}`}>{s.mangaka}</span>
+                      <span className={`font-bold ${(viewedIds.includes(s.id) || s.status === 'approved' || s.status === 'rejected') ? 'text-manga-red/70' : 'text-manga-red'}`}>{s.genre}</span>
+                      <span className={`font-bold truncate max-w-[120px] ${(viewedIds.includes(s.id) || s.status === 'approved' || s.status === 'rejected') ? 'text-gray-400' : 'text-gray-600'}`}>{s.mangaka}</span>
                     </div>
                   </div>
 
@@ -1247,6 +1262,16 @@ export default function ManuscriptReviewPage() {
                     </div>
                   </div>
                 </div>
+              ) : activeSeries.status === 'rejected' ? (
+                <div className="border-t-2 border-manga-ink pt-3 flex flex-col gap-2 flex-shrink-0">
+                  <div className="bg-red-50 border-4 border-red-500 p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-3">
+                    <XCircle className="w-8 h-8 text-red-600 flex-shrink-0 animate-pulse" />
+                    <div>
+                      <h4 className="font-extrabold text-sm text-manga-ink uppercase">HỒ SƠ ĐÃ BỊ TỪ CHỐI / CẦN SỬA ĐỔI</h4>
+                      <p className="text-xs text-gray-600 font-bold mt-1">Đề xuất tác phẩm đã bị từ chối/yêu cầu sửa đổi. Đang chờ Mangaka cập nhật và nộp lại.</p>
+                    </div>
+                  </div>
+                </div>
               ) : hasActiveSession(activeSeries.id) ? (
                 <div className="border-t-2 border-manga-ink pt-3 flex flex-col gap-2 flex-shrink-0">
                   <div className="bg-yellow-50 border-4 border-yellow-500 p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-3">
@@ -1259,7 +1284,16 @@ export default function ManuscriptReviewPage() {
                 </div>
               ) : (
                 <div className="border-t-2 border-manga-ink pt-3 flex flex-col gap-2 flex-shrink-0">
-                  <h3 className="font-bold text-xs uppercase text-manga-ink mb-1">Quyết Định Duyệt Series</h3>
+                  <h3 className="font-bold text-xs uppercase text-manga-ink mb-1">Đánh Giá Đề Xuất Series</h3>
+                  <div className="mb-1">
+                    <textarea
+                      rows={2}
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
+                      placeholder="Vui lòng nhập lý do từ chối hoặc lý do yêu cầu sửa đổi..."
+                      className="w-full px-3 py-2 border-2 border-manga-ink focus:outline-none focus:border-manga-red font-bold text-xs bg-white text-black placeholder-gray-400"
+                    />
+                  </div>
                   <div className="grid grid-cols-3 gap-3">
                     <button
                       onClick={() => handleApproveSeries(activeSeries.id)}

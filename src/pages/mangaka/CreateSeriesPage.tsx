@@ -115,6 +115,8 @@ export default function CreateSeriesPage() {
         description: description.trim(),
         genre: getFinalGenreString(),
         cover_image: coverUrl.trim() || null,
+        publishSchedule: publishSchedule,
+        proposedStartDate: proposedStartDate
       })
       setSuccessMsg('✅ Đã lưu bản nháp thành công!')
       setTimeout(() => navigate('/dashboard/mangaka/series'), 1500)
@@ -139,6 +141,8 @@ export default function CreateSeriesPage() {
         description: description.trim(),
         genre: getFinalGenreString(),
         cover_image: coverUrl.trim() || null,
+        publishSchedule: publishSchedule,
+        proposedStartDate: proposedStartDate
       })
 
       // Bước 2: Nộp duyệt
@@ -470,6 +474,7 @@ export default function CreateSeriesPage() {
                     className="w-full px-4 py-3 border-2 border-manga-ink focus:outline-none focus:border-manga-red font-bold text-sm bg-white"
                   >
                     <option value="Weekly">Hàng tuần (Weekly)</option>
+                    <option value="Bi-weekly">Nửa tháng (Bi-weekly)</option>
                     <option value="Monthly">Hàng tháng (Monthly)</option>
                     <option value="Special">Đặc biệt (Special)</option>
                   </select>

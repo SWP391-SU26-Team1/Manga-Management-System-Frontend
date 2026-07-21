@@ -28,6 +28,7 @@ export default function TantouHeader() {
   const [showNotifications, setShowNotifications] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [notifications, setNotifications] = useState<any[]>([])
+
   const [lastSeenTime, setLastSeenTime] = useState<string | null>(() => {
     return localStorage.getItem('mangaflow_last_seen_time')
   })
@@ -119,19 +120,21 @@ export default function TantouHeader() {
     }
     
     // Redirect logic
-    const t = (notif.type || '').toLowerCase()
+    const mapLink = (backendType: string): string => {
+      const t = (backendType || '').toLowerCase()
+      if (t.includes('manuscript')) return '/dashboard/tantou-editor/manuscript-review?tab=manuscript'
+      if (t.includes('series') && !t.includes('rank_drop') && !t.includes('abandoned') && !t.includes('low_views')) return '/dashboard/tantou-editor/manuscript-review?tab=series'
+      if (t.includes('feedback')) return '/dashboard/tantou-editor/notifications'
+      if (t.includes('vote') || t.includes('decision')) return '/dashboard/tantou-editor/workflow'
+      if (t.includes('overdue') || t.includes('abandoned') || t.includes('low_views') || t.includes('rank_drop')) return '/dashboard/tantou-editor/alerts'
+      return ''
+    }
+
     if (notif.link) {
       navigate(notif.link)
-    } else if (t.includes('manuscript')) {
-      navigate('/dashboard/tantou-editor/manuscript-review?tab=manuscript')
-    } else if (t.includes('series')) {
-      navigate('/dashboard/tantou-editor/manuscript-review?tab=series')
-    } else if (t.includes('feedback')) {
-      navigate('/dashboard/tantou-editor/notifications')
-    } else if (t.includes('vote') || t.includes('decision')) {
-      navigate('/dashboard/tantou-editor/workflow')
     } else {
-      navigate('/dashboard/tantou-editor/notifications')
+      const targetPath = mapLink(notif.type || '')
+      navigate(targetPath || '/dashboard/tantou-editor/notifications')
     }
     setShowNotifications(false)
   }

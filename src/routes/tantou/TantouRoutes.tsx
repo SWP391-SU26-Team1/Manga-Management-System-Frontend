@@ -27,9 +27,9 @@ export default function TantouRoutes() {
         <Route path="workflow" element={<ApprovalWorkflowPage />} />
         <Route path="alerts" element={<AlertsPage />} />
         <Route path="ranking" element={<RankingPerformancePage />} />
-        <Route path="reports" element={<EditorialReportsPage />} />
+
         <Route path="series-defense" element={<RecoveryProposalPage />} />
-        <Route path="team" element={<TeamManagementPage />} />
+
         <Route path="settings" element={<TantouSettingsPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="notifications" element={<NotificationsPage />} />

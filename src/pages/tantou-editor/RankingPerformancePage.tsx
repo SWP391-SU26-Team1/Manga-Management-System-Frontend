@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { TrendingUp, TrendingDown, Minus, Trophy, Star, MessageSquare, Loader2, AlertCircle } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, Trophy, Star, MessageSquare, Loader2, AlertCircle, Search, X, Eye } from 'lucide-react'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { editorService, ApiRankingEntry, ApiRankingPeriod } from '@/services/editor.service'
 
 interface DisplayRanking {
@@ -9,7 +10,8 @@ interface DisplayRanking {
   seriesId: string
   mangaka: string
   score: number
-  votes: number
+  likes: number
+  views: number
   isMine?: boolean
 }
 
@@ -20,6 +22,13 @@ export default function RankingPerformancePage() {
   const [selectedPeriod, setSelectedPeriod] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const [selectedSeriesForTrend, setSelectedSeriesForTrend] = useState<DisplayRanking | null>(null)
+  const [trendData, setTrendData] = useState<any[]>([])
+  const [trendLoading, setTrendLoading] = useState(false)
+  const [selectedSeriesChapters, setSelectedSeriesChapters] = useState<any[]>([])
+  const [modalTab, setModalTab] = useState<'TREND' | 'CHAPTERS'>('CHAPTERS')
 
   // Get user's managed series (from local storage or series API)
   const [mySeriesIds, setMySeriesIds] = useState<string[]>([])
@@ -50,23 +59,21 @@ export default function RankingPerformancePage() {
       const periodsList: ApiRankingPeriod[] = Array.isArray(periodsData) ? periodsData : (periodsData.periods || periodsData.items || [])
       setPeriods(periodsList)
 
-      // Set default period
-      if (periodsList.length > 0) {
-        setSelectedPeriod(periodsList[0].period_id)
-      }
-
       // My series IDs
       const seriesData = seriesRes.data || seriesRes
       const seriesList = Array.isArray(seriesData) ? seriesData : (seriesData.series || seriesData.items || [])
-      setMySeriesIds(seriesList.map((s: any) => s.series_id))
+      const myIds = seriesList.map((s: any) => s.series_id)
+      setMySeriesIds(myIds)
+
+      // Set default period
+      let defaultPeriod = ''
+      if (periodsList.length > 0) {
+        defaultPeriod = periodsList[0].period_id
+        setSelectedPeriod(defaultPeriod)
+      }
 
       // Fetch rankings for first period
-      if (periodsList.length > 0) {
-        await fetchRankings(periodsList[0].period_id)
-      } else {
-        // No periods, try fetching without period_id
-        await fetchRankings('')
-      }
+      await fetchRankings(defaultPeriod, myIds)
     } catch (err: any) {
       console.error('Failed to load ranking data:', err)
       setError('Không thể tải dữ liệu xếp hạng.')
@@ -75,25 +82,33 @@ export default function RankingPerformancePage() {
     }
   }
 
-  const fetchRankings = async (periodId: string) => {
+  const fetchRankings = async (periodId: string, currentMySeriesIds?: string[]) => {
     try {
-      const params: any = { limit: 50 }
+      const params: any = { limit: 50, status: 'published' }
       if (periodId) params.period_id = periodId
 
       const res = await editorService.getTopSeriesRankings(params)
       const data = res.data || res
-      const list = Array.isArray(data) ? data : (data.rankings || data.items || [])
+      let list = Array.isArray(data) ? data : (data.rankings || data.items || [])
+      
+      // Filter out any non-published series just to be completely safe
+      list = list.filter((r: any) => r.series && r.series.status === 'published')
 
-      const mapped: DisplayRanking[] = list.map((r: any, idx: number) => ({
-        rank: r.rank || idx + 1,
-        prevRank: r.previous_rank || r.prevRank || r.rank || idx + 1,
-        series: r.series?.title || r.title || '—',
-        seriesId: r.series_id || r.series?.series_id || '',
-        mangaka: r.series?.owner?.username || r.mangaka || '—',
-        score: r.score || 0,
-        votes: r.view_count || r.votes || 0,
-        isMine: mySeriesIds.includes(r.series_id || r.series?.series_id || ''),
-      }))
+      const myIds = currentMySeriesIds || mySeriesIds
+      const mapped: DisplayRanking[] = list.map((r: any, idx: number) => {
+        const sId = r.series_id || r.series?.series_id || ''
+        return {
+          rank: r.rank_position || idx + 1,
+          prevRank: r.prev_rank || r.rank_position || idx + 1,
+          series: r.series?.title || r.title || '—',
+          seriesId: sId,
+          mangaka: r.series?.owner?.username || r.series?.owner?.fullName || r.mangaka || '—',
+          score: r.score || 0,
+          likes: r.series?.like_count || 0,
+          views: r.series?.view_count || r.views || 0,
+          isMine: myIds.includes(sId),
+        }
+      })
 
       setRankings(mapped)
     } catch (err: any) {
@@ -101,13 +116,69 @@ export default function RankingPerformancePage() {
     }
   }
 
-  const displayRankings = activeTab === 'MINE' ? rankings.filter(r => r.isMine) : rankings
+  const handleSeriesClick = async (series: DisplayRanking) => {
+    setSelectedSeriesForTrend(series)
+    setTrendLoading(true)
+    setTrendData([])
+    setSelectedSeriesChapters([])
+    setModalTab('CHAPTERS')
+    try {
+      // Fetch ranking history and series details in parallel
+      const [historyRes, detailRes] = await Promise.all([
+        editorService.getSeriesHistory(series.seriesId).catch(err => {
+          console.error('Failed to load series history:', err)
+          return []
+        }),
+        editorService.getSeriesDetail(series.seriesId).catch(err => {
+          console.error('Failed to load series detail:', err)
+          return null
+        })
+      ])
+
+      // 1. Process history data
+      const historyData = historyRes.data || historyRes || []
+      const historyList = Array.isArray(historyData) ? [...historyData] : []
+      historyList.sort((a: any, b: any) => {
+        const dateA = a.ranking_period?.start_date ? new Date(a.ranking_period.start_date).getTime() : 0
+        const dateB = b.ranking_period?.start_date ? new Date(b.ranking_period.start_date).getTime() : 0
+        return dateA - dateB
+      })
+
+      const historyTrend = historyList.map((h: any, idx: number) => {
+        const prev = historyList[idx - 1]
+        return {
+          period_name: h.ranking_period?.name || `Kỳ ${idx + 1}`,
+          rank: h.rank_position,
+          change: prev ? prev.rank_position - h.rank_position : 0
+        }
+      })
+      setTrendData(historyTrend)
+
+      // 2. Process series details (chapters)
+      const detailData = detailRes?.data || detailRes
+      if (detailData && detailData.chapter) {
+        const chaps = Array.isArray(detailData.chapter) ? detailData.chapter : []
+        chaps.sort((a: any, b: any) => (a.chapter_number || 0) - (b.chapter_number || 0))
+        setSelectedSeriesChapters(chaps)
+      }
+    } catch (err) {
+      console.error('Failed to load series details or history:', err)
+    } finally {
+      setTrendLoading(false)
+    }
+  }
+
+  const displayRankings = rankings.filter(r =>
+    r.series.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    r.mangaka.toLowerCase().includes(searchQuery.toLowerCase())
+  )
 
   // Compute overview stats from data
   const myRankings = rankings.filter(r => r.isMine)
   const bestSeries = myRankings.length > 0 ? myRankings.reduce((best, r) => r.rank < best.rank ? r : best, myRankings[0]) : null
   const worstSeries = myRankings.length > 0 ? myRankings.reduce((worst, r) => r.rank > worst.rank ? r : worst, myRankings[0]) : null
-  const avgScore = myRankings.length > 0 ? (myRankings.reduce((sum, r) => sum + r.score, 0) / myRankings.length).toFixed(2) : '0'
+  const totalViews = myRankings.reduce((sum, r) => sum + r.views, 0)
+  const totalLikes = myRankings.reduce((sum, r) => sum + r.likes, 0)
 
   if (loading) {
     return (
@@ -159,7 +230,7 @@ export default function RankingPerformancePage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-manga-ink text-white p-6 border-4 border-manga-ink flex flex-col justify-between">
           <div className="flex items-center gap-2 mb-4 text-gray-300 text-xs font-bold uppercase">
-            <Trophy className="w-4 h-4 text-yellow-400" /> Series Hạng Cao Nhất (Của Bạn)
+            <Trophy className="w-4 h-4 text-yellow-400" /> Series Hạng Cao Nhất (Phụ Trách)
           </div>
           <div>
             {bestSeries ? (
@@ -167,12 +238,6 @@ export default function RankingPerformancePage() {
                 <h2 className="font-manga text-3xl font-bold text-yellow-400 mb-1">{bestSeries.series}</h2>
                 <div className="flex items-end gap-3">
                   <span className="text-4xl font-black">#{bestSeries.rank}</span>
-                  {(() => {
-                    const diff = bestSeries.prevRank - bestSeries.rank
-                    if (diff > 0) return <span className="text-green-400 font-bold flex items-center gap-1 text-sm mb-1"><TrendingUp className="w-4 h-4" /> Tăng {diff} hạng</span>
-                    if (diff < 0) return <span className="text-red-400 font-bold flex items-center gap-1 text-sm mb-1"><TrendingDown className="w-4 h-4" /> Giảm {Math.abs(diff)} hạng</span>
-                    return <span className="text-gray-400 font-bold flex items-center gap-1 text-sm mb-1"><Minus className="w-4 h-4" /> Giữ nguyên</span>
-                  })()}
                 </div>
               </>
             ) : (
@@ -183,7 +248,7 @@ export default function RankingPerformancePage() {
 
         <div className="bg-white border-4 border-manga-ink p-6 flex flex-col justify-between">
           <div className="flex items-center gap-2 mb-4 text-gray-500 text-xs font-bold uppercase">
-            <TrendingDown className="w-4 h-4 text-red-500" /> Series Giảm Sâu Nhất
+            <TrendingDown className="w-4 h-4 text-red-500" /> Series Hạng Thấp Nhất (Phụ Trách)
           </div>
           <div>
             {worstSeries ? (
@@ -191,12 +256,6 @@ export default function RankingPerformancePage() {
                 <h2 className="font-manga text-xl font-bold text-manga-ink mb-2">{worstSeries.series}</h2>
                 <div className="flex items-end gap-3">
                   <span className="text-3xl font-black text-gray-700">#{worstSeries.rank}</span>
-                  {(() => {
-                    const diff = worstSeries.prevRank - worstSeries.rank
-                    if (diff < 0) return <span className="text-red-500 font-bold flex items-center gap-1 text-sm mb-1"><TrendingDown className="w-4 h-4" /> Tụt {Math.abs(diff)} hạng</span>
-                    if (diff > 0) return <span className="text-green-500 font-bold flex items-center gap-1 text-sm mb-1"><TrendingUp className="w-4 h-4" /> Tăng {diff} hạng</span>
-                    return <span className="text-gray-400 font-bold flex items-center gap-1 text-sm mb-1"><Minus className="w-4 h-4" /> Giữ nguyên</span>
-                  })()}
                 </div>
               </>
             ) : (
@@ -207,10 +266,10 @@ export default function RankingPerformancePage() {
 
         <div className="bg-white border-4 border-manga-ink p-6 flex flex-col justify-between">
           <div className="flex items-center gap-2 mb-4 text-gray-500 text-xs font-bold uppercase">
-            <Star className="w-4 h-4 text-orange-500" /> Điểm Đánh Giá Trung Bình
+            <Eye className="w-4 h-4 text-orange-500" /> Tổng Lượt Đọc
           </div>
           <div>
-            <div className="text-4xl font-black text-manga-ink mb-1">{avgScore} <span className="text-xl text-gray-400">/ 100</span></div>
+            <div className="text-4xl font-black text-manga-ink mb-1">{totalViews.toLocaleString()} <span className="text-xl text-gray-400">lượt</span></div>
             <div className="text-sm font-bold text-gray-500">
               Tổng {myRankings.length} series đang phát hành
             </div>
@@ -218,55 +277,44 @@ export default function RankingPerformancePage() {
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="flex bg-gray-100 p-1 border-4 border-manga-ink w-fit mb-6">
-        <button onClick={() => setActiveTab('MINE')}
-          className={`px-8 py-2 text-xs font-bold uppercase transition-colors ${activeTab === 'MINE' ? 'bg-white border-2 border-manga-ink text-manga-ink shadow-sm' : 'text-gray-500 hover:text-manga-ink'}`}>
-          Series Của Tôi
-        </button>
-        <button onClick={() => setActiveTab('ALL')}
-          className={`px-8 py-2 text-xs font-bold uppercase transition-colors ${activeTab === 'ALL' ? 'bg-white border-2 border-manga-ink text-manga-ink shadow-sm' : 'text-gray-500 hover:text-manga-ink'}`}>
-          Toàn Bộ Tạp Chí
-        </button>
-      </div>
+
 
       {/* Table */}
+      <div className="mb-4 flex items-center bg-white border-2 border-manga-ink px-4 py-2 w-full max-w-md">
+        <Search className="w-5 h-5 text-gray-500 mr-2" />
+        <input
+          type="text"
+          placeholder="Tìm kiếm series hoặc mangaka..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="flex-1 text-sm font-bold focus:outline-none"
+        />
+      </div>
+
       <div className="bg-white border-4 border-manga-ink">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b-4 border-manga-ink bg-gray-50">
-              <th className="px-6 py-4 text-xs font-black text-manga-ink uppercase tracking-wider w-20">Hạng</th>
-              <th className="px-6 py-4 text-xs font-black text-manga-ink uppercase tracking-wider w-24">Xu Hướng</th>
-              <th className="px-6 py-4 text-xs font-black text-manga-ink uppercase tracking-wider">Series</th>
-              <th className="px-6 py-4 text-xs font-black text-manga-ink uppercase tracking-wider">Mangaka</th>
-              <th className="px-6 py-4 text-xs font-black text-manga-ink uppercase tracking-wider text-right">Điểm</th>
-              <th className="px-6 py-4 text-xs font-black text-manga-ink uppercase tracking-wider text-right">Lượt xem</th>
+              <th className="px-6 py-4 text-xs font-black text-manga-ink uppercase tracking-wider whitespace-nowrap w-20">Hạng</th>
+              <th className="px-6 py-4 text-xs font-black text-manga-ink uppercase tracking-wider whitespace-nowrap">Series</th>
+              <th className="px-6 py-4 text-xs font-black text-manga-ink uppercase tracking-wider whitespace-nowrap">Mangaka</th>
+              <th className="px-6 py-4 text-xs font-black text-manga-ink uppercase tracking-wider whitespace-nowrap text-right">Lượt thích</th>
             </tr>
           </thead>
           <tbody className="divide-y-2 divide-gray-100">
             {displayRankings.map((r, i) => {
               const diff = r.prevRank - r.rank
               return (
-                <tr key={i} className={`hover:bg-gray-50 transition-colors ${r.isMine && activeTab === 'ALL' ? 'bg-yellow-50/50' : ''}`}>
+                <tr key={i} className={`hover:bg-gray-50 transition-colors cursor-pointer ${r.isMine && activeTab === 'ALL' ? 'bg-yellow-50/50' : ''}`} onClick={() => handleSeriesClick(r)}>
                   <td className="px-6 py-5">
                     <span className={`text-xl font-black ${r.rank <= 3 ? 'text-manga-red' : 'text-gray-700'}`}>#{r.rank}</span>
                   </td>
                   <td className="px-6 py-5">
-                    {diff > 0 ? (
-                      <div className="flex items-center gap-1 text-green-500 font-bold text-sm"><TrendingUp className="w-4 h-4" /> +{diff}</div>
-                    ) : diff < 0 ? (
-                      <div className="flex items-center gap-1 text-red-500 font-bold text-sm"><TrendingDown className="w-4 h-4" /> {diff}</div>
-                    ) : (
-                      <div className="flex items-center gap-1 text-gray-400 font-bold text-sm"><Minus className="w-4 h-4" /> 0</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-5">
                     <div className="font-bold text-base text-manga-ink">{r.series}</div>
-                    {r.isMine && activeTab === 'ALL' && <div className="text-[10px] font-bold text-blue-600 uppercase mt-1">Series của bạn</div>}
+                    {r.isMine && activeTab === 'ALL' && <div className="text-[10px] font-bold text-blue-600 uppercase mt-1">Series phụ trách</div>}
                   </td>
                   <td className="px-6 py-5 font-bold text-gray-600">{r.mangaka}</td>
-                  <td className="px-6 py-5 text-right font-black text-lg text-manga-ink">{r.score}</td>
-                  <td className="px-6 py-5 text-right text-sm font-bold text-gray-500">{r.votes.toLocaleString()}</td>
+                  <td className="px-6 py-5 text-right text-sm font-bold text-gray-500">{r.likes.toLocaleString()}</td>
                 </tr>
               )
             })}
@@ -275,10 +323,115 @@ export default function RankingPerformancePage() {
 
         {displayRankings.length === 0 && (
           <div className="p-8 text-center text-gray-500 font-bold">
-            {activeTab === 'MINE' ? 'Chưa có series nào của bạn trong bảng xếp hạng.' : 'Không có dữ liệu xếp hạng.'}
+            {activeTab === 'MINE' ? 'Chưa có series nào bạn phụ trách trong bảng xếp hạng.' : 'Không có dữ liệu xếp hạng.'}
           </div>
         )}
       </div>
+
+      {selectedSeriesForTrend && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white border-4 border-manga-ink p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto relative">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-black font-manga text-manga-ink uppercase">CHI TIẾT SERIES: {selectedSeriesForTrend.series}</h2>
+              <button onClick={() => setSelectedSeriesForTrend(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X className="w-6 h-6" /></button>
+            </div>
+
+            {/* Tab selector */}
+            <div className="flex border-b-4 border-manga-ink mb-6">
+              <button
+                onClick={() => setModalTab('CHAPTERS')}
+                className={`px-4 py-2 font-black text-sm uppercase transition-all border-t-4 border-x-4 ${
+                  modalTab === 'CHAPTERS'
+                    ? 'border-manga-ink bg-white text-manga-ink -mb-[4px] relative z-10'
+                    : 'border-transparent text-gray-400 hover:text-manga-ink'
+                }`}
+              >
+                Hiệu suất từng Chapter
+              </button>
+              <button
+                onClick={() => setModalTab('TREND')}
+                className={`px-4 py-2 font-black text-sm uppercase transition-all border-t-4 border-x-4 ${
+                  modalTab === 'TREND'
+                    ? 'border-manga-ink bg-white text-manga-ink -mb-[4px] relative z-10'
+                    : 'border-transparent text-gray-400 hover:text-manga-ink'
+                }`}
+              >
+                Xu hướng xếp hạng
+              </button>
+            </div>
+
+            {trendLoading ? (
+              <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-manga-red" /></div>
+            ) : modalTab === 'CHAPTERS' ? (
+              <div className="overflow-x-auto border-2 border-manga-ink">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50 border-b-2 border-manga-ink">
+                      <th className="px-4 py-3 text-xs font-black text-manga-ink uppercase">Chapter / Tên chương</th>
+                      <th className="px-4 py-3 text-xs font-black text-manga-ink uppercase text-right">Lượt đọc</th>
+                      <th className="px-4 py-3 text-xs font-black text-manga-ink uppercase text-right">Lượt thích</th>
+                      <th className="px-4 py-3 text-xs font-black text-manga-ink uppercase text-right">Ngày đăng</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {selectedSeriesChapters.length > 0 ? (
+                      selectedSeriesChapters.map((ch: any, index: number) => {
+                        const likesCount = Array.isArray(ch.chapter_like) ? ch.chapter_like.length : 0;
+                        return (
+                          <tr key={ch.chapter_id || index} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-4 py-3 font-bold text-sm text-manga-ink">
+                              Chương {ch.chapter_number}: {ch.title}
+                            </td>
+                            <td className="px-4 py-3 text-right font-bold text-sm text-gray-500">
+                              {(ch.view_count || 0).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-3 text-right font-bold text-sm text-gray-500">
+                              {likesCount.toLocaleString()}
+                            </td>
+                            <td className="px-4 py-3 text-right font-bold text-xs text-gray-400">
+                              {new Date(ch.created_at).toLocaleDateString('vi-VN')}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-6 text-center text-gray-500 font-bold">
+                          Chưa có chapter nào được xuất bản cho series này.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : trendData.length > 0 ? (
+              <div className="h-80 w-full mt-4">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={trendData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="period_name" tick={{ fontSize: 12, fontWeight: 'bold' }} />
+                    <YAxis reversed={true} domain={[1, 'dataMax + 2']} tick={{ fontSize: 12, fontWeight: 'bold' }} label={{ value: 'Hạng', angle: -90, position: 'insideLeft' }} />
+                    <Tooltip
+                      contentStyle={{ border: '2px solid #000', fontWeight: 'bold' }}
+                      labelStyle={{ color: '#000' }}
+                      formatter={(value: any, name: any, props: any) => {
+                        const change = props.payload.change;
+                        let changeText = 'Giữ nguyên';
+                        if (change > 0) changeText = `Tăng ${change} hạng`;
+                        if (change < 0) changeText = `Giảm ${Math.abs(change)} hạng`;
+                        return [`Hạng ${value} (${changeText})`, 'Thứ hạng'];
+                      }}
+                    />
+                    <Line type="monotone" dataKey="rank" stroke="#ef4444" strokeWidth={4} activeDot={{ r: 8 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <p className="text-center text-gray-500 font-bold py-8">Chưa có dữ liệu lịch sử xếp hạng cho series này.</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

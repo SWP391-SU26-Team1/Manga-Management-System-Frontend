@@ -60,15 +60,17 @@ export default function NotificationsPage() {
     const t = (backendType || '').toLowerCase()
     if (t.includes('manuscript') || t.includes('editor_feedback')) return 'Mangaka'
     if (t.includes('vote') || t.includes('board') || t.includes('decision')) return 'Board'
+    if (t.includes('overdue') || t.includes('abandoned') || t.includes('low_views') || t.includes('rank_drop')) return 'System'
     return 'System'
   }
 
   const mapLink = (backendType: string): string => {
     const t = (backendType || '').toLowerCase()
     if (t.includes('manuscript')) return '/dashboard/tantou-editor/manuscript-review?tab=manuscript'
-    if (t.includes('series')) return '/dashboard/tantou-editor/manuscript-review?tab=series'
+    if (t.includes('series') && !t.includes('rank_drop') && !t.includes('abandoned') && !t.includes('low_views')) return '/dashboard/tantou-editor/manuscript-review?tab=series'
     if (t.includes('feedback')) return '/dashboard/tantou-editor/notifications'
     if (t.includes('vote') || t.includes('decision')) return '/dashboard/tantou-editor/workflow'
+    if (t.includes('overdue') || t.includes('abandoned') || t.includes('low_views') || t.includes('rank_drop')) return '/dashboard/tantou-editor/alerts'
     return ''
   }
 

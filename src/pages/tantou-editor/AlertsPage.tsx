@@ -15,9 +15,10 @@ export default function AlertsPage() {
       setLoading(true)
       const res = await editorService.getAlerts()
       if (res.success && Array.isArray(res.data)) {
-        setAlerts(res.data)
+        // Filter out MEDIUM alerts as requested by user
+        setAlerts(res.data.filter((a: ApiAlert) => a.type === 'CRITICAL' || a.type === 'HIGH'))
       } else {
-        setAlerts(res.data || [])
+        setAlerts([])
       }
       setError(null)
     } catch (err: any) {
@@ -50,8 +51,6 @@ export default function AlertsPage() {
 
   const criticalCount = alerts.filter(a => a.type === 'CRITICAL').length
   const highCount = alerts.filter(a => a.type === 'HIGH').length
-  const mediumCount = alerts.filter(a => a.type === 'MEDIUM').length
-
   const formatDate = (dateStr: string) => {
     try {
       const date = new Date(dateStr)
@@ -95,7 +94,7 @@ export default function AlertsPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <div className="bg-white border-2 border-red-600 p-4 relative overflow-hidden">
           <ShieldAlert className="w-16 h-16 text-red-100 absolute -right-2 -bottom-2" />
           <div className="relative z-10">
@@ -110,14 +109,6 @@ export default function AlertsPage() {
             <h3 className="font-bold text-orange-600 text-xs uppercase mb-1">Rủi Ro Cao</h3>
             <div className="text-4xl font-black text-manga-ink">{loading ? '...' : highCount}</div>
             <p className="text-[10px] font-bold text-gray-500 mt-2">Cần xử lý trong 48h</p>
-          </div>
-        </div>
-        <div className="bg-white border-2 border-yellow-400 p-4 relative overflow-hidden">
-          <AlertTriangle className="w-16 h-16 text-yellow-100 absolute -right-2 -bottom-2" />
-          <div className="relative z-10">
-            <h3 className="font-bold text-yellow-600 text-xs uppercase mb-1">Cảnh Cáo</h3>
-            <div className="text-4xl font-black text-manga-ink">{loading ? '...' : mediumCount}</div>
-            <p className="text-[10px] font-bold text-gray-500 mt-2">Nên theo dõi thêm</p>
           </div>
         </div>
       </div>

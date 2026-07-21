@@ -41,6 +41,7 @@ export interface BackendNotification {
   title: string
   content: string
   type: string
+  metadata?: any
   is_read: boolean
   created_at: string
 }
@@ -177,6 +178,11 @@ export const rankingService = {
   /** PATCH /api/notifications/:id/read - Đánh dấu thông báo đã đọc */
   markAsRead: async (notificationId: string): Promise<void> => {
     await api.patch(`/api/notifications/${notificationId}/read`)
+  },
+
+  /** PATCH /api/notifications/:id/acknowledge - Xác nhận rủi ro từ Editor */
+  acknowledgeReminder: async (notificationId: string): Promise<void> => {
+    await api.patch(`/api/notifications/${notificationId}/acknowledge`)
   },
 
   /** PATCH /api/mangaka/notifications/mark-all-read - Đánh dấu tất cả thông báo đã đọc */

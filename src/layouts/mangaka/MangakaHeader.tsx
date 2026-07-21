@@ -74,6 +74,7 @@ const translateNotification = (title: string, content: string, type: string) => 
     viContent = content || 'Ban biên tập đã đưa ra quyết định duyệt cho bản thảo của bạn.';
   } else if (
     t === 'ranking_warning' || 
+    t === 'ranking_warning_acknowledged' || 
     lowerTitle.includes('ranking risk') || 
     lowerTitle.includes('ranking warning') || 
     lowerTitle.includes('cảnh báo xếp hạng')

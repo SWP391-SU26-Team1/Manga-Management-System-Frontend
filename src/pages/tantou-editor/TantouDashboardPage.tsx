@@ -52,14 +52,42 @@ export default function TantouDashboardPage() {
     }
   }, [])
 
+  const translateNotification = (title: string, content: string, type: string) => {
+    const t = (type || '').toLowerCase();
+    const lowerTitle = (title || '').toLowerCase();
+
+    let viTitle = title;
+    let viContent = content;
+
+    if (t === 'manuscript_submitted' || t === 'series_submitted' || lowerTitle.includes('manuscript submitted') || lowerTitle.includes('nộp bản thảo')) {
+      viTitle = 'Cập nhật mới';
+      viContent = content || 'Tác giả đã nộp bản thảo mới cần duyệt.';
+    } else if (t === 'editor_feedback' || lowerTitle.includes('feedback') || lowerTitle.includes('nhận xét')) {
+      viTitle = 'Ý kiến thảo luận';
+      viContent = content || 'Có thảo luận hoặc ý kiến phản hồi mới.';
+    } else if (t === 'task_submitted' || lowerTitle.includes('submission')) {
+      viTitle = 'Trợ lý nộp bài';
+      viContent = content || 'Trợ lý đã nộp bản thảo/bản vẽ mới.';
+    } else if (t === 'vote_cast' || t.includes('vote') || lowerTitle.includes('vote')) {
+      viTitle = 'Đóng góp ý kiến của Hội đồng';
+      viContent = content || 'Thành viên Hội đồng đã bỏ phiếu duyệt.';
+    } else if (t === 'decision_result' || lowerTitle.includes('decision')) {
+      viTitle = 'Kết quả kiểm duyệt Hội đồng';
+      viContent = content || 'Hội đồng biên tập đã phản hồi báo cáo của bạn.';
+    }
+
+    return { title: viTitle, content: viContent };
+  }
+
   const fetchDashboard = async () => {
     try {
       setLoading(true)
       setError(null)
-      const [overviewRes, seriesRes, manuscriptsRes] = await Promise.all([
+      const [overviewRes, seriesRes, manuscriptsRes, notificationsRes] = await Promise.all([
         editorService.getDashboardOverview(),
         editorService.getSeries(),
-        editorService.getManuscripts().catch(() => ({ data: [] }))
+        editorService.getManuscripts().catch(() => ({ data: [] })),
+        editorService.getNotifications().catch(() => ({ data: [] }))
       ])
 
       const overview = overviewRes.data || overviewRes
@@ -80,6 +108,21 @@ export default function TantouDashboardPage() {
 
       overview.actual_pending_review = pendingManuscripts.length
       overview.actual_need_revision = revisionManuscripts.length
+
+      // Process notifications
+      const notificationsData = notificationsRes.data || notificationsRes
+      const notificationsList = Array.isArray(notificationsData) ? notificationsData : (notificationsData.notifications || notificationsData.items || [])
+      
+      const mappedNotifications = notificationsList.map((n: any) => {
+        const { title, content } = translateNotification(n.title, n.content || '', n.type)
+        return {
+          ...n,
+          title,
+          content
+        }
+      })
+
+      overview.recent_notifications = mappedNotifications
 
       setDashboardData(overview)
     } catch (err: any) {
@@ -127,7 +170,7 @@ export default function TantouDashboardPage() {
 
   const { managingSeries, pendingReview, needRevision, approvedThisMonth, overdue, atRiskSeries, todayOverview } = stats
 
-  const recentNotifications = (dashboardData?.recentNotifications || dashboardData?.recent_notifications || []).filter((n: any) => !n.is_read)
+  const recentNotifications = (dashboardData?.recentNotifications || dashboardData?.recent_notifications || [])
 
   // Loading state
   if (loading) {
@@ -246,8 +289,8 @@ export default function TantouDashboardPage() {
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-bold uppercase text-manga-ink text-sm">Thông Báo Gần Đây</h2>
             <div className="flex items-center gap-3">
-              {recentNotifications.length > 0 && (
-                <span className="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-sm">{recentNotifications.filter((n: any) => !n.is_read).length || recentNotifications.length} CHƯA ĐỌC</span>
+              {recentNotifications.filter((n: any) => !n.is_read).length > 0 && (
+                <span className="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-sm">{recentNotifications.filter((n: any) => !n.is_read).length} CHƯA ĐỌC</span>
               )}
               <button onClick={() => navigate('/dashboard/tantou-editor/notifications')} className="text-xs font-bold text-gray-500 hover:text-red-600 flex items-center gap-1 transition-colors">
                 Xem tất cả <ArrowRight className="w-3 h-3" />
@@ -260,7 +303,9 @@ export default function TantouDashboardPage() {
               <div 
                 key={notif.notification_id || notif.id || idx} 
                 onClick={() => handleNotifClick(notif)}
-                className="p-4 hover:bg-gray-50 transition-colors cursor-pointer group"
+                className={`p-4 hover:bg-gray-50 transition-colors cursor-pointer group relative ${
+                  notif.is_read ? 'opacity-70 bg-gray-50/50' : 'bg-white border-l-4 border-l-red-500'
+                }`}
               >
                 <div className="flex justify-between items-start mb-1">
                   <h3 className={`font-bold text-xs uppercase flex items-center gap-2 ${
@@ -301,10 +346,7 @@ export default function TantouDashboardPage() {
               <span className="flex items-center gap-2"><FileText className="w-4 h-4 text-red-500" /> Review bản thảo mới nhất</span>
               <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
             </Link>
-            <Link to="/dashboard/tantou-editor/reports" className="flex items-center justify-between p-2 text-sm font-bold text-blue-600 hover:bg-blue-50 transition-colors group rounded">
-              <span className="flex items-center gap-2"><MessageSquareText className="w-4 h-4 text-purple-500" /> Tạo báo cáo Editorial Board</span>
-              <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
-            </Link>
+
           </div>
         </div>
 
@@ -325,9 +367,7 @@ export default function TantouDashboardPage() {
               <span className="text-yellow-400">{todayOverview.reportsToSend} báo cáo</span>
             </div>
           </div>
-          <button onClick={() => navigate('/dashboard/tantou-editor/reports')} className="w-full mt-6 bg-transparent border-2 border-white text-white font-bold text-xs uppercase py-2 hover:bg-white hover:text-manga-ink transition-colors flex items-center justify-center gap-2">
-            TẠO BÁO CÁO EDITORIAL BOARD <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+
         </div>
 
       </div>

@@ -102,6 +102,12 @@ export default function ApprovalWorkflowPage() {
         chaptersList.map((ch: any) => ch.series_id)
       );
 
+      const seriesWithRejectedChapters = new Set(
+        chaptersList
+          .filter((ch: any) => ['rejected', 'needs_revision', 'needs_change'].includes(ch.status?.toLowerCase()))
+          .map((ch: any) => ch.series_id)
+      );
+
       // Map chapter_id to series_id for sessions resolution
       const chapterToSeriesMap = new Map();
       chaptersList.forEach((ch: any) => {
@@ -139,8 +145,9 @@ export default function ApprovalWorkflowPage() {
           submitDate: s.created_at ? new Date(s.created_at).toLocaleDateString('vi-VN') : '—',
           seriesStatus: s.status,
           hasApprovedChapters: seriesWithApprovedChapters.has(sId) || s.status === 'published',
-          hasChapters: seriesWithChapters.has(sId) || s.status === 'published',
-          hasActiveSessions: seriesWithActiveSessions.has(sId) || s.status === 'published'
+          hasRejectedChapters: seriesWithRejectedChapters.has(sId),
+          hasChapters: (seriesWithApprovedChapters.has(sId) && seriesWithChapters.has(sId)) || s.status === 'published',
+          hasActiveSessions: (seriesWithApprovedChapters.has(sId) && seriesWithActiveSessions.has(sId)) || s.status === 'published'
         };
       })
 
@@ -437,14 +444,26 @@ export default function ApprovalWorkflowPage() {
                           <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center font-bold text-sm shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)] z-10 ${
                             selectedSeries.hasApprovedChapters
                               ? 'border-green-500 bg-green-50 text-green-600'
+                              : selectedSeries.hasRejectedChapters
+                              ? 'border-red-500 bg-red-50 text-red-600'
                               : 'border-gray-300 bg-gray-50 text-gray-400'
                           }`}>
-                            {selectedSeries.hasApprovedChapters ? <Check className="w-4 h-4 text-green-655" /> : <Clock className="w-4 h-4 text-gray-400" />}
+                            {selectedSeries.hasApprovedChapters ? (
+                              <Check className="w-4 h-4 text-green-655" />
+                            ) : selectedSeries.hasRejectedChapters ? (
+                              <X className="w-4 h-4 text-red-655" />
+                            ) : (
+                              <Clock className="w-4 h-4 text-gray-400" />
+                            )}
                           </div>
                           <div className="w-0.5 h-12 bg-gray-200"></div>
                         </div>
                         <div className="flex flex-col min-w-0 pt-1.5 pb-2">
-                          <span className={`text-sm font-bold ${selectedSeries.hasApprovedChapters ? 'text-green-600' : 'text-gray-400'}`}>
+                          <span className={`text-sm font-bold ${
+                            selectedSeries.hasApprovedChapters ? 'text-green-600' :
+                            selectedSeries.hasRejectedChapters ? 'text-red-600' :
+                            'text-gray-400'
+                          }`}>
                             2. Duyệt phân cảnh & Kịch bản (Tantou Editor)
                           </span>
                           <span className="text-[11px] text-gray-500 font-medium">Biên tập viên duyệt kịch bản phân cảnh và khởi tạo chương mới</span>

@@ -36,7 +36,7 @@ export default function MangakaDashboardPage() {
 
   useEffect(() => {
     // Load user from localStorage
-    const stored = sessionStorage.getItem('mangaflow_user')
+    const stored = localStorage.getItem('mangaflow_user')
     if (stored) {
       const parsed = JSON.parse(stored)
       setUser({ fullName: parsed.fullName || parsed.username || 'Mangaka' })

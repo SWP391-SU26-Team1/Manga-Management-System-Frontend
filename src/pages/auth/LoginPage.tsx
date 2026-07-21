@@ -38,7 +38,7 @@ export default function LoginPage() {
           ...(data as any).user,
           token: (data as any).token
         }
-        sessionStorage.setItem('mangaflow_user', JSON.stringify(storedUserData))
+        localStorage.setItem('mangaflow_user', JSON.stringify(storedUserData))
         if (storedUserData.role === 'MANGAKA') {
           navigate('/dashboard/mangaka')
         } else if (storedUserData.role === 'ASSISTANT') {
@@ -168,7 +168,7 @@ export default function LoginPage() {
         ...data.user,
         token: data.token
       }
-      sessionStorage.setItem('mangaflow_user', JSON.stringify(storedUserData))
+      localStorage.setItem('mangaflow_user', JSON.stringify(storedUserData))
 
       if (storedUserData.role === 'MANGAKA') {
         navigate('/dashboard/mangaka')

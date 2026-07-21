@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router'
-import { Plus, BookOpen, Clock, AlertTriangle, FileText, CheckCircle, Tag } from 'lucide-react'
+import { Plus, BookOpen, Clock, AlertTriangle, FileText, CheckCircle, Tag, AlertCircle } from 'lucide-react'
 import { SeriesCard } from '@/components/mangaka/SeriesCard'
 import { seriesService, SeriesAPI, getErrorMessage } from '@/services/series.service'
 import { chapterService } from '@/services/chapter.service'
@@ -22,6 +22,22 @@ export default function SeriesPage() {
   const [counts, setCounts] = useState({
     total: 0, active: 0, waiting: 0, published: 0,
   })
+
+  const [alertModal, setAlertModal] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error';
+  }>({
+    show: false,
+    title: '',
+    message: '',
+    type: 'success'
+  })
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' = 'success') => {
+    setAlertModal({ show: true, title, message, type })
+  }
 
   const fetchData = async () => {
     setIsLoading(true)
@@ -63,10 +79,10 @@ export default function SeriesPage() {
   const handlePublishSeries = async (seriesId: string) => {
     try {
       await seriesService.publish(seriesId)
-      alert('Xuất bản Series thành công!')
+      showAlert('Thành công', 'Xuất bản Series thành công!', 'success')
       await fetchData()
     } catch (err) {
-      alert(getErrorMessage(err))
+      showAlert('Lỗi', getErrorMessage(err), 'error')
     }
   }
 
@@ -202,6 +218,35 @@ export default function SeriesPage() {
           <a href="#" className="hover:text-manga-red transition-colors">Hỗ trợ Mangaka</a>
         </div>
       </footer>
+      {/* Custom Manga-Style Alert Modal */}
+      {alertModal.show && (
+        <div className="fixed inset-0 bg-black/60 z-[10000] flex items-center justify-center p-4">
+          <div className="bg-white border-4 border-manga-ink manga-shadow max-w-sm w-full animate-in fade-in zoom-in-95 duration-150 text-black">
+            <div className="p-4 border-b-4 border-manga-ink bg-gray-50 flex justify-between items-center">
+              <h3 className="font-manga font-bold text-lg uppercase flex items-center gap-2">
+                {alertModal.type === 'success' ? (
+                  <CheckCircle className="w-5 h-5 text-green-600 animate-bounce" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 text-manga-red animate-bounce" />
+                )}
+                {alertModal.title}
+              </h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm font-bold text-gray-700">{alertModal.message}</p>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setAlertModal(prev => ({ ...prev, show: false }))}
+                  className="px-4 py-2 bg-manga-ink text-white font-bold uppercase text-xs hover:bg-gray-800 transition-colors cursor-pointer border-2 border-manga-ink"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

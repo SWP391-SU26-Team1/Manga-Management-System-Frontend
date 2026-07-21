@@ -81,7 +81,7 @@ export const authService = {
     } catch {
       // Ignored if API logout fails, we still clean up client-side
     } finally {
-      sessionStorage.removeItem('mangaflow_user')
+      localStorage.removeItem('mangaflow_user')
     }
   },
 

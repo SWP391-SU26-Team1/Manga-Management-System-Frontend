@@ -47,9 +47,9 @@ export default function AdminProfilePage() {
         avatar_url: form.avatarUrl.trim() || undefined,
       })
       setProfile(updated)
-      const stored = sessionStorage.getItem('mangaflow_user')
+      const stored = localStorage.getItem('mangaflow_user')
       const current = stored ? JSON.parse(stored) : {}
-      sessionStorage.setItem('mangaflow_user', JSON.stringify({ ...current, ...updated, token: current.token }))
+      localStorage.setItem('mangaflow_user', JSON.stringify({ ...current, ...updated, token: current.token }))
       window.dispatchEvent(new Event('mangaflow_profile_updated'))
       setEditing(false)
       setFeedback({ type: 'success', message: 'Đã cập nhật hồ sơ trên hệ thống.' })

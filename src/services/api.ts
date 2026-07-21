@@ -15,7 +15,7 @@ export const api = axios.create({
 
 const getStoredUser = (): { token?: string } | null => {
   try {
-    const raw = sessionStorage.getItem('mangaflow_user')
+    const raw = localStorage.getItem('mangaflow_user')
     return raw ? JSON.parse(raw) : null
   } catch {
     return null
@@ -23,15 +23,15 @@ const getStoredUser = (): { token?: string } | null => {
 }
 
 const clearSession = () => {
-  sessionStorage.removeItem('mangaflow_user')
+  localStorage.removeItem('mangaflow_user')
 }
 
 const updateStoredToken = (token: string) => {
   try {
-    const raw = sessionStorage.getItem('mangaflow_user')
+    const raw = localStorage.getItem('mangaflow_user')
     if (raw) {
       const user = JSON.parse(raw)
-      sessionStorage.setItem('mangaflow_user', JSON.stringify({ ...user, token }))
+      localStorage.setItem('mangaflow_user', JSON.stringify({ ...user, token }))
     }
   } catch {
     // ignore

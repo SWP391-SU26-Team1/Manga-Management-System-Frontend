@@ -12,7 +12,7 @@ export default function SeriesReviewDetailPage() {
   const { addNotification } = useNotifications()
 
   // User checking
-  const storedUser = sessionStorage.getItem('mangaflow_user')
+  const storedUser = localStorage.getItem('mangaflow_user')
   const currentUser = storedUser ? JSON.parse(storedUser) : { id: '', fullName: 'Unknown', email: '' }
 
   const [series, setSeries] = useState<any | undefined>(undefined)

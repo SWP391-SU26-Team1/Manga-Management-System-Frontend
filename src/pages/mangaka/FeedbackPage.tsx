@@ -76,7 +76,7 @@ export default function FeedbackPage() {
       const rawFeedbacks = await feedbackService.getAll()
 
       // Get current logged-in user from localStorage
-      const storedUser = sessionStorage.getItem('mangaflow_user')
+      const storedUser = localStorage.getItem('mangaflow_user')
       let currentUserId = ''
       if (storedUser) {
         try {

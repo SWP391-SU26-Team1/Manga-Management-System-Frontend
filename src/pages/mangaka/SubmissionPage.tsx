@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router'
 import {
   CheckCircle,
+  AlertCircle,
   AlertTriangle,
   Download,
   Layers,
@@ -56,6 +57,22 @@ export default function SubmissionPage() {
   const [zoomTitle, setZoomTitle] = useState<string>('')
   
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+  const [alertModal, setAlertModal] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error';
+  }>({
+    show: false,
+    title: '',
+    message: '',
+    type: 'error'
+  })
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' = 'error') => {
+    setAlertModal({ show: true, title, message, type })
+  }
 
   const getImageUrl = (url?: string | null) => {
     if (!url) return 'https://images.unsplash.com/photo-1563089145-599997674d42?q=80&w=600&auto=format&fit=crop'
@@ -360,7 +377,7 @@ export default function SubmissionPage() {
 
     const rawTask = rawTasks.find((t) => t.task_id === selected.id)
     if (!rawTask) {
-      alert('Không tìm thấy thông tin task tương ứng.')
+      showAlert('Thông báo', 'Không tìm thấy thông tin task tương ứng.', 'error')
       return
     }
 
@@ -370,7 +387,7 @@ export default function SubmissionPage() {
     const seriesId = chapterInfo?.seriesId
 
     if (!seriesId || !chapterId || !pageId) {
-      alert('Không tìm thấy thông tin Series/Chapter liên quan để thực hiện duyệt.')
+      showAlert('Thông báo', 'Không tìm thấy thông tin Series/Chapter liên quan để thực hiện duyệt.', 'error')
       return
     }
 
@@ -412,13 +429,13 @@ export default function SubmissionPage() {
       setIsMerging(false)
       setMergeStep('')
       console.error(err)
-      alert('Không thể phê duyệt task. Lỗi: ' + ((err as any).response?.data?.message || (err as any).message))
+      showAlert('Lỗi phê duyệt', 'Không thể phê duyệt task. Lỗi: ' + ((err as any).response?.data?.message || (err as any).message), 'error')
     }
   }
 
   const handleDownloadFile = async () => {
     if (!selected || !selected.previewUrl) {
-      alert('Không có file hoặc URL để tải về.')
+      showAlert('Thông báo', 'Không có file hoặc URL để tải về.', 'error')
       return
     }
 
@@ -469,13 +486,13 @@ export default function SubmissionPage() {
   const handleReject = async () => {
     if (!selected) return
     if (!comment.trim()) {
-      alert('Vui lòng nhập nhận xét để gửi yêu cầu sửa chữa!')
+      showAlert('Yêu cầu nhận xét', 'Vui lòng nhập nhận xét để gửi yêu cầu sửa chữa!', 'error')
       return
     }
 
     const rawTask = rawTasks.find((t) => t.task_id === selected.id)
     if (!rawTask) {
-      alert('Không tìm thấy thông tin task tương ứng.')
+      showAlert('Thông báo', 'Không tìm thấy thông tin task tương ứng.', 'error')
       return
     }
 
@@ -485,7 +502,7 @@ export default function SubmissionPage() {
     const seriesId = chapterInfo?.seriesId
 
     if (!seriesId || !chapterId || !pageId) {
-      alert('Không tìm thấy thông tin Series/Chapter liên quan để thực hiện gửi yêu cầu chỉnh sửa.')
+      showAlert('Thông báo', 'Không tìm thấy thông tin Series/Chapter liên quan để thực hiện gửi yêu cầu chỉnh sửa.', 'error')
       return
     }
 
@@ -510,7 +527,7 @@ export default function SubmissionPage() {
       loadData()
     } catch (err) {
       console.error(err)
-      alert('Không thể gửi yêu cầu chỉnh sửa. Lỗi: ' + ((err as any).response?.data?.message || (err as any).message))
+      showAlert('Lỗi gửi yêu cầu', 'Không thể gửi yêu cầu chỉnh sửa. Lỗi: ' + ((err as any).response?.data?.message || (err as any).message), 'error')
     } finally {
       setLoading(false)
     }
@@ -520,7 +537,7 @@ export default function SubmissionPage() {
     if (!selected) return
     const rawTask = rawTasks.find((t) => t.task_id === selected.id)
     if (!rawTask) {
-      alert('Không tìm thấy thông tin task tương ứng.')
+      showAlert('Thông báo', 'Không tìm thấy thông tin task tương ứng.', 'error')
       return
     }
 
@@ -536,7 +553,7 @@ export default function SubmissionPage() {
       loadData()
     } catch (err: any) {
       console.error(err)
-      alert('Không thể giả lập nộp bài. Lỗi: ' + (err.response?.data?.message || err.message))
+      showAlert('Lỗi', 'Không thể giả lập nộp bài. Lỗi: ' + (err.response?.data?.message || err.message), 'error')
     } finally {
       setLoading(false)
     }
@@ -1084,6 +1101,36 @@ export default function SubmissionPage() {
             <button onClick={() => setToastMessage(null)} className="ml-2 hover:bg-gray-100 p-1 bg-transparent border-none cursor-pointer">
               <X className="w-4 h-4 text-gray-400" />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Manga-Style Alert Modal */}
+      {alertModal.show && (
+        <div className="fixed inset-0 bg-black/60 z-[10000] flex items-center justify-center p-4">
+          <div className="bg-white border-4 border-manga-ink manga-shadow max-w-sm w-full animate-in fade-in zoom-in-95 duration-150 text-black">
+            <div className="p-4 border-b-4 border-manga-ink bg-gray-50 flex justify-between items-center">
+              <h3 className="font-manga font-bold text-lg uppercase flex items-center gap-2">
+                {alertModal.type === 'success' ? (
+                  <CheckCircle className="w-5 h-5 text-green-600 animate-bounce" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 text-manga-red animate-bounce" />
+                )}
+                {alertModal.title}
+              </h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm font-bold text-gray-700">{alertModal.message}</p>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setAlertModal(prev => ({ ...prev, show: false }))}
+                  className="px-4 py-2 bg-manga-ink text-white font-bold uppercase text-xs hover:bg-gray-800 transition-colors cursor-pointer border-2 border-manga-ink"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -175,6 +175,14 @@ export default function TasksPage() {
 
   useEffect(() => {
     loadTasksData()
+
+    const handleFocus = () => {
+      loadTasksData()
+    }
+    window.addEventListener('focus', handleFocus)
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+    }
   }, [])
 
   useEffect(() => {
@@ -237,7 +245,8 @@ export default function TasksPage() {
     try {
       const res = await assistantService.listMyTasks({ limit: 100 })
       if (res && res.success) {
-        const mapped = res.data.map(mapBackendTaskToAssistantTask)
+        const activeTasks = (res.data || []).filter((t: any) => t.status !== 'cancelled' && t.status !== 'deleted')
+        const mapped = activeTasks.map(mapBackendTaskToAssistantTask)
         setTasks(mapped)
         // Skip fetching detailed user profiles to avoid HTTP 403 Forbidden console errors
         // loadAvatars(mapped)
@@ -441,8 +450,17 @@ export default function TasksPage() {
     }
     setIsSubmitting(true)
     try {
+      const apiURL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const absoluteUrl = uploadedFileUrl.startsWith('http://') || uploadedFileUrl.startsWith('https://') 
+        ? uploadedFileUrl 
+        : `${apiURL}${uploadedFileUrl.startsWith('/') ? '' : '/'}${uploadedFileUrl}`
+
+      if (submittingTask?.status === 'Not Started') {
+        await assistantService.startTask(taskId).catch(() => {})
+      }
+
       await assistantService.createSubmission(taskId, {
-        file_url: uploadedFileUrl,
+        file_url: absoluteUrl,
         submission_notes: submitNotes
       })
       loadTasksData()
@@ -450,7 +468,7 @@ export default function TasksPage() {
       showToast('success', `Nộp kết quả thành công cho Task #${taskId}!`)
     } catch (err: any) {
       console.error(err)
-      showToast('error', `Lỗi: ${err?.message || 'Không thể nộp kết quả'}`)
+      showToast('error', `Lỗi: ${err?.response?.data?.message || err?.message || 'Không thể nộp kết quả'}`)
     } finally {
       setIsSubmitting(false)
     }

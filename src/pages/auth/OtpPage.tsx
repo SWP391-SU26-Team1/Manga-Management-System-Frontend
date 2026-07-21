@@ -144,7 +144,7 @@ export default function OtpPage() {
           ...data.user,
           token: data.token
         }
-        sessionStorage.setItem('mangaflow_user', JSON.stringify(storedUserData))
+        localStorage.setItem('mangaflow_user', JSON.stringify(storedUserData))
         sessionStorage.removeItem('pending_register_email')
         
         setModal({
@@ -171,7 +171,7 @@ export default function OtpPage() {
         })
       } else if (pendingUserStr) {
         const parsed = JSON.parse(pendingUserStr)
-        sessionStorage.setItem('mangaflow_user', JSON.stringify(parsed))
+        localStorage.setItem('mangaflow_user', JSON.stringify(parsed))
         sessionStorage.removeItem('pending_google_user')
         
         const role = parsed.role?.toUpperCase()

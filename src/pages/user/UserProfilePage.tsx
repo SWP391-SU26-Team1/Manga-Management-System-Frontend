@@ -30,7 +30,7 @@ export default function UserProfilePage() {
   const { showToast } = useToast()
 
   useEffect(() => {
-    const storedUser = sessionStorage.getItem('mangaflow_user')
+    const storedUser = localStorage.getItem('mangaflow_user')
     if (storedUser) {
       const parsed = JSON.parse(storedUser)
       setProfile(parsed)
@@ -59,7 +59,7 @@ export default function UserProfilePage() {
       bio: editForm.bio,
       favoriteGenres: editForm.favoriteGenres
     }
-    sessionStorage.setItem('mangaflow_user', JSON.stringify(updatedUser))
+    localStorage.setItem('mangaflow_user', JSON.stringify(updatedUser))
     setProfile(updatedUser)
     setIsEditing(false)
     window.dispatchEvent(new Event('mangaflow_profile_updated'))

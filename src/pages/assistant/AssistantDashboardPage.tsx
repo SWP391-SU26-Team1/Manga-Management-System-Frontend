@@ -91,7 +91,7 @@ export default function AssistantDashboardPage() {
 
   useEffect(() => {
     const loadUser = () => {
-      const storedUser = sessionStorage.getItem('mangaflow_user')
+      const storedUser = localStorage.getItem('mangaflow_user')
       if (storedUser) {
         setUser(JSON.parse(storedUser))
       }

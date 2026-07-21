@@ -1,6 +1,7 @@
 import api from './api'
 import { rankingService } from './ranking.service'
 import { PublishedSeries, PublishedChapter, MangaPage, ReadingHistoryItem, SearchParams, SearchResult, SeriesDetail } from '@/types/reader.types'
+export type { ReadingHistoryItem }
 
 const mapStatus = (status: string | undefined): 'PUBLISHING' | 'COMPLETED' | 'HIATUS' => {
   if (!status) return 'PUBLISHING';
@@ -314,7 +315,7 @@ export const readerService = {
     try {
       let token = null;
       try {
-        const userStr = sessionStorage.getItem('mangaflow_user');
+        const userStr = localStorage.getItem('mangaflow_user');
         if (userStr) token = JSON.parse(userStr).token;
       } catch (e) {}
 
@@ -349,7 +350,7 @@ export const readerService = {
     try {
       let token = null;
       try {
-        const userStr = sessionStorage.getItem('mangaflow_user');
+        const userStr = localStorage.getItem('mangaflow_user');
         if (userStr) token = JSON.parse(userStr).token;
       } catch (e) {}
 

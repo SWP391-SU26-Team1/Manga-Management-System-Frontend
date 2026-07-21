@@ -17,7 +17,7 @@ import { DisputesListPage, DisputeDetailsPage } from '@/pages/editorial-board/me
 
 
 export default function BoardRoutes() {
-  const storedUser = sessionStorage.getItem('mangaflow_user')
+  const storedUser = localStorage.getItem('mangaflow_user')
   const user = storedUser ? JSON.parse(storedUser) : null
 
   return (

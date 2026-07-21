@@ -251,7 +251,7 @@ export default function ReadingHistoryPage() {
           <div className="border-[4px] border-black bg-white shadow-[8px_8px_0px_rgba(0,0,0,1)] p-6 animate-slide-up dark:bg-zinc-800 dark:border-black dark:shadow-[8px_8px_0px_#000] dark:text-white" style={{ animationDelay: '0.5s' }}>
             <h3 className="font-manga text-xl font-bold uppercase mb-4 text-center">Thống kê đọc</h3>
             
-            {(sessionStorage.getItem('mangaflow_user') || localStorage.getItem('user')) ? (
+            {(localStorage.getItem('mangaflow_user') || localStorage.getItem('user')) ? (
               <div className="flex gap-4">
                 <div className="flex-1 border-[4px] border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] p-4 flex flex-col items-center justify-center bg-white hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[8px_8px_0px_rgba(0,0,0,1)] transition-all dark:bg-zinc-700 dark:border-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-[8px_8px_0px_#000]">
                   <span className="font-manga text-5xl font-bold text-manga-red">{history.length}</span>

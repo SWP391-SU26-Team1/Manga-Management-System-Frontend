@@ -8,7 +8,7 @@ import { useToast } from '@/contexts/ToastContext'
 
 const getLikeKey = () => {
   try {
-    const userStr = sessionStorage.getItem('mangaflow_user') || localStorage.getItem('user');
+    const userStr = localStorage.getItem('mangaflow_user') || localStorage.getItem('user');
     if (userStr) {
       const user = JSON.parse(userStr);
       if (user.id) return `mangaflow_liked_chapters_${user.id}`;
@@ -74,7 +74,7 @@ export default function ChapterReaderPage() {
         setIsLiked(!!parsed[chapterId]);
         
         // Sync with API
-        const userStr = sessionStorage.getItem('mangaflow_user') || localStorage.getItem('user');
+        const userStr = localStorage.getItem('mangaflow_user') || localStorage.getItem('user');
         if (userStr) {
           const user = JSON.parse(userStr);
           if (user.id) {
@@ -188,7 +188,7 @@ export default function ChapterReaderPage() {
   const handleChapterLike = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const userStr = sessionStorage.getItem('mangaflow_user') || localStorage.getItem('user');
+    const userStr = localStorage.getItem('mangaflow_user') || localStorage.getItem('user');
     if (!userStr) {
       showToast('Vui lòng đăng nhập để theo dõi (like) chương này!', 'error');
       return;

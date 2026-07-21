@@ -60,13 +60,13 @@ export function SharedSidebar() {
   const location = useLocation()
 
   const [user, setUser] = React.useState<any>(() => {
-    const storedUser = sessionStorage.getItem('mangaflow_user')
+    const storedUser = localStorage.getItem('mangaflow_user')
     return storedUser ? JSON.parse(storedUser) : null
   })
 
   React.useEffect(() => {
     const handleProfileUpdate = () => {
-      const storedUser = sessionStorage.getItem('mangaflow_user')
+      const storedUser = localStorage.getItem('mangaflow_user')
       setUser(storedUser ? JSON.parse(storedUser) : null)
     }
     window.addEventListener('mangaflow_profile_updated', handleProfileUpdate)
@@ -83,7 +83,7 @@ export function SharedSidebar() {
   const userInitials = displayName.split(' ').pop()?.slice(0, 2).toUpperCase() || 'TO'
 
   const handleLogout = () => {
-    sessionStorage.removeItem('mangaflow_user')
+    localStorage.removeItem('mangaflow_user')
     navigate('/login')
   }
 

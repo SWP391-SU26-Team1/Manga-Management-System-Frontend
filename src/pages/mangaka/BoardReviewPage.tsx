@@ -62,6 +62,22 @@ export default function BoardReviewPage() {
     { label: "Cần sửa", value: reviews.filter(r => r.status === 'Need Fix').length, icon: AlertCircle, color: "text-red-600" }
   ]
 
+  const [alertModal, setAlertModal] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error';
+  }>({
+    show: false,
+    title: '',
+    message: '',
+    type: 'success'
+  })
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' = 'success') => {
+    setAlertModal({ show: true, title, message, type })
+  }
+
   const handleSubmitRevision = async () => {
     if (!selectedReview) return;
     try {
@@ -80,14 +96,14 @@ export default function BoardReviewPage() {
       // 3. Submit the manuscript (draft -> submitted)
       await manuscriptService.submit(selectedReview.id)
       
-      alert(`Đã nộp bản sửa đổi cho bản thảo thành công!`);
+      showAlert('Thành công', 'Đã nộp bản sửa đổi cho bản thảo thành công!', 'success');
       setIsSubmitModalOpen(false);
       setSelectedReview(null);
       setRevisionNote('');
       await fetchReviews()
     } catch (err: any) {
       console.error(err)
-      alert('Không thể nộp bản sửa đổi. Lỗi: ' + (err.response?.data?.message || err.message))
+      showAlert('Lỗi', 'Không thể nộp bản sửa đổi. Lỗi: ' + (err.response?.data?.message || err.message), 'error')
     } finally {
       setLoading(false)
     }
@@ -242,6 +258,35 @@ export default function BoardReviewPage() {
                   className="bg-manga-ink text-white font-manga font-bold px-6 py-2 border-2 border-black hover:bg-gray-800 uppercase"
                 >
                   Gửi đi
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Custom Manga-Style Alert Modal */}
+      {alertModal.show && (
+        <div className="fixed inset-0 bg-black/60 z-[10000] flex items-center justify-center p-4">
+          <div className="bg-white border-4 border-manga-ink manga-shadow max-w-sm w-full animate-in fade-in zoom-in-95 duration-150 text-black">
+            <div className="p-4 border-b-4 border-manga-ink bg-gray-50 flex justify-between items-center">
+              <h3 className="font-manga font-bold text-lg uppercase flex items-center gap-2">
+                {alertModal.type === 'success' ? (
+                  <CheckCircle className="w-5 h-5 text-green-600 animate-bounce" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 text-manga-red animate-bounce" />
+                )}
+                {alertModal.title}
+              </h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm font-bold text-gray-700">{alertModal.message}</p>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setAlertModal(prev => ({ ...prev, show: false }))}
+                  className="px-4 py-2 bg-manga-ink text-white font-bold uppercase text-xs hover:bg-gray-800 transition-colors cursor-pointer border-2 border-manga-ink"
+                >
+                  Đóng
                 </button>
               </div>
             </div>

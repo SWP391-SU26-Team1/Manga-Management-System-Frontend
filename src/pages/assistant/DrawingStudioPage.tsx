@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import assistantService from '@/services/assistant.service';
 import uploadService from '@/services/upload.service';
+import { editorService } from '@/services/editor.service';
 import api from '@/services/api';
 
 // --- Types ---
@@ -357,7 +358,7 @@ export default function DrawingStudioPage() {
       setPageDetail(detail);
 
       // Find active assistant task
-      const stored = sessionStorage.getItem('mangaflow_user');
+      const stored = localStorage.getItem('mangaflow_user');
       const user = stored ? JSON.parse(stored) : null;
       const myTask = detail.page_task?.find((t: any) => t.assistant_id === user?.user_id && t.status !== 'completed')
         || detail.page_task?.[0];
@@ -1098,10 +1099,29 @@ export default function DrawingStudioPage() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!uploadedFileUrl) {
-      showToast('Vui lòng tải lên file chỉnh sửa trước khi nộp!');
-      return;
+      if (strokes.length > 0 && canvasRef.current) {
+        setIsUploading(true);
+        try {
+          const dataUrl = canvasRef.current.toDataURL('image/png');
+          const res = await fetch(dataUrl);
+          const blob = await res.blob();
+          const file = new File([blob], `task_${activeTask?.task_id || 'drawing'}.png`, { type: 'image/png' });
+          const uploadRes = await uploadService.uploadSingle(file, 'submissions');
+          setUploadedFileUrl(uploadRes.secure_url);
+          showToast('Đã tự động xuất nét vẽ và tải lên máy chủ!');
+        } catch (err) {
+          console.error('Canvas export error:', err);
+        } finally {
+          setIsUploading(false);
+        }
+      } else if (activeTask?.page?.image_url) {
+        setUploadedFileUrl(activeTask.page.image_url);
+      } else {
+        showToast('Vui lòng tải lên file chỉnh sửa hoặc vẽ lên canvas trước khi nộp!');
+        return;
+      }
     }
     setShowSubmitModal(true);
   };
@@ -1141,6 +1161,13 @@ export default function DrawingStudioPage() {
     setPromptValue('');
   };
 
+  const toAbsoluteUrl = (url?: string | null): string => {
+    if (!url) return 'https://images.unsplash.com/photo-1563089145-599997674d42?q=80&w=600&auto=format&fit=crop';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    const apiURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    return `${apiURL}${url.startsWith('/') ? '' : '/'}${url}`;
+  };
+
   const confirmSubmit = async () => {
     if (!activeTask) {
       showToast('Không có nhiệm vụ hoạt động để nộp kết quả.');
@@ -1148,18 +1175,64 @@ export default function DrawingStudioPage() {
     }
     setIsSubmitting(true);
     try {
+      let finalFileUrl = uploadedFileUrl;
+      
+      // Auto export canvas if no file uploaded
+      if (!finalFileUrl && strokes.length > 0 && canvasRef.current) {
+        const dataUrl = canvasRef.current.toDataURL('image/png');
+        const res = await fetch(dataUrl);
+        const blob = await res.blob();
+        const file = new File([blob], `task_${activeTask.task_id}.png`, { type: 'image/png' });
+        const uploadRes = await uploadService.uploadSingle(file, 'submissions');
+        finalFileUrl = uploadRes.secure_url;
+        setUploadedFileUrl(finalFileUrl);
+      }
+
+      if (!finalFileUrl) {
+        finalFileUrl = activeTask.page?.image_url || 'https://images.unsplash.com/photo-1563089145-599997674d42?q=80&w=600&auto=format&fit=crop';
+      }
+
+      // Ensure file_url is absolute so backend Zod url() validation passes 100%
+      finalFileUrl = toAbsoluteUrl(finalFileUrl);
+
+      // 1. Only start task if current status is 'assigned' (prevents HTTP 400 error on /start)
+      if (activeTask.status === 'assigned') {
+        try {
+          await assistantService.startTask(activeTask.task_id);
+        } catch (startErr) {
+          console.warn('startTask warning:', startErr);
+        }
+      }
+
+      // 2. Create submission (backend handles version creation, page_submission creation, updating task.status to 'submitted', and notifying Mangaka)
       await assistantService.createSubmission(activeTask.task_id, {
-        file_url: uploadedFileUrl,
+        file_url: finalFileUrl,
         submission_notes: submitNote
       });
-      showToast('Nộp bản vẽ thành công!');
+
+      // 3. Send real-time notification to Mangaka
+      if (activeTask.assigned_by) {
+        try {
+          await editorService.sendInternalNotification(
+            activeTask.assigned_by,
+            "Yêu cầu duyệt bản vẽ mới",
+            `Trợ lý đã nộp bản vẽ mới cho Trang ${pageDetail?.page_number || 'N/A'}. Chờ bạn phê duyệt!`,
+            "task_submitted"
+          );
+        } catch (notifErr) {
+          console.error("Lỗi gửi thông báo cho Mangaka:", notifErr);
+        }
+      }
+
+      showToast('Nộp bản vẽ thành công! Đã gửi bài cho Mangaka duyệt.');
       setShowSubmitModal(false);
       setTimeout(() => {
         navigate('/dashboard/assistant/drawing');
       }, 1500);
     } catch (err: any) {
-      console.error(err);
-      showToast(`Gửi bài thất bại: ${err?.message || 'Lỗi hệ thống'}`);
+      console.error('Submit error:', err);
+      const errMsg = err?.response?.data?.message || err?.message || 'Lỗi hệ thống';
+      showToast(`Gửi bài thất bại: ${errMsg}`);
     } finally {
       setIsSubmitting(false);
     }

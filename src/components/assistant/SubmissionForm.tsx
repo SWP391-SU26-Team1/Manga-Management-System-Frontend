@@ -108,17 +108,19 @@ export default function SubmissionForm({ taskId, onSuccess, onCancel }: Submissi
     setIsSubmitting(true)
     setError(null)
     try {
+      await assistantService.startTask(taskId).catch(() => {})
       await assistantService.createSubmission(taskId, {
         file_url: fileUrl,
         submission_notes: notes.trim(),
       })
+      await assistantService.submitTaskWorkflow(taskId, notes.trim()).catch(() => {})
       setSuccess(true)
       setTimeout(() => {
         if (onSuccess) onSuccess()
       }, 1500)
     } catch (err: any) {
       console.error('Lỗi nộp bài:', err)
-      setError(err.response?.data?.message || 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.')
+      setError(err.response?.data?.message || err.message || 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.')
     } finally {
       setIsSubmitting(false)
     }

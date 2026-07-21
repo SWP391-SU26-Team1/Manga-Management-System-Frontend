@@ -441,16 +441,18 @@ export default function TasksPage() {
     }
     setIsSubmitting(true)
     try {
+      await assistantService.startTask(taskId).catch(() => {})
       await assistantService.createSubmission(taskId, {
         file_url: uploadedFileUrl,
         submission_notes: submitNotes
       })
+      await assistantService.submitTaskWorkflow(taskId, submitNotes).catch(() => {})
       loadTasksData()
       setSubmittingTask(null)
       showToast('success', `Nộp kết quả thành công cho Task #${taskId}!`)
     } catch (err: any) {
       console.error(err)
-      showToast('error', `Lỗi: ${err?.message || 'Không thể nộp kết quả'}`)
+      showToast('error', `Lỗi: ${err?.response?.data?.message || err?.message || 'Không thể nộp kết quả'}`)
     } finally {
       setIsSubmitting(false)
     }

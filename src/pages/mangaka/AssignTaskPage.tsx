@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams, Link } from 'react-router'
-import { AlertTriangle, Info, X, ClipboardList, ZoomIn, ZoomOut, Maximize, CheckCircle, RefreshCw } from 'lucide-react'
+import { AlertTriangle, AlertCircle, Info, X, ClipboardList, ZoomIn, ZoomOut, Maximize, CheckCircle, RefreshCw } from 'lucide-react'
 import { TaskTable, DisplayTask } from '@/components/mangaka/TaskTable'
 import { seriesService, SeriesAPI } from '@/services/series.service'
 import { chapterService, ChapterAPI } from '@/services/chapter.service'
@@ -104,6 +104,22 @@ function AssignTaskContent() {
   const [uploadError, setUploadError] = useState('')
   const [isReplacingImage, setIsReplacingImage] = useState(false)
 
+  const [alertModal, setAlertModal] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error';
+  }>({
+    show: false,
+    title: '',
+    message: '',
+    type: 'success'
+  })
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' = 'success') => {
+    setAlertModal({ show: true, title, message, type })
+  }
+
   const handleUploadPages = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files || files.length === 0) return
@@ -182,10 +198,10 @@ function AssignTaskContent() {
       // Cập nhật state list pages cục bộ
       setPages(prevPages => prevPages.map(p => p._id === selectedPageId ? updatedPage : p))
       setPreviewUrl(res.secure_url)
-      alert('Đã thay thế ảnh của trang thành công!')
+      showAlert('Thành công', 'Đã thay thế ảnh của trang thành công!', 'success')
     } catch (err: any) {
       console.error(err)
-      alert(err.response?.data?.message || err.message || 'Lỗi khi thay thế ảnh, vui lòng thử lại.')
+      showAlert('Lỗi', err.response?.data?.message || err.message || 'Lỗi khi thay thế ảnh, vui lòng thử lại.', 'error')
     } finally {
       setIsReplacingImage(false)
     }
@@ -447,7 +463,7 @@ function AssignTaskContent() {
       setAnnotations(mappedAnns)
       setActiveAnnotationId(null)
     } catch {
-      alert('Không thể xóa task, vui lòng thử lại.')
+      showAlert('Lỗi', 'Không thể xóa task, vui lòng thử lại.', 'error')
     }
   }
 
@@ -480,7 +496,7 @@ function AssignTaskContent() {
       setTasks(ts)
     } catch (err) {
       const e = err as { response?: { data?: { message?: string } } }
-      alert(e?.response?.data?.message ?? 'Giao việc thất bại, vui lòng thử lại.')
+      showAlert('Lỗi', e?.response?.data?.message ?? 'Giao việc thất bại, vui lòng thử lại.', 'error')
     }
   }
 
@@ -1033,6 +1049,36 @@ function AssignTaskContent() {
             >
               <X className="w-4 h-4" />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Manga-Style Alert Modal */}
+      {alertModal.show && (
+        <div className="fixed inset-0 bg-black/60 z-[10000] flex items-center justify-center p-4">
+          <div className="bg-white border-4 border-manga-ink manga-shadow max-w-sm w-full animate-in fade-in zoom-in-95 duration-150 text-black">
+            <div className="p-4 border-b-4 border-manga-ink bg-gray-50 flex justify-between items-center">
+              <h3 className="font-manga font-bold text-lg uppercase flex items-center gap-2">
+                {alertModal.type === 'success' ? (
+                  <CheckCircle className="w-5 h-5 text-green-600 animate-bounce" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 text-manga-red animate-bounce" />
+                )}
+                {alertModal.title}
+              </h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm font-bold text-gray-700">{alertModal.message}</p>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setAlertModal(prev => ({ ...prev, show: false }))}
+                  className="px-4 py-2 bg-manga-ink text-white font-bold uppercase text-xs hover:bg-gray-800 transition-colors cursor-pointer border-2 border-manga-ink"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

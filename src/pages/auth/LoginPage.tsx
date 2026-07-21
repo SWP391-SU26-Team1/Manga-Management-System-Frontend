@@ -87,8 +87,6 @@ export default function LoginPage() {
     }
 
     initGoogleSignIn()
-    const timer = setTimeout(initGoogleSignIn, 1000)
-    return () => clearTimeout(timer)
   }, [])
 
   const handleGoogleFallbackClick = () => {

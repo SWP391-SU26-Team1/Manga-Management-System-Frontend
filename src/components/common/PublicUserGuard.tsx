@@ -11,19 +11,22 @@ export function PublicUserGuard({ children }: { children: React.ReactNode }) {
       if (storedUser) {
         try {
           const user: any = JSON.parse(storedUser)
-          // If the user is logged in but is NOT a regular user, redirect to their dashboard
-          if (user.role && (user.role as any) !== 'USER' && (user.role as any) !== 'user') {
-            if (user.role === 'MANGAKA') {
-              navigate('/dashboard/mangaka')
-            } else if (user.role === 'ASSISTANT') {
-              navigate('/dashboard/assistant')
-            } else if (user.role === 'EDITOR') {
-              navigate('/dashboard/tantou-editor')
-            } else if (user.role === 'BOARD') {
-              navigate('/dashboard/editorial-board')
-            } else if (user.role === 'ADMIN') {
-              navigate('/dashboard/admin')
-            }
+          // If the user is logged in but has a specific dashboard role, redirect them.
+          const r = user.role?.toUpperCase()
+          if (r === 'MANGAKA') {
+            navigate('/dashboard/mangaka')
+            return
+          } else if (r === 'ASSISTANT') {
+            navigate('/dashboard/assistant')
+            return
+          } else if (r === 'EDITOR') {
+            navigate('/dashboard/tantou-editor')
+            return
+          } else if (r === 'BOARD' || r === 'CHIEF_EDITOR') {
+            navigate('/dashboard/editorial-board')
+            return
+          } else if (r === 'ADMIN') {
+            navigate('/dashboard/admin')
             return
           }
         } catch {

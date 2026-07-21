@@ -1,5 +1,14 @@
 import React, { useEffect, useState } from 'react'
-import { User, Mail, Award, BookOpen, Clock, Heart, Edit2, Home, Save, X } from 'lucide-react'
+import { User, Mail, Award, BookOpen, Clock, Heart, Edit2, Home, Save, X, ShieldAlert, Loader2 } from 'lucide-react'
+import { useToast } from '@/contexts/ToastContext'
+import api from '@/services/api'
+
+const AVAILABLE_GENRES = [
+  'Action', 'Adventure', 'Comedy', 'Drama', 'Fantasy', 
+  'Horror', 'Mecha', 'Mystery', 'Psychological', 'Romance', 
+  'Sci-Fi', 'Slice of Life', 'Sports', 'Supernatural', 'Thriller',
+  'Isekai', 'Shounen', 'Shoujo', 'Seinen', 'Josei'
+]
 import { useNavigate } from 'react-router'
 import { readerService, ReadingHistoryItem } from '@/services/reader.service'
 
@@ -12,7 +21,12 @@ export default function UserProfilePage() {
     bio: '',
     favoriteGenres: ''
   })
+  
+  const [isSubmittingRole, setIsSubmittingRole] = useState(false)
+  const [selectedRole, setSelectedRole] = useState('mangaka')
+  
   const navigate = useNavigate()
+  const { showToast } = useToast()
 
   useEffect(() => {
     const storedUser = localStorage.getItem('mangaflow_user')
@@ -50,6 +64,35 @@ export default function UserProfilePage() {
     window.dispatchEvent(new Event('mangaflow_profile_updated'))
   }
 
+  const toggleGenre = (genre: string) => {
+    let current = editForm.favoriteGenres.split(',').map(g => g.trim()).filter(Boolean)
+    if (current.includes(genre)) {
+      current = current.filter(g => g !== genre)
+    } else {
+      current.push(genre)
+    }
+    setEditForm({ ...editForm, favoriteGenres: current.join(', ') })
+  }
+
+  const handleRequestRole = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmittingRole(true)
+    try {
+      await api.post('/api/users/request-role', { role: selectedRole })
+      showToast('Đã gửi yêu cầu thành công, vui lòng chờ Admin duyệt', 'success')
+    } catch (error: any) {
+      if (error.response?.status === 429) {
+        showToast('Bạn đã gửi một yêu cầu gần đây rồi, xin vui lòng đợi thêm', 'warning')
+      } else if (error.response?.status === 400) {
+        showToast('Bạn đã sở hữu quyền này rồi', 'error')
+      } else {
+        showToast('Đã có lỗi xảy ra, vui lòng thử lại sau', 'error')
+      }
+    } finally {
+      setIsSubmittingRole(false)
+    }
+  }
+
   const userInitials = profile.fullName
     ? profile.fullName.split(' ').pop()?.slice(0, 2).toUpperCase()
     : 'U'
@@ -72,26 +115,31 @@ export default function UserProfilePage() {
       {/* Header Title */}
       <div className="mb-8 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
         <div>
-          <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-xs font-bold uppercase mb-4 hover:text-manga-red transition-colors dark:text-gray-400">
+          <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-xs font-bold uppercase mb-4 hover:text-manga-red transition-colors text-manga-ink">
              &larr; QUAY LẠI
           </button>
-          <h1 className="font-manga text-4xl md:text-5xl font-bold uppercase text-manga-ink leading-none dark:text-white">
+          <h1 className="font-manga text-4xl md:text-5xl font-bold uppercase text-manga-ink leading-none">
             HỒ SƠ CÁ NHÂN
           </h1>
           <div className="h-1.5 w-24 bg-manga-red mt-3 mb-2" />
-          <p className="text-sm font-bold text-gray-500 dark:text-gray-400">
+          <p className="text-sm font-bold text-gray-500">
             Quản lý thông tin công khai và các chỉ số hoạt động của bạn
           </p>
         </div>
         
-        <div>
+        <div className="flex flex-col sm:flex-row gap-3">
            {!isEditing ? (
-             <button onClick={() => setIsEditing(true)} className="flex items-center gap-2 bg-manga-ink text-white font-bold uppercase text-sm px-6 py-3 border-4 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:bg-manga-red hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-y-[2px] transition-all">
-                <Edit2 className="w-4 h-4" /> CHỈNH SỬA HỒ SƠ
-             </button>
+             <>
+               <button onClick={() => setIsEditing(true)} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white text-manga-ink font-bold uppercase text-sm px-6 py-3 border-4 border-manga-ink shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:bg-manga-ink hover:text-white hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-y-[2px] transition-all dark:bg-zinc-800 dark:text-gray-100 dark:border-black dark:shadow-[4px_4px_0px_#000]">
+                  <Edit2 className="w-4 h-4" /> SỬA HỒ SƠ
+               </button>
+               <button onClick={() => navigate('/')} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-manga-red text-white font-bold uppercase text-sm px-6 py-3 border-4 border-manga-ink shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:bg-manga-ink hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-y-[2px] transition-all dark:border-black dark:shadow-[4px_4px_0px_#000]">
+                  <Home className="w-4 h-4" /> TRANG CHỦ
+               </button>
+             </>
            ) : (
-             <div className="flex gap-4">
-                <button onClick={handleSave} className="flex items-center gap-2 bg-manga-red text-white font-bold uppercase text-sm px-6 py-3 border-4 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:bg-red-600 transition-all">
+             <>
+                <button onClick={handleSave} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-manga-red text-white font-bold uppercase text-sm px-6 py-3 border-4 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:bg-red-600 transition-all dark:shadow-[4px_4px_0px_#000]">
                   <Save className="w-4 h-4" /> LƯU THAY ĐỔI
                 </button>
                 <button onClick={() => {
@@ -101,10 +149,10 @@ export default function UserProfilePage() {
                     bio: profile.bio || '',
                     favoriteGenres: profile.favoriteGenres || ''
                   })
-                }} className="flex items-center gap-2 bg-black text-white font-bold uppercase text-sm px-6 py-3 border-4 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:bg-gray-800 transition-all">
+                }} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-black text-white font-bold uppercase text-sm px-6 py-3 border-4 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:bg-gray-800 transition-all dark:shadow-[4px_4px_0px_#000]">
                   <X className="w-4 h-4" /> HỦY
                 </button>
-             </div>
+             </>
            )}
         </div>
       </div>
@@ -134,7 +182,7 @@ export default function UserProfilePage() {
                   type="text" 
                   value={editForm.fullName} 
                   onChange={(e) => setEditForm({...editForm, fullName: e.target.value})}
-                  className="w-full border-2 border-manga-ink p-2 text-sm font-bold outline-none focus:border-manga-red bg-white"
+                  className="w-full border-2 border-manga-ink p-2 text-sm font-bold outline-none focus:border-manga-red bg-white text-gray-900 dark:bg-zinc-700 dark:text-gray-100 dark:border-black"
                 />
               </div>
             ) : (
@@ -168,7 +216,7 @@ export default function UserProfilePage() {
               <textarea 
                 value={editForm.bio} 
                 onChange={(e) => setEditForm({...editForm, bio: e.target.value})}
-                className="w-full border-2 border-manga-ink p-2 text-sm font-medium outline-none focus:border-manga-red bg-white h-24"
+                className="w-full border-2 border-manga-ink p-2 text-sm font-medium outline-none focus:border-manga-red bg-white h-24 text-gray-900 dark:bg-zinc-700 dark:text-gray-100 dark:border-black"
                 placeholder="Nhập tiểu sử..."
               />
             ) : (
@@ -191,14 +239,25 @@ export default function UserProfilePage() {
 
             {isEditing ? (
               <div>
-                <input 
-                  type="text" 
-                  value={editForm.favoriteGenres} 
-                  onChange={(e) => setEditForm({...editForm, favoriteGenres: e.target.value})}
-                  className="w-full border-2 border-manga-ink p-3 text-sm font-bold outline-none focus:border-manga-red bg-white"
-                  placeholder="Ví dụ: Action, Romance, Comedy (ngăn cách bằng dấu phẩy)"
-                />
-                <p className="text-xs text-gray-500 mt-2 font-medium">Nhập các thể loại bạn yêu thích, ngăn cách bằng dấu phẩy. Nếu để trống, hệ thống sẽ tự động lấy từ lịch sử đọc.</p>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {AVAILABLE_GENRES.map(genre => {
+                    const isSelected = editForm.favoriteGenres.split(',').map(g => g.trim()).includes(genre)
+                    return (
+                      <button
+                        key={genre}
+                        onClick={() => toggleGenre(genre)}
+                        className={`px-3 py-1.5 font-bold text-xs uppercase shadow-[2px_2px_0px_rgba(15,15,15,1)] border-2 border-manga-ink transition-colors dark:border-black ${
+                          isSelected 
+                            ? 'bg-manga-red text-white' 
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-zinc-700 dark:text-gray-300'
+                        }`}
+                      >
+                        {genre}
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className="text-xs text-gray-500 font-medium mt-3 dark:text-gray-400">Click để chọn hoặc bỏ chọn thể loại yêu thích. Nếu không chọn gì, hệ thống sẽ tự động lấy từ lịch sử đọc.</p>
               </div>
             ) : (
               <div className="flex flex-wrap gap-3">
@@ -237,9 +296,44 @@ export default function UserProfilePage() {
               )}
             </div>
           </div>
-
         </div>
       </div>
+
+      {/* Request Role Section (Like UserSettingsPage) */}
+      <div className="bg-white border-4 border-manga-ink p-6 mt-12 shadow-[8px_8px_0px_rgba(15,15,15,1)] dark:bg-zinc-800 dark:border-black dark:shadow-[8px_8px_0px_#000]">
+        <h2 className="text-lg font-black uppercase text-manga-ink mb-4 flex items-center gap-2 dark:text-gray-100">
+          <ShieldAlert className="w-5 h-5 text-manga-red" />
+          Xin cấp quyền đặc biệt
+        </h2>
+        <p className="text-xs font-bold text-gray-500 mb-6 dark:text-gray-400">
+          Bạn có thể gửi yêu cầu cấp quyền đặc biệt trên hệ thống. Admin sẽ xem xét hồ sơ của bạn.
+        </p>
+        
+        <form onSubmit={handleRequestRole} className="flex flex-col md:flex-row items-end gap-4">
+          <div className="flex-1 w-full">
+            <label className="block text-xs font-black uppercase text-manga-ink mb-2 dark:text-gray-300">Vai trò muốn nâng cấp</label>
+            <select
+              value={selectedRole}
+              onChange={(e) => setSelectedRole(e.target.value)}
+              className="w-full border-2 border-manga-ink p-3 text-sm font-bold outline-none focus:border-manga-red bg-zinc-50 dark:bg-zinc-700 dark:text-white dark:border-black"
+              disabled={isSubmittingRole}
+            >
+              <option value="mangaka">Mangaka (Tác giả)</option>
+              <option value="assistant">Assistant (Trợ lý)</option>
+              <option value="editor">Editor (Biên tập viên)</option>
+              <option value="board">Board (Ban biên tập)</option>
+            </select>
+          </div>
+          <button
+            type="submit"
+            disabled={isSubmittingRole}
+            className="flex items-center justify-center gap-2 bg-manga-ink text-white font-manga font-bold text-sm uppercase px-8 py-3 h-[52px] border-2 border-manga-ink shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:bg-manga-red hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed dark:border-black dark:shadow-[4px_4px_0px_#000]"
+          >
+            {isSubmittingRole ? <Loader2 className="w-5 h-5 animate-spin" /> : 'GỬI YÊU CẦU'}
+          </button>
+        </form>
+      </div>
+
     </div>
   )
 }

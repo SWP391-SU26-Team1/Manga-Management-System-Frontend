@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Eye, Star, ArrowUp, ArrowDown, Minus, Loader2, TrendingUp } from 'lucide-react'
+import { Eye, Star, ArrowUp, ArrowDown, Minus, Loader2, TrendingUp, Heart } from 'lucide-react'
 import { SeriesAPI } from '@/services/series.service'
 import { rankingService, BackendSeriesRanking } from '@/services/ranking.service'
 
@@ -70,6 +70,19 @@ export function InteractionStats({ seriesList = [] }: InteractionStatsProps) {
   const rankChange = trend?.change ?? 0
   const seriesTitle = rankingData.series?.title || 'Series của bạn'
 
+  // Logarit rating formula
+  const totalViews = rankingData.series?.view_count ?? 0
+  const totalLikes = rankingData.series?.like_count ?? rankingData.total_vote ?? 0
+  
+  let rating = 0
+  if (totalViews >= 50) {
+    const baseRatio = (totalLikes / totalViews) * 100
+    const popularityBonus = Math.log10(totalLikes + 1) * 0.2
+    rating = (baseRatio * 0.35) + popularityBonus
+    if (rating > 5) rating = 5.0
+  }
+  const rateDisplay = rating.toFixed(1)
+
   return (
     <div className="bg-white manga-border manga-shadow-sm flex flex-col">
       {/* Header */}
@@ -81,9 +94,20 @@ export function InteractionStats({ seriesList = [] }: InteractionStatsProps) {
 
       {/* Content */}
       <div className="p-6 flex flex-col items-center">
-        <h3 className="font-manga text-xl font-bold uppercase tracking-widest text-manga-ink mb-1">
+        <h3 className="font-manga text-xl font-bold uppercase tracking-widest text-manga-ink mb-3">
           Xếp hạng tuần
         </h3>
+        
+        {rankingData.series?.cover_image && (
+          <div className="w-20 h-28 border-2 border-manga-ink mb-3 overflow-hidden shadow-[4px_4px_0px_rgba(0,0,0,1)] bg-gray-100">
+            <img 
+              src={rankingData.series.cover_image} 
+              alt={seriesTitle} 
+              className="w-full h-full object-cover"
+            />
+          </div>
+        )}
+
         <p className="text-xs text-gray-400 font-bold mb-4 text-center truncate w-full px-2">
           {seriesTitle}
         </p>
@@ -129,18 +153,18 @@ export function InteractionStats({ seriesList = [] }: InteractionStatsProps) {
           <div className="flex items-center gap-2 border border-manga-ink p-2 bg-gray-50">
             <Star className="w-4 h-4 text-yellow-500 fill-yellow-400" />
             <div>
-              <span className="text-[9px] font-bold text-gray-400 block uppercase leading-none">Score</span>
+              <span className="text-[9px] font-bold text-gray-400 block uppercase leading-none">Rate</span>
               <span className="font-manga text-sm font-bold text-manga-ink">
-                {rankingData.score?.toLocaleString()}
+                {rateDisplay}
               </span>
             </div>
           </div>
           <div className="col-span-2 flex items-center gap-2 border border-manga-ink p-2 bg-gray-50">
-            <TrendingUp className="w-4 h-4 text-manga-red" />
+            <Heart className="w-4 h-4 text-manga-red fill-current" />
             <div>
-              <span className="text-[9px] font-bold text-gray-400 block uppercase leading-none">Tổng Votes</span>
+              <span className="text-[9px] font-bold text-gray-400 block uppercase leading-none">Like</span>
               <span className="font-manga text-sm font-bold text-manga-ink">
-                {rankingData.total_vote?.toLocaleString()}
+                {totalLikes.toLocaleString()}
               </span>
             </div>
           </div>

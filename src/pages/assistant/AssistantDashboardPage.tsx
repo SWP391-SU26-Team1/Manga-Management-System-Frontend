@@ -71,7 +71,10 @@ export default function AssistantDashboardPage() {
         created_at: new Date().toISOString()
       }))
 
-      setNotifications([...localOverdueNotifs, ...(notifsRes?.data || [])].slice(0, 6))
+      const localNotifsStr = localStorage.getItem('mangaflow_local_notifications')
+      const customLocalNotifs = localNotifsStr ? JSON.parse(localNotifsStr) : []
+
+      setNotifications([...localOverdueNotifs, ...customLocalNotifs, ...(notifsRes?.data || [])].slice(0, 6))
     } catch (err: any) {
       console.error('Error fetching dashboard data:', err)
       setError('Không thể kết nối máy chủ để tải dữ liệu trang chủ.')

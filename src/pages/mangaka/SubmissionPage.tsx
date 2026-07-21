@@ -123,7 +123,16 @@ export default function SubmissionPage() {
 
       // 4. Map tasks to AssistantSubmission
       const mapped: AssistantSubmission[] = tasks
-        .filter((t) => t.assistant_id && t.page_id && ['submitted', 'needs_revision', 'rejected', 'approved', 'completed'].includes(t.status))
+        .filter((t) => {
+          // Chỉ lấy các task có trạng thái hợp lệ
+          if (!t.assistant_id || !t.page_id || !['submitted', 'needs_revision', 'rejected', 'approved', 'completed'].includes(t.status)) return false;
+          
+          // BẢO MẬT: Chỉ hiện task nếu user có quyền truy cập vào series của chapter này
+          const chapterInfo = cMap[t.page?.chapter_id]
+          if (!chapterInfo) return false;
+          
+          return true;
+        })
         .map((t) => {
           const chapterInfo = cMap[t.page?.chapter_id]
           const chapterTitle = chapterInfo ? chapterInfo.title : 'Nhiệm vụ lẻ'

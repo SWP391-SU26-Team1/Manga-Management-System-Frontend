@@ -72,7 +72,7 @@ export function InteractionStats({ seriesList = [] }: InteractionStatsProps) {
 
   // Logarit rating formula
   const totalViews = rankingData.series?.view_count ?? 0
-  const totalLikes = rankingData.series?.like_count ?? rankingData.total_vote ?? 0
+  const totalLikes = (rankingData.series as any)?.like_count ?? rankingData.total_vote ?? 0
   
   let rating = 0
   if (totalViews >= 50) {
@@ -98,10 +98,10 @@ export function InteractionStats({ seriesList = [] }: InteractionStatsProps) {
           Xếp hạng tuần
         </h3>
         
-        {rankingData.series?.cover_image && (
+        {rankingData.series?.cover_image_url && (
           <div className="w-20 h-28 border-2 border-manga-ink mb-3 overflow-hidden shadow-[4px_4px_0px_rgba(0,0,0,1)] bg-gray-100">
             <img 
-              src={rankingData.series.cover_image} 
+              src={rankingData.series.cover_image_url} 
               alt={seriesTitle} 
               className="w-full h-full object-cover"
             />

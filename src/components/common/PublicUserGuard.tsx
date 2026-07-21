@@ -13,7 +13,7 @@ export function PublicUserGuard({ children }: { children: React.ReactNode }) {
         try {
           const user: UserProfile = JSON.parse(storedUser)
           // If the user is logged in but is NOT a regular user, redirect to their dashboard
-          if (user.role && user.role !== 'USER') {
+          if (user.role && (user.role as any) !== 'USER' && (user.role as any) !== 'user') {
             if (user.role === 'MANGAKA') {
               navigate('/dashboard/mangaka')
             } else if (user.role === 'ASSISTANT') {

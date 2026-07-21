@@ -82,11 +82,16 @@ export default function MangakaDashboardPage() {
         let assignedTaskCount = 0
         let pendingSubsCount = 0
         try {
+          const allowedChapterIds = new Set(chapters.map((c) => c._id))
           const tasks = await taskService.getAllTasks({ limit: 200 })
-          assignedTaskCount = tasks.filter(
+          
+          // BẢO MẬT: Chỉ lấy task thuộc về series của mangaka này
+          const filteredTasks = tasks.filter((t: any) => allowedChapterIds.has(t.page?.chapter_id))
+
+          assignedTaskCount = filteredTasks.filter(
             (t: any) => t.status === 'assigned' || t.status === 'in_progress' || t.status === 'pending'
           ).length
-          pendingSubsCount = tasks.filter(
+          pendingSubsCount = filteredTasks.filter(
             (t: any) => t.status === 'submitted' || t.status === 'pending_review'
           ).length
         } catch {

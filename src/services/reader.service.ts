@@ -1,6 +1,7 @@
 import api from './api'
 import { rankingService } from './ranking.service'
 import { PublishedSeries, PublishedChapter, MangaPage, ReadingHistoryItem, SearchParams, SearchResult, SeriesDetail } from '@/types/reader.types'
+export type { ReadingHistoryItem }
 
 const mapStatus = (status: string | undefined): 'PUBLISHING' | 'COMPLETED' | 'HIATUS' => {
   if (!status) return 'PUBLISHING';

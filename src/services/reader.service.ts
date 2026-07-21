@@ -309,7 +309,7 @@ export const readerService = {
     try {
       let token = null;
       try {
-        const userStr = localStorage.getItem('mangaflow_user');
+        const userStr = sessionStorage.getItem('mangaflow_user');
         if (userStr) token = JSON.parse(userStr).token;
       } catch (e) {}
 
@@ -344,7 +344,7 @@ export const readerService = {
     try {
       let token = null;
       try {
-        const userStr = localStorage.getItem('mangaflow_user');
+        const userStr = sessionStorage.getItem('mangaflow_user');
         if (userStr) token = JSON.parse(userStr).token;
       } catch (e) {}
 

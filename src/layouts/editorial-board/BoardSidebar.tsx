@@ -43,13 +43,13 @@ export default function BoardSidebar() {
 
   // Dynamic user profile state and listener
   const [user, setUser] = useState<any>(() => {
-    const storedUser = localStorage.getItem('mangaflow_user')
+    const storedUser = sessionStorage.getItem('mangaflow_user')
     return storedUser ? JSON.parse(storedUser) : null
   })
 
   useEffect(() => {
     const handleProfileUpdate = () => {
-      const storedUser = localStorage.getItem('mangaflow_user')
+      const storedUser = sessionStorage.getItem('mangaflow_user')
       setUser(storedUser ? JSON.parse(storedUser) : null)
     }
     window.addEventListener('mangaflow_profile_updated', handleProfileUpdate)
@@ -63,7 +63,7 @@ export default function BoardSidebar() {
   const userInitials = displayName === 'Minamoto Shizuka' ? 'MS' : (displayName.split(' ').pop()?.slice(0, 2).toUpperCase() || 'ME')
 
   const handleLogout = () => {
-    localStorage.removeItem('mangaflow_user')
+    sessionStorage.removeItem('mangaflow_user')
     navigate('/login')
   }
 

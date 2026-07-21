@@ -357,7 +357,7 @@ export default function DrawingStudioPage() {
       setPageDetail(detail);
 
       // Find active assistant task
-      const stored = localStorage.getItem('mangaflow_user');
+      const stored = sessionStorage.getItem('mangaflow_user');
       const user = stored ? JSON.parse(stored) : null;
       const myTask = detail.page_task?.find((t: any) => t.assistant_id === user?.user_id && t.status !== 'completed')
         || detail.page_task?.[0];

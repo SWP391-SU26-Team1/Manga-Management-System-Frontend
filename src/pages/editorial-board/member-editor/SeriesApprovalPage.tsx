@@ -8,7 +8,7 @@ export default function SeriesApprovalPage() {
   const [seriesList, setSeriesList] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  const storedUser = localStorage.getItem('mangaflow_user')
+  const storedUser = sessionStorage.getItem('mangaflow_user')
   const currentUser = storedUser ? JSON.parse(storedUser) : null
 
   useEffect(() => {

@@ -95,7 +95,7 @@ export default function ChapterCommentsPanel({ isOpen, onClose, chapterId, chapt
     e.preventDefault();
     if (!newComment.trim()) return;
     
-    const userStr = localStorage.getItem('mangaflow_user') || localStorage.getItem('user');
+    const userStr = sessionStorage.getItem('mangaflow_user') || localStorage.getItem('user');
     if (!userStr) {
       showToast('Vui lòng đăng nhập để bình luận!', 'error');
       return;

@@ -7,7 +7,7 @@ interface DashboardLayoutProps {
 
 export default function DashboardLayout({ role }: DashboardLayoutProps) {
   // Simple auth check — redirect to login if no user in localStorage
-  const storedUser = localStorage.getItem('mangaflow_user')
+  const storedUser = sessionStorage.getItem('mangaflow_user')
   if (!storedUser) {
     return <Navigate to="/login" replace />
   }

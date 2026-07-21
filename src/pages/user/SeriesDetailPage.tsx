@@ -8,7 +8,7 @@ import { calculateMangakaAverageRating, calculateMangakaLevel, calculateSeriesRa
 
 const getLikeKey = () => {
   try {
-    const userStr = localStorage.getItem('mangaflow_user') || localStorage.getItem('user');
+    const userStr = sessionStorage.getItem('mangaflow_user') || localStorage.getItem('user');
     if (userStr) {
       const user = JSON.parse(userStr);
       if (user.id) return `mangaflow_liked_chapters_${user.id}`;
@@ -34,7 +34,7 @@ export default function SeriesDetailPage() {
 
   const handleChapterLike = async (e: React.MouseEvent, chapterId: string) => {
     e.preventDefault();
-    const userStr = localStorage.getItem('mangaflow_user') || localStorage.getItem('user');
+    const userStr = sessionStorage.getItem('mangaflow_user') || localStorage.getItem('user');
     if (!userStr) {
       showToast('Vui lòng đăng nhập để theo dõi!', 'error');
       return;
@@ -81,7 +81,7 @@ export default function SeriesDetailPage() {
     e.preventDefault();
     if (!replyContent.trim() || !replyingTo) return;
 
-    const userStr = localStorage.getItem('mangaflow_user') || localStorage.getItem('user');
+    const userStr = sessionStorage.getItem('mangaflow_user') || localStorage.getItem('user');
     if (!userStr) {
       showToast('Vui lòng đăng nhập để bình luận!', 'error');
       return;
@@ -139,7 +139,7 @@ export default function SeriesDetailPage() {
           const parsed = stored ? JSON.parse(stored) : {};
           
           // Sync with API
-          const userStr = localStorage.getItem('mangaflow_user') || localStorage.getItem('user');
+          const userStr = sessionStorage.getItem('mangaflow_user') || localStorage.getItem('user');
           let updated = false;
           if (userStr && seriesData && seriesData.chaptersData) {
             const user = JSON.parse(userStr);

@@ -235,7 +235,7 @@ export default function ManuscriptsPage() {
       }
 
       // b. Lấy mangaka_id từ localStorage
-      const userStr = localStorage.getItem('mangaflow_user')
+      const userStr = sessionStorage.getItem('mangaflow_user')
       let mangakaId = ''
       if (userStr) {
         try {

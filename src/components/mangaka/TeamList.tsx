@@ -16,7 +16,7 @@ export function TeamList({ seriesList = [] }: TeamListProps) {
       if (seriesList.length === 0) return;
       setLoading(true);
       try {
-        const authUserStr = localStorage.getItem('mangaflow_user') || '{}';
+        const authUserStr = sessionStorage.getItem('mangaflow_user') || '{}';
         const authUser = JSON.parse(authUserStr);
         const currentUserId = authUser.user_id || authUser.id;
 

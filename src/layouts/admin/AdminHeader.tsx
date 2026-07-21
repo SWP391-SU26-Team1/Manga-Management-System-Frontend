@@ -29,7 +29,7 @@ export default function AdminHeader() {
   const location = useLocation()
   const currentLabel = labelByPath[location.pathname] || 'Quản trị'
   const [user, setUser] = React.useState<StoredAdminUser | null>(() => {
-    const storedUser = localStorage.getItem('mangaflow_user')
+    const storedUser = sessionStorage.getItem('mangaflow_user')
     return storedUser ? JSON.parse(storedUser) : null
   })
   
@@ -38,7 +38,7 @@ export default function AdminHeader() {
 
   React.useEffect(() => {
     const handleProfileUpdate = () => {
-      const storedUser = localStorage.getItem('mangaflow_user')
+      const storedUser = sessionStorage.getItem('mangaflow_user')
       setUser(storedUser ? JSON.parse(storedUser) : null)
     }
     window.addEventListener('mangaflow_profile_updated', handleProfileUpdate)

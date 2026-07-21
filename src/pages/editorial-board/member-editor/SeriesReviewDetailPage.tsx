@@ -12,7 +12,7 @@ export default function SeriesReviewDetailPage() {
   const { addNotification } = useNotifications()
 
   // User checking
-  const storedUser = localStorage.getItem('mangaflow_user')
+  const storedUser = sessionStorage.getItem('mangaflow_user')
   const currentUser = storedUser ? JSON.parse(storedUser) : { id: '', fullName: 'Unknown', email: '' }
 
   const [series, setSeries] = useState<any | undefined>(undefined)
@@ -208,7 +208,7 @@ export default function SeriesReviewDetailPage() {
   const handleSendComment = (e: React.FormEvent) => {
     e.preventDefault()
     if (!newComment.trim()) return
-    const storedUser = localStorage.getItem('mangaflow_user')
+    const storedUser = sessionStorage.getItem('mangaflow_user')
     const userObj = storedUser ? JSON.parse(storedUser) : { fullName: 'Minamoto Shizuka', role: 'BOARD' }
     
     setComments([...comments, {

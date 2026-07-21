@@ -10,7 +10,7 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('mangaflow_user')
+    const storedUser = sessionStorage.getItem('mangaflow_user')
     if (storedUser) {
       const parsed = JSON.parse(storedUser)
       setUser(parsed)
@@ -31,7 +31,7 @@ export default function SettingsPage() {
       bio
     }
 
-    localStorage.setItem('mangaflow_user', JSON.stringify(updatedUser))
+    sessionStorage.setItem('mangaflow_user', JSON.stringify(updatedUser))
     setUser(updatedUser)
     
     // Dispatch custom event to notify Sidebar/Header to update profile

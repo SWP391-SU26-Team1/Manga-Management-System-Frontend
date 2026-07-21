@@ -35,19 +35,19 @@ export default function TantouSidebar() {
   const location = useLocation()
 
   const handleLogout = () => {
-    sessionStorage.removeItem('mangaflow_user')
+    localStorage.removeItem('mangaflow_user')
     navigate('/login')
   }
 
   // Get user from local storage with state & listener to sync instantly
   const [user, setUser] = React.useState<any>(() => {
-    const storedUser = sessionStorage.getItem('mangaflow_user')
+    const storedUser = localStorage.getItem('mangaflow_user')
     return storedUser ? JSON.parse(storedUser) : null
   })
 
   React.useEffect(() => {
     const handleProfileUpdate = () => {
-      const storedUser = sessionStorage.getItem('mangaflow_user')
+      const storedUser = localStorage.getItem('mangaflow_user')
       setUser(storedUser ? JSON.parse(storedUser) : null)
     }
     window.addEventListener('mangaflow_profile_updated', handleProfileUpdate)

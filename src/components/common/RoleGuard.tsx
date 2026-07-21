@@ -14,7 +14,7 @@ export function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
 
   useEffect(() => {
     const checkAuth = () => {
-      const storedUser = sessionStorage.getItem('mangaflow_user')
+      const storedUser = localStorage.getItem('mangaflow_user')
 
       if (!storedUser) {
         navigate('/login')
@@ -42,7 +42,7 @@ export function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
           }
         }
       } catch {
-        sessionStorage.removeItem('mangaflow_user')
+        localStorage.removeItem('mangaflow_user')
         navigate('/login')
       } finally {
         setLoading(false)

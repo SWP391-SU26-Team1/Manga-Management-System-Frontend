@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { UserProfile } from '@/data/mockUsers'
 
 export function PublicUserGuard({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
@@ -8,7 +7,7 @@ export function PublicUserGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const checkAuth = () => {
-      const storedUser = sessionStorage.getItem('mangaflow_user')
+      const storedUser = localStorage.getItem('mangaflow_user')
       if (storedUser) {
         try {
           const user: any = JSON.parse(storedUser)

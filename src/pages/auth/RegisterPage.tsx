@@ -34,7 +34,7 @@ export default function RegisterPage() {
           ...(data as any).user,
           token: (data as any).token
         }
-        sessionStorage.setItem('mangaflow_user', JSON.stringify(storedUserData))
+        localStorage.setItem('mangaflow_user', JSON.stringify(storedUserData))
         
         const role = storedUserData.role?.toUpperCase()
         if (role === 'MANGAKA') {

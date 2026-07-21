@@ -9,7 +9,7 @@ export default function UserNavHeader() {
   const location = useLocation()
   
   const [user, setUser] = useState<any>(() => {
-    const storedUser = sessionStorage.getItem('mangaflow_user')
+    const storedUser = localStorage.getItem('mangaflow_user')
     return storedUser ? JSON.parse(storedUser) : null
   })
 
@@ -89,7 +89,7 @@ export default function UserNavHeader() {
 
   useEffect(() => {
     const handleProfileUpdate = () => {
-      const storedUser = sessionStorage.getItem('mangaflow_user')
+      const storedUser = localStorage.getItem('mangaflow_user')
       setUser(storedUser ? JSON.parse(storedUser) : null)
     }
     window.addEventListener('mangaflow_profile_updated', handleProfileUpdate)
@@ -99,7 +99,7 @@ export default function UserNavHeader() {
   }, [])
 
   const handleLogout = () => {
-    sessionStorage.removeItem('mangaflow_user')
+    localStorage.removeItem('mangaflow_user')
     setUser(null)
     navigate('/login')
   }

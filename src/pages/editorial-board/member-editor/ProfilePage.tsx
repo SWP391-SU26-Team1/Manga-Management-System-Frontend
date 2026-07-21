@@ -13,7 +13,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     // Attempt to load user from localStorage
-    const storedUser = sessionStorage.getItem('mangaflow_user')
+    const storedUser = localStorage.getItem('mangaflow_user')
     let loadedProfile = null;
     if (storedUser) {
       loadedProfile = JSON.parse(storedUser)
@@ -62,7 +62,7 @@ export default function ProfilePage() {
           avatarUrl: finalAvatarUrl
         }
         setProfile(updatedProfile)
-        sessionStorage.setItem('mangaflow_user', JSON.stringify(updatedProfile))
+        localStorage.setItem('mangaflow_user', JSON.stringify(updatedProfile))
         
         // Clear selected file after successful save
         setAvatarFile(null)
@@ -92,7 +92,7 @@ export default function ProfilePage() {
             ...profile,
             avatarUrl: base64
           };
-          sessionStorage.setItem('mangaflow_user', JSON.stringify(tempProfile));
+          localStorage.setItem('mangaflow_user', JSON.stringify(tempProfile));
           window.dispatchEvent(new Event('mangaflow_profile_updated'));
         }
       };
@@ -108,7 +108,7 @@ export default function ProfilePage() {
       setAvatarFile(null)
       
       // Revert the localStorage and header/sidebar avatars to original profile
-      sessionStorage.setItem('mangaflow_user', JSON.stringify(profile));
+      localStorage.setItem('mangaflow_user', JSON.stringify(profile));
       window.dispatchEvent(new Event('mangaflow_profile_updated'));
     }
     setIsEditing(false)

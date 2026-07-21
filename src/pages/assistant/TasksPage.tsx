@@ -441,12 +441,19 @@ export default function TasksPage() {
     }
     setIsSubmitting(true)
     try {
-      await assistantService.startTask(taskId).catch(() => {})
+      const apiURL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const absoluteUrl = uploadedFileUrl.startsWith('http://') || uploadedFileUrl.startsWith('https://') 
+        ? uploadedFileUrl 
+        : `${apiURL}${uploadedFileUrl.startsWith('/') ? '' : '/'}${uploadedFileUrl}`
+
+      if (submittingTask?.status === 'Not Started') {
+        await assistantService.startTask(taskId).catch(() => {})
+      }
+
       await assistantService.createSubmission(taskId, {
-        file_url: uploadedFileUrl,
+        file_url: absoluteUrl,
         submission_notes: submitNotes
       })
-      await assistantService.submitTaskWorkflow(taskId, submitNotes).catch(() => {})
       loadTasksData()
       setSubmittingTask(null)
       showToast('success', `Nộp kết quả thành công cho Task #${taskId}!`)

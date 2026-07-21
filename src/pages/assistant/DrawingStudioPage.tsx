@@ -1161,6 +1161,13 @@ export default function DrawingStudioPage() {
     setPromptValue('');
   };
 
+  const toAbsoluteUrl = (url?: string | null): string => {
+    if (!url) return 'https://images.unsplash.com/photo-1563089145-599997674d42?q=80&w=600&auto=format&fit=crop';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    const apiURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    return `${apiURL}${url.startsWith('/') ? '' : '/'}${url}`;
+  };
+
   const confirmSubmit = async () => {
     if (!activeTask) {
       showToast('Không có nhiệm vụ hoạt động để nộp kết quả.');
@@ -1185,19 +1192,25 @@ export default function DrawingStudioPage() {
         finalFileUrl = activeTask.page?.image_url || 'https://images.unsplash.com/photo-1563089145-599997674d42?q=80&w=600&auto=format&fit=crop';
       }
 
-      // 1. Ensure task status is started (in_progress) so backend doesn't return 400
-      await assistantService.startTask(activeTask.task_id).catch(() => {});
+      // Ensure file_url is absolute so backend Zod url() validation passes 100%
+      finalFileUrl = toAbsoluteUrl(finalFileUrl);
 
-      // 2. Create submission record
+      // 1. Only start task if current status is 'assigned' (prevents HTTP 400 error on /start)
+      if (activeTask.status === 'assigned') {
+        try {
+          await assistantService.startTask(activeTask.task_id);
+        } catch (startErr) {
+          console.warn('startTask warning:', startErr);
+        }
+      }
+
+      // 2. Create submission (backend handles version creation, page_submission creation, updating task.status to 'submitted', and notifying Mangaka)
       await assistantService.createSubmission(activeTask.task_id, {
         file_url: finalFileUrl,
         submission_notes: submitNote
       });
 
-      // 3. Update task status to submitted
-      await assistantService.submitTaskWorkflow(activeTask.task_id, submitNote).catch(() => {});
-
-      // 4. Send real-time notification to Mangaka
+      // 3. Send real-time notification to Mangaka
       if (activeTask.assigned_by) {
         try {
           await editorService.sendInternalNotification(

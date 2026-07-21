@@ -108,12 +108,15 @@ export default function SubmissionForm({ taskId, onSuccess, onCancel }: Submissi
     setIsSubmitting(true)
     setError(null)
     try {
-      await assistantService.startTask(taskId).catch(() => {})
+      const apiURL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const absoluteUrl = fileUrl.startsWith('http://') || fileUrl.startsWith('https://') 
+        ? fileUrl 
+        : `${apiURL}${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`
+
       await assistantService.createSubmission(taskId, {
-        file_url: fileUrl,
+        file_url: absoluteUrl,
         submission_notes: notes.trim(),
       })
-      await assistantService.submitTaskWorkflow(taskId, notes.trim()).catch(() => {})
       setSuccess(true)
       setTimeout(() => {
         if (onSuccess) onSuccess()

@@ -71,15 +71,19 @@ export const boardService = {
   },
 
   applyManuscriptDecision: async (manuscriptId: string, status: string, note?: string): Promise<any> => {
-    const action = status.toLowerCase() === 'approved' || status.toLowerCase() === 'approve' ? 'approve' : 'reject'
-    const response = await api.patch(`/api/board/manuscripts/${manuscriptId}/${action}`, { note })
+    const finalStatus = status.toLowerCase() === 'approved' || status.toLowerCase() === 'approve' ? 'approved' : 'rejected'
+    const response = await api.patch(`/api/board/manuscripts/${manuscriptId}/apply-decision`, { status: finalStatus, note })
     return response.data
   },
 
   // --- 3. VOTES ---
   getVote: async (sessionId: string): Promise<any[]> => {
     const response = await api.get(`/api/board/review-sessions/${sessionId}/votes`)
-    return response.data.data || []
+    const list = response.data.data || []
+    return list.map((v: any) => ({
+      ...v,
+      users: v.users || v.voter
+    }))
   },
 
   getVoteById: async (voteId: string): Promise<any> => {
@@ -157,13 +161,15 @@ export const boardService = {
     return response.data.data || []
   },
 
-  getSeriesRankings: async (): Promise<any[]> => {
-    const response = await api.get('/api/board/series-rankings')
+  getSeriesRankings: async (periodId?: string): Promise<any[]> => {
+    const url = periodId ? `/api/board/series-rankings?periodId=${periodId}` : '/api/board/series-rankings'
+    const response = await api.get(url)
     return response.data.data || []
   },
 
-  getChapterRankings: async (): Promise<any[]> => {
-    const response = await api.get('/api/board/chapter-rankings')
+  getChapterRankings: async (periodId?: string): Promise<any[]> => {
+    const url = periodId ? `/api/board/chapter-rankings?periodId=${periodId}` : '/api/board/chapter-rankings'
+    const response = await api.get(url)
     return response.data.data || []
   },
 
@@ -230,13 +236,21 @@ export const boardService = {
     return response.data.data || []
   },
 
+  // Only returns series that have been through Tantou review (have an active review_session)
+  // Uses getPendingProposals logic via proposals endpoint, not raw series status
   getReviewedSeries: async (): Promise<any[]> => {
-    const response = await api.get('/api/board/series/pending')
+    // Get series that already passed board vote (approved status)
+    const response = await api.get('/api/series?status=approved')
     return response.data.data || []
   },
 
   getSeriesById: async (seriesId: string): Promise<any> => {
     const response = await api.get(`/api/series/${seriesId}`)
+    return response.data.data || response.data
+  },
+
+  getSeriesDetail: async (seriesId: string): Promise<any> => {
+    const response = await api.get(`/api/series/${seriesId}/detail`)
     return response.data.data || response.data
   }
 }

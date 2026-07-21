@@ -34,7 +34,7 @@ export default function AdminHeader() {
   })
   
   const [isOpen, setIsOpen] = React.useState(false)
-  const { notifications, unreadCount, markAllAsRead } = useNotifications()
+  const { notifications, unreadCount, markAllAsRead, markAsRead } = useNotifications()
 
   React.useEffect(() => {
     const handleProfileUpdate = () => {
@@ -98,27 +98,64 @@ export default function AdminHeader() {
                       Không có thông báo mới
                     </div>
                   ) : (
-                    notifications.map((notif) => (
-                      <div
-                        key={notif.id}
-                        className={`p-3 transition-colors ${notif.unread ? 'bg-red-50/50' : 'bg-white'}`}
-                      >
-                        <div className="flex justify-between items-start gap-2">
-                          <span className="text-xs font-black uppercase text-manga-ink block truncate flex-1">
-                            {notif.title}
-                          </span>
-                          {notif.unread && (
-                            <span className="w-2 h-2 bg-manga-red border border-manga-ink inline-block shrink-0 rounded-none mt-1 animate-pulse" />
-                          )}
+                    notifications.map((notif) => {
+                      const itemContent = (
+                        <>
+                          <div className="flex justify-between items-start gap-2">
+                            <span className="text-xs font-black uppercase text-manga-ink block truncate flex-1">
+                              {notif.type === 'ROLE_UPGRADE_REQUEST' ? '⚡ ' : ''}
+                              {notif.title}
+                            </span>
+                            {notif.unread && (
+                              <span className="w-2 h-2 bg-manga-red border border-manga-ink inline-block shrink-0 rounded-none mt-1 animate-pulse" />
+                            )}
+                          </div>
+                          <p className="text-[10px] text-gray-600 font-bold mt-1 leading-normal break-words">
+                            {notif.message}
+                          </p>
+                          <div className="flex items-center justify-between mt-1">
+                            <span className="text-[8px] text-gray-400 font-black uppercase block">
+                              {notif.time}
+                            </span>
+                            {notif.actionUrl && (
+                              <span className="text-[8px] font-black uppercase text-manga-red hover:underline">
+                                Xem chi tiết &gt;
+                              </span>
+                            )}
+                          </div>
+                        </>
+                      )
+
+                      if (notif.actionUrl) {
+                        return (
+                          <Link
+                            key={notif.id}
+                            to={notif.actionUrl}
+                            onClick={() => {
+                              markAsRead(notif.id)
+                              setIsOpen(false)
+                            }}
+                            className={`block p-3 transition-colors hover:bg-zinc-100 cursor-pointer ${
+                              notif.unread ? 'bg-red-50/50' : 'bg-white'
+                            }`}
+                          >
+                            {itemContent}
+                          </Link>
+                        )
+                      }
+
+                      return (
+                        <div
+                          key={notif.id}
+                          onClick={() => markAsRead(notif.id)}
+                          className={`block p-3 transition-colors ${
+                            notif.unread ? 'bg-red-50/50' : 'bg-white'
+                          }`}
+                        >
+                          {itemContent}
                         </div>
-                        <p className="text-[10px] text-gray-600 font-bold mt-1 leading-normal break-words">
-                          {notif.message}
-                        </p>
-                        <span className="text-[8px] text-gray-400 font-black uppercase block mt-1">
-                          {notif.time}
-                        </span>
-                      </div>
-                    ))
+                      )
+                    })
                   )}
                 </div>
               </div>

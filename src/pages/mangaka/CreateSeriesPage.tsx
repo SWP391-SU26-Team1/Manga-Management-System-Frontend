@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router'
 import { ArrowLeft, AlertTriangle, Send, Save, BookOpen, Tag, Calendar, FileText, Info, CheckCircle, X, Upload, Trash2 } from 'lucide-react'
 import { seriesService, getErrorMessage } from '@/services/series.service'
 import { uploadService } from '@/services/upload.service'
+import { editorService } from '@/services/editor.service'
 
 export default function CreateSeriesPage() {
   const navigate = useNavigate()
@@ -16,6 +17,14 @@ export default function CreateSeriesPage() {
   const [publishSchedule, setPublishSchedule] = useState('Weekly')
   const [proposedStartDate, setProposedStartDate] = useState('')
   const [editorNote, setEditorNote] = useState('')
+
+  const getTodayString = () => {
+    const today = new Date()
+    const yyyy = today.getFullYear()
+    const mm = String(today.getMonth() + 1).padStart(2, '0')
+    const dd = String(today.getDate()).padStart(2, '0')
+    return `${yyyy}-${mm}-${dd}`
+  }
 
   // UI state
   const [errors, setErrors] = useState<{ title?: string; genres?: string; description?: string }>({})
@@ -106,6 +115,8 @@ export default function CreateSeriesPage() {
         description: description.trim(),
         genre: getFinalGenreString(),
         cover_image: coverUrl.trim() || null,
+        publishSchedule: publishSchedule,
+        proposedStartDate: proposedStartDate
       })
       setSuccessMsg('✅ Đã lưu bản nháp thành công!')
       setTimeout(() => navigate('/dashboard/mangaka/series'), 1500)
@@ -130,12 +141,48 @@ export default function CreateSeriesPage() {
         description: description.trim(),
         genre: getFinalGenreString(),
         cover_image: coverUrl.trim() || null,
+        publishSchedule: publishSchedule,
+        proposedStartDate: proposedStartDate
       })
 
-      // Bước 2: Nộp lên Board
+      // Bước 2: Nộp duyệt
       await seriesService.submitReview(newSeries._id)
 
-      setSuccessMsg('✅ Hồ sơ đã được nộp lên Hội đồng biên tập! Trạng thái: Đang xét duyệt.')
+      // Gửi thông báo đến toàn bộ các Tantou Editor phụ trách (vì series mới chưa phân editor)
+      try {
+        const storedUser = localStorage.getItem('mangaflow_user')
+        let mangakaName = 'Họa sĩ'
+        if (storedUser) {
+          const parsed = JSON.parse(storedUser)
+          mangakaName = parsed.fullName || parsed.name || parsed.username || parsed.user?.fullName || parsed.user?.name || parsed.user?.username || 'Họa sĩ'
+        }
+
+        const systemEditors = [
+          'b29fb935-7a5d-4988-9327-a8e453ba7322', // LuanHuynh296
+          'f9a1ee69-6036-4fd6-bbef-de0e00370309', // editor_akira (Akira Watanabe)
+          '83556777-7c27-4039-ba81-655e58a788a7', // Tantou_Editor
+          '66666666-6666-6666-6666-666666666666', // editor_haru
+          '90000000-0000-0000-0000-000000000004', // editor_mika
+          'dcba68dd-5e62-49e2-a826-d2f5e6941561'  // codex_test_1781698003205
+        ]
+
+        await Promise.all(
+          systemEditors.map(editorId =>
+            editorService.sendInternalNotification(
+              editorId,
+              "Cập nhật mới",
+              `Có tác phẩm mới [${title.trim()}] từ ${mangakaName} đang chờ duyệt đưa vào sản xuất.`,
+              "series_submitted"
+            ).catch(errNotif => {
+              console.error(`Lỗi gửi thông báo cho editor ${editorId}:`, errNotif)
+            })
+          )
+        )
+      } catch (errNotifs) {
+        console.error("Lỗi khi xử lý thông báo nộp series:", errNotifs)
+      }
+
+      setSuccessMsg('✅ Hồ sơ đã được gửi yêu cầu duyệt! Trạng thái: Chờ duyệt.')
       setTimeout(() => navigate('/dashboard/mangaka/series'), 2000)
     } catch (err) {
       setApiError(getErrorMessage(err))
@@ -159,7 +206,7 @@ export default function CreateSeriesPage() {
         </h1>
         <div className="h-1.5 w-24 bg-manga-red mt-3" />
         <p className="text-sm font-bold text-gray-500 mt-2">
-          Tạo hồ sơ series và nộp lên Hội đồng biên tập để xét duyệt xuất bản
+          Tạo hồ sơ series và gửi yêu cầu duyệt xuất bản
         </p>
       </div>
 
@@ -217,8 +264,7 @@ export default function CreateSeriesPage() {
             QUY TRÌNH XÉT DUYỆT
           </h4>
           <p className="text-xs font-bold text-blue-800 leading-relaxed">
-            Series mới được <strong>Lưu nháp</strong> (Draft) trước, sau đó bạn có thể <strong>Nộp lên Hội đồng</strong> để xét duyệt.
-            Sau khi nộp, trạng thái chuyển sang <strong className="text-orange-600">Đang xét duyệt (Under Review)</strong>.
+            Series mới được <strong>Lưu nháp</strong> (Draft) trước, sau đó bạn có thể <strong>Gửi yêu cầu duyệt</strong> để Tantou Editor phụ trách xem xét và phê duyệt.
           </p>
         </div>
       </div>
@@ -428,6 +474,7 @@ export default function CreateSeriesPage() {
                     className="w-full px-4 py-3 border-2 border-manga-ink focus:outline-none focus:border-manga-red font-bold text-sm bg-white"
                   >
                     <option value="Weekly">Hàng tuần (Weekly)</option>
+                    <option value="Bi-weekly">Nửa tháng (Bi-weekly)</option>
                     <option value="Monthly">Hàng tháng (Monthly)</option>
                     <option value="Special">Đặc biệt (Special)</option>
                   </select>
@@ -439,6 +486,7 @@ export default function CreateSeriesPage() {
                   <input
                     type="date"
                     value={proposedStartDate}
+                    min={getTodayString()}
                     onChange={e => setProposedStartDate(e.target.value)}
                     className="w-full px-4 py-3 border-2 border-manga-ink focus:outline-none focus:border-manga-red font-bold text-sm bg-white"
                   />
@@ -530,10 +578,10 @@ export default function CreateSeriesPage() {
               <div className="bg-orange-50 border-2 border-orange-400 p-4 flex gap-3">
                 <AlertTriangle className="w-5 h-5 text-orange-500 flex-shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="font-black text-xs uppercase tracking-wider text-orange-700 mb-1">LƯU Ý KHI NỘP LÊN HỘI ĐỒNG</h4>
+                  <h4 className="font-black text-xs uppercase tracking-wider text-orange-700 mb-1">LƯU Ý KHI GỬI DUYỆT</h4>
                   <p className="text-xs font-bold text-orange-800 leading-relaxed">
-                    Sau khi nộp, trạng thái series sẽ chuyển sang <strong>Đang xét duyệt</strong>.
-                    Hội đồng biên tập sẽ xem xét và bỏ phiếu thông qua.
+                    Sau khi nộp, trạng thái series sẽ chuyển sang <strong>Chờ duyệt</strong>.
+                    Tantou Editor phụ trách của bạn sẽ trực tiếp xem xét phê duyệt hoặc yêu cầu chỉnh sửa lại.
                   </p>
                 </div>
               </div>
@@ -579,7 +627,7 @@ export default function CreateSeriesPage() {
                     ) : (
                       <>
                         <Send className="w-4 h-4" />
-                        Nộp lên Hội đồng
+                        Gửi yêu cầu duyệt
                       </>
                     )}
                   </button>

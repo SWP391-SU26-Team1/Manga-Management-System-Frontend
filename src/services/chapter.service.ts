@@ -18,6 +18,7 @@ export interface ChapterAPI {
 export interface CreateChapterPayload {
   title: string
   chapter_number: number
+  editor_id?: string
 }
 
 const mapChapter = (data: any): ChapterAPI => {
@@ -57,6 +58,22 @@ export const chapterService = {
   getById: async (chapterId: string): Promise<ChapterAPI> => {
     const res = await api.get<{ success: boolean; data: any }>(
       `/api/chapters/${chapterId}`
+    )
+    return mapChapter(res.data.data)
+  },
+
+  /** PATCH /api/mangaka/series/:seriesId/chapters/:chapterId/submit-review — nộp chapter lên review */
+  submitReview: async (seriesId: string, chapterId: string): Promise<ChapterAPI> => {
+    const res = await api.patch<{ success: boolean; data: any }>(
+      `/api/mangaka/series/${seriesId}/chapters/${chapterId}/submit-review`
+    )
+    return mapChapter(res.data.data)
+  },
+
+  /** PATCH /api/mangaka/series/:seriesId/chapters/:chapterId/publish — xuất bản chapter */
+  publish: async (seriesId: string, chapterId: string): Promise<ChapterAPI> => {
+    const res = await api.patch<{ success: boolean; data: any }>(
+      `/api/mangaka/series/${seriesId}/chapters/${chapterId}/publish`
     )
     return mapChapter(res.data.data)
   },

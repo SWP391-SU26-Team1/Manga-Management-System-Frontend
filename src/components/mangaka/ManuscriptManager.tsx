@@ -13,31 +13,30 @@ type ChapterStatus = 'completed' | 'in_progress' | 'draft' | 'pending' | 'submit
 
 const getStatusDetails = (status: string) => {
   switch (status) {
-    case 'completed':
-      return { label: 'Hoàn thiện', icon: CheckCircle2, color: 'text-manga-red', badgeStyle: 'text-manga-red border-manga-ink font-bold' }
-    case 'submitted':
+    case 'published':
+      return { label: 'Đã xuất bản', icon: CheckCircle2, color: 'text-manga-red', badgeStyle: 'bg-red-50 text-manga-red border-manga-ink font-bold' }
+    case 'approved':
+      return { label: 'Đã duyệt', icon: CheckCircle2, color: 'text-green-600', badgeStyle: 'bg-green-50 text-green-600 border-green-300 font-bold' }
+    case 'pending_review':
       return { label: 'Chờ duyệt', icon: Clock, color: 'text-blue-600', badgeStyle: 'bg-blue-50 text-blue-600 border-blue-300' }
-    case 'in_progress':
-      return { label: 'Đang vẽ', icon: Edit2, color: 'text-manga-ink', badgeStyle: 'bg-white border-2 border-manga-ink' }
+    case 'rejected':
+      return { label: 'Từ chối', icon: Edit2, color: 'text-orange-600', badgeStyle: 'bg-orange-50 text-orange-600 border-orange-300' }
     case 'draft':
     default:
       return { label: 'Phác thảo', icon: ListOrdered, color: 'text-gray-500', badgeStyle: 'bg-gray-100 text-gray-500 border-gray-300' }
   }
 }
 
-// Static cover images for visual variety
-const COVER_IMAGES = [
-  'https://images.unsplash.com/photo-1601850494422-3cf14624b0b3?q=80&w=800&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?q=80&w=800&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800&auto=format&fit=crop',
-]
-
 export function ManuscriptManager({ seriesList = [], allChapters = [] }: ManuscriptManagerProps) {
   const isLoading = seriesList.length === 0
 
-  // Lấy 3 chapter mới nhất (sort theo chapter_number desc) từ tất cả series
+  // Lấy 3 chapter mới nhất (sort theo updated_at hoặc created_at desc) từ tất cả series
   const recentChapters = [...allChapters]
-    .sort((a, b) => b.chapter_number - a.chapter_number)
+    .sort((a, b) => {
+      const dateA = new Date(a.updated_at || a.created_at || 0).getTime()
+      const dateB = new Date(b.updated_at || b.created_at || 0).getTime()
+      return dateB - dateA
+    })
     .slice(0, 3)
 
   // Build series lookup
@@ -69,9 +68,8 @@ export function ManuscriptManager({ seriesList = [], allChapters = [] }: Manuscr
             Chưa có bản thảo chương nào.
           </div>
         ) : (
-          recentChapters.map((chapter, idx) => {
+          recentChapters.map((chapter) => {
             const { label: statusLabel, icon: StatusIcon, color: iconColor, badgeStyle } = getStatusDetails(chapter.status)
-            const coverImg = COVER_IMAGES[idx % COVER_IMAGES.length]
             const series = seriesMap[chapter.series_id]
 
             return (
@@ -91,15 +89,12 @@ export function ManuscriptManager({ seriesList = [], allChapters = [] }: Manuscr
                 )}
 
                 {/* Visual Preview */}
-                <div className="aspect-[4/3] bg-gray-200 border-2 border-manga-ink mb-4 relative overflow-hidden group-hover:manga-shadow-sm transition-shadow">
-                  {chapter.status === 'completed' || chapter.status === 'in_progress' ? (
+                <div className="aspect-[3/4] bg-gray-200 border-2 border-manga-ink mb-4 relative overflow-hidden group-hover:manga-shadow-sm transition-shadow">
+                  {series?.cover_image ? (
                     <img
-                      src={series?.cover_image || coverImg}
+                      src={series.cover_image}
                       alt={`Chương ${chapter.chapter_number}`}
                       className="w-full h-full object-cover grayscale contrast-125"
-                      onError={(e) => {
-                        ;(e.target as HTMLImageElement).src = coverImg
-                      }}
                     />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 border-2 border-dashed border-gray-300">

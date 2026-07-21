@@ -1,6 +1,6 @@
 
 import React, { useState } from "react";
-import { MessageSquare, AlertCircle, CheckCircle, Send, CornerDownRight, ExternalLink } from "lucide-react";
+import { MessageSquare, AlertCircle, CheckCircle, Send, CornerDownRight, ExternalLink, Trash2 } from "lucide-react";
 import { EditorFeedback } from "@/data/mangakaMockData";
 import { Link } from "react-router";
 
@@ -8,9 +8,10 @@ interface FeedbackCardProps {
   feedback: EditorFeedback;
   onResolve: (id: string) => void;
   onReply: (id: string, reply: string) => void;
+  onDeleteNotification?: (id: string) => void;
 }
 
-export function FeedbackCard({ feedback, onResolve, onReply }: FeedbackCardProps) {
+export function FeedbackCard({ feedback, onResolve, onReply, onDeleteNotification }: FeedbackCardProps) {
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [replyText, setReplyText] = useState("");
 
@@ -86,9 +87,9 @@ export function FeedbackCard({ feedback, onResolve, onReply }: FeedbackCardProps
               </span>
             )}
           </div>
-          {feedback.chapterNumber && feedback.pageNumber && (
+          {feedback.chapterNumber && (feedback.pageId || feedback.pageNumber) && (
             <Link 
-              to={`/dashboard/mangaka/page-viewer/p_c_${feedback.seriesId}_${feedback.chapterNumber}_${feedback.pageNumber}`}
+              to={feedback.pageId ? `/dashboard/mangaka/page-viewer/${feedback.pageId}` : `/dashboard/mangaka/page-viewer/p_c_${feedback.seriesId}_${feedback.chapterNumber}_${feedback.pageNumber}`}
               className="mt-2 inline-flex items-center gap-1 text-[10px] uppercase font-bold text-manga-ink hover:text-manga-red hover:underline"
             >
               <ExternalLink className="w-3 h-3" /> Mở trang bản thảo
@@ -104,7 +105,15 @@ export function FeedbackCard({ feedback, onResolve, onReply }: FeedbackCardProps
 
       {/* Footer / Actions */}
       <div className="border-t-2 border-manga-ink pt-4 mt-2 flex flex-col gap-3">
-        {feedback.status === "Open" ? (
+        {feedback.isNotification ? (
+          <button
+            onClick={() => onDeleteNotification && onDeleteNotification(feedback.id)}
+            className="w-full flex items-center justify-center gap-1.5 bg-white hover:bg-red-50 text-red-600 border-2 border-manga-ink font-bold text-xs uppercase py-2 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 active:shadow-none"
+          >
+            <Trash2 className="w-4 h-4" />
+            Xóa nhận xét này
+          </button>
+        ) : feedback.status === "Open" ? (
           <div className="flex gap-2">
             <button
               onClick={handleResolve}
@@ -113,13 +122,15 @@ export function FeedbackCard({ feedback, onResolve, onReply }: FeedbackCardProps
               <CheckCircle className="w-4 h-4" />
               Đánh dấu Đã xử lý
             </button>
-            <button
-              onClick={() => setShowReplyForm(!showReplyForm)}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-white text-manga-ink border-2 border-manga-ink font-bold text-xs uppercase py-2 hover:bg-gray-50 transition-all"
-            >
-              <MessageSquare className="w-4 h-4" />
-              Phản hồi
-            </button>
+            {!feedback.isNotification && (
+              <button
+                onClick={() => setShowReplyForm(!showReplyForm)}
+                className="flex-1 flex items-center justify-center gap-1.5 bg-white text-manga-ink border-2 border-manga-ink font-bold text-xs uppercase py-2 hover:bg-gray-50 transition-all"
+              >
+                <MessageSquare className="w-4 h-4" />
+                Phản hồi
+              </button>
+            )}
           </div>
         ) : (
           <div className="flex items-center gap-1.5 text-green-600 font-bold text-xs uppercase">

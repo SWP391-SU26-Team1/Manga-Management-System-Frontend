@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
-import { Bell, Search, AlertTriangle, RefreshCw, FileText, Star, Vote, AlertCircle, X, ExternalLink, User, Settings, LogOut } from 'lucide-react'
+import { Bell, Search, AlertTriangle, RefreshCw, FileText, Star, Vote, AlertCircle, X, User, Settings, LogOut } from 'lucide-react'
 import { useNotifications, Notification } from '@/contexts/NotificationContext'
 
 export default function BoardHeader() {
@@ -71,15 +71,7 @@ export default function BoardHeader() {
       )
     }
     
-    if (path.startsWith('/dashboard/editorial-board/disputes')) {
-      return (
-        <div className="flex items-center gap-2 text-sm font-sans font-semibold text-gray-500">
-          <span className="uppercase text-xs font-bold tracking-wider text-gray-400">MANGAFLOW</span>
-          <span className="text-gray-300">/</span>
-          <span className="text-gray-900 font-bold">Báo cáo tranh cãi</span>
-        </div>
-      )
-    }
+
 
     if (path.startsWith('/dashboard/editorial-board/recovery')) {
       return (
@@ -178,6 +170,8 @@ export default function BoardHeader() {
 
       {/* Actions section */}
       <div className="flex items-center gap-6">
+
+
         {/* Search Bar */}
         <div className="relative w-64">
           <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -197,8 +191,8 @@ export default function BoardHeader() {
           >
             <Bell className="w-5 h-5 text-gray-600 hover:text-gray-900 transition-colors" />
             {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-manga-red text-white text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-white">
-                {unreadCount}
+              <span className="absolute -top-1 -right-2 min-w-[16px] h-4 px-1 bg-manga-red text-white text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-white leading-none whitespace-nowrap">
+                {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}
           </button>
@@ -244,8 +238,6 @@ export default function BoardHeader() {
                         setShowNotifications(false);
                         if (notif.type === 'REVIEW' || notif.type === 'RATING' || notif.type === 'VOTE') {
                           navigate('/dashboard/editorial-board/review/cyber-ronin/draft');
-                        } else if (notif.type === 'RISK' || notif.type === 'RESUBMIT' || notif.type === 'OVERDUE') {
-                          navigate('/dashboard/editorial-board/disputes/MF-8492');
                         } else {
                           navigate('/dashboard/editorial-board');
                         }

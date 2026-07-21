@@ -23,6 +23,7 @@ export interface BackendFeedback {
     submission_status: string
     version_number: number
     page?: {
+      page_id?: string
       page_number: number
       chapter?: {
         chapter_number: number

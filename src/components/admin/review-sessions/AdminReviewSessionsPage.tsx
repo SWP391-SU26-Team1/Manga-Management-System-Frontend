@@ -12,7 +12,7 @@ import { reviewSessionApi } from '@/services/admin/reviewSessionApi'
 import { voteApi } from '@/services/admin/voteApi'
 import { boardService } from '@/services/board.service'
 import { ConfirmDialog } from './ConfirmDialog'
-import { EmptyState } from './EmptyState'
+import { AdminEmptyState } from '@/components/admin/AdminEmptyState'
 import { ErrorState } from './ErrorState'
 import {
   getChapterLabel,
@@ -25,11 +25,12 @@ import {
   normalizeListResponse,
 } from './helpers'
 import { LoadingSkeleton } from './LoadingSkeleton'
-import { Pagination } from './Pagination'
+import { AdminPagination } from '@/components/admin/AdminPagination'
 import { ReviewSessionCard } from './ReviewSessionCard'
 import { ReviewSessionDetailDrawer } from './ReviewSessionDetailDrawer'
 import { ReviewSessionFormModal } from './ReviewSessionFormModal'
 import { ReviewSessionTable } from './ReviewSessionTable'
+import { AdminButton } from '@/components/admin/AdminButton'
 import {
   ConfirmState,
   DetailTab,
@@ -51,8 +52,13 @@ import { VoteFormModal } from './VoteFormModal'
 const DEFAULT_LIMIT = 10
 
 const statusOptions: Array<{ label: string; value: StatusFilter }> = [
-  { label: 'All statuses', value: 'all' },
-  ...REVIEW_STATUSES.map((status) => ({ label: status.replace(/_/g, ' '), value: status })),
+  { label: 'Tất cả trạng thái', value: 'all' },
+  { label: 'Chờ xử lý', value: 'pending' },
+  { label: 'Đang tiến hành', value: 'in_progress' },
+  { label: 'Tạm dừng', value: 'paused' },
+  { label: 'Đã hoàn thành', value: 'completed' },
+  { label: 'Đã kết thúc', value: 'finished' },
+  { label: 'Đã hủy', value: 'cancelled' },
 ]
 
 const optionalString = (value: string) => {
@@ -123,7 +129,7 @@ export function AdminReviewSessionsPage() {
     (session: ReviewSession) => {
       const sessionId = getSessionId(session)
       if (!sessionId) {
-        notify('error', 'Cannot perform this action because the session identifier was not returned by the API.')
+        notify('error', 'Không thể thực hiện hành động này vì API không trả về định danh phiên.')
         return null
       }
 
@@ -263,18 +269,18 @@ export function AdminReviewSessionsPage() {
       if (sessionModalMode === 'create') {
         const seriesId = optionalString(sessionForm.series_id)
         if (!seriesId) {
-          notify('error', 'Please select a series from the suggestion list.')
+          notify('error', 'Vui lòng chọn bộ truyện từ danh sách gợi ý.')
           return
         }
 
         if (!isUuidLike(seriesId)) {
-          notify('error', 'The selected series does not contain a valid UUID. Please choose another suggestion.')
+          notify('error', 'Bộ truyện được chọn không hợp lệ. Vui lòng chọn gợi ý khác.')
           return
         }
 
         const chapterId = optionalString(sessionForm.chapter_id)
         if (chapterId && !isUuidLike(chapterId)) {
-          notify('error', 'The selected chapter does not contain a valid UUID. Please choose another suggestion or leave chapter empty.')
+          notify('error', 'Chương truyện được chọn không hợp lệ. Vui lòng chọn gợi ý khác hoặc bỏ trống.')
           return
         }
 
@@ -285,13 +291,13 @@ export function AdminReviewSessionsPage() {
           description: optionalString(sessionForm.description),
           status: 'pending',
         })
-        notify('success', 'Review session created successfully.')
+        notify('success', 'Tạo phiên đánh giá thành công.')
       } else if (editingSession) {
         await reviewSessionApi.update(getSessionId(editingSession), {
           name: sessionForm.name.trim(),
           description: optionalString(sessionForm.description),
         })
-        notify('success', 'Review session updated successfully.')
+        notify('success', 'Cập nhật phiên đánh giá thành công.')
       }
 
       closeSessionModal()
@@ -323,7 +329,16 @@ export function AdminReviewSessionsPage() {
 
     try {
       const resData = await reviewSessionApi[action](sessionId)
-      notify('success', `${action.replace(/^\w/, (letter) => letter.toUpperCase())} session successful.`)
+      
+      const actionNames: Record<string, string> = {
+        start: 'Bắt đầu',
+        pause: 'Tạm dừng',
+        finalize: 'Hoàn tất',
+        cancel: 'Hủy bỏ',
+        finish: 'Kết thúc',
+      }
+      const actionName = actionNames[action] || action
+      notify('success', `Đã ${actionName.toLowerCase()} phiên đánh giá thành công.`)
       
       if (action === 'finalize' && resData?.summary) {
         setResults((current) => ({ ...current, [sessionId]: resData.summary }))
@@ -344,21 +359,21 @@ export function AdminReviewSessionsPage() {
     if (action === 'cancel' || action === 'finish' || action === 'finalize') {
       setConfirmState({
         title: action === 'cancel' 
-          ? 'Cancel review session?' 
+          ? 'Hủy phiên đánh giá?' 
           : action === 'finalize' 
-            ? 'Finalize review session?' 
-            : 'Finish review session?',
+            ? 'Hoàn tất phiên đánh giá?' 
+            : 'Kết thúc phiên đánh giá?',
         message:
           action === 'cancel'
-            ? `This will cancel "${getSessionName(session)}" and stop the active workflow.`
+            ? `Bạn có chắc chắn muốn hủy phiên "${getSessionName(session)}" và dừng quy trình hiện tại?`
             : action === 'finalize'
-              ? `This will close voting on "${getSessionName(session)}", calculate the average score, and generate a recommendation.`
-              : `This will close "${getSessionName(session)}" after completion.`,
+              ? `Thao tác này sẽ đóng biểu quyết cho "${getSessionName(session)}", tính điểm trung bình và tạo khuyến nghị.`
+              : `Thao tác này sẽ kết thúc phiên đánh giá "${getSessionName(session)}".`,
         confirmLabel: action === 'cancel' 
-          ? 'Cancel Session' 
+          ? 'Hủy phiên' 
           : action === 'finalize' 
-            ? 'Finalize Session' 
-            : 'Finish Session',
+            ? 'Hoàn tất phiên' 
+            : 'Kết thúc phiên',
         tone: action === 'cancel' ? 'danger' : 'warning',
         onConfirm: () => runWorkflow(session, action),
       })
@@ -370,9 +385,9 @@ export function AdminReviewSessionsPage() {
 
   const handleDeleteSession = (session: ReviewSession) => {
     setConfirmState({
-      title: 'Delete review session?',
-      message: `This will permanently delete "${getSessionName(session)}".`,
-      confirmLabel: 'Delete Session',
+      title: 'Xóa phiên đánh giá?',
+      message: `Bạn có chắc chắn muốn xóa vĩnh viễn phiên "${getSessionName(session)}"?`,
+      confirmLabel: 'Xóa phiên',
       tone: 'danger',
       onConfirm: async () => {
         const sessionId = requireSessionId(session)
@@ -382,7 +397,7 @@ export function AdminReviewSessionsPage() {
 
         try {
           await reviewSessionApi.delete(sessionId)
-          notify('success', 'Review session deleted successfully.')
+          notify('success', 'Xóa phiên đánh giá thành công.')
           if (sessions.length === 1 && page > 1) {
             setPage((current) => current - 1)
           } else {
@@ -420,16 +435,16 @@ export function AdminReviewSessionsPage() {
         
         try {
           if (chapterId) {
-            await boardService.applyChapterDecision(chapterId, decisionStr, `Automatically ${decisionStr}d based on board votes.`)
+            await boardService.applyChapterDecision(chapterId, decisionStr, `Tự động phê duyệt dựa trên biểu quyết của ban đánh giá.`)
           }
           if (seriesId) {
-            await boardService.applySeriesDecision(seriesId, decisionStr, `Automatically ${decisionStr}d based on board votes.`)
+            await boardService.applySeriesDecision(seriesId, decisionStr, `Tự động phê duyệt dựa trên biểu quyết của ban đánh giá.`)
           }
         } catch (e) {
           console.error("Error applying decisions:", e)
         }
       }
-      notify('success', 'Vote result processed successfully.')
+      notify('success', 'Xử lý kết quả biểu quyết thành công.')
       await loadSessions()
     } catch (processError) {
       notify('error', getErrorMessage(processError))
@@ -445,7 +460,13 @@ export function AdminReviewSessionsPage() {
     setDetailLoading(true)
     try {
       await reviewSessionApi.applyDecision(sessionId, { status, note })
-      notify('success', `Decision applied successfully: ${status}`)
+      const statusNames: Record<string, string> = {
+        published: 'Xuất bản',
+        approved: 'Phê duyệt',
+        rejected: 'Từ chối',
+      }
+      const statusName = statusNames[status] || status
+      notify('success', `Đã áp dụng quyết định thành công: ${statusName}`)
       await loadSessions()
       await openDetail(session, 'overview')
     } catch (applyError) {
@@ -486,7 +507,7 @@ export function AdminReviewSessionsPage() {
 
     const score = Number(voteForm.score)
     if (!Number.isFinite(score) || score < 1 || score > 10) {
-      notify('error', 'Score must be between 1 and 10.')
+      notify('error', 'Điểm số phải nằm trong khoảng từ 1 đến 10.')
       return
     }
 
@@ -502,11 +523,11 @@ export function AdminReviewSessionsPage() {
           note: optionalString(voteForm.note),
           status: voteForm.status,
         })
-        notify('success', 'Vote created successfully.')
+        notify('success', 'Tạo biểu quyết thành công.')
       } else if (editingVote) {
         const voteId = getVoteId(editingVote)
         if (!voteId) {
-          notify('error', 'Cannot update this vote because the vote identifier was not returned by the API.')
+          notify('error', 'Không thể cập nhật vì không tìm thấy định danh biểu quyết.')
           return
         }
 
@@ -518,7 +539,7 @@ export function AdminReviewSessionsPage() {
         if (editingVote.status !== voteForm.status) {
           await voteApi.updateStatus(voteId, voteForm.status)
         }
-        notify('success', 'Vote updated successfully.')
+        notify('success', 'Cập nhật biểu quyết thành công.')
       }
 
       closeVoteModal()
@@ -533,14 +554,14 @@ export function AdminReviewSessionsPage() {
   const verifyVote = async (vote: Vote) => {
     const voteId = getVoteId(vote)
     if (!voteId) {
-      notify('error', 'Cannot verify this vote because the vote identifier was not returned by the API.')
+      notify('error', 'Không thể xác minh biểu quyết vì không tìm thấy định danh.')
       return
     }
 
     setBusyVoteId(voteId)
     try {
       await voteApi.updateStatus(voteId, 'verified' as VoteStatus)
-      notify('success', 'Vote verified successfully.')
+      notify('success', 'Xác minh biểu quyết thành công.')
       await loadVotes(vote.session_id || (detailSession ? getSessionId(detailSession) : ''))
     } catch (verifyError) {
       notify('error', getErrorMessage(verifyError))
@@ -555,21 +576,21 @@ export function AdminReviewSessionsPage() {
 
   const handleDeleteVote = (vote: Vote) => {
     setConfirmState({
-      title: 'Delete vote?',
-      message: `This will permanently delete the vote from ${vote.users?.username || vote.users?.email || 'this voter'}.`,
-      confirmLabel: 'Delete Vote',
+      title: 'Xóa biểu quyết?',
+      message: `Bạn có chắc chắn muốn xóa vĩnh viễn biểu quyết của ${vote.users?.username || vote.users?.email || 'thành viên này'}?`,
+      confirmLabel: 'Xóa biểu quyết',
       tone: 'danger',
       onConfirm: async () => {
         const voteId = getVoteId(vote)
         if (!voteId) {
-          notify('error', 'Cannot delete this vote because the vote identifier was not returned by the API.')
+          notify('error', 'Không thể xóa biểu quyết vì không tìm thấy định danh.')
           return
         }
 
         setBusyVoteId(voteId)
         try {
           await voteApi.delete(voteId)
-          notify('success', 'Vote deleted successfully.')
+          notify('success', 'Xóa biểu quyết thành công.')
           await loadVotes(vote.session_id || (detailSession ? getSessionId(detailSession) : ''))
         } catch (deleteError) {
           notify('error', getErrorMessage(deleteError))
@@ -584,27 +605,27 @@ export function AdminReviewSessionsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="border-2 border-manga-ink bg-white p-6 shadow-[6px_6px_0px_rgba(0,0,0,1)]">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-sm font-semibold text-blue-600">Admin Review Session Management</p>
-            <h1 className="mt-1 text-2xl font-semibold text-slate-950">Review Sessions</h1>
-            <p className="mt-2 max-w-3xl text-sm text-slate-500">
-              Manage review session lifecycle, inspect votes, verify submitted votes, process results, and close workflow.
+            <p className="text-xs font-black uppercase tracking-wider text-manga-red">Quản lý ban biên tập</p>
+            <h1 className="font-manga text-4xl font-black uppercase text-manga-ink mt-1">Phiên đánh giá</h1>
+            <p className="mt-2 max-w-3xl text-sm font-bold text-gray-500">
+              Quản lý vòng đời phiên đánh giá, kiểm tra phiếu biểu quyết, xác minh tính hợp lệ, tổng hợp kết quả và phê duyệt xuất bản.
             </p>
           </div>
-          <button
+          <AdminButton
             type="button"
+            variant="red"
+            icon={Plus}
             onClick={openCreateSession}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
           >
-            <Plus className="h-4 w-4" />
-            Create Review Session
-          </button>
+            Tạo phiên đánh giá
+          </AdminButton>
         </div>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="border-2 border-manga-ink bg-[#fafafa] p-4 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <label className="relative flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -612,8 +633,8 @@ export function AdminReviewSessionsPage() {
               type="search"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Search by review session name, series, chapter, or description"
-              className="h-11 w-full rounded-md border border-slate-300 bg-white pl-10 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              placeholder="Tìm kiếm theo tên phiên, bộ truyện, chương hoặc mô tả..."
+              className="h-11 w-full border-2 border-manga-ink bg-white pl-10 pr-3 text-sm font-bold outline-none focus:bg-amber-50"
             />
           </label>
           <select
@@ -622,7 +643,7 @@ export function AdminReviewSessionsPage() {
               setStatusFilter(event.target.value as StatusFilter)
               setPage(1)
             }}
-            className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium capitalize text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            className="h-11 border-2 border-manga-ink bg-white px-3 text-sm font-black text-manga-ink outline-none focus:bg-amber-50 capitalize"
           >
             {statusOptions.map((option) => (
               <option key={option.value} value={option.value}>
@@ -638,9 +659,9 @@ export function AdminReviewSessionsPage() {
       {loading ? (
         <LoadingSkeleton />
       ) : !error && visibleSessions.length === 0 ? (
-        <EmptyState
-          title="No review sessions found"
-          description="Try changing the search keyword or status filter, or create a new review session."
+        <AdminEmptyState
+          title="Không tìm thấy phiên đánh giá nào"
+          description="Thử thay đổi từ khóa tìm kiếm hoặc trạng thái bộ lọc, hoặc tạo mới một phiên đánh giá."
         />
       ) : (
         !error && (
@@ -681,11 +702,11 @@ export function AdminReviewSessionsPage() {
       )}
 
       {!loading && !error && (
-        <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-3 border-2 border-manga-ink bg-white px-4 py-3 text-sm font-bold text-manga-ink shadow-[4px_4px_0_rgba(0,0,0,1)] md:flex-row md:items-center md:justify-between">
           <p>
-            Showing {showingStart}-{showingEnd} of {pagination.total.toLocaleString()} review sessions
+            Hiển thị từ {showingStart} đến {showingEnd} trong tổng số {pagination.total.toLocaleString()} phiên đánh giá
           </p>
-          <Pagination
+          <AdminPagination
             page={pagination.page}
             totalPages={pagination.totalPages}
             disabled={loading}
@@ -741,7 +762,7 @@ export function AdminReviewSessionsPage() {
         open={Boolean(confirmState)}
         title={confirmState?.title || ''}
         message={confirmState?.message || ''}
-        confirmLabel={confirmState?.confirmLabel || 'Confirm'}
+        confirmLabel={confirmState?.confirmLabel || 'Xác nhận'}
         tone={confirmState?.tone}
         loading={confirmLoading}
         onCancel={() => !confirmLoading && setConfirmState(null)}
@@ -749,11 +770,11 @@ export function AdminReviewSessionsPage() {
       />
 
       {toast && (
-        <div className="fixed bottom-5 right-5 z-[80] max-w-md rounded-lg border border-slate-200 bg-white p-4 shadow-xl">
+        <div className="fixed bottom-5 right-5 z-[80] max-w-md border-2 border-manga-ink bg-white p-4 shadow-[6px_6px_0_rgba(0,0,0,1)]">
           <div className="flex items-start gap-3">
-            <div className={`mt-1 h-2.5 w-2.5 rounded-full ${toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'}`} />
-            <p className="text-sm font-medium text-slate-800">{toast.message}</p>
-            <button type="button" onClick={closeToast} className="ml-auto rounded p-1 text-slate-400 hover:bg-slate-100">
+            <div className={`mt-1.5 h-3 w-3 border border-manga-ink ${toast.type === 'success' ? 'bg-emerald-400' : 'bg-manga-red'}`} />
+            <p className="text-sm font-bold text-manga-ink">{toast.message}</p>
+            <button type="button" onClick={closeToast} className="ml-auto flex h-6 w-6 items-center justify-center border border-manga-ink hover:bg-gray-100">
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -762,3 +783,4 @@ export function AdminReviewSessionsPage() {
     </div>
   )
 }
+

@@ -2,10 +2,11 @@ import React from 'react'
 import { Plus, RefreshCw } from 'lucide-react'
 import type { ReviewSession, Vote } from '@/services/admin/admin.types'
 import { getVoteId } from './helpers'
-import { EmptyState } from './EmptyState'
+import { AdminEmptyState } from '@/components/admin/AdminEmptyState'
 import { LoadingSkeleton } from './LoadingSkeleton'
 import { VoteCard } from './VoteCard'
 import { VoteTable } from './VoteTable'
+import { AdminButton } from '@/components/admin/AdminButton'
 import type { VoteHandler, VoteStatusFilter } from './types'
 
 type VotePanelProps = {
@@ -23,9 +24,9 @@ type VotePanelProps = {
 }
 
 const filterOptions: Array<{ label: string; value: VoteStatusFilter }> = [
-  { label: 'All votes', value: 'all' },
-  { label: 'Submitted', value: 'submitted' },
-  { label: 'Verified', value: 'verified' },
+  { label: 'Tất cả biểu quyết', value: 'all' },
+  { label: 'Chờ duyệt', value: 'submitted' },
+  { label: 'Đã xác minh', value: 'verified' },
 ]
 
 export function VotePanel({
@@ -48,15 +49,17 @@ export function VotePanel({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-3 border-2 border-manga-ink bg-[#fafafa] p-4 shadow-[4px_4px_0px_rgba(0,0,0,1)] lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap gap-2">
           {filterOptions.map((option) => (
             <button
               key={option.value}
               type="button"
               onClick={() => onFilterChange(option.value)}
-              className={`h-9 rounded-md px-3 text-sm font-semibold ${
-                filter === option.value ? 'bg-blue-600 text-white' : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+              className={`h-9 border-2 border-manga-ink px-3 text-sm font-black transition-all ${
+                filter === option.value
+                  ? 'bg-manga-red text-white shadow-[2px_2px_0px_rgba(0,0,0,1)]'
+                  : 'bg-white text-manga-ink hover:bg-gray-50'
               }`}
             >
               {option.label}
@@ -64,29 +67,32 @@ export function VotePanel({
           ))}
         </div>
         <div className="flex gap-2">
-          <button
+          <AdminButton
             type="button"
+            variant="white"
+            icon={RefreshCw}
             onClick={onReload}
-            className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
-            <RefreshCw className="h-4 w-4" />
-            Reload
-          </button>
+            Tải lại
+          </AdminButton>
           {canCreateVote && (
-            <button
+            <AdminButton
               type="button"
+              variant="red"
+              icon={Plus}
               onClick={onCreateVote}
-              className="inline-flex h-9 items-center gap-2 rounded-md bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700"
             >
-              <Plus className="h-4 w-4" />
-              Create Vote
-            </button>
+              Tạo biểu quyết
+            </AdminButton>
           )}
         </div>
       </div>
 
       {filteredVotes.length === 0 ? (
-        <EmptyState title="No votes found" description="Votes for this session will appear here after reviewers submit them." />
+        <AdminEmptyState
+          title="Chưa có biểu quyết nào"
+          description="Các lượt biểu quyết cho phiên này sẽ xuất hiện ở đây sau khi các thành viên ban đánh giá thực hiện gửi."
+        />
       ) : (
         <>
           <VoteTable
@@ -113,3 +119,4 @@ export function VotePanel({
     </div>
   )
 }
+

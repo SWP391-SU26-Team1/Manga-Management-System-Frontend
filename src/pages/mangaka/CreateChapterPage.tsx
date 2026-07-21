@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router'
 import { FilePlus, AlertCircle, CheckCircle, AlertTriangle } from 'lucide-react'
 import { seriesService, SeriesAPI, getErrorMessage } from '@/services/series.service'
 import { chapterService, ChapterAPI } from '@/services/chapter.service'
+import api from '@/services/api'
 
 export default function CreateChapterPage() {
   const { seriesId } = useParams()
@@ -10,6 +11,8 @@ export default function CreateChapterPage() {
 
   const [series, setSeries] = useState<SeriesAPI | null>(null)
   const [existingChapters, setExistingChapters] = useState<ChapterAPI[]>([])
+  const [tantous, setTantous] = useState<any[]>([])
+  const [selectedTantouId, setSelectedTantouId] = useState<string>('')
 
   const [chapterNumber, setChapterNumber] = useState(1)
   const [title, setTitle] = useState('')
@@ -19,21 +22,28 @@ export default function CreateChapterPage() {
   const [successMsg, setSuccessMsg] = useState('')
   const [apiError, setApiError] = useState('')
 
-  // Load series + existing chapters để tính chapter_number kế tiếp
+  // Load series + existing chapters + editors để chọn
   useEffect(() => {
     if (!seriesId) return
     const fetchData = async () => {
       setIsLoading(true)
       try {
-        const [s, chs] = await Promise.all([
+        const [s, chs, tantouRes] = await Promise.all([
           seriesService.getById(seriesId),
           chapterService.getBySeriesId(seriesId),
+          api.get('/api/users?role=editor'),
         ])
         setSeries(s)
         setExistingChapters(chs)
         if (chs.length > 0) {
           const maxNum = Math.max(...chs.map(c => c.chapter_number))
           setChapterNumber(maxNum + 1)
+        }
+
+        const tantouList = tantouRes.data.data || tantouRes.data || []
+        setTantous(tantouList)
+        if (tantouList.length > 0) {
+          setSelectedTantouId(tantouList[0].user_id || tantouList[0].id)
         }
       } catch (err) {
         setApiError(getErrorMessage(err))
@@ -54,6 +64,7 @@ export default function CreateChapterPage() {
       await chapterService.create(seriesId, {
         title: title.trim(),
         chapter_number: chapterNumber,
+        editor_id: selectedTantouId || undefined,
       })
       setSuccessMsg(`✅ Đã tạo thành công Chương ${chapterNumber}: ${title}!`)
       setTimeout(() => navigate(`/dashboard/mangaka/series/${seriesId}`), 1500)
@@ -155,6 +166,25 @@ export default function CreateChapterPage() {
               placeholder="VD: Cậu bé đá..."
               required
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-gray-700 uppercase mb-2">
+              Chọn Tantou Editor duyệt Chapter <span className="text-manga-red">*</span>
+            </label>
+            <select
+              value={selectedTantouId}
+              onChange={(e) => setSelectedTantouId(e.target.value)}
+              required
+              className="w-full border-2 border-manga-ink p-3 text-sm font-bold bg-white focus:ring-2 focus:ring-manga-red focus:outline-none"
+            >
+              <option value="">-- Chọn Tantou Editor --</option>
+              {tantous.map((t) => (
+                <option key={t.user_id || t.id} value={t.user_id || t.id}>
+                  {t.name || t.username} ({t.email})
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="pt-6 mt-6 border-t-2 border-dashed border-gray-300 flex justify-end gap-4">

@@ -21,9 +21,7 @@ export interface DisputeCaseDetail {
   editorMetricValue: number
   editorMetricTarget: number
   status: 'PENDING' | 'DECIDED'
-  chiefDecision?: 'AUTHOR' | 'EDITOR' | 'COMPROMISE'
-  chiefCompromise?: string
-  chiefNextActions?: string
+
   memberOpinion?: DisputeOpinion
 }
 
@@ -49,15 +47,7 @@ export const disputeService = {
     return response.data
   },
 
-  // POST /api/disputes/:caseId/verdict - Submits Chief Editor final verdict on a dispute
-  saveVerdict: async (caseId: string, verdict: 'AUTHOR' | 'EDITOR' | 'COMPROMISE', compromise: string, nextActions: string): Promise<any> => {
-    const response = await api.post(`/api/disputes/${caseId}/verdict`, {
-      verdict,
-      compromise,
-      nextActions
-    })
-    return response.data
-  }
+
 }
 
 export default disputeService

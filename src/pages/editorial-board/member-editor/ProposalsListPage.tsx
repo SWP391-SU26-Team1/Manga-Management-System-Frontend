@@ -27,7 +27,7 @@ export default function ProposalsListPage() {
       <div className="mb-8">
         <h1 className="font-manga text-4xl md:text-5xl font-black uppercase tracking-tight text-manga-ink flex items-center gap-3">
           <FileText className="w-10 h-10 text-manga-red" />
-          HỘP THƯ CÔNG VIỆC (PROPOSALS)
+          PHIÊN ĐÁNH GIÁ
         </h1>
         <p className="text-sm font-bold text-gray-500 uppercase mt-2">
           Danh sách các bản thảo / tác phẩm đang chờ Hội đồng biên tập xét duyệt
@@ -55,44 +55,56 @@ export default function ProposalsListPage() {
             return (
               <div 
                 key={proposal.session_id || proposal.id}
-                className="bg-white border-4 border-manga-ink p-6 shadow-[6px_6px_0px_rgba(0,0,0,1)] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-y-1 transition-all flex flex-col"
+                className="bg-white border-4 border-manga-ink p-4 sm:p-6 shadow-[6px_6px_0px_rgba(0,0,0,1)] hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-y-1 transition-all flex flex-col sm:flex-row gap-4 sm:gap-6"
               >
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex items-center gap-2">
-                    <span className={`text-[10px] font-black uppercase px-2 py-1 border-2 border-manga-ink text-white ${isSeries ? 'bg-manga-red' : 'bg-manga-ink'}`}>
-                      {isSeries ? 'DUYỆT SERIES' : 'DUYỆT CHAPTER'}
-                    </span>
-                    <span className="text-[10px] font-black uppercase px-2 py-1 bg-yellow-100 text-yellow-700 border-2 border-yellow-500">
-                      {proposal.status || 'PENDING'}
-                    </span>
-                  </div>
-                  <time className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {new Date(proposal.created_at).toLocaleDateString()}
-                  </time>
+                {/* Thumbnail */}
+                <div className="w-24 h-36 sm:w-28 sm:h-40 flex-shrink-0 border-2 border-black overflow-hidden bg-gray-100 hidden sm:block">
+                  <img 
+                    src={proposal.series?.cover_image_url || 'https://images.unsplash.com/photo-1578632292335-df3f3e8f4c64?w=200&h=300&fit=crop'} 
+                    alt="Cover" 
+                    className="w-full h-full object-cover"
+                  />
                 </div>
 
-                <h3 className="font-manga text-xl font-bold uppercase text-manga-ink line-clamp-2 mb-4 flex-1">
-                  {title} {proposal.chapter_id && `- Chapter ${proposal.chapter?.chapter_number || ''}`}
-                </h3>
+                {/* Content */}
+                <div className="flex-1 flex flex-col">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-[10px] font-black uppercase px-2 py-1 border-2 border-manga-ink text-white ${isSeries ? 'bg-manga-red' : 'bg-manga-ink'}`}>
+                        {isSeries ? 'DUYỆT SERIES' : 'DUYỆT CHAPTER'}
+                      </span>
+                      <span className="text-[10px] font-black uppercase px-2 py-1 bg-yellow-100 text-yellow-700 border-2 border-yellow-500">
+                        {proposal.status || 'PENDING'}
+                      </span>
+                    </div>
+                    <time className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1 flex-shrink-0 ml-2">
+                      <Clock className="w-3 h-3" />
+                      {new Date(proposal.created_at).toLocaleDateString()}
+                    </time>
+                  </div>
 
-                <div className="space-y-2 mb-6">
-                  <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase">
-                    <User className="w-4 h-4" />
-                    <span>Tác giả: <span className="text-manga-ink">{proposal.series?.author || 'N/A'}</span></span>
+                  <h3 className="font-manga text-xl font-bold uppercase text-manga-ink line-clamp-2 mb-4 flex-1">
+                    {title} {proposal.chapter_id && `- Chapter ${proposal.chapter?.chapter_number || ''}`}
+                  </h3>
+
+                  <div className="space-y-2 mb-6">
+                    <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase">
+                      <User className="w-4 h-4" />
+                      <span>Tác giả: <span className="text-manga-ink">{proposal.series?.author || 'N/A'}</span></span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase">
+                      <Tag className="w-4 h-4" />
+                      <span>Mã phiên: <span className="text-manga-red">{(proposal.session_id || '').substring(0, 8)}</span></span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase">
-                    <Tag className="w-4 h-4" />
-                    <span>Mã phiên: <span className="text-manga-red">{(proposal.session_id || '').substring(0, 8)}</span></span>
-                  </div>
+
+                  <Link
+                    to={targetUrl}
+                    className="w-full bg-manga-ink text-white font-manga font-bold text-xs uppercase py-3 border-2 border-manga-ink shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:bg-white hover:text-manga-ink hover:shadow-none transition-all flex items-center justify-center gap-2 text-center mt-auto"
+                  >
+                    TIẾN HÀNH DUYỆT BẢN THẢO <ArrowRight className="w-4 h-4" />
+                  </Link>
                 </div>
-
-                <Link
-                  to={targetUrl}
-                  className="w-full bg-manga-ink text-white font-manga font-bold text-xs uppercase py-3 border-2 border-manga-ink shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:bg-white hover:text-manga-ink hover:shadow-none transition-all flex items-center justify-center gap-2 text-center"
-                >
-                  TIẾN HÀNH DUYỆT BẢN THẢO <ArrowRight className="w-4 h-4" />
-                </Link>
               </div>
             )
           })}

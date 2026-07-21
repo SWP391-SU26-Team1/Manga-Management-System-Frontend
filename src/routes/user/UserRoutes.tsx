@@ -2,17 +2,17 @@ import React from 'react'
 import { Routes, Route } from 'react-router'
 import DashboardLayout from '@/layouts/DashboardLayout'
 
-// User pages
-import UserHomePage from '@/pages/user/UserHomePage'
-import MangaListPage from '@/pages/user/MangaListPage'
+import UserProfilePage from '@/pages/user/UserProfilePage'
+import UserSettingsPage from '@/pages/user/UserSettingsPage'
 import NotificationsPage from '@/pages/user/NotificationsPage'
 
 export default function UserRoutes() {
   return (
     <Routes>
       <Route element={<DashboardLayout role="user" />}>
-        <Route index element={<UserHomePage />} />
-        <Route path="manga-list" element={<MangaListPage />} />
+        <Route index element={<UserProfilePage />} />
+        <Route path="profile" element={<UserProfilePage />} />
+        <Route path="settings" element={<UserSettingsPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
       </Route>
     </Routes>

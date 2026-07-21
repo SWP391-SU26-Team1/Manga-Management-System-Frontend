@@ -6,6 +6,9 @@ import { FeedbackCard } from '@/components/mangaka/FeedbackCard'
 import { feedbackService } from '@/services/feedback.service'
 import { seriesService } from '@/services/series.service'
 import { chapterService } from '@/services/chapter.service'
+import { manuscriptService } from '@/services/manuscript.service'
+import { rankingService } from '@/services/ranking.service'
+import api from '@/services/api'
 
 export default function FeedbackPage() {
   const [feedbacks, setFeedbacks] = useState<EditorFeedback[]>([])
@@ -13,6 +16,22 @@ export default function FeedbackPage() {
   const [severityFilter, setSeverityFilter] = useState<'All' | 'Critical' | 'High' | 'Medium' | 'Low'>('All')
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+
+  const [alertModal, setAlertModal] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error';
+  }>({
+    show: false,
+    title: '',
+    message: '',
+    type: 'success'
+  })
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error') => {
+    setAlertModal({ show: true, title, message, type })
+  }
 
   const loadFeedbacks = async () => {
     try {
@@ -44,12 +63,39 @@ export default function FeedbackPage() {
         })
       )
 
+      // 2.5. Load notifications for current user to capture text manuscript rejections
+      let userNotifications: any[] = []
+      try {
+        userNotifications = await rankingService.getNotifications()
+      } catch (err) {
+        console.error('Failed to load notifications for feedback:', err)
+      }
+
       // 3. Load feedbacks
       const rawFeedbacks = await feedbackService.getAll()
 
+      // Get current logged-in user from localStorage
+      const storedUser = localStorage.getItem('mangaflow_user')
+      let currentUserId = ''
+      if (storedUser) {
+        try {
+          const parsed = JSON.parse(storedUser)
+          currentUserId = parsed.id || parsed.user_id || ''
+        } catch (e) {
+          console.error('Failed to parse user from localStorage', e)
+        }
+      }
+
+      // Filter: Only keep feedbacks from the Editor (Tantou).
+      // Editor's comments are in page_task_feedback with editor's user_id as mangaka_id.
+      // So fb.mangaka_id must not be null (excluding Assistant comments) and must not be current Mangaka's ID.
+      const filteredRaw = rawFeedbacks.filter(
+        (fb) => fb.mangaka_id !== null && fb.mangaka_id !== currentUserId
+      )
+
       // 4. Resolve submission details for each feedback in parallel
       const mappedFeedbacks: EditorFeedback[] = await Promise.all(
-        rawFeedbacks.map(async (fb) => {
+        filteredRaw.map(async (fb) => {
           try {
             let pageNumber: number | undefined
             let chapterNumber: number | undefined
@@ -73,7 +119,7 @@ export default function FeedbackPage() {
             // Severity heuristic if not provided
             let severity: 'Low' | 'Medium' | 'High' | 'Critical' = 'Medium'
             const lowerContent = fb.content.toLowerCase()
-            if (lowerContent.includes('critical') || lowerContent.includes('gấp') || lowerContent.includes('khẩn cấp') || lowerContent.includes('lỗi nặng')) {
+            if (lowerContent.includes('critical') || lowerContent.includes('gấp') || lowerContent.includes('khần cấp') || lowerContent.includes('lỗi nặng')) {
               severity = 'Critical'
             } else if (lowerContent.includes('high') || lowerContent.includes('quan trọng') || lowerContent.includes('sai lệch')) {
               severity = 'High'
@@ -109,7 +155,115 @@ export default function FeedbackPage() {
         })
       )
 
-      setFeedbacks(mappedFeedbacks)
+      // 4b. Load rejected manuscripts for all series of current Mangaka
+      const manuscriptFeedbacks: EditorFeedback[] = []
+      await Promise.all(
+        series.map(async (s) => {
+          try {
+            const mList = await manuscriptService.getBySeriesId(s._id)
+            const rejectedManuscripts = mList.filter(
+              (m) =>
+                m.status?.toLowerCase() === 'rejected' ||
+                m.status?.toLowerCase() === 'needs_revision'
+            )
+            
+            await Promise.all(
+              rejectedManuscripts.map(async (m) => {
+                try {
+                  // Check if there are matching overall rejection notifications
+                  const matchNotifs = userNotifications.filter(n => n.type === `ms_fb:${m._id}`)
+                  matchNotifs.forEach((n) => {
+                    manuscriptFeedbacks.push({
+                      id: n.notification_id,
+                      sender: 'Tantou Editor',
+                      seriesId: s._id,
+                      seriesTitle: s.title,
+                      chapterNumber: (m as any).chapter?.chapter_number || (m as any).chapter_number || 1,
+                      isAnnotation: false,
+                      isNotification: true,
+                      content: `[LÝ DO TỪ CHỐI TỔNG THỂ]: ${n.content}`,
+                      severity: 'Critical',
+                      status: n.is_read ? 'Resolved' : 'Open',
+                      createdAt: n.created_at || m.updated_at || m.created_at
+                    })
+                  })
+
+                  const filesRes = await api.get<{ success: boolean; data: any[] }>('/api/manuscript-files', {
+                    params: { manuscriptId: m._id }
+                  })
+                  const files = filesRes.data.data || []
+                  
+                  await Promise.all(
+                    files.map(async (f, pageIdx) => {
+                      try {
+                        const annRes = await api.get<{ success: boolean; data: any[] }>(`/api/pages/${f.file_id}/annotations`)
+                        const annotations = annRes.data.data || []
+                        
+                        annotations.forEach((ann: any) => {
+                          const isRejectionReason = ann.content?.includes('LÝ DO TỪ CHỐI CHƯƠNG:')
+                          let cleanedContent = ann.content || ''
+                          if (isRejectionReason) {
+                            cleanedContent = (ann.content || '').replace('LÝ DO TỪ CHỐI CHƯƠNG:', '').trim()
+                          }
+                          
+                          manuscriptFeedbacks.push({
+                            id: ann.annotation_id || `ann-${Date.now()}-${Math.random()}`,
+                            sender: 'Tantou Editor',
+                            seriesId: s._id,
+                            seriesTitle: s.title,
+                            chapterNumber: (m as any).chapter?.chapter_number || (m as any).chapter_number || 1,
+                            pageNumber: pageIdx + 1,
+                            pageId: f.file_id,
+                            isAnnotation: true,
+                            content: isRejectionReason 
+                              ? `[LÝ DO TỪ CHỐI TỔNG THỂ]: ${cleanedContent}` 
+                              : `[Yêu cầu sửa đổi ở vùng hình vẽ]: ${cleanedContent}`,
+                            severity: isRejectionReason ? 'Critical' : 'High',
+                            status: ann.status === 'resolved' ? 'Resolved' : 'Open',
+                            createdAt: ann.created_at || m.updated_at || m.created_at
+                          })
+                        })
+                      } catch (err) {
+                        console.error(`Failed to load annotations for page ${f.file_id}:`, err)
+                      }
+                    })
+                  )
+                } catch (err) {
+                  console.error(`Failed to load details for rejected manuscript ${m._id}:`, err)
+                }
+              })
+            )
+          } catch (e) {
+            console.error('Failed to load manuscripts for series', s._id, e)
+          }
+        })
+      )
+
+      // 4c. Load series rejection / revision requests from userNotifications
+      const seriesProposalFeedbacks: EditorFeedback[] = []
+      userNotifications.forEach((n: any) => {
+        const type = (n.type || '').toLowerCase()
+        if (type.startsWith('series_revision_requested') || type.startsWith('series_rejected')) {
+          const parts = n.type.split(':')
+          const seriesId = parts[1] || ''
+          const seriesTitle = sMap[seriesId] || 'Tác phẩm'
+          
+          seriesProposalFeedbacks.push({
+            id: n.notification_id,
+            sender: 'Tantou Editor',
+            seriesId: seriesId,
+            seriesTitle: seriesTitle,
+            isAnnotation: false,
+            isNotification: true,
+            content: `[ĐỀ XUẤT SERIES]: ${n.content}`,
+            severity: 'Critical',
+            status: n.is_read ? 'Resolved' : 'Open',
+            createdAt: n.created_at
+          })
+        }
+      })
+
+      setFeedbacks([...mappedFeedbacks, ...manuscriptFeedbacks, ...seriesProposalFeedbacks])
     } catch (err: any) {
       console.error(err)
       setError('Không thể tải nhận xét từ Editor. Vui lòng kiểm tra lại kết nối.')
@@ -125,11 +279,18 @@ export default function FeedbackPage() {
   // Handler to resolve feedback
   const handleResolveFeedback = async (id: string) => {
     try {
-      await feedbackService.delete(id)
+      const fb = feedbacks.find(f => f.id === id)
+      if (fb?.isAnnotation) {
+        await api.patch(`/api/annotations/${id}/status`, { status: 'resolved' })
+      } else if (fb?.isNotification) {
+        await rankingService.markAsRead(id)
+      } else {
+        await feedbackService.delete(id)
+      }
       await loadFeedbacks()
     } catch (err) {
       console.error(err)
-      alert('Không thể đánh dấu đã xử lý. Lỗi: ' + ((err as any).response?.data?.message || (err as any).message))
+      showAlert('Lỗi', 'Không thể đánh dấu đã xử lý. Lỗi: ' + ((err as any).response?.data?.message || (err as any).message), 'error')
     }
   }
 
@@ -139,12 +300,28 @@ export default function FeedbackPage() {
       const fb = feedbacks.find(f => f.id === id)
       if (!fb) return
       
-      const updatedContent = `${fb.content}\n\n[Mangaka Phản hồi]: ${replyContent}`
-      await feedbackService.reply(id, updatedContent)
+      if (fb.isAnnotation) {
+        const updatedContent = `${fb.content}\n\n[Mangaka Phản hồi]: ${replyContent}`
+        await api.patch(`/api/annotations/${id}`, { content: updatedContent })
+      } else {
+        const updatedContent = `${fb.content}\n\n[Mangaka Phản hồi]: ${replyContent}`
+        await feedbackService.reply(id, updatedContent)
+      }
       await loadFeedbacks()
     } catch (err) {
       console.error(err)
-      alert('Không thể gửi phản hồi. Lỗi: ' + ((err as any).response?.data?.message || (err as any).message))
+      showAlert('Lỗi', 'Không thể gửi phản hồi. Lỗi: ' + ((err as any).response?.data?.message || (err as any).message), 'error')
+    }
+  }
+
+  const handleDeleteNotification = async (id: string) => {
+    if (!confirm('Bạn có chắc chắn muốn xóa nhận xét đề xuất series này?')) return
+    try {
+      await rankingService.deleteNotification(id)
+      await loadFeedbacks()
+    } catch (err) {
+      console.error(err)
+      showAlert('Lỗi', 'Không thể xóa nhận xét.', 'error')
     }
   }
 
@@ -173,7 +350,7 @@ export default function FeedbackPage() {
         <p className="text-sm font-bold text-gray-600">
           Xem nhận xét của Tantou Editor (Biên tập viên phụ trách) về kịch bản, phác thảo nhân vật, 
           chì chi tiết hoặc các yêu cầu chỉnh sửa trước khi nộp bản thảo lên Ban biên tập.
-          Ðây là luồng phản hồi riêng biệt với việc duyệt kết quả trợ lý.
+          Đây là luồng phản hồi riêng biệt với việc duyệt kết quả trợ lý.
         </p>
       </div>
 
@@ -251,6 +428,7 @@ export default function FeedbackPage() {
               feedback={fb}
               onResolve={handleResolveFeedback}
               onReply={handleReplyFeedback}
+              onDeleteNotification={handleDeleteNotification}
             />
           ))
         ) : (
@@ -267,6 +445,36 @@ export default function FeedbackPage() {
         </div>
         Tất cả phản hồi và đánh dấu Đã xử lý (Resolved) của bạn sẽ gửi thông báo trực tiếp đến tài khoản quản lý của Editor phụ trách. Vui lòng thảo luận kỹ trước khi nhấn Đã xử lý để tránh việc Editor phải từ chối lại.
       </div>
+      {/* Alert Modal */}
+      {alertModal.show && (
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
+          <div className="bg-white border-4 border-manga-ink manga-shadow max-w-sm w-full animate-in fade-in zoom-in-95 duration-150 text-black">
+            <div className="p-4 border-b-4 border-manga-ink bg-gray-50 flex justify-between items-center">
+              <h3 className="font-manga font-bold text-lg uppercase flex items-center gap-2">
+                {alertModal.type === 'success' ? (
+                  <CheckCircle className="w-5 h-5 text-green-600 animate-bounce" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 text-manga-red animate-bounce" />
+                )}
+                {alertModal.title}
+              </h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm font-bold text-gray-700">{alertModal.message}</p>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setAlertModal(prev => ({ ...prev, show: false }))}
+                  className="px-4 py-2 bg-manga-ink text-white font-bold uppercase text-xs hover:bg-gray-800 transition-colors cursor-pointer"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Footer */}
       <footer className="mt-16 pt-8 border-t-2 border-manga-ink flex flex-col md:flex-row items-center justify-between gap-4 text-sm font-bold text-gray-500">
         <div className="font-manga text-2xl text-manga-red">MangaFlow</div>

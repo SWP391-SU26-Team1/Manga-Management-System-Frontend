@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-brand-50: #eef2ff;
   --color-brand-500: #6366f1;
@@ -10,11 +12,24 @@
 
   --font-sans: 'Inter', sans-serif;
   --font-manga: 'Oswald', sans-serif;
+
+  --animate-bounce-subtle: bounce-subtle 2s infinite;
+
+  @keyframes bounce-subtle {
+    0%, 100% {
+      transform: translateY(0);
+      animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+    }
+    50% {
+      transform: translateY(-4px);
+      animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+    }
+  }
 }
 
 @layer base {
   body {
-    @apply bg-white text-manga-ink antialiased font-sans;
+    @apply bg-[#F5F5F5] text-manga-ink antialiased font-sans dark:bg-zinc-900 dark:text-zinc-100 transition-colors duration-200;
   }
 
   /* Utilities for the Manga editorial style */

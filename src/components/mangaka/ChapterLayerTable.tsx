@@ -15,15 +15,15 @@ export function ChapterLayerTable({ pages, seriesId, chapterId, chapterNumber }:
   const getStatusBadge = (status: MangaPage["overallStatus"]) => {
     switch (status) {
       case "Approved":
-        return <span className="bg-manga-red text-white border-manga-ink border px-2 py-0.5 text-[10px] font-bold uppercase whitespace-nowrap">Approved</span>;
+        return <span className="bg-manga-red text-white border-manga-ink border px-2 py-0.5 text-[10px] font-bold uppercase whitespace-nowrap">Đã duyệt</span>;
       case "Submitted":
-        return <span className="bg-blue-100 text-blue-800 border-blue-300 border px-2 py-0.5 text-[10px] font-bold uppercase whitespace-nowrap">Submitted</span>;
+        return <span className="bg-blue-100 text-blue-800 border-blue-300 border px-2 py-0.5 text-[10px] font-bold uppercase whitespace-nowrap">Chờ duyệt</span>;
       case "Doing":
-        return <span className="bg-yellow-100 text-yellow-800 border-yellow-300 border px-2 py-0.5 text-[10px] font-bold uppercase whitespace-nowrap">Doing</span>;
+        return <span className="bg-yellow-100 text-yellow-800 border-yellow-300 border px-2 py-0.5 text-[10px] font-bold uppercase whitespace-nowrap">Đang làm</span>;
       case "Need Fix":
-        return <span className="bg-red-100 text-red-800 border-red-300 border px-2 py-0.5 text-[10px] font-bold uppercase whitespace-nowrap">Need Fix</span>;
+        return <span className="bg-red-100 text-red-800 border-red-300 border px-2 py-0.5 text-[10px] font-bold uppercase whitespace-nowrap">Cần sửa</span>;
       default:
-        return <span className="bg-gray-100 text-gray-500 border-gray-300 border px-2 py-0.5 text-[10px] font-bold uppercase whitespace-nowrap">Not Started</span>;
+        return <span className="bg-gray-100 text-gray-500 border-gray-300 border px-2 py-0.5 text-[10px] font-bold uppercase whitespace-nowrap">Chưa bắt đầu</span>;
     }
   };
 

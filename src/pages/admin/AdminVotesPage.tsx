@@ -12,7 +12,7 @@ import type { PaginationMeta, Vote, VoteStatus } from '@/services/admin/admin.ty
 const emptyPagination: PaginationMeta = { page: 1, limit: 10, total: 0, totalPages: 1 }
 const inputClass = 'w-full border-2 border-manga-ink bg-white px-4 py-3 text-sm font-bold outline-none'
 const labelClass = 'mb-2 block text-xs font-black uppercase text-gray-600'
-const iconClass = 'flex h-10 w-10 items-center justify-center border-2 border-manga-ink bg-white hover:bg-gray-100 disabled:opacity-50'
+const iconClass = 'flex h-10 w-10 items-center justify-center border-2 border-manga-ink disabled:opacity-50'
 const getError = (error: unknown) => {
   const value = error as { response?: { data?: { message?: string } }; message?: string }
   return value.response?.data?.message || value.message || 'Có lỗi xảy ra.'
@@ -150,12 +150,12 @@ export default function AdminVotesPage() {
             <span className={labelClass}>Tìm kiếm</span>
             <div className="flex gap-2">
               <input value={keywordInput} onChange={(e) => setKeywordInput(e.target.value)} className={inputClass} placeholder="Tìm quyết định, ghi chú..." />
-              <button type="submit" className={iconClass}><Search className="h-5 w-5" /></button>
+              <button type="submit" className={`${iconClass} bg-white hover:bg-gray-100`}><Search className="h-5 w-5" /></button>
             </div>
           </form>
           <div className="flex gap-2">
-            <button type="button" onClick={load} className={iconClass} title="Tải lại"><RefreshCw className={loading ? 'animate-spin' : ''} /></button>
-            <button type="button" onClick={resetFilters} className={iconClass} title="Xóa bộ lọc"><X className="h-5 w-5" /></button>
+            <button type="button" onClick={load} className={`${iconClass} bg-white hover:bg-gray-100`} title="Tải lại"><RefreshCw className={loading ? 'animate-spin' : ''} /></button>
+            <button type="button" onClick={resetFilters} className={`${iconClass} bg-white hover:bg-gray-100`} title="Xóa bộ lọc"><X className="h-5 w-5" /></button>
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -185,7 +185,7 @@ export default function AdminVotesPage() {
                   <td className="px-5 py-5 font-black uppercase">{vote.decision || 'N/A'}</td>
                   <td className="px-5 py-5 text-2xl font-black">{vote.score ?? '-'}</td>
                   <td className="px-5 py-5"><AdminStatusBadge status={vote.status} /></td>
-                  <td className="px-5 py-5"><div className="flex justify-end gap-2">{vote.status === 'submitted' && <button disabled={busyId === vote.vote_id} onClick={() => verify(vote)} className={`${iconClass} bg-emerald-500 text-white`}><CheckCircle2 /></button>}<button onClick={() => openEdit(vote)} className={iconClass}><Edit3 /></button><button disabled={busyId === vote.vote_id} onClick={() => remove(vote)} className={`${iconClass} bg-manga-red text-white`}><Trash2 /></button></div></td>
+                  <td className="px-5 py-5"><div className="flex justify-end gap-2">{vote.status === 'submitted' && <button disabled={busyId === vote.vote_id} onClick={() => verify(vote)} className={`${iconClass} bg-emerald-500 text-white hover:bg-emerald-600`}><CheckCircle2 /></button>}<button onClick={() => openEdit(vote)} className={`${iconClass} bg-white hover:bg-gray-100`}><Edit3 /></button><button disabled={busyId === vote.vote_id} onClick={() => remove(vote)} className={`${iconClass} bg-manga-red text-white hover:bg-red-600`}><Trash2 /></button></div></td>
                 </tr>
               ))}
             </tbody>

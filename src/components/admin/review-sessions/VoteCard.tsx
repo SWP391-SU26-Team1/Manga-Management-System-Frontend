@@ -2,7 +2,7 @@ import React from 'react'
 import { CheckCircle2, Edit3, Trash2 } from 'lucide-react'
 import type { Vote } from '@/services/admin/admin.types'
 import { formatDateTime, formatScore, getVoteId, getVoterLabel } from './helpers'
-import { StatusBadge } from './StatusBadge'
+import { AdminStatusBadge } from '@/components/admin/AdminStatusBadge'
 import type { VoteHandler } from './types'
 
 type VoteCardProps = {
@@ -13,59 +13,65 @@ type VoteCardProps = {
   onDelete: VoteHandler
 }
 
-const actionClass = 'inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600'
+const actionClass =
+  'inline-flex h-9 w-9 items-center justify-center border-2 border-manga-ink bg-white text-manga-ink shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_rgba(0,0,0,1)]'
 
 export function VoteCard({ vote, busyVoteId, onEdit, onVerify, onDelete }: VoteCardProps) {
   const isBusy = busyVoteId === getVoteId(vote)
 
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-4 md:hidden">
+    <article className="border-2 border-manga-ink bg-white p-4 shadow-[4px_4px_0px_rgba(0,0,0,1)] md:hidden">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="font-semibold text-slate-950">{getVoterLabel(vote)}</p>
-          {vote.users?.email && <p className="mt-1 text-xs text-slate-500">{vote.users.email}</p>}
+          <p className="font-black text-manga-ink">{getVoterLabel(vote)}</p>
+          {vote.users?.email && <p className="mt-1 text-xs font-bold text-gray-500">{vote.users.email}</p>}
         </div>
-        <StatusBadge status={vote.status} />
+        <AdminStatusBadge status={vote.status} />
       </div>
-      <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+      <div className="mt-4 grid grid-cols-2 gap-3 text-xs font-bold">
         <div>
-          <p className="font-semibold text-slate-500">Decision</p>
-          <p className="mt-1 capitalize text-slate-900">{vote.decision || 'N/A'}</p>
+          <p className="text-gray-400 uppercase tracking-wider text-[10px]">Quyết định</p>
+          <p className="mt-1 capitalize text-manga-ink font-black">{vote.decision || 'N/A'}</p>
         </div>
         <div>
-          <p className="font-semibold text-slate-500">Score</p>
-          <p className="mt-1 text-slate-900">{formatScore(vote.score)}</p>
+          <p className="text-gray-400 uppercase tracking-wider text-[10px]">Điểm số</p>
+          <p className="mt-1 text-manga-ink font-black">{formatScore(vote.score)}</p>
         </div>
         <div className="col-span-2">
-          <p className="font-semibold text-slate-500">Note</p>
-          <p className="mt-1 whitespace-pre-wrap text-slate-900">{vote.note || 'N/A'}</p>
+          <p className="text-gray-400 uppercase tracking-wider text-[10px]">Ghi chú</p>
+          <p className="mt-1 whitespace-pre-wrap text-manga-ink">{vote.note || 'N/A'}</p>
         </div>
         <div className="col-span-2">
-          <p className="font-semibold text-slate-500">Created at</p>
-          <p className="mt-1 text-slate-900">{formatDateTime(vote.created_at)}</p>
+          <p className="text-gray-400 uppercase tracking-wider text-[10px]">Ngày tạo</p>
+          <p className="mt-1 text-manga-ink">{formatDateTime(vote.created_at)}</p>
         </div>
       </div>
-      <div className="mt-4 flex justify-end gap-2 border-t border-slate-100 pt-4">
-        <button type="button" title="Edit vote" onClick={() => onEdit(vote)} className={actionClass}>
+      <div className="mt-4 flex justify-end gap-2 border-t-2 border-manga-ink pt-4">
+        <button
+          type="button"
+          title="Chỉnh sửa biểu quyết"
+          onClick={() => onEdit(vote)}
+          className={actionClass}
+        >
           <Edit3 className="h-4 w-4" />
         </button>
         {vote.status !== 'verified' && (
           <button
             type="button"
-            title="Verify vote"
+            title="Xác minh biểu quyết"
             disabled={isBusy}
             onClick={() => onVerify(vote)}
-            className={`${actionClass} border-green-200 text-green-700`}
+            className={`${actionClass} bg-emerald-400 text-black`}
           >
             <CheckCircle2 className="h-4 w-4" />
           </button>
         )}
         <button
           type="button"
-          title="Delete vote"
+          title="Xóa biểu quyết"
           disabled={isBusy}
           onClick={() => onDelete(vote)}
-          className={`${actionClass} border-red-200 text-red-600`}
+          className={`${actionClass} bg-manga-red text-white`}
         >
           <Trash2 className="h-4 w-4" />
         </button>
@@ -73,3 +79,4 @@ export function VoteCard({ vote, busyVoteId, onEdit, onVerify, onDelete }: VoteC
     </article>
   )
 }
+

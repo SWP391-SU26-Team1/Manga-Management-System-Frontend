@@ -24,21 +24,91 @@ export default function LoginPage() {
   const [loginError, setLoginError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const getInputClass = (field: 'email' | 'password', extraPaddingRight = 'pr-4') => {
-    const isTouched = touched[field]
-    const error = errors[field]
-    
-    let borderClass = 'border-manga-ink focus:border-manga-red'
-    
-    if (isTouched) {
-      if (error) {
-        borderClass = 'border-manga-red focus:border-manga-red'
+  const handleGoogleCallback = async (response: any) => {
+    setLoginError(null)
+    setLoading(true)
+    try {
+      const data = await authService.loginWithGoogle(response.credential)
+      
+      if ('otpSent' in data && data.otpSent) {
+        sessionStorage.setItem('pending_register_email', data.email)
+        navigate(`/verify-otp?email=${encodeURIComponent(data.email)}&type=register`)
       } else {
-        borderClass = 'border-green-500 focus:border-green-500'
+        const storedUserData = {
+          ...(data as any).user,
+          token: (data as any).token
+        }
+        localStorage.setItem('mangaflow_user', JSON.stringify(storedUserData))
+        if (storedUserData.role === 'MANGAKA') {
+          navigate('/dashboard/mangaka')
+        } else if (storedUserData.role === 'ASSISTANT') {
+          navigate('/dashboard/assistant')
+        } else if (storedUserData.role === 'EDITOR') {
+          navigate('/dashboard/tantou-editor')
+        } else if (storedUserData.role?.toUpperCase() === 'ADMIN') {
+          navigate('/dashboard/admin')
+        } else if (['BOARD', 'CHIEF_EDITOR'].includes(storedUserData.role?.toUpperCase())) {
+          navigate('/dashboard/editorial-board')
+        } else {
+          navigate('/')
+        }
+      }
+    } catch (err: any) {
+      console.error('Google login error:', err)
+      const errorMsg = err.response?.data?.message || 'Đăng nhập Google thất bại.'
+      setLoginError(errorMsg)
+      setLoading(false)
+    }
+  }
+
+  React.useEffect(() => {
+    const initGoogleSignIn = () => {
+      const w = window as any
+      if (w.google) {
+        const clientId = import.meta.env.GOOGLE_CLIENT_ID || import.meta.env.VITE_GOOGLE_CLIENT_ID || "1032120760447-placeholder.apps.googleusercontent.com"
+        w.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: handleGoogleCallback,
+        })
+        
+        const btnParent = document.getElementById("google-signin-btn-container")
+        if (btnParent) {
+          w.google.accounts.id.renderButton(
+            btnParent,
+            {
+              theme: "outline",
+              size: "large",
+              width: btnParent.clientWidth || 320,
+              text: "signin_with"
+            }
+          )
+        }
       }
     }
-    
-    return `w-full pl-8 ${extraPaddingRight} py-2 border-b-2 bg-transparent focus:outline-none transition-colors ${borderClass}`
+
+    initGoogleSignIn()
+    const timer = setTimeout(initGoogleSignIn, 1000)
+    return () => clearTimeout(timer)
+  }, [])
+
+  const handleGoogleFallbackClick = () => {
+    const w = window as any
+    if (w.google) {
+      w.google.accounts.id.prompt()
+    } else {
+      alert("Google Sign-In SDK đang tải. V vui lòng thử lại sau vài giây.")
+    }
+  }
+
+  const getInputClass = (field: 'email' | 'password', extraPaddingRight = 'pr-4') => {
+    const base = `w-full pl-8 py-2 bg-transparent border-b-2 focus:outline-none transition-colors ${extraPaddingRight} `
+    if (touched[field] && errors[field]) {
+      return base + 'border-manga-red text-manga-red dark:text-manga-red focus:border-manga-red'
+    }
+    if (touched[field] && !errors[field] && (field === 'email' ? email : password)) {
+      return base + 'border-green-500 text-manga-ink dark:text-white focus:border-green-500'
+    }
+    return base + 'border-black dark:border-gray-500 text-manga-ink dark:text-white focus:border-manga-red dark:focus:border-manga-red'
   }
 
   const validateField = (field: 'email' | 'password', value: string) => {
@@ -128,26 +198,26 @@ export default function LoginPage() {
     !errors.password
 
   return (
-    <div className="min-h-screen bg-white relative flex items-center justify-center p-4 font-sans overflow-hidden">
+    <div className="min-h-screen bg-[#F5F5F5] dark:bg-zinc-900 relative flex items-center justify-center p-4 font-sans overflow-hidden transition-colors">
       <button
         onClick={() => navigate('/register')}
-        className="absolute top-6 left-6 md:top-10 md:left-10 z-50 p-2 bg-white text-manga-ink manga-border manga-shadow-sm hover:translate-y-1 hover:manga-shadow-none transition-all flex items-center justify-center"
+        className="absolute top-6 left-6 md:top-10 md:left-10 z-50 p-2 bg-white dark:bg-zinc-800 text-manga-ink dark:text-white manga-border manga-shadow-sm hover:translate-y-1 hover:manga-shadow-none transition-all flex items-center justify-center"
         aria-label="Quay lại"
       >
         <ArrowLeft className="w-6 h-6" />
       </button>
 
       {/* Background Manga Panels (Decorative) */}
-      <div className="absolute inset-0 pointer-events-none opacity-20">
-        <div className="absolute top-10 left-10 w-64 h-80 border-4 border-manga-ink -rotate-6 bg-gray-50" />
-        <div className="absolute bottom-20 right-20 w-96 h-64 border-4 border-manga-ink rotate-3 bg-gray-50" />
-        <div className="absolute -top-10 right-32 w-72 h-72 border-4 border-manga-ink rotate-12 bg-gray-50" />
-        <div className="absolute bottom-10 left-20 w-80 h-40 border-4 border-manga-ink -rotate-2 bg-gray-50" />
+      <div className="absolute inset-0 pointer-events-none opacity-20 dark:opacity-10">
+        <div className="absolute top-10 left-10 w-64 h-80 border-4 border-manga-ink dark:border-black -rotate-6 bg-gray-50 dark:bg-zinc-800" />
+        <div className="absolute bottom-20 right-20 w-96 h-64 border-4 border-manga-ink dark:border-black rotate-3 bg-gray-50 dark:bg-zinc-800" />
+        <div className="absolute -top-10 right-32 w-72 h-72 border-4 border-manga-ink dark:border-black rotate-12 bg-gray-50 dark:bg-zinc-800" />
+        <div className="absolute bottom-10 left-20 w-80 h-40 border-4 border-manga-ink dark:border-black -rotate-2 bg-gray-50 dark:bg-zinc-800" />
       </div>
 
       <div className="w-full max-w-lg z-10">
         {/* Form Card */}
-        <div className="manga-border manga-shadow bg-white flex flex-col">
+        <div className="manga-border manga-shadow bg-white dark:bg-zinc-800 flex flex-col transition-colors">
           {/* Header Card */}
           <div className="bg-manga-ink p-8 text-white relative">
             <div className="absolute -top-4 left-6 bg-white text-manga-ink font-manga font-bold px-3 py-1 text-sm manga-border">
@@ -173,7 +243,7 @@ export default function LoginPage() {
 
               {/* Email Input */}
               <div className="space-y-2">
-                <label className="block text-sm font-bold uppercase tracking-wider text-manga-ink">
+                <label className="block text-sm font-bold uppercase tracking-wider text-manga-ink dark:text-white">
                   Email
                 </label>
                 <div className="relative">
@@ -195,7 +265,7 @@ export default function LoginPage() {
               {/* Password Input */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <label className="block text-sm font-bold uppercase tracking-wider text-manga-ink">
+                  <label className="block text-sm font-bold uppercase tracking-wider text-manga-ink dark:text-white">
                     Mật khẩu
                   </label>
                   <Link to="/forgot-password" className="text-xs font-bold text-manga-red hover:underline">
@@ -247,19 +317,19 @@ export default function LoginPage() {
             </div>
 
             {/* Social Login */}
-            <div className="mt-6 grid grid-cols-2 gap-4">
-              <button className="flex items-center justify-center gap-2 bg-white text-manga-ink font-bold py-2 px-4 manga-border manga-shadow-sm hover:bg-gray-50 transition-colors">
-                <svg className="w-5 h-5" viewBox="0 0 24 24">
-                  <path fill="currentColor" d="M21.35,11.1H12.18V13.83H18.69C18.36,17.64 15.19,19.27 12.19,19.27C8.36,19.27 5,16.25 5,12C5,7.9 8.2,4.73 12.2,4.73C15.29,4.73 17.1,6.7 17.1,6.7L19,4.72C19,4.72 16.56,2 12.1,2C6.42,2 2.03,6.8 2.03,12C2.03,17.05 6.16,22 12.25,22C17.6,22 21.5,18.33 21.5,12.91C21.5,11.76 21.35,11.1 21.35,11.1V11.1Z" />
-                </svg>
-                Google
-              </button>
-              <button className="flex items-center justify-center gap-2 bg-manga-ink text-white font-bold py-2 px-4 manga-border border-manga-ink manga-shadow-sm hover:bg-gray-900 transition-colors">
-                <svg className="w-5 h-5" viewBox="0 0 24 24">
-                  <path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                </svg>
-                Twitter
-              </button>
+            <div className="mt-6 flex justify-center">
+              <div id="google-signin-btn-container" className="w-full max-w-sm flex justify-center">
+                <button
+                  type="button"
+                  onClick={handleGoogleFallbackClick}
+                  className="w-full flex items-center justify-center gap-2 bg-white text-manga-ink font-bold py-2.5 px-4 manga-border manga-shadow-sm hover:bg-gray-50 transition-colors"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24">
+                    <path fill="currentColor" d="M21.35,11.1H12.18V13.83H18.69C18.36,17.64 15.19,19.27 12.19,19.27C8.36,19.27 5,16.25 5,12C5,7.9 8.2,4.73 12.2,4.73C15.29,4.73 17.1,6.7 17.1,6.7L19,4.72C19,4.72 16.56,2 12.1,2C6.42,2 2.03,6.8 2.03,12C2.03,17.05 6.16,22 12.25,22C17.6,22 21.5,18.33 21.5,12.91C21.5,11.76 21.35,11.1 21.35,11.1V11.1Z" />
+                  </svg>
+                  Google
+                </button>
+              </div>
             </div>
 
             {/* Bottom Link */}
@@ -269,7 +339,7 @@ export default function LoginPage() {
                 to="/register"
                 className="font-bold underline decoration-2 underline-offset-4 hover:text-manga-red transition-colors"
               >
-                Tạo bản thảo mới
+                Đăng ký ngay!
               </Link>
             </div>
           </div>

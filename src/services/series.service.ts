@@ -12,6 +12,9 @@ export interface SeriesAPI {
   view_count?: number
   created_at: string
   updated_at?: string
+  author?: any
+  publishSchedule?: string
+  proposedStartDate?: string
 }
 
 export interface CreateSeriesPayload {
@@ -19,6 +22,8 @@ export interface CreateSeriesPayload {
   description: string
   genre?: string
   cover_image?: string | null
+  publishSchedule?: string
+  proposedStartDate?: string
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -44,6 +49,9 @@ const mapSeries = (data: any): SeriesAPI => {
     view_count: data.view_count,
     created_at: data.created_at,
     updated_at: data.updated_at,
+    author: data.author || data.mangaka_id || data.author_name || null,
+    publishSchedule: data.publishSchedule,
+    proposedStartDate: data.proposedStartDate,
   }
 }
 
@@ -54,6 +62,12 @@ export const seriesService = {
   getAll: async (): Promise<SeriesAPI[]> => {
     const res = await api.get<{ success: boolean; data: any[] }>('/api/mangaka/series')
     return (res.data.data ?? []).map(mapSeries)
+  },
+
+  /** GET /api/mangaka/series/:seriesId/members */
+  getMembers: async (seriesId: string): Promise<any[]> => {
+    const res = await api.get<{ success: boolean; data: any[] }>(`/api/mangaka/series/${seriesId}/members`)
+    return res.data.data ?? []
   },
 
   /** GET /api/mangaka/series/:seriesId */
@@ -69,8 +83,24 @@ export const seriesService = {
       description: payload.description,
       genre: payload.genre,
       cover_image_url: payload.cover_image || null,
+      publishSchedule: payload.publishSchedule,
+      proposedStartDate: payload.proposedStartDate
     }
     const res = await api.post<{ success: boolean; data: any }>('/api/mangaka/series', mappedPayload)
+    return mapSeries(res.data.data)
+  },
+
+  /** PATCH /api/mangaka/series/:seriesId — cập nhật series */
+  update: async (seriesId: string, payload: CreateSeriesPayload): Promise<SeriesAPI> => {
+    const mappedPayload = {
+      title: payload.title,
+      description: payload.description,
+      genre: payload.genre,
+      cover_image_url: payload.cover_image || null,
+      publishSchedule: payload.publishSchedule,
+      proposedStartDate: payload.proposedStartDate
+    }
+    const res = await api.patch<{ success: boolean; data: any }>(`/api/mangaka/series/${seriesId}`, mappedPayload)
     return mapSeries(res.data.data)
   },
 
@@ -78,6 +108,14 @@ export const seriesService = {
   submitReview: async (seriesId: string): Promise<SeriesAPI> => {
     const res = await api.patch<{ success: boolean; data: any }>(
       `/api/mangaka/series/${seriesId}/submit-review`
+    )
+    return mapSeries(res.data.data)
+  },
+
+  /** PATCH /api/mangaka/series/:seriesId/publish — xuất bản series */
+  publish: async (seriesId: string): Promise<SeriesAPI> => {
+    const res = await api.patch<{ success: boolean; data: any }>(
+      `/api/mangaka/series/${seriesId}/publish`
     )
     return mapSeries(res.data.data)
   },

@@ -12,31 +12,26 @@ import {
   FileText
 } from 'lucide-react'
 
-// Main panel menu items
 const mainMenuItems = [
   {
-    label: "Tổng quan (Dashboard)",
+    label: "Trang chủ",
     path: "/dashboard/editorial-board",
-    icon: LayoutDashboard,
-    exact: true
+    exact: true,
+    icon: LayoutDashboard
   },
   {
-    label: "Hộp thư công việc (Proposals)",
+    label: "Phiên Đánh Giá",
     path: "/dashboard/editorial-board/proposals",
     icon: FileText
   },
-  {
-    label: "Báo cáo tranh cãi",
-    path: "/dashboard/editorial-board/disputes",
-    icon: AlertTriangle
-  },
+
   {
     label: "Bảng Xếp Hạng",
     path: "/dashboard/editorial-board/rankings",
     icon: Award
   },
   {
-    label: "Lịch sử Phán quyết",
+    label: "Lịch sử",
     path: "/dashboard/editorial-board/history",
     icon: History
   }
@@ -99,11 +94,12 @@ export default function BoardSidebar() {
 
   const activeMenuItems = isReviewMode ? reviewMenuItems : mainMenuItems
 
-  const checkIsActive = (path: string, exact?: boolean) => {
+  const checkIsActive = (itemPath: string, exact?: boolean) => {
+    const basePath = itemPath.split('?')[0]
     if (exact) {
-      return location.pathname === path
+      return location.pathname === basePath
     }
-    return location.pathname.startsWith(path)
+    return location.pathname.startsWith(basePath)
   }
 
 

@@ -50,7 +50,7 @@ export default function MangakaDashboardPage() {
         setSeriesList(series)
 
         const activeSeries = series.filter(
-          (s) => s.status === 'ongoing' || s.status === 'draft' || s.status === 'in_progress'
+          (s) => s.status === 'ongoing' || s.status === 'draft' || s.status === 'in_progress' || s.status === 'approved'
         )
 
         // 2. Fetch chapters for all series (parallel)
@@ -193,7 +193,7 @@ export default function MangakaDashboardPage() {
 
         {/* Right Column (Smaller) */}
         <div className="lg:col-span-1 flex flex-col gap-6">
-          <TeamList />
+          <TeamList seriesList={seriesList} />
           <InteractionStats seriesList={seriesList} />
         </div>
       </div>

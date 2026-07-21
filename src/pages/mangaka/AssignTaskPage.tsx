@@ -8,6 +8,7 @@ import { pageService, PageAPI } from '@/services/page.service'
 import { taskService, TaskAPI, LAYER_TYPE_MAP, TaskType } from '@/services/task.service'
 import { regionService } from '@/services/region.service'
 import { uploadService } from '@/services/upload.service'
+import { editorService } from '@/services/editor.service'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,7 +28,7 @@ type UILayerType = 'Line Art' | 'Background' | 'Panel Frame' | 'Speech Balloon' 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 function AssignTaskContent() {
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   // Data from API
   const [seriesList, setSeriesList] = useState<SeriesAPI[]>([])
@@ -52,6 +53,34 @@ function AssignTaskContent() {
   const [taskSuccessMsg, setTaskSuccessMsg] = useState('')
   const [taskWarningMsg, setTaskWarningMsg] = useState('')
 
+  const getTodayString = () => {
+    const today = new Date()
+    const yyyy = today.getFullYear()
+    const mm = String(today.getMonth() + 1).padStart(2, '0')
+    const dd = String(today.getDate()).padStart(2, '0')
+    return `${yyyy}-${mm}-${dd}`
+  }
+
+  // Pre-fill layerType and note from query parameters
+  useEffect(() => {
+    const paramLayer = searchParams.get('layerType')
+    const paramNote = searchParams.get('note')
+
+    if (paramLayer) {
+      let mapped: UILayerType = 'Line Art'
+      const lower = paramLayer.toLowerCase()
+      if (lower === 'screentone' || lower === 'coloring') mapped = 'Screentone'
+      else if (lower === 'background') mapped = 'Background'
+      else if (lower === 'speech balloon' || lower === 'lettering') mapped = 'Speech Balloon'
+      else if (lower === 'panel frame' || lower === 'cleaning' || lower === 'sfx') mapped = 'Panel Frame'
+      setLayerType(mapped)
+    }
+
+    if (paramNote) {
+      setNote(decodeURIComponent(paramNote))
+    }
+  }, [searchParams])
+
   // Image state
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
@@ -59,6 +88,7 @@ function AssignTaskContent() {
   const [annotations, setAnnotations] = useState<AreaMarkup[]>([])
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null)
   const [isDrawing, setIsDrawing] = useState(false)
+  const [isMouseDown, setIsMouseDown] = useState(false)
   const [startPos, setStartPos] = useState({ x: 0, y: 0 })
   const [currentPos, setCurrentPos] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
@@ -104,6 +134,7 @@ function AssignTaskContent() {
       // Auto select the first created page
       if (createdPages.length > 0) {
         setSelectedPageId(createdPages[0]._id)
+        setSearchParams({ seriesId: selectedSeriesId, chapterId: selectedChapterId, pageId: createdPages[0]._id })
       }
       
       setSuccessMsg('Đã tải lên các trang phác thảo thô thành công!')
@@ -180,7 +211,7 @@ function AssignTaskContent() {
       }
     }
     fetchSeries()
-  }, [searchParams])
+  }, [])
 
   // ── Load chapters and members when series changes ──────────────────────────
   useEffect(() => {
@@ -328,22 +359,7 @@ function AssignTaskContent() {
     setIsSubmitting(true)
     try {
       const apiTaskType: TaskType = LAYER_TYPE_MAP[layerType] ?? 'inking'
-      let dbRegionId = selectedAnn.id
-
-      // If the region is newly drawn locally, save it on backend first
-      if (selectedAnn.id.startsWith('vung-')) {
-        const newReg = await regionService.create(selectedSeriesId, selectedChapterId, selectedPageId, {
-          region_type: apiTaskType,
-          coordinates: {
-            x: selectedAnn.x,
-            y: selectedAnn.y,
-            w: selectedAnn.w,
-            h: selectedAnn.h
-          },
-          label: selectedAnn.label
-        })
-        dbRegionId = newReg.region_id
-      }
+      const dbRegionId = selectedAnn.id
 
       await taskService.create(selectedSeriesId, selectedChapterId, selectedPageId, {
         assigned_to: assignedTo,
@@ -353,6 +369,20 @@ function AssignTaskContent() {
         deadline,
         region_id: dbRegionId
       })
+
+      // Send real-time notification to the assigned assistant (assignedTo is the user_id)
+      if (assignedTo) {
+        try {
+          await editorService.sendInternalNotification(
+            assignedTo,
+            "Nhiệm vụ mới được giao",
+            `Bạn đã được giao nhiệm vụ vẽ lớp [${layerType}] cho Trang ${activePage?.page_number ?? 'N/A'}.`,
+            "task_assigned"
+          )
+        } catch (errNotif) {
+          console.error("Lỗi khi gửi thông báo nội bộ cho trợ lý:", errNotif)
+        }
+      }
 
       setTaskSuccessMsg('Đã giao nhiệm vụ thành công!')
       setTimeout(() => {
@@ -423,7 +453,23 @@ function AssignTaskContent() {
 
   const handleAssignTask = async (taskId: string) => {
     try {
+      const targetTask = tasks.find(t => t._id === taskId)
       await taskService.assign(selectedSeriesId, selectedChapterId, selectedPageId, taskId)
+      
+      // Send real-time notification to the assigned assistant
+      if (targetTask && targetTask.assigned_to) {
+        try {
+          await editorService.sendInternalNotification(
+            targetTask.assigned_to,
+            "Nhiệm vụ mới được giao",
+            `Bạn đã được phân công nhiệm vụ vẽ lớp [${targetTask.task_type || 'task'}] cho Trang ${activePage?.page_number ?? 'N/A'}.`,
+            "task_assigned"
+          )
+        } catch (errNotif) {
+          console.error("Lỗi khi gửi thông báo nội bộ cho trợ lý:", errNotif)
+        }
+      }
+
       setTaskSuccessMsg('Giao việc thành công!')
       setTimeout(() => {
         setTaskSuccessMsg('')
@@ -445,37 +491,73 @@ function AssignTaskContent() {
     const rect = imageContainerRef.current.getBoundingClientRect()
     const x = ((e.clientX - rect.left) / rect.width) * 100 / zoom
     const y = ((e.clientY - rect.top) / rect.height) * 100 / zoom
-    setIsDrawing(true)
+    setIsMouseDown(true)
     setStartPos({ x, y })
     setCurrentPos({ x, y })
   }
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDrawing || !imageContainerRef.current) return
+    if (!isMouseDown || !imageContainerRef.current) return
     const rect = imageContainerRef.current.getBoundingClientRect()
     const x = Math.max(0, Math.min(((e.clientX - rect.left) / rect.width) * 100 / zoom, 100))
     const y = Math.max(0, Math.min(((e.clientY - rect.top) / rect.height) * 100 / zoom, 100))
-    setCurrentPos({ x, y })
+    
+    if (!isDrawing) {
+      const dx = Math.abs(x - startPos.x)
+      const dy = Math.abs(y - startPos.y)
+      // Bắt đầu kéo vẽ khi di chuyển chuột vượt quá 1% kích thước khung chứa
+      if (dx > 1 || dy > 1) {
+        setIsDrawing(true)
+      }
+    } else {
+      setCurrentPos({ x, y })
+    }
   }
 
-  const handleMouseUp = () => {
+  const handleMouseUp = async () => {
+    setIsMouseDown(false)
     if (!isDrawing) return
     setIsDrawing(false)
     const width = Math.abs(currentPos.x - startPos.x)
     const height = Math.abs(currentPos.y - startPos.y)
     if (width > 2 && height > 2) {
-      const newId = `vung-${Date.now()}`
-      const newAnnotation: AreaMarkup = {
-        id: newId,
-        x: Math.min(startPos.x, currentPos.x),
-        y: Math.min(startPos.y, currentPos.y),
-        w: width,
-        h: height,
-        label: `Vùng ${annotations.length + 1}`,
+      if (!selectedSeriesId || !selectedChapterId || !selectedPageId) {
+        alert('Vui lòng chọn đầy đủ Series, Chapter và Trang trước khi vẽ!')
+        return
       }
-      setAnnotations([...annotations, newAnnotation])
-      setActiveAnnotationId(newId)
-      setNote(prev => prev + (prev ? '\n' : '') + `Yêu cầu tại [${newAnnotation.label}]: `)
+      try {
+        const apiTaskType: TaskType = LAYER_TYPE_MAP[layerType] ?? 'inking'
+        const label = `Vùng ${annotations.length + 1}`
+        
+        // Lưu vùng vẽ lên backend ngay lập tức
+        const newReg = await regionService.create(selectedSeriesId, selectedChapterId, selectedPageId, {
+          region_type: apiTaskType,
+          coordinates: {
+            x: Math.min(startPos.x, currentPos.x),
+            y: Math.min(startPos.y, currentPos.y),
+            w: width,
+            h: height
+          },
+          label
+        })
+        
+        const newAnnotation: AreaMarkup = {
+          id: newReg.region_id,
+          x: Math.min(startPos.x, currentPos.x),
+          y: Math.min(startPos.y, currentPos.y),
+          w: width,
+          h: height,
+          label,
+          saved: true
+        }
+        
+        setAnnotations(prev => [...prev, newAnnotation])
+        setActiveAnnotationId(newReg.region_id)
+        setNote(prev => prev + (prev ? '\n' : '') + `Yêu cầu tại [${newAnnotation.label}]: `)
+      } catch (err) {
+        console.error('Lỗi khi tạo vùng vẽ trên backend:', err)
+        alert('Không thể lưu vùng vẽ lên hệ thống, vui lòng thử lại.')
+      }
     }
   }
 
@@ -518,7 +600,11 @@ function AssignTaskContent() {
           ) : (
             <select
               value={selectedSeriesId}
-              onChange={e => setSelectedSeriesId(e.target.value)}
+              onChange={e => {
+                const nextId = e.target.value
+                setSelectedSeriesId(nextId)
+                setSearchParams({ seriesId: nextId })
+              }}
               className="border-2 border-manga-ink px-2.5 py-1.5 font-bold text-xs bg-white uppercase focus:outline-none"
             >
               {seriesList.length === 0 && <option value="">-- Chưa có series --</option>}
@@ -537,7 +623,11 @@ function AssignTaskContent() {
           ) : (
             <select
               value={selectedChapterId}
-              onChange={e => setSelectedChapterId(e.target.value)}
+              onChange={e => {
+                const nextId = e.target.value
+                setSelectedChapterId(nextId)
+                setSearchParams({ seriesId: selectedSeriesId, chapterId: nextId })
+              }}
               disabled={chapters.length === 0}
               className="border-2 border-manga-ink px-2.5 py-1.5 font-bold text-xs bg-white uppercase focus:outline-none disabled:opacity-50"
             >
@@ -558,7 +648,11 @@ function AssignTaskContent() {
             <div className="flex items-center gap-2">
               <select
                 value={selectedPageId}
-                onChange={e => setSelectedPageId(e.target.value)}
+                onChange={e => {
+                  const nextId = e.target.value
+                  setSelectedPageId(nextId)
+                  setSearchParams({ seriesId: selectedSeriesId, chapterId: selectedChapterId, pageId: nextId })
+                }}
                 disabled={pages.length === 0}
                 className="border-2 border-manga-ink px-2.5 py-1.5 font-bold text-xs bg-white uppercase focus:outline-none disabled:opacity-50"
               >
@@ -703,6 +797,11 @@ function AssignTaskContent() {
 
                     {annotations.map(ann => {
                       const isActive = ann.id === activeAnnotationId
+                      const isNearTop = ann.y < 7
+                      const isTooShort = ann.h < 6
+                      const verticalClass = isNearTop
+                        ? (isTooShort ? 'top-full mt-0.5' : 'top-0')
+                        : '-top-6'
                       return (
                         <div
                           key={ann.id}
@@ -710,16 +809,21 @@ function AssignTaskContent() {
                           className={`absolute border-2 ${isActive ? 'border-manga-red bg-manga-red/20 z-20' : 'border-manga-red border-dashed bg-manga-red/5 z-10'} group transition-colors`}
                           style={{ left: `${ann.x}%`, top: `${ann.y}%`, width: `${ann.w}%`, height: `${ann.h}%` }}
                         >
-                          <div className="absolute -top-6 left-[-2px] bg-manga-red text-white text-[10px] font-bold px-1.5 py-0.5 whitespace-nowrap">{ann.label}</div>
+                          <div className={`absolute ${verticalClass} left-[-2px] bg-manga-red text-white text-[10px] font-bold px-1.5 py-0.5 whitespace-nowrap z-30`}>{ann.label}</div>
                           {isActive && (
                             <button
                               type="button"
-                              onMouseDown={e => {
+                              onMouseDown={async e => {
                                 e.stopPropagation()
+                                try {
+                                  await regionService.delete(selectedSeriesId, selectedChapterId, selectedPageId, ann.id)
+                                } catch (err) {
+                                  console.error('Lỗi khi xóa vùng vẽ trên backend:', err)
+                                }
                                 setAnnotations(annotations.filter(a => a.id !== ann.id))
                                 if (activeAnnotationId === ann.id) setActiveAnnotationId(null)
                               }}
-                              className="absolute -top-6 right-0 bg-manga-ink text-white p-0.5 hover:bg-red-700 transition-colors"
+                              className={`absolute ${verticalClass} right-0 bg-manga-ink text-white p-0.5 hover:bg-red-700 transition-colors z-30`}
                             >
                               <X className="w-3.5 h-3.5" />
                             </button>
@@ -833,6 +937,7 @@ function AssignTaskContent() {
                   type="date"
                   required
                   value={deadline}
+                  min={getTodayString()}
                   onChange={e => setDeadline(e.target.value)}
                   className="w-full border-2 border-manga-ink px-3 py-2 text-sm focus:outline-none focus:border-manga-red"
                 />

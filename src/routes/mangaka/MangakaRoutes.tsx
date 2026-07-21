@@ -10,6 +10,8 @@ import AssignTaskPage from '@/pages/mangaka/AssignTaskPage'
 import AssistantsPage from '@/pages/mangaka/AssistantsPage'
 import RankingPage from '@/pages/mangaka/RankingPage'
 import CreateSeriesPage from '@/pages/mangaka/CreateSeriesPage'
+import CreateManuscriptPage from '@/pages/mangaka/CreateManuscriptPage'
+import DraftsPage from '@/pages/mangaka/DraftsPage'
 import FeedbackPage from '@/pages/mangaka/FeedbackPage'
 import BoardReviewPage from '@/pages/mangaka/BoardReviewPage'
 import RiskAlertsPage from '@/pages/mangaka/RiskAlertsPage'
@@ -29,6 +31,8 @@ export default function MangakaRoutes() {
         <Route index element={<MangakaDashboardPage />} />
         <Route path="series" element={<SeriesPage />} />
         <Route path="create-series" element={<CreateSeriesPage />} />
+        <Route path="create-manuscript" element={<CreateManuscriptPage />} />
+        <Route path="drafts" element={<DraftsPage />} />
         <Route path="submission" element={<SubmissionPage />} />
         <Route path="assign-task" element={<AssignTaskPage />} />
         <Route path="assistants" element={<AssistantsPage />} />

@@ -71,6 +71,7 @@ const mapBackendTaskToAssistantTask = (task: PageTask): AssistantTask => {
     regionId: (task as any).region_id || undefined,
     createdAt: task.created_at || '',
     assignedById: task.users?.user_id || '',
+    assignedByAvatar: (task.users as any)?.avatar_url || '',
   }
 }
 
@@ -234,11 +235,12 @@ export default function TasksPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const res = await assistantService.listMyTasks()
+      const res = await assistantService.listMyTasks({ limit: 100 })
       if (res && res.success) {
         const mapped = res.data.map(mapBackendTaskToAssistantTask)
         setTasks(mapped)
-        loadAvatars(mapped)
+        // Skip fetching detailed user profiles to avoid HTTP 403 Forbidden console errors
+        // loadAvatars(mapped)
       } else {
         setTasks([])
       }
@@ -285,13 +287,13 @@ export default function TasksPage() {
   const getStatusBadge = (status?: string) => {
     switch (status) {
       case 'Approved':
-        return <span className="bg-[#E6FFFA] text-[#38B2AC] px-2 py-1 text-[10px] font-bold uppercase tracking-wider">APPROVED</span>
+        return <span className="bg-[#E6FFFA] text-[#38B2AC] px-2 py-1 text-[10px] font-bold uppercase tracking-wider">ĐÃ DUYỆT</span>
       case 'In Progress':
-        return <span className="bg-[#EBF8FF] text-[#4299E1] px-2 py-1 text-[10px] font-bold uppercase tracking-wider">IN PROGRESS</span>
+        return <span className="bg-[#EBF8FF] text-[#4299E1] px-2 py-1 text-[10px] font-bold uppercase tracking-wider">ĐANG LÀM</span>
       case 'Submitted':
-        return <span className="bg-[#FAF5FF] text-[#9F7AEA] px-2 py-1 text-[10px] font-bold uppercase tracking-wider">REVIEW</span>
+        return <span className="bg-[#FAF5FF] text-[#9F7AEA] px-2 py-1 text-[10px] font-bold uppercase tracking-wider">CHỜ DUYỆT</span>
       case 'Need Fix':
-        return <span className="bg-[#FFF5F5] text-[#F56565] px-2 py-1 text-[10px] font-bold uppercase tracking-wider">REVISION</span>
+        return <span className="bg-[#FFF5F5] text-[#F56565] px-2 py-1 text-[10px] font-bold uppercase tracking-wider">CẦN SỬA</span>
       case 'Not Started':
         return <span className="bg-[#FFFDF0] text-[#D69E2E] px-2 py-1 text-[10px] font-bold uppercase tracking-wider">CHỜ NHẬN</span>
       default:
@@ -497,11 +499,11 @@ export default function TasksPage() {
       case 'Approved':
         return { label: 'ĐÃ DUYỆT', bg: 'bg-[#E6FFFA]', text: 'text-[#38B2AC]', border: 'border-[#38B2AC]' }
       case 'Submitted':
-        return { label: 'REVIEW', bg: 'bg-[#FAF5FF]', text: 'text-[#9F7AEA]', border: 'border-[#9F7AEA]' }
+        return { label: 'CHỜ DUYỆT', bg: 'bg-[#FAF5FF]', text: 'text-[#9F7AEA]', border: 'border-[#9F7AEA]' }
       case 'Need Fix':
-        return { label: 'REVISION', bg: 'bg-[#FFF5F5]', text: 'text-[#F56565]', border: 'border-[#F56565]' }
+        return { label: 'CẦN SỬA', bg: 'bg-[#FFF5F5]', text: 'text-[#F56565]', border: 'border-[#F56565]' }
       default:
-        return { label: 'IN PROGRESS', bg: 'bg-[#EBF8FF]', text: 'text-[#4299E1]', border: 'border-[#4299E1]' }
+        return { label: 'ĐANG LÀM', bg: 'bg-[#EBF8FF]', text: 'text-[#4299E1]', border: 'border-[#4299E1]' }
     }
   }
 
@@ -666,7 +668,7 @@ export default function TasksPage() {
                       statusFilter === 'In Progress' ? 'bg-[#E63946] text-white border-[#E63946]' : 'bg-white text-gray-500 border-gray-200 hover:text-manga-ink hover:border-manga-ink'
                     }`}
                   >
-                    IN PROGRESS ({inProgressTasks})
+                    ĐANG LÀM ({inProgressTasks})
                   </button>
                   <button 
                     onClick={() => setStatusFilter('Not Started')}
@@ -682,7 +684,7 @@ export default function TasksPage() {
                       statusFilter === 'Submitted' ? 'bg-[#E63946] text-white border-[#E63946]' : 'bg-white text-gray-500 border-gray-200 hover:text-manga-ink hover:border-manga-ink'
                     }`}
                   >
-                    REVIEW ({reviewTasks})
+                    CHỜ DUYỆT ({reviewTasks})
                   </button>
                   <button 
                     onClick={() => setStatusFilter('Need Fix')}
@@ -690,7 +692,7 @@ export default function TasksPage() {
                       statusFilter === 'Need Fix' ? 'bg-[#E63946] text-white border-[#E63946]' : 'bg-white text-gray-500 border-gray-200 hover:text-manga-ink hover:border-manga-ink'
                     }`}
                   >
-                    REVISION ({revisionTasks})
+                    CẦN SỬA ({revisionTasks})
                   </button>
                   <button 
                     onClick={() => setStatusFilter('Approved')}
@@ -698,7 +700,7 @@ export default function TasksPage() {
                       statusFilter === 'Approved' ? 'bg-[#E63946] text-white border-[#E63946]' : 'bg-white text-gray-500 border-gray-200 hover:text-manga-ink hover:border-manga-ink'
                     }`}
                   >
-                    APPROVED ({approvedTasks})
+                    ĐÃ DUYỆT ({approvedTasks})
                   </button>
                 </div>
               </div>
@@ -727,12 +729,10 @@ export default function TasksPage() {
               <table className="w-full text-left border-collapse min-w-[900px]">
                 <thead>
                   <tr className="bg-[#1A1A1A] text-white text-[10px] uppercase tracking-wider">
-                    <th className="py-3 px-4 font-bold border-r border-gray-700">TASK ID</th>
-                    <th className="py-3 px-4 font-bold border-r border-gray-700">MANGA TITLE</th>
+                    <th className="py-3 px-4 font-bold border-r border-gray-700">Tiêu đề Manga</th>
                     <th className="py-3 px-4 font-bold border-r border-gray-700">LOẠI NHIỆM VỤ</th>
                     <th className="py-3 px-4 font-bold border-r border-gray-700">DEADLINE</th>
                     <th className="py-3 px-4 font-bold border-r border-gray-700 text-center">TRẠNG THÁI</th>
-                    <th className="py-3 px-4 font-bold border-r border-gray-700 text-center">ƯU TIÊN</th>
                     <th className="py-3 px-4 font-bold border-r border-gray-700 text-center">TÀI NGUYÊN</th>
                     <th className="py-3 px-4 font-bold text-center">HÀNH ĐỘNG</th>
                   </tr>
@@ -740,7 +740,6 @@ export default function TasksPage() {
                 <tbody className="divide-y border-t-2 border-manga-ink">
                   {displayTasks.map(task => (
                     <tr key={task.id} className="hover:bg-gray-50 transition-colors group border-b border-gray-200">
-                      <td className="py-4 px-4 font-bold text-[#E63946] text-xs">#{task.id}</td>
                       <td className="py-4 px-4 font-bold text-manga-ink text-xs">{task.seriesTitle}</td>
                       <td className="py-4 px-4 text-gray-500 font-medium text-xs">{task.layerType}</td>
                       <td className="py-4 px-4 text-xs font-semibold text-gray-600">
@@ -751,12 +750,6 @@ export default function TasksPage() {
                       </td>
                       <td className="py-4 px-4 text-center">
                         {getStatusBadge(task.status)}
-                      </td>
-                      <td className="py-4 px-4">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <span className={`text-[12px] leading-none ${getPriorityColor(task.priority)}`}>●</span>
-                          <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider">{getPriorityText(task.priority)}</span>
-                        </div>
                       </td>
                       <td className="py-4 px-4 text-center">
                         <button 
@@ -836,12 +829,15 @@ export default function TasksPage() {
           const task = viewedTask || safeTasks[0];
           if (!task) return null;
           
+          const currentRegionIndex = viewingTaskDetail?.regions?.findIndex((r: any) => r.region_id === task.regionId) ?? -1;
+          const regionLabel = currentRegionIndex !== -1 ? `Vùng ${currentRegionIndex + 1}` : 'Vùng nhiệm vụ';
+          
           // Status labels translated to match mockup
           const getStatusText = (status: AssistantTask['status']) => {
             switch (status) {
               case 'Not Started': return 'CHỜ NHẬN'
               case 'In Progress': return 'ĐANG LÀM'
-              case 'Submitted': return 'REVIEW'
+              case 'Submitted': return 'CHỜ DUYỆT'
               case 'Need Fix': return 'CẦN SỬA'
               case 'Approved': return 'ĐÃ DUYỆT'
               default: return 'CHỜ NHẬN'
@@ -945,7 +941,7 @@ export default function TasksPage() {
                           {/* Render regions */}
                           {viewingTaskDetail?.regions
                             ?.filter((r: any) => r.page_id === viewingTaskDetail.page_id)
-                            ?.map((r: any) => {
+                            ?.map((r: any, idx: number) => {
                             const rx = r.coordinates?.x ?? r.x ?? 0
                             const ry = r.coordinates?.y ?? r.y ?? 0
                             const rw = r.coordinates?.w ?? r.coordinates?.width ?? r.width ?? 0
@@ -953,6 +949,11 @@ export default function TasksPage() {
                             
                             // Check if this region belongs to the current task
                             const isCurrentTaskRegion = r.region_id === task.regionId
+                            const isNearTop = ry < 7
+                            const isTooShort = rh < 6
+                            const verticalClass = isNearTop
+                              ? (isTooShort ? 'top-full mt-0.5' : 'top-0')
+                              : '-top-6'
                             
                             return (
                               <div
@@ -969,10 +970,10 @@ export default function TasksPage() {
                                   height: `${rh}%`
                                 }}
                               >
-                                <div className={`absolute -top-6 left-[-2px] text-white text-[9px] font-black uppercase tracking-wider py-0.5 px-1.5 border border-black ${
+                                <div className={`absolute ${verticalClass} left-[-2px] text-white text-[9px] font-black uppercase tracking-wider py-0.5 px-1.5 border border-black z-30 ${
                                   isCurrentTaskRegion ? 'bg-[#E63946]' : 'bg-zinc-500'
                                 }`}>
-                                  {r.label || getTaskTypeName(r.region_type || r.type || '') || 'Vùng nhiệm vụ'}
+                                  {`Vùng ${idx + 1}`}
                                 </div>
                               </div>
                             )
@@ -1088,10 +1089,6 @@ export default function TasksPage() {
                         <span className="bg-[#E63946] text-white text-[9px] font-black tracking-wider uppercase py-0.5 px-2.5">
                           ART TASK
                         </span>
-                        <span className="text-[10px] font-bold text-gray-500 flex items-center gap-1.5">
-                          <span className={`w-2 h-2 rounded-full ${getPriorityDotColor(task.priority)}`} />
-                          {getPriorityText(task.priority)}
-                        </span>
                       </div>
                     </div>
 
@@ -1152,7 +1149,13 @@ export default function TasksPage() {
                           <div className="flex flex-col gap-1.5">
                             <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400">Người giao việc</h4>
                             <div className="flex items-center gap-3 p-2 border border-zinc-200">
-                              {assignedUsers[task.assignedById || '']?.avatarUrl ? (
+                              {task.assignedByAvatar ? (
+                                <img
+                                  src={getImageUrl(task.assignedByAvatar)}
+                                  alt={task.assignedBy}
+                                  className="w-8 h-8 rounded-full object-cover shrink-0 border border-zinc-200"
+                                />
+                              ) : assignedUsers[task.assignedById || '']?.avatarUrl ? (
                                 <img
                                   src={getImageUrl(assignedUsers[task.assignedById || '']?.avatarUrl)}
                                   alt={assignedUsers[task.assignedById || '']?.fullName || task.assignedBy}
@@ -1160,12 +1163,12 @@ export default function TasksPage() {
                                 />
                               ) : (
                                 <div className="w-8 h-8 rounded-full bg-[#E63946] text-white font-black text-xs flex items-center justify-center shrink-0 uppercase">
-                                  {(assignedUsers[task.assignedById || '']?.fullName || task.assignedBy || 'M').charAt(0)}
+                                  {(task.assignedBy || 'M').charAt(0)}
                                 </div>
                               )}
                               <div>
                                 <p className="text-xs font-black text-manga-ink leading-none">
-                                  {assignedUsers[task.assignedById || '']?.fullName || task.assignedBy}
+                                  {task.assignedBy}
                                 </p>
                                 <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">Mangaka / Editor</p>
                               </div>
@@ -1176,7 +1179,7 @@ export default function TasksPage() {
                           <div className="flex flex-col gap-1.5">
                             <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400">Vùng được giao (1)</h4>
                             <div className="p-3 border border-zinc-200 bg-white flex flex-col gap-0.5">
-                              <p className="text-xs font-black text-manga-ink leading-tight">Vùng nhiệm vụ</p>
+                              <p className="text-xs font-black text-manga-ink leading-tight">{regionLabel}</p>
                               <p className="text-[10px] font-bold text-[#E63946] uppercase">{task.layerType}</p>
                             </div>
                           </div>
@@ -1221,18 +1224,26 @@ export default function TasksPage() {
                             {viewingTaskDetail?.feedbacks && viewingTaskDetail.feedbacks.length > 0 ? (
                               viewingTaskDetail.feedbacks.map((fb: any) => {
                                 const isFromMangaka = fb.mangaka_id !== null;
-                                const authorName = isFromMangaka 
-                                  ? (task.assignedBy || 'Mangaka') 
-                                  : 'Trợ lý';
+                                const authorUser = isFromMangaka ? fb.mangaka : fb.assistant;
+                                const authorName = authorUser?.name || authorUser?.username || (isFromMangaka ? (task.assignedBy || 'Mangaka') : 'Trợ lý');
+                                const avatarUrl = authorUser?.avatar_url;
                                 const roleText = isFromMangaka ? 'Mangaka' : 'Trợ lý';
                                 const initials = authorName.substring(0, 2).toUpperCase();
                                 const feedbackText = fb.content || fb.feedback_content || '';
                                 
                                 return (
                                   <div key={fb.feedback_id || fb.id} className="flex gap-3 items-start pt-2 first:pt-0">
-                                    <div className={`w-8 h-8 rounded-full ${isFromMangaka ? 'bg-zinc-950' : 'bg-zinc-600'} text-white font-black text-[10px] flex items-center justify-center shrink-0 border border-black shadow-sm`}>
-                                      {initials}
-                                    </div>
+                                    {avatarUrl ? (
+                                      <img
+                                        src={getImageUrl(avatarUrl)}
+                                        alt={authorName}
+                                        className="w-8 h-8 rounded-full object-cover shrink-0 border border-zinc-200"
+                                      />
+                                    ) : (
+                                      <div className={`w-8 h-8 rounded-full ${isFromMangaka ? 'bg-zinc-950' : 'bg-zinc-600'} text-white font-black text-[10px] flex items-center justify-center shrink-0 border border-black shadow-sm`}>
+                                        {initials}
+                                      </div>
+                                    )}
                                     <div className="flex-1">
                                       <div className="flex items-center gap-1.5 flex-wrap">
                                         <span className="text-xs font-black text-manga-ink leading-none">{authorName}</span>

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { PenTool, PencilRuler, FileSignature, Sparkles, Eye, EyeOff, ArrowLeft, Award } from 'lucide-react'
+import { PenTool, PencilRuler, FileSignature, Sparkles, Eye, EyeOff, ArrowLeft, Award, BookOpen } from 'lucide-react'
 import { validateUsername, validateEmail, validatePassword, validateConfirmPassword } from '@/utils/validators'
 import authService from '@/services/auth.service'
 
 export default function RegisterPage() {
   const navigate = useNavigate()
-  const [role, setRole] = useState<'mangaka' | 'assistant' | 'editor' | 'board'>('mangaka')
+  const [role, setRole] = useState<'reader' | 'mangaka' | 'assistant'>('reader')
   const [registerError, setRegisterError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
@@ -19,6 +19,84 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  const handleGoogleCallback = async (response: any) => {
+    setRegisterError(null)
+    setLoading(true)
+    try {
+      const data = await authService.loginWithGoogle(response.credential)
+      
+      if ('otpSent' in data && data.otpSent) {
+        sessionStorage.setItem('pending_register_email', data.email)
+        navigate(`/verify-otp?email=${encodeURIComponent(data.email)}&type=register`)
+      } else {
+        const storedUserData = {
+          ...(data as any).user,
+          token: (data as any).token
+        }
+        localStorage.setItem('mangaflow_user', JSON.stringify(storedUserData))
+        
+        const role = storedUserData.role?.toUpperCase()
+        if (role === 'MANGAKA') {
+          navigate('/dashboard/mangaka')
+        } else if (role === 'ASSISTANT') {
+          navigate('/dashboard/assistant')
+        } else if (role === 'EDITOR') {
+          navigate('/dashboard/tantou-editor')
+        } else if (role === 'ADMIN') {
+          navigate('/dashboard/admin')
+        } else if (['BOARD', 'CHIEF_EDITOR'].includes(role)) {
+          navigate('/dashboard/editorial-board')
+        } else {
+          navigate('/')
+        }
+      }
+    } catch (err: any) {
+      console.error('Google register error:', err)
+      const errorMsg = err.response?.data?.message || 'Đăng ký bằng Google thất bại.'
+      setRegisterError(errorMsg)
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    const initGoogleSignIn = () => {
+      const w = window as any
+      if (w.google) {
+        const clientId = import.meta.env.GOOGLE_CLIENT_ID || import.meta.env.VITE_GOOGLE_CLIENT_ID || "1032120760447-placeholder.apps.googleusercontent.com"
+        w.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: handleGoogleCallback,
+        })
+        
+        const btnParent = document.getElementById("google-register-btn-container")
+        if (btnParent) {
+          w.google.accounts.id.renderButton(
+            btnParent,
+            {
+              theme: "outline",
+              size: "large",
+              width: btnParent.clientWidth || 320,
+              text: "signup_with"
+            }
+          )
+        }
+      }
+    }
+
+    initGoogleSignIn()
+    const timer = setTimeout(initGoogleSignIn, 1000)
+    return () => clearTimeout(timer)
+  }, [])
+
+  const handleGoogleFallbackClick = () => {
+    const w = window as any
+    if (w.google) {
+      w.google.accounts.id.prompt()
+    } else {
+      alert("Google Sign-In SDK đang tải. Vui lòng thử lại sau vài giây.")
+    }
+  }
 
   useEffect(() => {
     let timer: any
@@ -68,17 +146,20 @@ export default function RegisterPage() {
     const isTouched = touched[field]
     const error = errors[field]
     
-    let borderClass = 'border-manga-ink focus:border-manga-red'
+    let borderClass = 'border-black dark:border-gray-500 focus:border-manga-red dark:focus:border-manga-red'
+    let textClass = 'text-manga-ink dark:text-white'
     
     if (isTouched) {
       if (error) {
         borderClass = 'border-manga-red focus:border-manga-red'
+        textClass = 'text-manga-red dark:text-manga-red'
       } else {
         borderClass = 'border-green-500 focus:border-green-500'
+        textClass = 'text-manga-ink dark:text-white'
       }
     }
     
-    return `w-full py-2 border-b-2 bg-transparent focus:outline-none transition-colors text-sm placeholder:text-gray-300 ${borderClass} ${extraClasses}`
+    return `w-full py-2 border-b-2 bg-transparent focus:outline-none transition-colors text-sm placeholder:text-gray-300 ${borderClass} ${textClass} ${extraClasses}`
   }
 
   const validateField = (field: string, val: string) => {
@@ -142,11 +223,6 @@ export default function RegisterPage() {
       return
     }
 
-    // Intercept Privileged Roles to handle Backend limitation gracefully on the Frontend
-    if (role === 'board' || role === 'editor') {
-      setRegisterError(`Vì lý do bảo mật, tài khoản ${role === 'board' ? 'Hội đồng Biên tập' : 'Biên tập viên'} không được phép tự đăng ký tự do. Vui lòng đăng nhập bằng tài khoản được cấp hoặc liên hệ Admin.`)
-      return
-    }
 
     setLoading(true)
     try {
@@ -157,14 +233,13 @@ export default function RegisterPage() {
         role
       })
       
-      const storedUserData = {
-        ...data.user,
-        token: data.token
+      if (data.otpSent) {
+        sessionStorage.setItem('pending_register_email', data.email)
+        navigate(`/verify-otp?email=${encodeURIComponent(data.email)}&type=register`)
+      } else {
+        setRegisterError('Đăng ký không thành công. Không thể gửi mã OTP.')
+        setLoading(false)
       }
-      
-      localStorage.setItem('mangaflow_user', JSON.stringify(storedUserData))
-      setRegisteredUser(storedUserData)
-      setShowSuccess(true)
     } catch (err: any) {
       console.error('Registration error:', err)
       const errorMsg = err.response?.data?.message || 'Đăng ký thất bại. Vui lòng thử lại.'
@@ -174,22 +249,22 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#fcfcfc] relative flex items-center justify-center p-4 md:p-8 font-sans overflow-hidden">
+    <div className="min-h-screen bg-[#F5F5F5] dark:bg-zinc-900 relative flex items-center justify-center p-4 font-sans overflow-hidden transition-colors">
       <button
         onClick={() => navigate('/')}
-        className="absolute top-6 left-6 md:top-10 md:left-10 z-50 p-2 bg-white text-manga-ink manga-border manga-shadow-sm hover:translate-y-1 hover:manga-shadow-none transition-all flex items-center justify-center"
+        className="absolute top-6 left-6 md:top-10 md:left-10 z-50 p-2 bg-white dark:bg-zinc-800 text-manga-ink dark:text-white manga-border manga-shadow-sm hover:translate-y-1 hover:manga-shadow-none transition-all flex items-center justify-center"
         aria-label="Quay lại"
       >
         <ArrowLeft className="w-6 h-6" />
       </button>
 
       {/* Background Manga Panels */}
-      <div className="absolute inset-0 pointer-events-none opacity-20">
-        <div className="absolute top-[-5%] left-[-5%] w-[400px] h-[500px] border-[6px] border-manga-ink -rotate-12 bg-gray-100" style={{ backgroundImage: "url('/images/cover-1.png')", backgroundSize: 'cover', opacity: 0.3, filter: 'grayscale(100%)' }} />
-        <div className="absolute bottom-[-10%] right-[-5%] w-[500px] h-[400px] border-[6px] border-manga-ink rotate-6 bg-gray-100" style={{ backgroundImage: "url('/images/hero.png')", backgroundSize: 'cover', opacity: 0.3, filter: 'grayscale(100%)' }} />
+      <div className="absolute inset-0 pointer-events-none opacity-20 dark:opacity-10">
+        <div className="absolute top-[-5%] left-[-5%] w-[400px] h-[500px] border-[6px] border-manga-ink dark:border-black -rotate-12 bg-gray-100 dark:bg-zinc-800" style={{ backgroundImage: "url('/images/cover-1.png')", backgroundSize: 'cover', opacity: 0.3, filter: 'grayscale(100%)' }} />
+        <div className="absolute bottom-[-10%] right-[-5%] w-[500px] h-[400px] border-[6px] border-manga-ink dark:border-black rotate-6 bg-gray-100 dark:bg-zinc-800" style={{ backgroundImage: "url('/images/hero.png')", backgroundSize: 'cover', opacity: 0.3, filter: 'grayscale(100%)' }} />
       </div>
 
-      <div className="w-full max-w-5xl z-10 flex flex-col md:flex-row manga-border manga-shadow bg-white">
+      <div className="w-full max-w-5xl z-10 flex flex-col md:flex-row manga-border manga-shadow bg-white dark:bg-zinc-800 transition-colors">
 
         {/* Left Block - Intro */}
         <div className="w-full md:w-5/12 bg-manga-ink text-white p-10 md:p-14 flex flex-col justify-between relative overflow-hidden">
@@ -217,7 +292,7 @@ export default function RegisterPage() {
         </div>
 
         {/* Right Block - Form */}
-        <div className="w-full md:w-7/12 bg-white p-10 md:p-14 relative z-10">
+        <div className="w-full md:w-7/12 bg-white dark:bg-zinc-800 p-10 md:p-14 relative z-10 transition-colors">
           {showSuccess ? (
             <div className="flex flex-col items-center justify-center h-full text-center py-6 space-y-6">
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center text-green-500 animate-bounce">
@@ -265,7 +340,21 @@ export default function RegisterPage() {
               </h2>
 
             {/* Roles Selection */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-10">
+            <div className="grid grid-cols-3 gap-3 md:gap-4 mb-10">
+              {/* Reader */}
+              <button
+                type="button"
+                onClick={() => setRole('reader')}
+                className={`flex flex-col items-center justify-center p-4 border-2 transition-all ${
+                  role === 'reader'
+                    ? 'border-manga-ink bg-manga-ink text-white'
+                    : 'border-manga-ink bg-white text-manga-ink hover:bg-gray-50'
+                }`}
+              >
+                <BookOpen className="w-6 h-6 mb-2" />
+                <span className="text-xs font-bold uppercase tracking-wider">Độc Giả</span>
+              </button>
+
               {/* Mangaka */}
               <button
                 type="button"
@@ -293,75 +382,47 @@ export default function RegisterPage() {
                 <PencilRuler className="w-6 h-6 mb-2" />
                 <span className="text-xs font-bold uppercase tracking-wider">Trợ lý</span>
               </button>
-
-              {/* Editor */}
-              <button
-                type="button"
-                onClick={() => setRole('editor')}
-                className={`flex flex-col items-center justify-center p-4 border-2 transition-all ${
-                  role === 'editor'
-                    ? 'border-manga-ink bg-manga-ink text-white'
-                    : 'border-manga-ink bg-white text-manga-ink hover:bg-gray-50'
-                }`}
-              >
-                <FileSignature className="w-6 h-6 mb-2" />
-                <span className="text-xs font-bold uppercase tracking-wider text-center">Biên tập viên</span>
-              </button>
-
-              {/* Board */}
-              <button
-                type="button"
-                onClick={() => setRole('board')}
-                className={`flex flex-col items-center justify-center p-4 border-2 transition-all ${
-                  role === 'board'
-                    ? 'border-manga-ink bg-manga-ink text-white'
-                    : 'border-manga-ink bg-white text-manga-ink hover:bg-gray-50'
-                }`}
-              >
-                <Award className="w-6 h-6 mb-2" />
-                <span className="text-xs font-bold uppercase tracking-wider text-center">Hội đồng</span>
-              </button>
             </div>
 
-            <div className="space-y-6">
-              {/* Username Input */}
-              <div className="space-y-1">
-                <label className="block text-[11px] font-bold uppercase tracking-widest text-manga-ink">
-                  Tên đăng ký
-                </label>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => handleChange(e, 'username')}
-                  onBlur={() => handleBlur('username')}
-                  placeholder="Nhập tên đăng nhập của bạn (VD: nguyen_van_a)"
-                  className={getInputClass('username')}
-                />
-                {errors.username && <p className="text-manga-red text-xs font-bold mt-1">{errors.username}</p>}
-              </div>
-
-              {/* Email Input */}
-              <div className="space-y-1">
-                <label className="block text-[11px] font-bold uppercase tracking-widest text-manga-ink">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => handleChange(e, 'email')}
-                  onBlur={() => handleBlur('email')}
-                  placeholder="example@studio.com"
-                  className={getInputClass('email')}
-                />
-                {errors.email && <p className="text-manga-red text-xs font-bold mt-1">{errors.email}</p>}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Password Input */}
+              <div className="space-y-6">
+                {/* Username Input */}
                 <div className="space-y-1">
-                  <label className="block text-[11px] font-bold uppercase tracking-widest text-manga-ink">
-                    Mật khẩu
+                  <label className="block text-[11px] font-bold uppercase tracking-widest text-manga-ink dark:text-white">
+                    Tên đăng ký
                   </label>
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => handleChange(e, 'username')}
+                    onBlur={() => handleBlur('username')}
+                    placeholder="Nhập tên đăng nhập của bạn (VD: nguyen_van_a)"
+                    className={getInputClass('username')}
+                  />
+                  {errors.username && <p className="text-manga-red text-xs font-bold mt-1">{errors.username}</p>}
+                </div>
+
+                {/* Email Input */}
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-bold uppercase tracking-widest text-manga-ink dark:text-white">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => handleChange(e, 'email')}
+                    onBlur={() => handleBlur('email')}
+                    placeholder="example@studio.com"
+                    className={getInputClass('email')}
+                  />
+                  {errors.email && <p className="text-manga-red text-xs font-bold mt-1">{errors.email}</p>}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Password Input */}
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold uppercase tracking-widest text-manga-ink dark:text-white">
+                      Mật khẩu
+                    </label>
                   <div className="relative">
                     <input
                       type={showPassword ? 'text' : 'password'}
@@ -390,7 +451,7 @@ export default function RegisterPage() {
 
                 {/* Confirm Password Input */}
                 <div className="space-y-1">
-                  <label className="block text-[11px] font-bold uppercase tracking-widest text-manga-ink">
+                  <label className="block text-[11px] font-bold uppercase tracking-widest text-manga-ink dark:text-white">
                     Xác nhận mật khẩu
                   </label>
                   <div className="relative">
@@ -426,6 +487,29 @@ export default function RegisterPage() {
               >
                 {loading ? 'Đang xử lý...' : 'Bắt đầu sáng tạo'}
               </button>
+            </div>
+
+            {/* Divider */}
+            <div className="mt-6 flex items-center justify-center gap-4">
+              <div className="h-px bg-manga-ink flex-1" />
+              <span className="font-manga text-sm font-bold uppercase">Hoặc</span>
+              <div className="h-px bg-manga-ink flex-1" />
+            </div>
+
+            {/* Social Register */}
+            <div className="mt-6 flex justify-center">
+              <div id="google-register-btn-container" className="w-full max-w-sm flex justify-center">
+                <button
+                  type="button"
+                  onClick={handleGoogleFallbackClick}
+                  className="w-full flex items-center justify-center gap-2 bg-white text-manga-ink font-bold py-2.5 px-4 manga-border manga-shadow-sm hover:bg-gray-50 transition-colors"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24">
+                    <path fill="currentColor" d="M21.35,11.1H12.18V13.83H18.69C18.36,17.64 15.19,19.27 12.19,19.27C8.36,19.27 5,16.25 5,12C5,7.9 8.2,4.73 12.2,4.73C15.29,4.73 17.1,6.7 17.1,6.7L19,4.72C19,4.72 16.56,2 12.1,2C6.42,2 2.03,6.8 2.03,12C2.03,17.05 6.16,22 12.25,22C17.6,22 21.5,18.33 21.5,12.91C21.5,11.76 21.35,11.1 21.35,11.1V11.1Z" />
+                  </svg>
+                  Google
+                </button>
+              </div>
             </div>
 
             {/* Bottom Link */}

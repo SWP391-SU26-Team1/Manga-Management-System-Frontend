@@ -34,7 +34,7 @@ export default function AssistantDashboardPage() {
         assistantService.getPerformance(),
         assistantService.getBySeries(),
         assistantService.listNotifications({ limit: 6 }),
-        assistantService.listMyTasks()
+        assistantService.listMyTasks({ limit: 100 })
       ])
 
       setOverview(overData)
@@ -56,6 +56,8 @@ export default function AssistantDashboardPage() {
       // Dynamically detect overdue tasks and create red warning notifications
       const overdueTasks = allTasks.filter(task => {
         if (!task.deadline || task.status === 'completed' || task.status === 'approved') return false
+        // Skip tasks whose overdue warnings have been read/dismissed locally by the assistant
+        if (localStorage.getItem(`mangaflow_read_local_notification_${task.task_id}`) === 'true') return false
         return new Date().getTime() > new Date(task.deadline).getTime()
       })
 
@@ -69,7 +71,10 @@ export default function AssistantDashboardPage() {
         created_at: new Date().toISOString()
       }))
 
-      setNotifications([...localOverdueNotifs, ...(notifsRes?.data || [])].slice(0, 6))
+      const localNotifsStr = localStorage.getItem('mangaflow_local_notifications')
+      const customLocalNotifs = localNotifsStr ? JSON.parse(localNotifsStr) : []
+
+      setNotifications([...localOverdueNotifs, ...customLocalNotifs, ...(notifsRes?.data || [])].slice(0, 6))
     } catch (err: any) {
       console.error('Error fetching dashboard data:', err)
       setError('Không thể kết nối máy chủ để tải dữ liệu trang chủ.')
@@ -80,6 +85,8 @@ export default function AssistantDashboardPage() {
 
   useEffect(() => {
     loadData()
+    window.addEventListener('mangaflow_notifications_updated', loadData)
+    return () => window.removeEventListener('mangaflow_notifications_updated', loadData)
   }, [])
 
   useEffect(() => {
@@ -97,9 +104,21 @@ export default function AssistantDashboardPage() {
   const handleMarkRead = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
     try {
+      if (id.startsWith('local_overdue_')) {
+        const taskId = id.replace('local_overdue_', '')
+        localStorage.setItem(`mangaflow_read_local_notification_${taskId}`, 'true')
+        setNotifications(prev => prev.filter(n => n.notification_id !== id))
+        window.dispatchEvent(new Event('mangaflow_notifications_updated'))
+        return
+      }
+
       await assistantService.markRead(id)
       const notifsRes = await assistantService.listNotifications({ limit: 6 })
-      setNotifications(notifsRes?.data || [])
+      setNotifications(prev => {
+        const locals = prev.filter(n => n.notification_id.startsWith('local_overdue_'))
+        return [...locals, ...(notifsRes?.data || [])].slice(0, 6)
+      })
+      window.dispatchEvent(new Event('mangaflow_notifications_updated'))
     } catch (err) {
       console.error('Failed to mark notification as read:', err)
     }
@@ -109,9 +128,21 @@ export default function AssistantDashboardPage() {
     e.stopPropagation()
     if (!confirm('Bạn có chắc chắn muốn xóa thông báo này?')) return
     try {
+      if (id.startsWith('local_overdue_')) {
+        const taskId = id.replace('local_overdue_', '')
+        localStorage.setItem(`mangaflow_read_local_notification_${taskId}`, 'true')
+        setNotifications(prev => prev.filter(n => n.notification_id !== id))
+        window.dispatchEvent(new Event('mangaflow_notifications_updated'))
+        return
+      }
+
       await assistantService.deleteNotification(id)
       const notifsRes = await assistantService.listNotifications({ limit: 6 })
-      setNotifications(notifsRes?.data || [])
+      setNotifications(prev => {
+        const locals = prev.filter(n => n.notification_id.startsWith('local_overdue_'))
+        return [...locals, ...(notifsRes?.data || [])].slice(0, 6)
+      })
+      window.dispatchEvent(new Event('mangaflow_notifications_updated'))
     } catch (err) {
       console.error('Failed to delete notification:', err)
     }
@@ -123,7 +154,7 @@ export default function AssistantDashboardPage() {
     const now = new Date()
     const diffMs = now.getTime() - date.getTime()
     const diffMins = Math.floor(diffMs / 60000)
-    const diffHours = Math.floor(diffMins / 3600000)
+    const diffHours = Math.floor(diffMs / 3600000)
     const diffDays = Math.floor(diffHours / 24)
 
     if (diffMins < 1) return 'Vừa xong'
@@ -171,6 +202,72 @@ export default function AssistantDashboardPage() {
       textColor: 'text-gray-600',
       icon: Bell
     }
+  }
+
+  const translateNotification = (title: string, content: string) => {
+    let t = title || ''
+    let c = content || ''
+
+    const titleLower = t.toLowerCase()
+    if (titleLower.includes('submission approved')) {
+      t = 'Bản nộp đã được duyệt'
+    } else if (titleLower.includes('new task assigned')) {
+      t = 'Nhiệm vụ mới được giao'
+    } else if (titleLower.includes('task reassigned')) {
+      t = 'Nhiệm vụ phân công lại'
+    } else if (titleLower.includes('series approved')) {
+      t = 'Bộ truyện đã được duyệt'
+    } else if (titleLower.includes('revision requested') || titleLower.includes('needs_revision')) {
+      t = 'Yêu cầu chỉnh sửa'
+    } else if (titleLower.includes('task completed')) {
+      t = 'Nhiệm vụ đã hoàn thành'
+    } else if (titleLower.includes('task rejected') || titleLower.includes('submission rejected')) {
+      t = 'Bài nộp bị từ chối'
+    } else if (titleLower.includes('manuscript submitted')) {
+      t = 'Bản thảo đã được nộp'
+    } else if (titleLower.includes('task submitted')) {
+      t = 'Nhiệm vụ đã nộp'
+    }
+
+    const contentLower = c.toLowerCase()
+    if (contentLower.includes('your page version') && contentLower.includes('has been approved')) {
+      const match = c.match(/version\s+(\d+)/i)
+      const versionNum = match ? match[1] : '1'
+      c = `Phiên bản bản vẽ trang ${versionNum} của bạn đã được tác giả phê duyệt.`
+    } else if (contentLower.includes('your page version') && contentLower.includes('has been rejected')) {
+      const match = c.match(/version\s+(\d+)/i)
+      const versionNum = match ? match[1] : '1'
+      c = `Phiên bản bản vẽ trang ${versionNum} của bạn bị từ chối.`
+    } else if (contentLower.includes('reviewer requested changes on page version')) {
+      const match = c.match(/version\s+(\d+):\s*(.*)/i)
+      const versionNum = match ? match[1] : '1'
+      const note = match ? match[2] : ''
+      c = `Tác giả yêu cầu chỉnh sửa ở phiên bản bản vẽ trang ${versionNum}: ${note}`
+    } else if (contentLower.includes('you have been assigned a new') || contentLower.includes('you have a new')) {
+      let taskType = ''
+      if (contentLower.includes('inking')) taskType = 'vẽ nét (Inking)'
+      else if (contentLower.includes('coloring')) taskType = 'tô màu (Coloring)'
+      else if (contentLower.includes('lettering')) taskType = 'đi chữ (Lettering)'
+      else if (contentLower.includes('cleaning')) taskType = 'làm sạch (Cleaning)'
+      else if (contentLower.includes('sfx')) taskType = 'hiệu ứng (SFX)'
+      else if (contentLower.includes('background')) taskType = 'vẽ nền (Background)'
+      
+      c = `Bạn vừa được phân công một nhiệm vụ ${taskType || 'vẽ'} mới.`
+    } else if (contentLower.includes('series decision: approved')) {
+      c = 'Quyết định cho bộ truyện: Đã duyệt thành công.'
+    } else if (contentLower.includes('please revise your submission')) {
+      c = 'Vui lòng kiểm tra và chỉnh sửa lại bản vẽ của bạn.'
+    } else if (contentLower.includes('your task has been completed')) {
+      c = 'Nhiệm vụ của bạn đã được ghi nhận hoàn thành.'
+    } else if (contentLower.includes('your task has been rejected')) {
+      c = 'Bản nộp nhiệm vụ của bạn không được phê duyệt và bị từ chối.'
+    } else if (contentLower.includes('a task has been submitted for review')) {
+      c = 'Nhiệm vụ đã được nộp và đang chờ tác giả phê duyệt.'
+    } else if (contentLower.includes('reassigned to you') || contentLower.includes('has been reassigned to you')) {
+      c = 'Một nhiệm vụ vẽ đã được bàn giao lại cho bạn.'
+    }
+
+    return { title: t, content: c }
   }
 
   if (isLoading) {
@@ -308,127 +405,62 @@ export default function AssistantDashboardPage() {
 
       {/* Bottom Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Notifications */}
+        {/* Left Column: Project Progress */}
         <div>
-          <div className="flex items-center justify-between mb-4 bg-[#1A1A1A] text-white p-3 border-2 border-manga-ink shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-            <div className="flex items-center gap-3">
-              <h2 className="font-bold text-sm uppercase tracking-wider">THÔNG BÁO GẦN ĐÂY</h2>
-              {notifications.filter(n => !n.is_read).length > 0 && (
-                <span className="bg-[#E63946] text-white text-[10px] font-bold px-2 py-0.5 rounded-sm uppercase">
-                  {notifications.filter(n => !n.is_read).length} Chưa đọc
-                </span>
-              )}
-            </div>
+          <div className="mb-4 bg-[#1A1A1A] text-white p-3 border-2 border-manga-ink shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+            <h2 className="font-bold text-sm uppercase tracking-wider">TIẾN ĐỘ DỰ ÁN</h2>
           </div>
 
-          <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
-            {notifications.length > 0 ? (
-              notifications.map((notif) => {
-                const style = getNotificationStyle(notif.type, notif.content)
-                const Icon = style.icon
+          <div className="space-y-4">
+            {seriesList.length > 0 ? (
+              seriesList.map((series, idx) => {
+                const pct = series.total > 0 ? Math.round((series.completed / series.total) * 100) : 0
                 return (
-                  <div key={notif.notification_id} className={style.bg}>
-                    <div className="flex justify-between items-start mb-2">
-                      <div className={`flex items-center gap-2 ${style.textColor}`}>
-                        <Icon className="w-4 h-4" />
-                        <span className="font-bold text-[11px] uppercase tracking-wider">{style.label}</span>
+                  <div key={series.series_id || idx} className="bg-white border-2 border-manga-ink p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h3 className="font-bold text-base text-manga-ink">{series.title}</h3>
+                        <p className="text-xs font-semibold text-gray-400 mt-0.5">{series.completed}/{series.total} nhiệm vụ</p>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {!notif.is_read && <span className="w-2 h-2 rounded-full bg-red-500" title="Chưa đọc"></span>}
-                        <span className="text-[11px] font-semibold text-gray-400">{formatTimeAgo(notif.created_at)}</span>
+                      <span className="bg-[#EBF5FF] text-[#457B9D] px-2 py-1 text-[10px] font-bold uppercase rounded-sm border border-[#457B9D]/30">Active</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1 h-3 bg-gray-100 border-2 border-manga-ink relative overflow-hidden">
+                        <div className="absolute top-0 left-0 h-full bg-[#E63946]" style={{ width: `${pct}%` }}></div>
                       </div>
                     </div>
-                    <h4 className="font-bold text-sm text-manga-ink mb-1">{notif.title}</h4>
-                    <p className="text-[13px] font-medium text-gray-800 leading-relaxed">
-                      {notif.content}
-                    </p>
-                    <div className="flex justify-end gap-3 mt-3 pt-2 border-t border-gray-100">
-                      {!notif.is_read && (
-                        <button
-                          onClick={(e) => handleMarkRead(notif.notification_id, e)}
-                          className="text-[11px] font-bold text-gray-500 hover:text-manga-ink flex items-center gap-1 transition-colors"
-                        >
-                          <Check className="w-3.5 h-3.5" /> Đọc
-                        </button>
-                      )}
-                      <button
-                        onClick={(e) => handleDeleteNotification(notif.notification_id, e)}
-                        className="text-[11px] font-bold text-gray-500 hover:text-[#E63946] flex items-center gap-1 transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" /> Xóa
-                      </button>
+                    <div className="flex justify-between items-center mt-2">
+                      <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Hoàn thành</span>
+                      <span className="text-sm font-bold text-[#E63946]">{pct}%</span>
                     </div>
                   </div>
                 )
               })
             ) : (
               <div className="bg-white border-2 border-manga-ink p-8 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] text-center">
-                <Bell className="w-12 h-12 mx-auto text-gray-300 mb-2" />
-                <p className="text-gray-500 font-bold uppercase text-sm">Không có thông báo nào</p>
+                <Activity className="w-12 h-12 mx-auto text-gray-300 mb-2" />
+                <p className="text-gray-500 font-bold uppercase text-sm">Chưa tham gia dự án nào</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Right Column: Progress & Quick Access */}
-        <div className="flex flex-col gap-8">
-          {/* Project Progress */}
-          <div>
-            <div className="mb-4 bg-[#1A1A1A] text-white p-3 border-2 border-manga-ink shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-              <h2 className="font-bold text-sm uppercase tracking-wider">TIẾN ĐỘ DỰ ÁN</h2>
-            </div>
-
-            <div className="space-y-4">
-              {seriesList.length > 0 ? (
-                seriesList.map((series, idx) => {
-                  const pct = series.total > 0 ? Math.round((series.completed / series.total) * 100) : 0
-                  return (
-                    <div key={series.series_id || idx} className="bg-white border-2 border-manga-ink p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-                      <div className="flex justify-between items-start mb-4">
-                        <div>
-                          <h3 className="font-bold text-base text-manga-ink">{series.title}</h3>
-                          <p className="text-xs font-semibold text-gray-400 mt-0.5">{series.completed}/{series.total} nhiệm vụ</p>
-                        </div>
-                        <span className="bg-[#EBF5FF] text-[#457B9D] px-2 py-1 text-[10px] font-bold uppercase rounded-sm border border-[#457B9D]/30">Active</span>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="flex-1 h-3 bg-gray-100 border-2 border-manga-ink relative overflow-hidden">
-                          <div className="absolute top-0 left-0 h-full bg-[#E63946]" style={{ width: `${pct}%` }}></div>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center mt-2">
-                        <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Hoàn thành</span>
-                        <span className="text-sm font-bold text-[#E63946]">{pct}%</span>
-                      </div>
-                    </div>
-                  )
-                })
-              ) : (
-                <div className="bg-white border-2 border-manga-ink p-8 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] text-center">
-                  <Activity className="w-12 h-12 mx-auto text-gray-300 mb-2" />
-                  <p className="text-gray-500 font-bold uppercase text-sm">Chưa tham gia dự án nào</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Quick Access */}
-          <div className="bg-[#FAFAFA] border-2 border-manga-ink p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-            <h2 className="font-bold text-sm uppercase tracking-wider mb-4 text-manga-ink">TRUY CẬP NHANH</h2>
-            <div className="space-y-3">
-              <Link to="/dashboard/assistant/tasks" className="flex items-center justify-between p-3 bg-white border-2 border-gray-200 hover:border-manga-ink hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all group">
-                <span className="text-sm font-bold text-manga-ink">Xem tất cả nhiệm vụ</span>
-                <ArrowRight className="w-4 h-4 text-[#E63946] group-hover:translate-x-1 transition-transform" />
-              </Link>
-              <Link to="/dashboard/assistant/reports" className="flex items-center justify-between p-3 bg-white border-2 border-gray-200 hover:border-manga-ink hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all group">
-                <span className="text-sm font-bold text-manga-ink">Xem báo cáo hiệu suất</span>
-                <ArrowRight className="w-4 h-4 text-[#E63946] group-hover:translate-x-1 transition-transform" />
-              </Link>
-              <Link to="/dashboard/assistant/feedback" className="flex items-center justify-between p-3 bg-white border-2 border-gray-200 hover:border-manga-ink hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all group">
-                <span className="text-sm font-bold text-manga-ink">Phản hồi và nộp lại</span>
-                <ArrowRight className="w-4 h-4 text-[#E63946] group-hover:translate-x-1 transition-transform" />
-              </Link>
-            </div>
+        {/* Right Column: Quick Access */}
+        <div className="bg-[#FAFAFA] border-2 border-manga-ink p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] self-start">
+          <h2 className="font-bold text-sm uppercase tracking-wider mb-4 text-manga-ink">TRUY CẬP NHANH</h2>
+          <div className="space-y-3">
+            <Link to="/dashboard/assistant/tasks" className="flex items-center justify-between p-3 bg-white border-2 border-gray-200 hover:border-manga-ink hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all group">
+              <span className="text-sm font-bold text-manga-ink">Xem tất cả nhiệm vụ</span>
+              <ArrowRight className="w-4 h-4 text-[#E63946] group-hover:translate-x-1 transition-transform" />
+            </Link>
+            <Link to="/dashboard/assistant/reports" className="flex items-center justify-between p-3 bg-white border-2 border-gray-200 hover:border-manga-ink hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all group">
+              <span className="text-sm font-bold text-manga-ink">Xem báo cáo hiệu suất</span>
+              <ArrowRight className="w-4 h-4 text-[#E63946] group-hover:translate-x-1 transition-transform" />
+            </Link>
+            <Link to="/dashboard/assistant/feedback" className="flex items-center justify-between p-3 bg-white border-2 border-gray-200 hover:border-manga-ink hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all group">
+              <span className="text-sm font-bold text-manga-ink">Phản hồi và nộp lại</span>
+              <ArrowRight className="w-4 h-4 text-[#E63946] group-hover:translate-x-1 transition-transform" />
+            </Link>
           </div>
         </div>
       </div>

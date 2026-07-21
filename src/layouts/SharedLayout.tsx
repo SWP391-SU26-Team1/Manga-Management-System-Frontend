@@ -11,7 +11,7 @@ export function SharedLayout({ header }: SharedLayoutProps) {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const storedUser = localStorage.getItem('mangaflow_user')
+  const storedUser = sessionStorage.getItem('mangaflow_user')
   if (!storedUser) {
     return <Navigate to="/login" replace />
   }

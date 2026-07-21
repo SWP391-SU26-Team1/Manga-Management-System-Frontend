@@ -64,7 +64,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     let activeSocket: Socket | null = null
 
     const checkAndConnect = () => {
-      const userStr = localStorage.getItem('mangaflow_user')
+      const userStr = sessionStorage.getItem('mangaflow_user')
       if (!userStr) {
         if (activeSocket) {
           activeSocket.disconnect()
@@ -180,7 +180,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const fetchNotifications = async () => {
     // Only fetch if user is logged in
-    const userStr = localStorage.getItem('mangaflow_user')
+    const userStr = sessionStorage.getItem('mangaflow_user')
     if (!userStr) return
 
     try {

@@ -139,7 +139,7 @@ export default function RecoveryProposalPage() {
       try {
         const rawFeedbacks = await feedbackService.getAll()
         let currentUserId = ''
-        const storedUser = localStorage.getItem('mangaflow_user')
+        const storedUser = sessionStorage.getItem('mangaflow_user')
         if (storedUser) {
           const parsed = JSON.parse(storedUser)
           currentUserId = parsed.id || parsed.user_id || ''

@@ -20,6 +20,8 @@ import ReadingHistoryPage from '@/pages/user/ReadingHistoryPage'
 import WebPreferencesPage from '@/pages/user/WebPreferencesPage'
 import UserLayout from '@/layouts/user/UserLayout'
 
+import { PublicUserGuard } from '@/components/common/PublicUserGuard'
+
 // Role Routes
 import MangakaRoutes from './mangaka/MangakaRoutes'
 import AssistantRoutes from './assistant/AssistantRoutes'
@@ -32,7 +34,7 @@ export default function AppRoutes() {
   return (
     <Routes>
       {/* Public - Reader Routes (có Header + Footer) */}
-      <Route element={<UserLayout />}>
+      <Route element={<PublicUserGuard><UserLayout /></PublicUserGuard>}>
         <Route path="/" element={<UserHomePage />} />
         <Route path="/series/:seriesId" element={<SeriesDetailPage />} />
         <Route path="/search" element={<SearchResultsPage />} />
@@ -42,7 +44,11 @@ export default function AppRoutes() {
       </Route>
 
       {/* Reader - Full-screen (không có Header/Footer) */}
-      <Route path="/series/:seriesId/chapter/:chapterId" element={<ChapterReaderPage />} />
+      <Route path="/series/:seriesId/chapter/:chapterId" element={
+        <PublicUserGuard>
+          <ChapterReaderPage />
+        </PublicUserGuard>
+      } />
 
       {/* Auth Routes */}
       <Route element={<AuthLayout />}>

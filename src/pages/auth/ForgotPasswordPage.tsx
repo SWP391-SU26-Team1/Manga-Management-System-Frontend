@@ -282,7 +282,7 @@ export default function ForgotPasswordPage() {
         ...data.user,
         token: data.token
       }
-      localStorage.setItem('mangaflow_user', JSON.stringify(storedUserData))
+      sessionStorage.setItem('mangaflow_user', JSON.stringify(storedUserData))
 
       // 3. Điều hướng trực tiếp vào màn hình chính dựa theo role
       if (storedUserData.role === 'MANGAKA') {

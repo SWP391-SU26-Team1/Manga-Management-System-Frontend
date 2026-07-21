@@ -1,5 +1,5 @@
 import React from "react";
-import { Eye, Edit2, Trash2, ClipboardList, X, BellRing, ExternalLink } from "lucide-react";
+import { Eye, Edit2, Trash2, ClipboardList, X, BellRing, ExternalLink, AlertTriangle } from "lucide-react";
 import { Link } from "react-router";
 
 export interface DisplayTask {
@@ -29,6 +29,16 @@ interface TaskTableProps {
 export function TaskTable({ tasks, onDeleteTask, onEditTask, onAssignTask, onRemindTask }: TaskTableProps) {
   const [selectedTask, setSelectedTask] = React.useState<DisplayTask | null>(null);
   const [assigningIds, setAssigningIds] = React.useState<Record<string, boolean>>({});
+
+  const [confirmModal, setConfirmModal] = React.useState<{
+    show: boolean;
+    message: string;
+    onConfirm: (() => void) | null;
+  }>({
+    show: false,
+    message: '',
+    onConfirm: null
+  });
 
   const handleAssignClick = async (taskId: string, chapterId: string, pageId: string) => {
     if (assigningIds[taskId]) return;
@@ -81,11 +91,15 @@ export function TaskTable({ tasks, onDeleteTask, onEditTask, onAssignTask, onRem
   };
 
   const handleCancel = (taskId: string) => {
-    if (confirm("Bạn có chắc chắn muốn hủy công việc này không? Trợ lý sẽ nhận được thông báo dừng vẽ.")) {
-      if (onDeleteTask) {
-        onDeleteTask(taskId);
+    setConfirmModal({
+      show: true,
+      message: 'Bạn có chắc chắn muốn hủy công việc này không? Trợ lý sẽ nhận được thông báo dừng vẽ.',
+      onConfirm: () => {
+        if (onDeleteTask) {
+          onDeleteTask(taskId);
+        }
       }
-    }
+    });
   };
 
   if (tasks.length === 0) {
@@ -272,6 +286,49 @@ export function TaskTable({ tasks, onDeleteTask, onEditTask, onAssignTask, onRem
                   <Edit2 className="w-4 h-4" /> Chỉnh sửa
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Custom Manga Confirm Modal */}
+      {confirmModal.show && (
+        <div className="fixed inset-0 bg-black/60 z-[10000] flex items-center justify-center p-4">
+          <div className="bg-white border-4 border-manga-ink manga-shadow max-w-sm w-full animate-in fade-in zoom-in-95 duration-150 text-black">
+            <div className="p-4 border-b-4 border-manga-ink bg-red-50 flex justify-between items-center">
+              <h3 className="font-manga font-bold text-lg uppercase flex items-center gap-2 text-manga-red">
+                <AlertTriangle className="w-5 h-5 text-manga-red animate-bounce" />
+                XÁC NHẬN HỦY CÔNG VIỆC
+              </h3>
+              <button 
+                onClick={() => setConfirmModal(prev => ({ ...prev, show: false }))} 
+                className="hover:bg-gray-200 p-1 bg-transparent border-none cursor-pointer"
+              >
+                <X className="w-5 h-5 text-manga-ink" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm font-bold text-gray-700">
+                {confirmModal.message}
+              </p>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmModal(prev => ({ ...prev, show: false }))}
+                  className="px-4 py-2 bg-white text-manga-ink font-bold uppercase text-xs hover:bg-gray-100 transition-colors border-2 border-manga-ink cursor-pointer"
+                >
+                  Hủy Bỏ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirmModal.onConfirm) confirmModal.onConfirm();
+                    setConfirmModal(prev => ({ ...prev, show: false }));
+                  }}
+                  className="px-4 py-2 bg-manga-red text-white font-bold uppercase text-xs hover:bg-red-700 transition-colors border-2 border-manga-ink cursor-pointer manga-shadow-sm"
+                >
+                  Xác Nhận Hủy
+                </button>
+              </div>
             </div>
           </div>
         </div>

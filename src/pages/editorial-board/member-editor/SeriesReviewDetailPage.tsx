@@ -26,7 +26,6 @@ export default function SeriesReviewDetailPage() {
 
   const [sessionStatus, setSessionStatus] = useState<string>('open')
   const [comments, setComments] = useState<any[]>([])
-  const [newComment, setNewComment] = useState('')
 
   // Mock member voting stats for this series
   const mockVotingStats = seriesId === 'phoenix-legend' ? {
@@ -205,20 +204,7 @@ export default function SeriesReviewDetailPage() {
 
 
 
-  const handleSendComment = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newComment.trim()) return
-    const storedUser = sessionStorage.getItem('mangaflow_user')
-    const userObj = storedUser ? JSON.parse(storedUser) : { fullName: 'Minamoto Shizuka', role: 'BOARD' }
-    
-    setComments([...comments, {
-      id: Date.now(),
-      author: userObj.fullName.toUpperCase() + ' (MEMBER EDITOR)',
-      text: newComment,
-      time: 'Vừa xong'
-    }])
-    setNewComment('')
-  }
+
 
   const handlePinComment = (id: number) => {
     const commentToPin = comments.find(c => c.id === id)
@@ -427,22 +413,6 @@ export default function SeriesReviewDetailPage() {
             )
           })}
         </div>
-
-        <form onSubmit={handleSendComment} className="flex gap-2 border-t-2 border-manga-ink pt-4">
-          <input
-            type="text"
-            value={newComment}
-            onChange={e => setNewComment(e.target.value)}
-            placeholder="Nhập ý kiến thảo luận về dự án truyện này..."
-            className="flex-1 border-2 border-manga-ink px-4 py-2.5 text-xs font-bold outline-none focus:border-manga-red bg-zinc-50"
-          />
-          <button 
-            type="submit" 
-            className="bg-manga-ink text-white border-2 border-manga-ink px-5 py-2.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:bg-manga-red hover:shadow-[1px_1px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] cursor-pointer"
-          >
-            <Send className="w-4 h-4" />
-          </button>
-        </form>
       </div>
     </div>
   )

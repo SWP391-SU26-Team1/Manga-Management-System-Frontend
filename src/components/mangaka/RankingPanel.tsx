@@ -112,11 +112,10 @@ export function RankingPanel({ stats }: RankingPanelProps) {
             { label: "Lượt xem", value: currentStat.views, icon: Eye, color: "text-manga-ink" },
             { label: "Lượt thích", value: currentStat.likes, icon: Heart, color: "text-manga-red" },
             { label: "Bình luận", value: currentStat.comments, icon: MessageSquare, color: "text-blue-500" },
-            { label: "Theo dõi", value: currentStat.followers, icon: Users, color: "text-purple-500" },
-          ].map((item) => {
+          ].map((item, idx) => {
             const Icon = item.icon;
             return (
-              <div key={item.label} className="bg-white border-2 border-manga-ink p-4 flex flex-col justify-between manga-shadow-sm">
+              <div key={item.label} className={`bg-white border-2 border-manga-ink p-4 flex flex-col justify-between manga-shadow-sm ${idx === 2 ? 'col-span-2' : ''}`}>
                 <div className="flex justify-between items-center mb-1">
                   <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{item.label}</span>
                   <Icon className={`w-4 h-4 ${item.color}`} />
@@ -132,7 +131,7 @@ export function RankingPanel({ stats }: RankingPanelProps) {
               <div className="flex items-center gap-1">
                 <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
                 <span className="font-manga text-2xl font-bold text-manga-ink">{currentStat.rating}</span>
-                <span className="text-xs text-gray-400 font-bold">/10</span>
+                <span className="text-xs text-gray-400 font-bold">/5</span>
               </div>
             </div>
             <div className="text-right">

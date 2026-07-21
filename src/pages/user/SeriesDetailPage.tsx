@@ -225,6 +225,66 @@ export default function SeriesDetailPage() {
     }
   });
 
+  const getTimeAgo = (dateStr: string) => {
+    if (!dateStr) return 'Không xác định'
+    const date = new Date(dateStr)
+    if (isNaN(date.getTime())) return 'Không xác định'
+    
+    const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000)
+    if (seconds < 60) return 'Vừa xong'
+    const minutes = Math.floor(seconds / 60)
+    if (minutes < 60) return `${minutes} phút trước`
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `${hours} giờ trước`
+    const days = Math.floor(hours / 24)
+    if (days < 30) return `${days} ngày trước`
+    const months = Math.floor(days / 30)
+    if (months < 12) return `${months} tháng trước`
+    return `${Math.floor(months / 12)} năm trước`
+  }
+
+  const activities: any[] = [];
+  
+  if (selectedUser) {
+    authorWorks.forEach(work => {
+      if (work.latestChapterNumber > 0 && work.latestChapterDate) {
+        activities.push({
+          id: `chap-${work.id}`,
+          title: `Vừa ra mắt chương ${work.latestChapterNumber} của "${work.title}"`,
+          date: new Date(work.latestChapterDate),
+          dateStr: work.latestChapterDate
+        });
+      }
+      
+      if (work.viewCount >= 100) {
+        let milestone = 100;
+        if (work.viewCount >= 1000000) milestone = 1000000;
+        else if (work.viewCount >= 100000) milestone = 100000;
+        else if (work.viewCount >= 10000) milestone = 10000;
+        else if (work.viewCount >= 1000) milestone = 1000;
+        
+        activities.push({
+          id: `view-${work.id}-${milestone}`,
+          title: `Tác phẩm "${work.title}" đạt mốc ${milestone.toLocaleString('vi-VN')} lượt đọc`,
+          date: new Date(work.updatedAt || work.createdAt || Date.now()),
+          dateStr: work.updatedAt || work.createdAt || new Date().toISOString()
+        });
+      }
+
+      if (work.createdAt) {
+        activities.push({
+          id: `series-${work.id}`,
+          title: `Đã ra mắt tác phẩm mới "${work.title}"`,
+          date: new Date(work.createdAt),
+          dateStr: work.createdAt
+        });
+      }
+    });
+  }
+
+  activities.sort((a, b) => b.date.getTime() - a.date.getTime());
+  const topActivities = activities.slice(0, 5);
+
   return (
     <div className="min-h-screen bg-[#F5F5F5] py-8 px-4 sm:px-6 lg:px-8 relative dark:bg-zinc-900 transition-colors"
          style={{ backgroundImage: 'radial-gradient(#d1d5db 2px, transparent 2px)', backgroundSize: '32px 32px' }}>
@@ -731,20 +791,17 @@ export default function SeriesDetailPage() {
                           <Heart className="w-5 h-5 text-manga-red" /> Hoạt động gần đây
                         </h3>
                         <div className="space-y-4">
-                          <div className="flex items-start gap-4 border-l-4 border-manga-red pl-4 py-1">
-                            <div className="w-2 h-2 rounded-full bg-manga-red mt-1.5 -ml-[23px]"></div>
-                            <div>
-                              <p className="font-bold text-sm text-gray-800 dark:text-white">Vừa ra mắt chương mới "{series.title}"</p>
-                              <span className="text-xs text-gray-500 font-bold uppercase dark:text-gray-400">2 giờ trước</span>
+                          {topActivities.length > 0 ? topActivities.map((act, index) => (
+                            <div key={act.id} className={`flex items-start gap-4 border-l-4 ${index === 0 ? 'border-manga-red' : 'border-gray-300 dark:border-zinc-600'} pl-4 py-1`}>
+                              <div className={`w-2 h-2 rounded-full ${index === 0 ? 'bg-manga-red' : 'bg-gray-300 dark:bg-zinc-600'} mt-1.5 -ml-[23px]`}></div>
+                              <div>
+                                <p className={`font-bold text-sm ${index === 0 ? 'text-gray-800 dark:text-white' : 'text-gray-600 dark:text-gray-300'}`}>{act.title}</p>
+                                <span className="text-xs text-gray-500 font-bold uppercase dark:text-gray-400">{getTimeAgo(act.dateStr)}</span>
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex items-start gap-4 border-l-4 border-gray-300 dark:border-zinc-600 pl-4 py-1">
-                            <div className="w-2 h-2 rounded-full bg-gray-300 mt-1.5 -ml-[23px] dark:bg-zinc-600"></div>
-                            <div>
-                              <p className="font-bold text-sm text-gray-600 dark:text-gray-300">Đạt mốc 10.000 lượt đọc</p>
-                              <span className="text-xs text-gray-500 font-bold uppercase dark:text-gray-400">Hôm qua</span>
-                            </div>
-                          </div>
+                          )) : (
+                            <div className="text-sm font-bold text-gray-500 italic">Chưa có hoạt động nào gần đây.</div>
+                          )}
                         </div>
                       </div>
                   </div>

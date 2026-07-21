@@ -26,7 +26,15 @@ export const getCreatedByLabel = (session: ReviewSession) =>
   session.created_by?.username ||
   'Không rõ người tạo'
 
-export const getVoterLabel = (vote: Vote) => vote.users?.username || vote.users?.email || 'Không rõ người biểu quyết'
+export const getVoterLabel = (vote: Vote) => {
+  const data = vote.voter || vote.users
+  return data?.name || data?.username || data?.email || 'Không rõ người biểu quyết'
+}
+
+export const getVoterAvatar = (vote: Vote) => {
+  const data = vote.voter || vote.users
+  return data?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(getVoterLabel(vote))}&background=random`
+}
 
 export const isUuidLike = (value?: string | null) =>
   Boolean(value && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value))

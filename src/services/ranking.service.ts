@@ -105,12 +105,21 @@ export const rankingService = {
             }
           }
 
+          let ratingValue = 0.0;
+          if (actualViews >= 50) {
+             const baseRatio = ((detail?.totalLikes || 0) / actualViews) * 100;
+             const popularityBonus = Math.log10((detail?.totalLikes || 0) + 1) * 0.2; 
+             let rawRating = (baseRatio * 0.35) + popularityBonus;
+             if (rawRating > 5.0) rawRating = 5.0;
+             ratingValue = Number(rawRating.toFixed(1));
+          }
+
           return {
             series_ranking_id: s.series_id,
             period_id: period_id || 'all-time',
             series_id: s.series_id,
-            rank_position: idx + 1,
-            score: actualViews,
+            rank_position: 0, // Will be assigned after sort
+            score: ratingValue, // Use rating formula as score
             total_vote: detail?.totalLikes || 0,
             created_at: new Date().toISOString(),
             series: {
@@ -134,8 +143,8 @@ export const rankingService = {
             series_ranking_id: s.series_id,
             period_id: period_id || 'all-time',
             series_id: s.series_id,
-            rank_position: idx + 1,
-            score: s.view_count || 0,
+            rank_position: 0,
+            score: 0.0,
             total_vote: 0,
             created_at: new Date().toISOString(),
             series: {
@@ -150,7 +159,14 @@ export const rankingService = {
         }
       });
       
-      return await Promise.all(detailedSeriesPromises);
+      const unsorted = await Promise.all(detailedSeriesPromises);
+      // Sort by rating (score) descending
+      const sorted = unsorted.sort((a, b) => b.score - a.score);
+      // Re-assign rank position
+      return sorted.map((item, index) => ({
+        ...item,
+        rank_position: index + 1
+      }));
     } catch (error) {
       console.error('Error in fallback ranking', error);
       return [];

@@ -139,7 +139,7 @@ export const assistantService = {
   }): Promise<{ success: boolean; data: PageTask[]; pagination?: any }> => {
     const res = await api.get('/api/assistant/page-tasks', { params: filters })
     if (res.data && Array.isArray(res.data.data)) {
-      res.data.data = res.data.data.filter((t: any) => t.status !== 'pending' && t.status !== 'cancelled')
+      res.data.data = res.data.data.filter((t: any) => t.status !== 'pending')
     }
     return res.data
   },

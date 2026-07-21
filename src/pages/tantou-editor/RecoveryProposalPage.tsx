@@ -1,14 +1,22 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router'
 import { Shield, FileWarning, Plus, CheckCircle2, Clock, BookOpen, Calendar, RefreshCw, Send, ClipboardList, X, Loader2 } from 'lucide-react'
 import { editorService, ApiProposal } from '../../services/editor.service'
 
 export default function RecoveryProposalPage() {
-  const [activeTab, setActiveTab] = useState<'RECOVERY' | 'NEW_SERIES' | 'PUBLISH_CHAPTER' | 'SCHEDULE_CHANGE'>('RECOVERY')
+  const [activeTab, setActiveTab] = useState<'RECOVERY' | 'DEADLINE_REMINDER'>('RECOVERY')
+  const [remindSeries, setRemindSeries] = useState('')
+  const [remindChapter, setRemindChapter] = useState('')
+  const [chapterList, setChapterList] = useState<any[]>([])
+  const [remindMessage, setRemindMessage] = useState('')
   const [proposals, setProposals] = useState<ApiProposal[]>([])
   const [seriesList, setSeriesList] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [searchParams] = useSearchParams()
+  const submittingRef = useRef(false)
 
   // Form states
   // 1. Recovery
@@ -17,24 +25,9 @@ export default function RecoveryProposalPage() {
   const [recReason, setRecReason] = useState('')
   const [recPlan, setRecPlan] = useState('')
 
-  // 2. New Series
-  const [newTitle, setNewTitle] = useState('')
-  const [newAuthor, setNewAuthor] = useState('')
-  const [newGenre, setNewGenre] = useState('Fantasy')
-  const [newSynopsis, setNewSynopsis] = useState('')
-  const [newTarget, setNewTarget] = useState('')
 
-  // 3. Publish Chapter
-  const [pubSeries, setPubSeries] = useState('Shadow Realm Chronicles')
-  const [pubChapter, setPubChapter] = useState('Ch.49')
-  const [pubPages, setPubPages] = useState('18')
-  const [pubDate, setPubDate] = useState('')
 
-  // 4. Schedule Change
-  const [schedSeries, setSchedSeries] = useState('Midnight Detective Agency')
-  const [schedCurrent, setSchedCurrent] = useState('Hàng tháng')
-  const [schedProposed, setSchedProposed] = useState('Hàng tuần')
-  const [schedReason, setSchedReason] = useState('')
+  const [alerts, setAlerts] = useState<any[]>([])
 
   const loadProposals = async () => {
     try {
@@ -61,30 +54,103 @@ export default function RecoveryProposalPage() {
         setSeriesList(res.data)
         const firstTitle = res.data[0].title
         setRecSeries(firstTitle)
-        setPubSeries(firstTitle)
-        setSchedSeries(firstTitle)
+        setRemindSeries(firstTitle)
       }
     } catch (err) {
       console.error('Không thể tải danh sách series', err)
     }
   }
 
+  const loadAlerts = async () => {
+    try {
+      const res = await editorService.getAlerts()
+      if (res.success && Array.isArray(res.data)) {
+        setAlerts(res.data)
+      }
+    } catch (err) {
+      console.error('Không thể tải danh sách cảnh báo', err)
+    }
+  }
+
   useEffect(() => {
     loadProposals()
     loadSeries()
-  }, [])
+    loadAlerts()
+
+    const tabParam = searchParams.get('tab')
+    if (tabParam === 'deadline') {
+      setActiveTab('DEADLINE_REMINDER')
+      const seriesParam = searchParams.get('series')
+      if (seriesParam) {
+        setRemindSeries(seriesParam)
+      }
+      const chapterParam = searchParams.get('chapter')
+      if (chapterParam) {
+        setRemindChapter(chapterParam)
+      }
+      const msgParam = searchParams.get('msg')
+      if (msgParam === 'late') {
+        const daysLateParam = searchParams.get('daysLate') || 'vài'
+        const chapterStr = chapterParam ? `chương ${chapterParam}` : 'chương mới'
+        const seriesStr = seriesParam ? `truyện "${seriesParam}"` : 'truyện'
+        setRemindMessage(`Gửi tác giả, hiện tại bản thảo ${chapterStr} của ${seriesStr} đã quá hạn nộp ${daysLateParam} ngày so với lịch trình dự kiến. Vui lòng phản hồi về tình hình tiến độ và ưu tiên hoàn thành sớm nhé!`)
+      }
+    } else if (tabParam === 'recovery') {
+      setActiveTab('RECOVERY')
+      const seriesParam = searchParams.get('series')
+      if (seriesParam) {
+        setRecSeries(seriesParam)
+      }
+    }
+  }, [searchParams])
+
+  useEffect(() => {
+    if (remindSeries && activeTab === 'DEADLINE_REMINDER') {
+      const selectedSeriesObj = seriesList.find((s: any) => s.title === remindSeries)
+      if (selectedSeriesObj) {
+        editorService.getChapters({ seriesId: selectedSeriesObj.series_id }).then(res => {
+          if (res.success && res.data) {
+            setChapterList(res.data)
+          } else {
+            setChapterList([])
+          }
+        })
+      } else {
+        setChapterList([])
+      }
+    }
+  }, [remindSeries, activeTab, seriesList])
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
     setTimeout(() => setToastMessage(null), 3000)
   }
 
+  const isDuplicate = () => {
+    if (activeTab === 'DEADLINE_REMINDER') {
+      return proposals.some(p => p.type === 'DEADLINE_REMINDER' && p.series_title === remindSeries && p.metadata?.chapter === remindChapter && p.status === 'PENDING')
+    }
+    if (activeTab === 'RECOVERY') {
+      return proposals.some(p => p.type === 'RECOVERY' && p.series_title === recSeries && p.status === 'PENDING')
+    }
+    return false
+  }
+
   const handleSubmitProposal = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (submittingRef.current) return
+    if (isDuplicate()) {
+      showToast('Yêu cầu này đã được gửi đi')
+      return
+    }
+
     let details = ''
     let title = ''
     let metadata: any = null
 
+    submittingRef.current = true
+    setIsSubmitting(true)
     try {
       if (activeTab === 'RECOVERY') {
         title = recSeries
@@ -94,35 +160,36 @@ export default function RecoveryProposalPage() {
           reason: recReason,
           plan: recPlan
         }
-      } else if (activeTab === 'NEW_SERIES') {
-        title = newTitle
-        details = `Đề xuất truyện mới: Tác giả: ${newAuthor}. Thể loại: ${newGenre}. Tóm tắt: ${newSynopsis}. Mục tiêu độc giả: ${newTarget}`
-        metadata = {
-          author: newAuthor,
-          genre: newGenre,
-          synopsis: newSynopsis,
-          target_audience: newTarget
+      } else if (activeTab === 'DEADLINE_REMINDER') {
+        title = remindSeries
+        let finalMessage = remindMessage
+
+        const selectedChap = chapterList.find(c => c.title === remindChapter)
+        if (selectedChap && selectedChap.scheduled_date) {
+          const schedDate = new Date(selectedChap.scheduled_date)
+          const now = new Date()
+          if (now > schedDate) {
+            const diffTime = Math.abs(now.getTime() - schedDate.getTime())
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+            const autoMsg = `Gửi tác giả, hiện tại bản thảo chương ${selectedChap.title} của truyện "${remindSeries}" đã quá hạn nộp ${diffDays} ngày so với lịch trình dự kiến. Vui lòng phản hồi về tình hình tiến độ và ưu tiên hoàn thành sớm nhé!`
+            if (!remindMessage) {
+              finalMessage = autoMsg
+            }
+          }
         }
-      } else if (activeTab === 'PUBLISH_CHAPTER') {
-        title = pubSeries
-        details = `Xin xuất bản chương mới: ${pubChapter} (${pubPages} trang). Ngày dự kiến: ${pubDate}`
-        metadata = {
-          chapter: pubChapter,
-          pages: Number(pubPages),
-          publish_date: pubDate
+        if (!finalMessage) {
+          finalMessage = `Gửi tác giả, hiện tại bản thảo chương ${remindChapter || 'mới'} của truyện "${remindSeries}" đang có dấu hiệu trễ so với lịch trình dự kiến.`
         }
-      } else if (activeTab === 'SCHEDULE_CHANGE') {
-        title = schedSeries
-        details = `Đề xuất đổi lịch đăng: Từ [${schedCurrent}] sang [${schedProposed}]. Lý do: ${schedReason}`
+
+        details = `Nhắc nhở Deadline cho series ${remindSeries}${remindChapter ? ` - Chương: ${remindChapter}` : ''}. Lời nhắn: ${finalMessage}`
         metadata = {
-          current_schedule: schedCurrent,
-          proposed_schedule: schedProposed,
-          reason: schedReason
+          message: finalMessage,
+          chapter: remindChapter
         }
       }
 
       if (!title) {
-        alert('Vui lòng điền các thông tin bắt buộc!')
+        showToast('Vui lòng điền các thông tin bắt buộc!')
         return
       }
 
@@ -137,33 +204,24 @@ export default function RecoveryProposalPage() {
       if (activeTab === 'RECOVERY') {
         setRecReason('')
         setRecPlan('')
-      } else if (activeTab === 'NEW_SERIES') {
-        setNewTitle('')
-        setNewAuthor('')
-        setNewSynopsis('')
-        setNewTarget('')
-      } else if (activeTab === 'PUBLISH_CHAPTER') {
-        setPubChapter('')
-        setPubPages('18')
-        setPubDate('')
-      } else if (activeTab === 'SCHEDULE_CHANGE') {
-        setSchedReason('')
       }
 
       showToast('Đã gửi đề xuất lên Ban Biên Tập thành công!')
-      loadProposals()
+      await loadProposals()
     } catch (err: any) {
       console.error(err)
-      alert(`Gửi đề xuất thất bại: ${err.response?.data?.message || err.message || 'Lỗi hệ thống'}`)
+      showToast(`Gửi đề xuất thất bại: ${err.response?.data?.message || err.message || 'Lỗi hệ thống'}`)
+    } finally {
+      submittingRef.current = false
+      setIsSubmitting(false)
     }
   }
 
   const getProposalTypeLabel = (type: string) => {
     switch (type) {
-      case 'RECOVERY': return 'Phục hồi Series'
-      case 'NEW_SERIES': return 'Truyện mới'
-      case 'PUBLISH_CHAPTER': return 'Xuất bản Chương'
-      case 'SCHEDULE_CHANGE': return 'Đổi lịch đăng'
+      case 'RECOVERY': return 'Khắc phục tụt hạng'
+
+      case 'DEADLINE_REMINDER': return 'Nhắc Deadline'
       default: return type
     }
   }
@@ -171,9 +229,8 @@ export default function RecoveryProposalPage() {
   const getProposalTypeColor = (type: string) => {
     switch (type) {
       case 'RECOVERY': return 'bg-red-100 text-red-700 border-red-300'
-      case 'NEW_SERIES': return 'bg-green-100 text-green-700 border-green-300'
-      case 'PUBLISH_CHAPTER': return 'bg-blue-100 text-blue-700 border-blue-300'
-      case 'SCHEDULE_CHANGE': return 'bg-purple-100 text-purple-700 border-purple-300'
+
+      case 'DEADLINE_REMINDER': return 'bg-orange-100 text-orange-700 border-orange-300'
       default: return 'bg-gray-100 text-gray-700 border-gray-300'
     }
   }
@@ -205,6 +262,11 @@ export default function RecoveryProposalPage() {
     }
   }
 
+  const selectedSeriesObj = seriesList.find((s: any) => s.title === recSeries)
+  const hasRankDropAlert = selectedSeriesObj && alerts.some(a => 
+    a.alert_id === `rank_drop_${selectedSeriesObj.series_id}` && !a.is_resolved
+  )
+
   return (
     <div className="max-w-7xl mx-auto pb-12 relative">
       {/* Toast */}
@@ -231,35 +293,17 @@ export default function RecoveryProposalPage() {
           <div className="flex bg-gray-100 border-b-4 border-manga-ink overflow-x-auto divide-x-2 divide-manga-ink">
             <button
               onClick={() => setActiveTab('RECOVERY')}
-              className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap flex-1 text-center transition-colors ${
-                activeTab === 'RECOVERY' ? 'bg-white text-manga-red' : 'text-gray-500 hover:bg-gray-50 hover:text-manga-ink'
-              }`}
+              className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap flex-1 text-center transition-colors ${activeTab === 'RECOVERY' ? 'bg-white text-manga-red' : 'text-gray-500 hover:bg-gray-50 hover:text-manga-ink'
+                }`}
             >
-              Phục hồi Series
+              Khắc phục tụt hạng
             </button>
             <button
-              onClick={() => setActiveTab('NEW_SERIES')}
-              className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap flex-1 text-center transition-colors ${
-                activeTab === 'NEW_SERIES' ? 'bg-white text-manga-red' : 'text-gray-500 hover:bg-gray-50 hover:text-manga-ink'
-              }`}
+              onClick={() => setActiveTab('DEADLINE_REMINDER')}
+              className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap flex-1 text-center transition-colors ${activeTab === 'DEADLINE_REMINDER' ? 'bg-white text-manga-red' : 'text-gray-500 hover:bg-gray-50 hover:text-manga-ink'
+                }`}
             >
-              Đề xuất Truyện mới
-            </button>
-            <button
-              onClick={() => setActiveTab('PUBLISH_CHAPTER')}
-              className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap flex-1 text-center transition-colors ${
-                activeTab === 'PUBLISH_CHAPTER' ? 'bg-white text-manga-red' : 'text-gray-500 hover:bg-gray-50 hover:text-manga-ink'
-              }`}
-            >
-              Xin Xuất bản Chương
-            </button>
-            <button
-              onClick={() => setActiveTab('SCHEDULE_CHANGE')}
-              className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap flex-1 text-center transition-colors ${
-                activeTab === 'SCHEDULE_CHANGE' ? 'bg-white text-manga-red' : 'text-gray-500 hover:bg-gray-50 hover:text-manga-ink'
-              }`}
-            >
-              Đổi lịch đăng
+              Nhắc Deadline
             </button>
           </div>
 
@@ -267,21 +311,23 @@ export default function RecoveryProposalPage() {
           <form onSubmit={handleSubmitProposal} className="p-6">
             {activeTab === 'RECOVERY' && (
               <div className="space-y-4">
-                <div className="bg-red-50 border-2 border-red-500 p-4 mb-2 flex items-start gap-3 text-red-800">
-                  <FileWarning className="w-5 h-5 text-red-600 shrink-0 mt-0.5 animate-pulse" />
-                  <div>
-                    <h4 className="font-bold text-sm">Cảnh báo rớt hạng ranking cần khắc phục</h4>
-                    <p className="text-xs font-medium mt-1">
-                      Cần nộp đề xuất phục hồi chất lượng ngay lập tức để bảo vệ truyện trước nguy cơ bị Ban biên tập xem xét hạ rank hoặc dừng xuất bản.
-                    </p>
+                {hasRankDropAlert && (
+                  <div className="bg-red-50 border-2 border-red-500 p-4 mb-2 flex items-start gap-3 text-red-800">
+                    <FileWarning className="w-5 h-5 text-red-600 shrink-0 mt-0.5 animate-pulse" />
+                    <div>
+                      <h4 className="font-bold text-sm">Cảnh báo rớt hạng ranking cần khắc phục</h4>
+                      <p className="text-xs font-medium mt-1">
+                        Cần nộp đề xuất phục hồi chất lượng ngay lập tức để bảo vệ truyện trước nguy cơ bị Ban biên tập xem xét hạ rank hoặc dừng xuất bản.
+                      </p>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Series Cần Bảo Vệ</label>
-                    <select 
-                      value={recSeries} 
+                    <select
+                      value={recSeries}
                       onChange={(e) => setRecSeries(e.target.value)}
                       className="w-full border-2 border-manga-ink p-2 text-sm bg-gray-50 focus:outline-none"
                     >
@@ -290,11 +336,11 @@ export default function RecoveryProposalPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Mục Tiêu Thăng Hạng</label>
-                    <input 
-                      type="text" 
-                      value={recTarget} 
+                    <input
+                      type="text"
+                      value={recTarget}
                       onChange={(e) => setRecTarget(e.target.value)}
-                      className="w-full border-2 border-manga-ink p-2 text-sm focus:outline-none focus:border-red-500" 
+                      className="w-full border-2 border-manga-ink p-2 text-sm focus:outline-none focus:border-red-500"
                       required
                     />
                   </div>
@@ -302,208 +348,89 @@ export default function RecoveryProposalPage() {
 
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nguyên nhân giảm hạng tuần qua</label>
-                  <textarea 
+                  <textarea
                     rows={3}
                     placeholder="Phân tích lý do (nhịp truyện chậm, art không đều, kịch bản thiếu cao trào...)"
                     value={recReason}
                     onChange={(e) => setRecReason(e.target.value)}
-                    className="w-full border-2 border-manga-ink p-2 text-sm focus:outline-none resize-none font-medium" 
+                    className="w-full border-2 border-manga-ink p-2 text-sm focus:outline-none resize-none font-medium"
                     required
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Kế hoạch cải thiện chi tiết</label>
-                  <textarea 
+                  <textarea
                     rows={4}
                     placeholder="Mô tả cụ thể hướng đi cốt truyện mới, bổ sung thêm trợ lý vẽ background hoặc cải tiến nét vẽ nhân vật chính..."
                     value={recPlan}
                     onChange={(e) => setRecPlan(e.target.value)}
-                    className="w-full border-2 border-manga-ink p-2 text-sm focus:outline-none resize-none font-medium" 
+                    className="w-full border-2 border-manga-ink p-2 text-sm focus:outline-none resize-none font-medium"
                     required
                   />
                 </div>
               </div>
             )}
 
-            {activeTab === 'NEW_SERIES' && (
+            {activeTab === 'DEADLINE_REMINDER' && (
               <div className="space-y-4">
+                <div className="bg-orange-50 border-2 border-orange-500 p-4 mb-2 flex items-start gap-3 text-orange-800">
+                  <FileWarning className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-bold text-sm">Gửi Nhắc nhở Trễ Hạn</h4>
+                    <p className="text-xs font-medium mt-1">
+                      Gửi thông báo khẩn cấp đến tác giả để yêu cầu đẩy nhanh tiến độ hoàn thành chương truyện bị chậm.
+                    </p>
+                  </div>
+                </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tên Truyện Đề Xuất</label>
-                  <input 
-                    type="text" 
-                    placeholder="Nhập tên dự án truyện mới..."
-                    value={newTitle}
-                    onChange={(e) => setNewTitle(e.target.value)}
-                    className="w-full border-2 border-manga-ink p-2 text-sm focus:outline-none focus:border-red-500 font-bold" 
-                    required
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tác Giả (Mangaka)</label>
-                    <input 
-                      type="text" 
-                      placeholder="Tên Mangaka..."
-                      value={newAuthor}
-                      onChange={(e) => setNewAuthor(e.target.value)}
-                      className="w-full border-2 border-manga-ink p-2 text-sm focus:outline-none" 
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Thể Loại Chính</label>
-                    <select 
-                      value={newGenre}
-                      onChange={(e) => setNewGenre(e.target.value)}
-                      className="w-full border-2 border-manga-ink p-2 text-sm focus:outline-none bg-white"
-                    >
-                      <option value="Fantasy">Fantasy (Giả Tưởng)</option>
-                      <option value="Shounen Action">Shounen Action (Hành Động)</option>
-                      <option value="Mystery">Mystery (Huyền Bí)</option>
-                      <option value="Romance">Romance (Lãng Mạn)</option>
-                      <option value="Sci-Fi">Sci-Fi (Khoa Học Viễn Tưởng)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tóm tắt cốt truyện sơ bộ (Synopsis)</label>
-                  <textarea 
-                    rows={4}
-                    placeholder="Mô tả tóm tắt tuyến truyện chính, điểm hấp dẫn độc giả..."
-                    value={newSynopsis}
-                    onChange={(e) => setNewSynopsis(e.target.value)}
-                    className="w-full border-2 border-manga-ink p-2 text-sm focus:outline-none resize-none font-medium" 
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Đối tượng độc giả mục tiêu & Tiềm năng doanh thu</label>
-                  <input 
-                    type="text" 
-                    placeholder="Ví dụ: Nam giới 15-25 tuổi, kế hoạch bán bản quyền merchandise..."
-                    value={newTarget}
-                    onChange={(e) => setNewTarget(e.target.value)}
-                    className="w-full border-2 border-manga-ink p-2 text-sm focus:outline-none" 
-                    required
-                  />
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'PUBLISH_CHAPTER' && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Chọn Series</label>
-                    <select 
-                      value={pubSeries}
-                      onChange={(e) => setPubSeries(e.target.value)}
-                      className="w-full border-2 border-manga-ink p-2 text-sm focus:outline-none bg-white"
-                    >
-                      {getSeriesOptions()}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Chương số (Chapter)</label>
-                    <input 
-                      type="text" 
-                      placeholder="Ví dụ: Ch.49..."
-                      value={pubChapter}
-                      onChange={(e) => setPubChapter(e.target.value)}
-                      className="w-full border-2 border-manga-ink p-2 text-sm focus:outline-none focus:border-red-500 font-bold" 
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Số trang dự kiến</label>
-                    <input 
-                      type="number" 
-                      value={pubPages}
-                      onChange={(e) => setPubPages(e.target.value)}
-                      className="w-full border-2 border-manga-ink p-2 text-sm focus:outline-none" 
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ngày Phát Hành Dự Kiến</label>
-                    <input 
-                      type="date" 
-                      value={pubDate}
-                      onChange={(e) => setPubDate(e.target.value)}
-                      className="w-full border-2 border-manga-ink p-2 text-sm focus:outline-none" 
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'SCHEDULE_CHANGE' && (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Chọn Series</label>
-                  <select 
-                    value={schedSeries}
-                    onChange={(e) => setSchedSeries(e.target.value)}
-                    className="w-full border-2 border-manga-ink p-2 text-sm focus:outline-none bg-white"
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Series đang trễ hạn</label>
+                  <select
+                    value={remindSeries}
+                    onChange={(e) => { setRemindSeries(e.target.value); setRemindChapter(''); }}
+                    className="w-full border-2 border-manga-ink p-2 text-sm bg-white focus:outline-none"
                   >
                     {getSeriesOptions()}
                   </select>
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Lịch đăng hiện tại</label>
-                    <input 
-                      type="text" 
-                      value={schedCurrent}
-                      onChange={(e) => setSchedCurrent(e.target.value)}
-                      className="w-full border-2 border-manga-ink p-2 text-sm focus:outline-none bg-gray-50" 
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Lịch đăng đề xuất mới</label>
-                    <select 
-                      value={schedProposed}
-                      onChange={(e) => setSchedProposed(e.target.value)}
-                      className="w-full border-2 border-manga-ink p-2 text-sm focus:outline-none bg-white"
-                    >
-                      <option value="Hàng tuần">Hàng tuần</option>
-                      <option value="Hai tuần/lần">Hai tuần/lần</option>
-                      <option value="Hàng tháng">Hàng tháng</option>
-                      <option value="Tạm ngưng phát hành">Tạm ngưng phát hành (Hiatus)</option>
-                    </select>
-                  </div>
-                </div>
-
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Lý do thay đổi lịch đăng</label>
-                  <textarea 
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Chương đang trễ hạn (Tùy chọn)</label>
+                  <select
+                    value={remindChapter}
+                    onChange={(e) => setRemindChapter(e.target.value)}
+                    className="w-full border-2 border-manga-ink p-2 text-sm bg-white focus:outline-none"
+                  >
+                    <option value="">-- Áp dụng cho toàn bộ Series --</option>
+                    {chapterList.map((chap: any) => (
+                      <option key={chap.chapter_id} value={chap.title}>{chap.title}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nội dung nhắc nhở</label>
+                  <textarea
                     rows={4}
-                    placeholder="Giải trình lý do cụ thể (Tình hình sức khỏe tác giả, cần chuẩn bị thêm tư liệu cho arc mới...)"
-                    value={schedReason}
-                    onChange={(e) => setSchedReason(e.target.value)}
-                    className="w-full border-2 border-manga-ink p-2 text-sm focus:outline-none resize-none font-medium" 
+                    placeholder="Nhập nội dung nhắc nhở..."
+                    value={remindMessage}
+                    onChange={(e) => setRemindMessage(e.target.value)}
+                    className="w-full border-2 border-manga-ink p-2 text-sm focus:outline-none resize-none font-medium"
                     required
                   />
                 </div>
               </div>
             )}
 
-            <div className="mt-6 border-t-2 border-gray-100 pt-4 flex justify-end">
+
+
+            <div className="mt-6 border-t-2 border-gray-100 pt-4 flex flex-col">
               <button
                 type="submit"
-                className="bg-manga-ink hover:bg-black text-white font-bold text-sm uppercase tracking-wider px-6 py-3 border-2 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 transition-all flex items-center gap-2"
+                disabled={isSubmitting || isDuplicate()}
+                className={`w-full font-bold py-3 px-4 transition-colors flex items-center justify-center gap-2 border-2 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 ${(isSubmitting || isDuplicate()) ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-manga-ink hover:bg-black text-white'
+                  }`}
               >
-                <Send className="w-4 h-4" /> Gửi Đề Xuất Lên Ban Biên Tập
+                <Send className="w-5 h-5" />
+                {isSubmitting ? 'ĐANG GỬI...' : (activeTab === 'RECOVERY' ? 'GỬI ĐỀ XUẤT PHỤC HỒI' : (activeTab === 'DEADLINE_REMINDER' ? 'GỬI CHO MANGAKA' : 'GỬI ĐỀ XUẤT LÊN BAN BIÊN TẬP'))}
               </button>
             </div>
           </form>
@@ -546,7 +473,7 @@ export default function RecoveryProposalPage() {
                     </span>
                     <span className="text-[9px] font-bold text-gray-400">{formatDate(prop.created_at)}</span>
                   </div>
-                  
+
                   <h4 className="font-bold text-sm text-manga-ink mb-1 truncate">{prop.series_title}</h4>
                   <p className="text-xs text-gray-600 font-medium leading-relaxed mb-3 break-words bg-gray-50 p-2 border border-gray-100">
                     {prop.details}

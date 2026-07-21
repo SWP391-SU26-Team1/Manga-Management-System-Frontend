@@ -194,7 +194,7 @@ export interface ApiReport {
 // Proposal
 export interface ApiProposal {
   proposal_id: string
-  type: 'RECOVERY' | 'NEW_SERIES' | 'PUBLISH_CHAPTER' | 'SCHEDULE_CHANGE'
+  type: 'RECOVERY' | 'NEW_SERIES' | 'PUBLISH_CHAPTER' | 'SCHEDULE_CHANGE' | 'DEADLINE_REMINDER'
   series_title: string
   details: string
   status: 'PENDING' | 'APPROVED' | 'REJECTED'
@@ -443,7 +443,7 @@ export const editorService = {
   },
 
   // ---------- Page Tasks (Editor) ----------
-  getEditorReviewTasks: async (params?: { status?: string; assistant_id?: string; series_id?: string }) => {
+  getEditorReviewTasks: async (params?: { status?: string; assistant_id?: string; series_id?: string; limit?: number }) => {
     const res = await api.get('/api/editor/review/page-tasks', { params })
     return res.data
   },
@@ -815,7 +815,7 @@ export const editorService = {
   },
 
   createProposal: async (body: {
-    type: 'RECOVERY' | 'NEW_SERIES' | 'PUBLISH_CHAPTER' | 'SCHEDULE_CHANGE';
+    type: 'RECOVERY' | 'NEW_SERIES' | 'PUBLISH_CHAPTER' | 'SCHEDULE_CHANGE' | 'DEADLINE_REMINDER';
     series_title: string;
     details: string;
     metadata: any;

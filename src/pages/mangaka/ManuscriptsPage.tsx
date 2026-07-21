@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router'
-import { FileText, Clock, AlertTriangle, CheckCircle, Eye, Upload, Send, X, BookOpen } from 'lucide-react'
+import { FileText, Clock, AlertTriangle, CheckCircle, Eye, Upload, Send, X, BookOpen, AlertCircle } from 'lucide-react'
 import { seriesService, SeriesAPI } from '@/services/series.service'
 import { chapterService } from '@/services/chapter.service'
 import { pageService } from '@/services/page.service'
@@ -95,12 +95,29 @@ export default function ManuscriptsPage() {
   const [newChapterNum, setNewChapterNum] = useState('')
   const [newChapterPages, setNewChapterPages] = useState('20')
   const [files, setFiles] = useState<File[]>([])
+  const [newChapterContent, setNewChapterContent] = useState('')
 
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [viewingSuggestion, setViewingSuggestion] = useState<any | null>(null)
   const [viewingEditorComment, setViewingEditorComment] = useState<any | null>(null)
+
+  const [alertModal, setAlertModal] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error';
+  }>({
+    show: false,
+    title: '',
+    message: '',
+    type: 'success'
+  })
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error') => {
+    setAlertModal({ show: true, title, message, type })
+  }
 
   // Load data from services
   const loadData = async () => {
@@ -162,22 +179,22 @@ export default function ManuscriptsPage() {
   const handleUpdateStatus = async (seriesId: string, manuscriptId: string) => {
     try {
       await manuscriptService.revise(seriesId, manuscriptId)
-      alert('Đã chuyển bản thảo về trạng thái nháp thành công!')
+      showAlert('Thành công', 'Đã chuyển bản thảo về trạng thái nháp thành công!', 'success')
       await loadData()
     } catch (err) {
       console.error(err)
-      alert('Không thể thực hiện chỉnh sửa trạng thái.')
+      showAlert('Lỗi', 'Không thể thực hiện chỉnh sửa trạng thái.', 'error')
     }
   }
 
   const handlePublishChapter = async (seriesId: string, chapterId: string) => {
     try {
       await chapterService.publish(seriesId, chapterId)
-      alert('Xuất bản chapter thành công!')
+      showAlert('Thành công', 'Xuất bản chapter thành công!', 'success')
       await loadData()
     } catch (err) {
       console.error(err)
-      alert('Không thể xuất bản chapter.')
+      showAlert('Lỗi', 'Không thể xuất bản chapter.', 'error')
     }
   }
 
@@ -239,7 +256,7 @@ export default function ManuscriptsPage() {
         series_id: selectedSeriesId,
         chapter_id: chapterId,
         title: `Bản thảo Chương ${chapterNumberStr}: ${chapterTitle}`,
-        file_url: files.length > 0 ? (await Promise.all(files.map(f => uploadService.uploadSingle(f, 'manuscripts'))))[0].secure_url : undefined,
+        content: newChapterContent,
         status: 'submitted'
       })
 
@@ -253,46 +270,23 @@ export default function ManuscriptsPage() {
         console.warn('Auto-submit workflow failed, manuscript may still be in draft:', submitErr)
       }
 
-      // e. Nếu có file upload, thêm file liên kết
-      if (files.length > 0) {
-        const uploadPromises = files.map(f => uploadService.uploadSingle(f, 'manuscripts'))
-        const uploadResults = await Promise.all(uploadPromises)
-        await Promise.all(
-          uploadResults.map((res, index) => {
-            const f = files[index]
-            return manuscriptService.addFile({
-              manuscript_id: createdMs._id,
-              file_url: res.secure_url,
-              file_name: f.name,
-              file_type: f.name.split('.').pop() || 'psd'
-            })
-          })
-        )
-      }
-
       // f. Gửi thông báo đến toàn bộ các Tantou Editor phụ trách
       try {
         const mems = await seriesService.getMembers(selectedSeriesId)
-        const editors = mems
+        let editors = mems
           .filter((m: any) => m.users?.role?.toLowerCase() === 'editor')
           .map((m: any) => m.users.user_id)
           
-          // Danh sách các Biên tập viên (Tantou Editor) trong hệ thống để tất cả đều nhận được thông báo
-          const systemEditors = [
+        if (editors.length === 0) {
+          editors = [
             'b29fb935-7a5d-4988-9327-a8e453ba7322', // LuanHuynh296
             'f9a1ee69-6036-4fd6-bbef-de0e00370309', // editor_akira (Akira Watanabe)
             '83556777-7c27-4039-ba81-655e58a788a7', // Tantou_Editor
             '66666666-6666-6666-6666-666666666666', // editor_haru
             '90000000-0000-0000-0000-000000000004', // editor_mika
-            'dcba68dd-5e62-49e2-a826-d2f5e6941561', // codex_test_1781698003205
-            'usr_editor_001'                        // fallback mock
+            'dcba68dd-5e62-49e2-a826-d2f5e6941561'  // codex_test_1781698003205
           ]
-
-          systemEditors.forEach(id => {
-            if (!editors.includes(id)) {
-              editors.push(id)
-            }
-          })
+        }
 
           const activeSeries = seriesList.find(s => s._id === selectedSeriesId)
           
@@ -326,10 +320,11 @@ export default function ManuscriptsPage() {
         console.error("Lỗi khi xử lý thông báo nộp bản thảo cho Tantou:", errNotifs)
       }
 
-      alert('Đã thực hiện thành công!')
+      showAlert('Thành công', 'Đã thực hiện thành công!', 'success')
       setShowSubmitModal(false)
       setNewChapterTitle('')
       setNewChapterNum('')
+      setNewChapterContent('')
       setFiles([])
       setSelectedChapterId(null)
       
@@ -720,30 +715,16 @@ export default function ManuscriptsPage() {
               />
             </div>
 
-            <div className="mb-5">
-              <label className="block text-[11px] font-black uppercase mb-1">
-                File đính kèm (PSD/ZIP/Ảnh) {!selectedChapterId && '(Tùy chọn)'}
-              </label>
-              <label className="border-2 border-dashed border-gray-400 p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:border-black bg-gray-50 transition-all rounded-none block">
-                <Upload className="w-7 h-7 mb-2 text-gray-500 mx-auto" />
-                <p className="text-[10px] font-black text-gray-500 uppercase max-w-xs mx-auto break-all">
-                  {files.length > 0 
-                    ? `Đã chọn ${files.length} file: ${files.map(f => f.name).join(', ')}`
-                    : 'Kéo thả file/ảnh hoặc click để tải lên'}
-                </p>
-                <input
-                  type="file"
-                  multiple
-                  accept=".psd,.zip,.rar,.pdf,image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files.length > 0) {
-                      setFiles(Array.from(e.target.files))
-                    }
-                  }}
-                  required={!!selectedChapterId}
-                />
-              </label>
+            <div className="mb-4">
+              <label className="block text-[11px] font-black uppercase mb-1">Nội dung kịch bản chữ / Phân cảnh *</label>
+              <textarea
+                value={newChapterContent}
+                onChange={e => setNewChapterContent(e.target.value)}
+                rows={7}
+                className="w-full border-2 border-black p-2 text-xs font-bold focus:outline-none rounded-none bg-white"
+                placeholder="VD: Cảnh 1: Doraemon bước ra từ ngăn bàn... (Copy kịch bản chữ vào đây)"
+                required
+              />
             </div>
 
             <div className="flex gap-3 justify-end">
@@ -753,6 +734,7 @@ export default function ManuscriptsPage() {
                   setShowSubmitModal(false)
                   setNewChapterTitle('')
                   setNewChapterNum('')
+                  setNewChapterContent('')
                   setFiles([])
                   setSelectedChapterId(null)
                 }}
@@ -879,6 +861,36 @@ export default function ManuscriptsPage() {
         </div>
       )}
       </div>
+
+      {/* Alert Modal */}
+      {alertModal.show && (
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
+          <div className="bg-white border-4 border-manga-ink manga-shadow max-w-sm w-full animate-in fade-in zoom-in-95 duration-150 text-black">
+            <div className="p-4 border-b-4 border-manga-ink bg-gray-50 flex justify-between items-center">
+              <h3 className="font-manga font-bold text-lg uppercase flex items-center gap-2">
+                {alertModal.type === 'success' ? (
+                  <CheckCircle className="w-5 h-5 text-green-600 animate-bounce" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 text-manga-red animate-bounce" />
+                )}
+                {alertModal.title}
+              </h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm font-bold text-gray-700">{alertModal.message}</p>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setAlertModal(prev => ({ ...prev, show: false }))}
+                  className="px-4 py-2 bg-manga-ink text-white font-bold uppercase text-xs hover:bg-gray-800 transition-colors cursor-pointer"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="mt-16 pt-8 border-t-2 border-manga-ink flex flex-col md:flex-row items-center justify-between gap-4 text-sm font-bold text-gray-500">

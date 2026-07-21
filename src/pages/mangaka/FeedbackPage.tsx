@@ -17,6 +17,22 @@ export default function FeedbackPage() {
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
 
+  const [alertModal, setAlertModal] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error';
+  }>({
+    show: false,
+    title: '',
+    message: '',
+    type: 'success'
+  })
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error') => {
+    setAlertModal({ show: true, title, message, type })
+  }
+
   const loadFeedbacks = async () => {
     try {
       setLoading(true)
@@ -223,7 +239,31 @@ export default function FeedbackPage() {
         })
       )
 
-      setFeedbacks([...mappedFeedbacks, ...manuscriptFeedbacks])
+      // 4c. Load series rejection / revision requests from userNotifications
+      const seriesProposalFeedbacks: EditorFeedback[] = []
+      userNotifications.forEach((n: any) => {
+        const type = (n.type || '').toLowerCase()
+        if (type.startsWith('series_revision_requested') || type.startsWith('series_rejected')) {
+          const parts = n.type.split(':')
+          const seriesId = parts[1] || ''
+          const seriesTitle = sMap[seriesId] || 'Tác phẩm'
+          
+          seriesProposalFeedbacks.push({
+            id: n.notification_id,
+            sender: 'Tantou Editor',
+            seriesId: seriesId,
+            seriesTitle: seriesTitle,
+            isAnnotation: false,
+            isNotification: true,
+            content: `[ĐỀ XUẤT SERIES]: ${n.content}`,
+            severity: 'Critical',
+            status: n.is_read ? 'Resolved' : 'Open',
+            createdAt: n.created_at
+          })
+        }
+      })
+
+      setFeedbacks([...mappedFeedbacks, ...manuscriptFeedbacks, ...seriesProposalFeedbacks])
     } catch (err: any) {
       console.error(err)
       setError('Không thể tải nhận xét từ Editor. Vui lòng kiểm tra lại kết nối.')
@@ -250,7 +290,7 @@ export default function FeedbackPage() {
       await loadFeedbacks()
     } catch (err) {
       console.error(err)
-      alert('Không thể đánh dấu đã xử lý. Lỗi: ' + ((err as any).response?.data?.message || (err as any).message))
+      showAlert('Lỗi', 'Không thể đánh dấu đã xử lý. Lỗi: ' + ((err as any).response?.data?.message || (err as any).message), 'error')
     }
   }
 
@@ -270,7 +310,18 @@ export default function FeedbackPage() {
       await loadFeedbacks()
     } catch (err) {
       console.error(err)
-      alert('Không thể gửi phản hồi. Lỗi: ' + ((err as any).response?.data?.message || (err as any).message))
+      showAlert('Lỗi', 'Không thể gửi phản hồi. Lỗi: ' + ((err as any).response?.data?.message || (err as any).message), 'error')
+    }
+  }
+
+  const handleDeleteNotification = async (id: string) => {
+    if (!confirm('Bạn có chắc chắn muốn xóa nhận xét đề xuất series này?')) return
+    try {
+      await rankingService.deleteNotification(id)
+      await loadFeedbacks()
+    } catch (err) {
+      console.error(err)
+      showAlert('Lỗi', 'Không thể xóa nhận xét.', 'error')
     }
   }
 
@@ -299,7 +350,7 @@ export default function FeedbackPage() {
         <p className="text-sm font-bold text-gray-600">
           Xem nhận xét của Tantou Editor (Biên tập viên phụ trách) về kịch bản, phác thảo nhân vật, 
           chì chi tiết hoặc các yêu cầu chỉnh sửa trước khi nộp bản thảo lên Ban biên tập.
-          Ðây là luồng phản hồi riêng biệt với việc duyệt kết quả trợ lý.
+          Đây là luồng phản hồi riêng biệt với việc duyệt kết quả trợ lý.
         </p>
       </div>
 
@@ -377,6 +428,7 @@ export default function FeedbackPage() {
               feedback={fb}
               onResolve={handleResolveFeedback}
               onReply={handleReplyFeedback}
+              onDeleteNotification={handleDeleteNotification}
             />
           ))
         ) : (
@@ -393,6 +445,36 @@ export default function FeedbackPage() {
         </div>
         Tất cả phản hồi và đánh dấu Đã xử lý (Resolved) của bạn sẽ gửi thông báo trực tiếp đến tài khoản quản lý của Editor phụ trách. Vui lòng thảo luận kỹ trước khi nhấn Đã xử lý để tránh việc Editor phải từ chối lại.
       </div>
+      {/* Alert Modal */}
+      {alertModal.show && (
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
+          <div className="bg-white border-4 border-manga-ink manga-shadow max-w-sm w-full animate-in fade-in zoom-in-95 duration-150 text-black">
+            <div className="p-4 border-b-4 border-manga-ink bg-gray-50 flex justify-between items-center">
+              <h3 className="font-manga font-bold text-lg uppercase flex items-center gap-2">
+                {alertModal.type === 'success' ? (
+                  <CheckCircle className="w-5 h-5 text-green-600 animate-bounce" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 text-manga-red animate-bounce" />
+                )}
+                {alertModal.title}
+              </h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm font-bold text-gray-700">{alertModal.message}</p>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setAlertModal(prev => ({ ...prev, show: false }))}
+                  className="px-4 py-2 bg-manga-ink text-white font-bold uppercase text-xs hover:bg-gray-800 transition-colors cursor-pointer"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Footer */}
       <footer className="mt-16 pt-8 border-t-2 border-manga-ink flex flex-col md:flex-row items-center justify-between gap-4 text-sm font-bold text-gray-500">
         <div className="font-manga text-2xl text-manga-red">MangaFlow</div>

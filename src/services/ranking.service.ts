@@ -15,6 +15,7 @@ export interface BackendSeriesRanking {
     status: string
     cover_image_url?: string | null
     view_count?: number
+    author?: string
   }
   ranking_period?: {
     name: string
@@ -41,6 +42,7 @@ export interface BackendNotification {
   title: string
   content: string
   type: string
+  metadata?: any
   is_read: boolean
   created_at: string
 }
@@ -92,6 +94,17 @@ export const rankingService = {
         try {
           const detail = await readerService.getSeriesDetail(s.series_id);
           const actualViews = detail?.totalViews || s.view_count || 0;
+          
+          let authorName = detail?.authorName || 'Đang cập nhật';
+          if (authorName === 'Unknown Author' || authorName === 'Đang cập nhật') {
+            if (s.series_member && s.series_member.length > 0) {
+              const mangaka = s.series_member.find((m: any) => m.role_in_series === 'owner' || m.role_in_series === 'mangaka');
+              if (mangaka && mangaka.users) {
+                authorName = mangaka.users.name || mangaka.users.username || 'Đang cập nhật';
+              }
+            }
+          }
+
           return {
             series_ranking_id: s.series_id,
             period_id: period_id || 'all-time',
@@ -105,10 +118,18 @@ export const rankingService = {
               genre: s.genre,
               status: s.status,
               cover_image_url: s.cover_image_url,
-              view_count: actualViews
+              view_count: actualViews,
+              author: authorName
             }
           };
         } catch (err) {
+          let authorName = 'Đang cập nhật';
+          if (s.series_member && s.series_member.length > 0) {
+            const mangaka = s.series_member.find((m: any) => m.role_in_series === 'owner' || m.role_in_series === 'mangaka');
+            if (mangaka && mangaka.users) {
+              authorName = mangaka.users.name || mangaka.users.username || 'Đang cập nhật';
+            }
+          }
           return {
             series_ranking_id: s.series_id,
             period_id: period_id || 'all-time',
@@ -122,7 +143,8 @@ export const rankingService = {
               genre: s.genre,
               status: s.status,
               cover_image_url: s.cover_image_url,
-              view_count: s.view_count || 0
+              view_count: s.view_count || 0,
+              author: authorName
             }
           };
         }
@@ -177,6 +199,11 @@ export const rankingService = {
   /** PATCH /api/notifications/:id/read - Đánh dấu thông báo đã đọc */
   markAsRead: async (notificationId: string): Promise<void> => {
     await api.patch(`/api/notifications/${notificationId}/read`)
+  },
+
+  /** PATCH /api/notifications/:id/acknowledge - Xác nhận rủi ro từ Editor */
+  acknowledgeReminder: async (notificationId: string): Promise<void> => {
+    await api.patch(`/api/notifications/${notificationId}/acknowledge`)
   },
 
   /** PATCH /api/mangaka/notifications/mark-all-read - Đánh dấu tất cả thông báo đã đọc */

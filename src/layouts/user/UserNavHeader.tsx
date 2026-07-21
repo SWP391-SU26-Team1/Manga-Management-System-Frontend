@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router'
-import { Search, Bell, User, LogOut, Settings } from 'lucide-react'
+import { Search, Bell, User, LogOut, Settings, Clock } from 'lucide-react'
 import SearchOverlay from '@/components/user/SearchOverlay'
+import { readerService } from '@/services/reader.service'
 
 export default function UserNavHeader() {
   const navigate = useNavigate()
@@ -14,16 +15,77 @@ export default function UserNavHeader() {
 
   const [showProfile, setShowProfile] = useState(false)
   const profileRef = useRef<HTMLDivElement>(null)
+  
+  const [showNotifications, setShowNotifications] = useState(false)
+  const notificationsRef = useRef<HTMLDivElement>(null)
+  const [notifications, setNotifications] = useState<any[]>([])
+  const [loadingNotifications, setLoadingNotifications] = useState(false)
+  
+  const [hasNewNotifications, setHasNewNotifications] = useState(false)
+
+  useEffect(() => {
+    if (user) {
+      const checkNewNotifications = async () => {
+        try {
+          const latest = await readerService.getLatestUpdates(1)
+          if (latest && latest.length > 0) {
+            const lastUpdate = latest[0].updatedAt || latest[0].createdAt
+            const lastRead = localStorage.getItem('mangaflow_last_read_notifications')
+            
+            if (!lastRead) {
+              setHasNewNotifications(true)
+            } else if (lastUpdate) {
+              const updateDate = new Date(lastUpdate).getTime()
+              const readDate = new Date(lastRead).getTime()
+              if (updateDate > readDate) {
+                setHasNewNotifications(true)
+              }
+            }
+          }
+        } catch (error) {
+          console.error(error)
+        }
+      }
+      checkNewNotifications()
+      
+      const interval = setInterval(checkNewNotifications, 5 * 60 * 1000)
+      return () => clearInterval(interval)
+    }
+  }, [user])
 
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (showProfile && profileRef.current && !profileRef.current.contains(e.target as Node)) {
         setShowProfile(false)
       }
+      if (showNotifications && notificationsRef.current && !notificationsRef.current.contains(e.target as Node)) {
+        setShowNotifications(false)
+      }
     }
     document.addEventListener('mousedown', handleOutsideClick)
     return () => document.removeEventListener('mousedown', handleOutsideClick)
-  }, [showProfile])
+  }, [showProfile, showNotifications])
+
+  useEffect(() => {
+    if (showNotifications && notifications.length === 0) {
+      setLoadingNotifications(true)
+      readerService.getLatestUpdates(10).then(latest => {
+        setNotifications(latest)
+        setLoadingNotifications(false)
+      }).catch(() => setLoadingNotifications(false))
+    }
+  }, [showNotifications, notifications.length])
+
+  const formatTimeAgo = (dateString: string) => {
+    if (!dateString) return ''
+    const date = new Date(dateString)
+    const now = new Date()
+    const diff = Math.floor((now.getTime() - date.getTime()) / 1000)
+    if (diff < 60) return 'Vừa xong'
+    if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`
+    if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`
+    return `${Math.floor(diff / 86400)} ngày trước`
+  }
 
   useEffect(() => {
     const handleProfileUpdate = () => {
@@ -89,10 +151,57 @@ export default function UserNavHeader() {
           
           {user ? (
             <>
-              <Link to="/dashboard/user/notifications" className="text-manga-ink hover:text-manga-red transition-colors relative flex items-center dark:text-zinc-300 dark:hover:text-manga-red">
-                <Bell className="w-5 h-5 stroke-[2.5]" />
-                <span className="absolute -top-1 -right-1 w-2 h-2 bg-manga-red rounded-full border border-white"></span>
-              </Link>
+              <div className="relative flex items-center" ref={notificationsRef}>
+                <button 
+                  onClick={() => {
+                    setShowNotifications(!showNotifications)
+                    if (!showNotifications) {
+                      setHasNewNotifications(false)
+                      localStorage.setItem('mangaflow_last_read_notifications', new Date().toISOString())
+                    }
+                  }} 
+                  className="text-manga-ink hover:text-manga-red transition-colors relative flex items-center dark:text-zinc-300 dark:hover:text-manga-red"
+                >
+                  <Bell className="w-5 h-5 stroke-[2.5]" />
+                  {hasNewNotifications && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-manga-red rounded-full border border-white"></span>
+                  )}
+                </button>
+
+                {showNotifications && (
+                  <div className="absolute top-10 -right-20 md:right-0 w-[320px] md:w-[360px] bg-white border-[3px] border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] flex flex-col z-50 animate-fade-in dark:bg-zinc-800 dark:border-black dark:shadow-[4px_4px_0px_#000]">
+                    <div className="flex items-center justify-between p-3 border-b-2 border-black dark:border-zinc-700 bg-gray-50 dark:bg-zinc-900">
+                      <h3 className="font-manga text-lg font-bold uppercase text-manga-ink dark:text-white">Thông Báo</h3>
+                      <Link to="/dashboard/user/notifications" onClick={() => setShowNotifications(false)} className="text-[10px] font-bold text-manga-red hover:underline uppercase">Xem tất cả</Link>
+                    </div>
+                    <div className="max-h-[350px] overflow-y-auto custom-scrollbar p-2 flex flex-col gap-2">
+                      {loadingNotifications ? (
+                        <div className="py-8 flex justify-center"><div className="animate-spin w-6 h-6 border-2 border-b-transparent border-manga-red rounded-full"></div></div>
+                      ) : notifications.length === 0 ? (
+                        <div className="py-8 text-center text-gray-400 text-xs font-bold uppercase">Không có thông báo mới</div>
+                      ) : (
+                        notifications.map((n: any) => (
+                          <Link key={n.id} to={`/series/${n.id}`} onClick={() => setShowNotifications(false)} className="flex gap-3 p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors border border-transparent hover:border-gray-200 dark:hover:border-zinc-600 rounded-sm">
+                            <div className="w-10 h-14 bg-gray-200 flex-shrink-0 border border-black dark:border-zinc-900 overflow-hidden">
+                              <img src={n.coverImageUrl || `https://ui-avatars.com/api/?name=${n.title}`} alt="" className="w-full h-full object-cover" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex justify-between items-start mb-0.5">
+                                <span className="text-[9px] bg-manga-red text-white font-bold px-1 py-0.5 uppercase border border-black dark:border-red-900 leading-none">Mới Xuất Bản</span>
+                                <span className="text-[9px] text-gray-500 dark:text-gray-400 font-bold flex items-center gap-0.5">
+                                  <Clock className="w-3 h-3" /> {formatTimeAgo(n.updatedAt || n.createdAt)}
+                                </span>
+                              </div>
+                              <div className="text-xs font-bold text-manga-ink dark:text-gray-100 truncate mt-1">{n.title}</div>
+                              <div className="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-1 mt-0.5 leading-tight">Bộ truyện vừa được xuất bản và ra mắt cộng đồng.</div>
+                            </div>
+                          </Link>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
               
               <div className="flex items-center gap-3">
                 <div className="relative" ref={profileRef}>

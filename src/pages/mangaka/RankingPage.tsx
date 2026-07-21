@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { Link } from 'react-router'
-import { AlertCircle, TrendingUp, Bell, AlertTriangle, Info, ChevronDown, ChevronUp } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router'
+import { AlertCircle, TrendingUp, Bell, AlertTriangle, Info, ChevronDown, ChevronUp, CheckCircle2 } from 'lucide-react'
 import { RankingPanel } from '@/components/mangaka/RankingPanel'
 import { RankingStat, RiskAlert } from '@/data/mangakaMockData'
 import { rankingService } from '@/services/ranking.service'
@@ -40,11 +40,20 @@ const RISK_LEVEL_CONFIG = {
 export default function RankingPage() {
   const [stats, setStats] = useState<RankingStat[]>([])
   const [alerts, setAlerts] = useState<RiskAlert[]>([])
-  const [activeTab, setActiveTab] = useState<'ranking' | 'alerts'>('ranking')
+  const [searchParams] = useSearchParams()
+  const initialTab = searchParams.get('tab') === 'alerts' ? 'alerts' : 'ranking'
+  const [activeTab, setActiveTab] = useState<'ranking' | 'alerts'>(initialTab)
   const [expandedAlertId, setExpandedAlertId] = useState<string | null>(null)
   const [readAlerts, setReadAlerts] = useState<Set<string>>(new Set())
+  const [acknowledgedAlerts, setAcknowledgedAlerts] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+  
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const showToast = (msg: string) => {
+    setToastMessage(msg)
+    setTimeout(() => setToastMessage(null), 3000)
+  }
 
   const fetchRankingData = async () => {
     try {
@@ -133,10 +142,11 @@ export default function RankingPage() {
 
       // 4. Fetch notifications and build alerts list
       const notifications = await rankingService.getNotifications()
-      const warningNotifications = notifications.filter(n => n.type === 'ranking_warning')
+      const warningNotifications = notifications.filter(n => n.type === 'ranking_warning' || n.type === 'ranking_warning_acknowledged')
 
       const notificationAlerts: RiskAlert[] = warningNotifications.map(n => {
         const matched = mySeries.find(s => n.content.includes(s.title) || n.title.includes(s.title))
+        let isAck = n.type === 'ranking_warning_acknowledged';
         return {
           id: n.notification_id,
           seriesId: matched ? matched._id : '',
@@ -144,27 +154,11 @@ export default function RankingPage() {
           message: n.content,
           createdAt: n.created_at,
           isRead: n.is_read,
+          isAcknowledged: isAck
         }
       })
 
-      // Build dynamic alerts based on checkSeriesRisk
-      const dynamicRiskAlerts: RiskAlert[] = []
-      statsResults.forEach((r, idx) => {
-        if (r && r.riskData && r.riskData.at_risk) {
-          const series = mySeries[idx]
-          const level = r.riskData.low_score ? 'High' : 'Medium'
-          dynamicRiskAlerts.push({
-            id: `dynamic_${series._id}`,
-            seriesId: series._id,
-            level,
-            message: `Tác phẩm "${series.title}" đang gặp rủi ro ${level === 'High' ? 'cao' : 'trung bình'}. ${r.riskData.declining ? 'Xếp hạng đang giảm liên tiếp.' : ''} ${r.riskData.low_score ? 'Điểm tương tác thấp (< 5).' : ''}`,
-            createdAt: new Date().toISOString(),
-            isRead: false,
-          })
-        }
-      })
-
-      const mergedAlerts = [...notificationAlerts, ...dynamicRiskAlerts]
+      const mergedAlerts = [...notificationAlerts]
       setAlerts(mergedAlerts)
 
       // Auto switch to alerts tab if there are unread high-risk alerts
@@ -183,6 +177,12 @@ export default function RankingPage() {
   useEffect(() => {
     fetchRankingData()
   }, [])
+  
+  useEffect(() => {
+    if (searchParams.get('tab') === 'alerts') {
+      setActiveTab('alerts')
+    }
+  }, [searchParams])
 
   const unreadCount = alerts.filter(a => !a.isRead && !readAlerts.has(a.id)).length
   const highRiskCount = alerts.filter(a => a.level === 'High').length
@@ -196,6 +196,22 @@ export default function RankingPage() {
       }
     }
     setReadAlerts(prev => new Set([...prev, id]))
+  }
+
+  const handleAcknowledge = async (id: string) => {
+    if (!id.startsWith('dynamic_')) {
+      try {
+        await rankingService.acknowledgeReminder(id)
+        showToast('Đã gửi thông báo xác nhận cho Tantou Editor thành công!')
+      } catch (err) {
+        console.error("Lỗi khi xác nhận thông báo:", err)
+        showToast('Có lỗi xảy ra khi xác nhận.')
+        return
+      }
+    }
+    setReadAlerts(prev => new Set([...prev, id]))
+    setAcknowledgedAlerts(prev => new Set([...prev, id]))
+    setExpandedAlertId(null)
   }
 
   return (
@@ -332,7 +348,7 @@ export default function RankingPage() {
             {[
               { label: 'Tổng cảnh báo', value: alerts.length, color: 'text-manga-ink' },
               { label: 'Rủi ro Cao', value: alerts.filter(a => a.level === 'High').length, color: 'text-manga-red' },
-              { label: 'Chưa đọc', value: unreadCount, color: 'text-orange-500' },
+              { label: 'Rủi ro Thấp', value: alerts.filter(a => a.level !== 'High').length, color: 'text-orange-500' },
             ].map(stat => (
               <div key={stat.label} className="bg-white border-2 border-manga-ink p-4 text-center">
                 <div className={`font-manga text-3xl font-bold ${stat.color}`}>{stat.value}</div>
@@ -355,7 +371,9 @@ export default function RankingPage() {
                 const config = RISK_LEVEL_CONFIG[alert.level as keyof typeof RISK_LEVEL_CONFIG] || RISK_LEVEL_CONFIG.Low
                 const Icon = config.icon
                 const isRead = alert.isRead || readAlerts.has(alert.id)
+                const isAcknowledged = alert.isAcknowledged || acknowledgedAlerts.has(alert.id)
                 const isExpanded = expandedAlertId === alert.id
+                const isDeadline = alert.message.toLowerCase().includes('quá hạn') || alert.message.toLowerCase().includes('trễ hạn') || alert.message.toLowerCase().includes('deadline')
                 return (
                   <div
                     key={alert.id}
@@ -365,7 +383,9 @@ export default function RankingPage() {
                       className="p-4 flex items-start gap-3 cursor-pointer"
                       onClick={() => {
                         setExpandedAlertId(isExpanded ? null : alert.id)
-                        markRead(alert.id)
+                        if (!isDeadline) {
+                          markRead(alert.id)
+                        }
                       }}
                     >
                       <Icon className={`w-5 h-5 flex-shrink-0 mt-0.5 ${config.iconColor}`} />
@@ -380,7 +400,7 @@ export default function RankingPage() {
                             </span>
                           )}
                         </div>
-                        <p className={`text-sm font-bold leading-snug ${config.text}`}>{alert.message}</p>
+                        <p className={`text-sm font-bold leading-snug ${config.text}`} style={{ whiteSpace: 'pre-line' }}>{alert.message}</p>
                         <div className="text-[10px] uppercase font-bold mt-1 opacity-60">
                           {new Date(alert.createdAt).toLocaleString('vi-VN')}
                         </div>
@@ -407,6 +427,26 @@ export default function RankingPage() {
                             <ul className="text-xs font-bold text-gray-700 space-y-1">
                               <li>• Chú ý xu hướng chỉ số trong các kỳ tới</li>
                             </ul>
+                          )}
+                          
+                          
+                          {!isAcknowledged && (
+                            <div className="mt-4 pt-3 border-t border-dashed border-gray-300">
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); handleAcknowledge(alert.id); }}
+                                className="w-full bg-manga-red hover:bg-red-700 transition-colors text-white py-2 font-bold text-xs uppercase"
+                              >
+                                Xác nhận
+                              </button>
+                            </div>
+                          )}
+                          
+                          {isAcknowledged && (
+                            <div className="mt-4 pt-3 border-t border-dashed border-gray-300 text-center">
+                              <span className="text-xs font-bold text-green-600 uppercase flex items-center justify-center gap-1">
+                                <CheckCircle2 className="w-4 h-4" /> Đã xác nhận rủi ro
+                              </span>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -436,6 +476,13 @@ export default function RankingPage() {
           <a href="#" className="hover:text-manga-red transition-colors">Hỗ trợ Mangaka</a>
         </div>
       </footer>
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-8 right-8 bg-manga-ink text-white px-6 py-3 font-bold text-sm manga-shadow-sm z-50 animate-in fade-in slide-in-from-bottom-4">
+          {toastMessage}
+        </div>
+      )}
     </div>
   )
 }

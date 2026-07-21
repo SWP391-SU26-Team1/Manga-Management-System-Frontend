@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { Search, ChevronDown, ChevronRight, CheckCircle2, AlertCircle, Clock, Loader2, X, Image, Maximize2, Download } from 'lucide-react'
+import { useNavigate } from 'react-router'
+import { Search, ChevronDown, ChevronRight, CheckCircle2, AlertCircle, Clock, Loader2, X, Image, Maximize2, Download, BellRing } from 'lucide-react'
 import { editorService } from '@/services/editor.service'
 
 interface DisplayPage {
@@ -29,11 +30,15 @@ interface DisplayChapter {
   status?: string
   series_id?: string
   pages: DisplayPage[]
+  created_at?: string
+  isVirtual?: boolean
 }
 
 interface DisplaySeriesProgress {
   id: string
   series: string
+  status: string
+  publishSchedule?: string
   chapters: DisplayChapter[]
 }
 
@@ -50,6 +55,7 @@ const getFriendlyPageStatus = (status: string) => {
 }
 
 export default function PageProgressPage() {
+  const navigate = useNavigate()
   const [progressData, setProgressData] = useState<DisplaySeriesProgress[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [expandedChapters, setExpandedChapters] = useState<Set<string>>(new Set()) // Lưu trữ ID Series được mở rộng
@@ -109,7 +115,7 @@ export default function PageProgressPage() {
         editorService.getSeries({ limit: 100 }),
         editorService.getChapters({ limit: 100 }),
         editorService.getPages({ limit: 100 }),
-        editorService.getEditorReviewTasks()
+        editorService.getPageTasks({ limit: 1000 })
       ])
 
       const seriesData = seriesRes.data || seriesRes
@@ -125,16 +131,16 @@ export default function PageProgressPage() {
       const tasksList = Array.isArray(tasksData) ? tasksData : (tasksData.tasks || tasksData.items || [])
       setRawTasks(tasksList)
 
-      // Ánh xạ Series theo ID
-      const seriesMap: Record<string, string> = {}
+      const seriesMap: Record<string, any> = {}
       const activeSeriesIds = new Set<string>()
       seriesList.forEach((s: any) => {
-        seriesMap[s.series_id || s.id] = s.title
-        // Chỉ lấy ra các bộ truyện đã được duyệt (loại bỏ các truyện đang chờ duyệt pending_review, bản nháp draft, bị từ chối rejected)
-        const statusLower = String(s.status || '').toLowerCase()
-        if (['published', 'approved', 'in_production', 'hidden', 'archived'].includes(statusLower)) {
-          activeSeriesIds.add(s.series_id || s.id)
+        seriesMap[s.series_id || s.id] = { 
+          title: s.title, 
+          status: String(s.status || '').toLowerCase(),
+          publishSchedule: s.publishSchedule || 'Weekly',
+          proposedStartDate: s.proposedStartDate
         }
+        activeSeriesIds.add(s.series_id || s.id)
       })
 
       // Gom nhóm trang theo Chapter ID
@@ -149,16 +155,30 @@ export default function PageProgressPage() {
       // Gom nhóm Chapter theo Series ID
       const seriesProgressMap: Record<string, DisplaySeriesProgress> = {}
 
+      // Khởi tạo cho tất cả series của Tantou trước để đảm cả bộ truyện trống cũng hiện diện
+      seriesList.forEach((s: any) => {
+        const seriesId = s.series_id || s.id
+        seriesProgressMap[seriesId] = {
+          id: seriesId,
+          series: s.title,
+          status: String(s.status || '').toLowerCase(),
+          publishSchedule: s.publishSchedule || 'Weekly',
+          chapters: []
+        }
+      })
+
       const activeChapters = chaptersList.filter((ch: any) => activeSeriesIds.has(ch.series_id))
 
       activeChapters.forEach((ch: any) => {
         const seriesId = ch.series_id
-        const seriesTitle = seriesMap[seriesId] || ch.series?.title || '—'
+        const seriesInfo = seriesMap[seriesId] || { title: ch.series?.title || '—', status: 'unknown' }
 
         if (!seriesProgressMap[seriesId]) {
           seriesProgressMap[seriesId] = {
             id: seriesId,
-            series: seriesTitle,
+            series: seriesInfo.title,
+            status: seriesInfo.status,
+            publishSchedule: seriesInfo.publishSchedule,
             chapters: []
           }
         }
@@ -195,23 +215,55 @@ export default function PageProgressPage() {
 
         // Tính toán deadline chương truyện và kiểm tra trễ hạn
         let chapterDeadline = '—'
+        let chapterDeadlineDate: Date | null = null;
+
+        if (seriesInfo && seriesInfo.proposedStartDate) {
+          const startDate = new Date(seriesInfo.proposedStartDate)
+          if (!isNaN(startDate.getTime())) {
+            let intervalDays = 7
+            const schedule = String(seriesInfo.publishSchedule || '').toLowerCase()
+            if (schedule.includes('bi-weekly')) {
+              intervalDays = 14
+            } else if (schedule.includes('monthly')) {
+              intervalDays = 30
+            }
+            const chapNum = ch.chapter_number || 1
+            // Chapter 1 uses proposedStartDate, Chapter 2 is + intervalDays, etc.
+            chapterDeadlineDate = new Date(startDate.getTime() + (chapNum - 1) * intervalDays * 24 * 60 * 60 * 1000)
+            chapterDeadline = chapterDeadlineDate.toLocaleDateString('vi-VN')
+          }
+        }
+
+        // Fallback if no proposedStartDate was found or parsed
+        if (!chapterDeadlineDate) {
+          rawPages.forEach((p: any) => {
+            const task = tasksList.find((t: any) => t.page_id === p.page_id)
+            if (task?.deadline) {
+              const d = new Date(task.deadline)
+              if (chapterDeadlineDate === null || d < chapterDeadlineDate) {
+                chapterDeadlineDate = d;
+                chapterDeadline = d.toLocaleDateString('vi-VN')
+              }
+            }
+          })
+        }
+
         let isLate = false;
         let latePagesCount = 0;
         const now = new Date()
 
-        rawPages.forEach((p: any) => {
-          const task = tasksList.find((t: any) => t.page_id === p.page_id)
-          if (task?.deadline) {
-            const d = new Date(task.deadline)
-            if (chapterDeadline === '—' || d < new Date(chapterDeadline)) {
-              chapterDeadline = d.toLocaleDateString('vi-VN')
-            }
-            if (d < now && !['approved', 'completed'].includes(p.status.toLowerCase())) {
-              isLate = true
-              latePagesCount++
-            }
+        if (chapterDeadlineDate) {
+          const isChapDone = ['approved', 'completed', 'published'].includes(String(ch.status || '').toLowerCase())
+          if (!isChapDone && chapterDeadlineDate < now) {
+            isLate = true
+            rawPages.forEach((p: any) => {
+              if (!['approved', 'completed'].includes(p.status.toLowerCase())) {
+                latePagesCount++
+              }
+            })
+            if (latePagesCount === 0) latePagesCount = 1
           }
-        })
+        }
 
         seriesProgressMap[seriesId].chapters.push({
           id: ch.chapter_id || ch.id,
@@ -227,10 +279,70 @@ export default function PageProgressPage() {
           isLate,
           latePagesCount,
           pages,
+          created_at: ch.created_at
         })
       })
 
-      // Sắp xếp các chương trong từng bộ truyện theo số chương giảm dần
+
+
+      // 4. Tính toán chương ảo cho các series đã xuất bản
+      const currentDate = new Date();
+      Object.values(seriesProgressMap).forEach(series => {
+        if (series.status === 'published') {
+          const hasActiveChapter = series.chapters.some(c => {
+            const isDone = ['approved', 'completed', 'published', 'đã hoàn thành', 'đã xuất bản'].includes(String(c.status || '').toLowerCase()) || c.progress === 100;
+            return !isDone;
+          });
+          
+          if (!hasActiveChapter) {
+            const publishedChaps = series.chapters.filter(c => ['approved', 'completed', 'published', 'đã hoàn thành', 'đã xuất bản'].includes(String(c.status || '').toLowerCase()) || c.progress === 100);
+            
+            let latestChapNum = 0;
+            const seriesInfo = seriesMap[series.id];
+            let lastPublishDateStr = seriesInfo?.proposedStartDate || series.created_at || new Date().toISOString();
+            
+            if (publishedChaps.length > 0) {
+              publishedChaps.sort((a, b) => b.chapter_number - a.chapter_number);
+              const latest = publishedChaps[0];
+              latestChapNum = latest.chapter_number || 0;
+              if (latest.created_at) {
+                lastPublishDateStr = latest.created_at;
+              }
+            }
+            
+            const lastDate = new Date(lastPublishDateStr);
+            let intervalDays = 7;
+            const schedule = String(series.publishSchedule || '').toLowerCase();
+            if (schedule.includes('bi-weekly')) {
+              intervalDays = 14;
+            } else if (schedule.includes('monthly')) {
+              intervalDays = 30;
+            }
+            
+            const virtualDeadlineDate = new Date(lastDate.getTime() + intervalDays * 24 * 60 * 60 * 1000);
+            const isLate = virtualDeadlineDate < currentDate;
+            
+            series.chapters.push({
+              id: `virtual_${series.id}`,
+              chapter: `Chương ${latestChapNum + 1} (Dự kiến)`,
+              chapter_number: latestChapNum + 1,
+              status: 'CHƯA KHỞI TẠO',
+              series_id: series.id,
+              submitDate: '—',
+              deadline: virtualDeadlineDate.toLocaleDateString('vi-VN'),
+              approvedCount: 0,
+              totalCount: 0,
+              progress: 0,
+              isLate: isLate,
+              latePagesCount: isLate ? 1 : 0,
+              pages: [],
+              created_at: new Date().toISOString(),
+              isVirtual: true
+            });
+          }
+        }
+      });
+
       const mapped = Object.values(seriesProgressMap).map(sp => {
         sp.chapters.sort((a, b) => b.chapter_number - a.chapter_number)
         return sp
@@ -294,7 +406,7 @@ export default function PageProgressPage() {
       showToast(`Đã DUYỆT trang ${page.page} thành công!`)
     } catch (err: any) {
       console.error(err)
-      alert('Không thể duyệt trang: ' + (err.message || ''))
+      showToast('Không thể duyệt trang: ' + (err.message || ''))
     }
   }
 
@@ -305,7 +417,7 @@ export default function PageProgressPage() {
 
   const handleConfirmReject = async (page: any) => {
     if (!rejectReason.trim()) {
-      alert('Vui lòng nhập lý do cần sửa!')
+      showToast('Vui lòng nhập lý do cần sửa!')
       return
     }
     try {
@@ -325,7 +437,7 @@ export default function PageProgressPage() {
       setRejectReason('')
     } catch (err: any) {
       console.error(err)
-      alert('Không thể gửi yêu cầu sửa: ' + (err.message || ''))
+      showToast('Không thể gửi yêu cầu sửa: ' + (err.message || ''))
     }
   }
 
@@ -396,11 +508,9 @@ export default function PageProgressPage() {
             <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50/50 transition-colors" onClick={() => toggleExpand(series.id)}>
               <div className="flex items-center gap-4">
                 {expandedChapters.has(series.id) ? <ChevronDown className="w-5 h-5 text-gray-400" /> : <ChevronRight className="w-5 h-5 text-gray-400" />}
-                <div className="flex items-center gap-2">
-                  <span className="font-manga text-lg font-bold text-manga-ink">{series.series}</span>
-                  <span className="px-2 py-0.5 bg-manga-red/10 text-manga-red text-xs font-bold border border-manga-red/20 rounded">
-                    {series.chapters.length} Chapter
-                  </span>
+                <div className="flex-1 flex items-start gap-3 pt-1">
+                  <span className="font-manga text-xl font-bold text-manga-ink leading-tight">{series.series}</span>
+
                 </div>
               </div>
               
@@ -408,39 +518,15 @@ export default function PageProgressPage() {
                 <div className="text-right">
                   <div className="text-[10px] text-gray-400 uppercase">Trạng Thái</div>
                   <div className="text-gray-600">
-                    {series.chapters.some(ch => ch.isLate) ? (
-                      <span className="text-red-500 font-extrabold animate-pulse">Cần lưu ý (Trễ hạn)</span>
+                    {series.status === 'published' ? (
+                      <span className="text-green-600 font-bold">Đã xuất bản</span>
                     ) : (
-                      <span className="text-green-600 font-bold">Bình thường</span>
+                      <span className="text-gray-500 font-bold">Đang vẽ</span>
                     )}
                   </div>
                 </div>
                 
-                {/* Tiến Độ Tổng Thể Bộ Truyện */}
-                <div className="w-48">
-                  {(() => {
-                    const totalPages = series.chapters.reduce((sum, ch) => sum + ch.totalCount, 0)
-                    const approvedPages = series.chapters.reduce((sum, ch) => {
-                      const dynamicApproved = ch.pages.filter(p => {
-                        const status = pageStatuses[`${ch.id}-${p.page}`] || p.status
-                        return status === 'APPROVED' || status === 'COMPLETED'
-                      }).length
-                      return sum + dynamicApproved
-                    }, 0)
-                    const overallProgress = totalPages > 0 ? Math.round((approvedPages / totalPages) * 100) : 0
-                    return (
-                      <>
-                        <div className="flex justify-between text-[10px] mb-1 uppercase">
-                          <span className="text-gray-500">{approvedPages}/{totalPages} trang đã duyệt</span>
-                          <span className={overallProgress === 100 ? 'text-green-600' : 'text-manga-ink'}>{overallProgress}%</span>
-                        </div>
-                        <div className="h-1.5 w-full bg-gray-100 rounded overflow-hidden">
-                          <div className={`h-full ${overallProgress === 100 ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: `${overallProgress}%` }} />
-                        </div>
-                      </>
-                    )
-                  })()}
-                </div>
+
               </div>
             </div>
 
@@ -455,7 +541,7 @@ export default function PageProgressPage() {
                         <th className="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Trạng Thái</th>
                         <th className="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Tiến Độ</th>
                         <th className="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Ngày Tạo</th>
-                        <th className="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Hạn Chót</th>
+                        <th className="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Dự kiến ra mắt</th>
                         <th className="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Số Trang</th>
                         <th className="px-4 py-2 w-40"></th>
                       </tr>

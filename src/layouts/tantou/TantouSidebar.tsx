@@ -25,11 +25,9 @@ const MENU_ITEMS = [
   { path: '/dashboard/tantou-editor/chapters', icon: FileText, label: 'Chapter / Page' },
   { path: '/dashboard/tantou-editor/manuscript-review', icon: ClipboardCheck, label: 'Review Bản Thảo' },
   { path: '/dashboard/tantou-editor/workflow', icon: GitBranch, label: 'Quy Trình Duyệt' },
-  { path: '/dashboard/tantou-editor/alerts', icon: AlertTriangle, label: 'Cảnh Báo' },
   { path: '/dashboard/tantou-editor/ranking', icon: TrendingUp, label: 'Ranking / Hiệu Suất' },
-  { path: '/dashboard/tantou-editor/reports', icon: FileBarChart, label: 'Báo Cáo' },
+  { path: '/dashboard/tantou-editor/alerts', icon: AlertTriangle, label: 'Cảnh Báo' },
   { path: '/dashboard/tantou-editor/series-defense', icon: ShieldAlert, label: 'Bảo Vệ Series' },
-  { path: '/dashboard/tantou-editor/team', icon: Users, label: 'Nhóm Làm Việc' },
 ]
 
 export default function TantouSidebar() {
@@ -89,13 +87,13 @@ export default function TantouSidebar() {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-3 py-2.5 font-bold text-sm transition-all border-2 ${
+                className={`flex items-center gap-3 px-4 py-3 font-bold text-sm transition-all border-2 rounded-none ${
                   isActive
-                    ? 'bg-red-500 text-white border-black'
+                    ? 'bg-[#E63946] text-white border-black'
                     : 'bg-white text-black hover:bg-red-50 border-transparent'
                 }`}
               >
-                <Icon className="w-4 h-4 flex-shrink-0" />
+                <Icon className="w-5 h-5 flex-shrink-0" />
                 <span className="leading-tight">{item.label}</span>
               </Link>
             )
@@ -106,9 +104,9 @@ export default function TantouSidebar() {
       <div className="p-3 border-t-2 border-manga-ink bg-white space-y-2 flex-shrink-0">
         <Link
           to="/dashboard/tantou-editor/settings"
-          className={`flex items-center gap-3 px-3 py-2.5 font-bold text-sm transition-all border-2 w-full ${
+          className={`flex items-center gap-3 px-4 py-3 font-bold text-sm transition-all border-2 w-full ${
             location.pathname === '/dashboard/tantou-editor/settings'
-              ? 'bg-red-500 text-white border-black'
+              ? 'bg-[#E63946] text-white border-black'
               : 'bg-white text-black hover:bg-red-50 border-transparent'
           }`}
         >
@@ -117,7 +115,7 @@ export default function TantouSidebar() {
         </Link>
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2.5 font-bold text-sm text-red-600 hover:bg-red-50 border-2 border-transparent hover:border-black transition-all w-full text-left cursor-pointer"
+          className="w-full flex items-center gap-3 px-4 py-3 font-bold text-sm text-red-600 hover:bg-red-50 border-2 border-transparent hover:border-black transition-colors cursor-pointer text-left"
         >
           <LogOut className="w-4 h-4 flex-shrink-0" />
           <span>Đăng xuất</span>
@@ -125,7 +123,7 @@ export default function TantouSidebar() {
 
         {/* Profile info with neo-brutalist styling */}
         <div className="flex items-center gap-2 p-2 border-2 border-manga-ink bg-white rounded-none">
-          <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-manga-ink flex items-center justify-center font-extrabold text-xs shadow-sm flex-shrink-0 bg-red-500 text-white">
+          <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-manga-ink flex items-center justify-center font-extrabold text-xs shadow-sm flex-shrink-0 bg-[#E63946] text-white">
             {currentAvatar ? (
               <img src={currentAvatar} alt={userName} className="w-full h-full object-cover" />
             ) : (

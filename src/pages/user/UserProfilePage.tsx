@@ -1,46 +1,111 @@
-import React, { useEffect, useState, useRef } from 'react'
-import { User, Mail, Award, BookOpen, Clock, Heart, Camera } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
+import { User, Mail, Award, BookOpen, Clock, Heart, Edit2, Home, Save, X } from 'lucide-react'
+import { useNavigate } from 'react-router'
+import { readerService, ReadingHistoryItem } from '@/services/reader.service'
 
 export default function UserProfilePage() {
   const [profile, setProfile] = useState<any>(null)
-  
-  // Note: we can keep it read-only or use edit mode similar to Board. The user asked for it to look like the image.
-  // The image shows the profile with "CHỈNH SỬA HỒ SƠ" button, "THỐNG KÊ", "HOẠT ĐỘNG GẦN ĐÂY", etc.
-  
+  const [history, setHistory] = useState<ReadingHistoryItem[]>([])
+  const [isEditing, setIsEditing] = useState(false)
+  const [editForm, setEditForm] = useState({
+    fullName: '',
+    bio: '',
+    favoriteGenres: ''
+  })
+  const navigate = useNavigate()
+
   useEffect(() => {
     const storedUser = localStorage.getItem('mangaflow_user')
     if (storedUser) {
-      setProfile(JSON.parse(storedUser))
+      const parsed = JSON.parse(storedUser)
+      setProfile(parsed)
+      setEditForm({
+        fullName: parsed.fullName || '',
+        bio: parsed.bio || '',
+        favoriteGenres: parsed.favoriteGenres || ''
+      })
     }
+
+    // Fetch real reading history
+    readerService.getReadingHistory().then(data => {
+      setHistory(data)
+    })
   }, [])
 
   if (!profile) {
     return <div className="p-8 text-center font-bold text-red-500">Đang tải hồ sơ...</div>
   }
 
-  const userInitials = profile.fullName 
-    ? profile.fullName.split(' ').pop()?.slice(0, 2).toUpperCase() 
+  const handleSave = () => {
+    if (!profile) return
+    const updatedUser = {
+      ...profile,
+      fullName: editForm.fullName,
+      bio: editForm.bio,
+      favoriteGenres: editForm.favoriteGenres
+    }
+    localStorage.setItem('mangaflow_user', JSON.stringify(updatedUser))
+    setProfile(updatedUser)
+    setIsEditing(false)
+    window.dispatchEvent(new Event('mangaflow_profile_updated'))
+  }
+
+  const userInitials = profile.fullName
+    ? profile.fullName.split(' ').pop()?.slice(0, 2).toUpperCase()
     : 'U'
 
-  // User stats
-  const stats = [
-    { label: 'Truyện đã đọc', value: 24, icon: BookOpen, color: 'text-blue-500' },
-    { label: 'Chương đã đọc', value: 156, icon: Clock, color: 'text-green-500' },
-    { label: 'Đang theo dõi', value: 12, icon: Heart, color: 'text-manga-red' },
-  ]
+  // Favorite genres from reading history or profile
+  let favoriteGenres: string[] = []
+  if (profile.favoriteGenres) {
+    favoriteGenres = profile.favoriteGenres.split(',').map((g: string) => g.trim()).filter(Boolean)
+  } else {
+    const allGenres = history.flatMap(h => (h.seriesGenre || '').split(',').map(g => g.trim())).filter(Boolean)
+    favoriteGenres = Array.from(new Set(allGenres)).slice(0, 5)
+  }
+
+  if (favoriteGenres.length === 0) {
+    favoriteGenres.push('Chưa có dữ liệu')
+  }
 
   return (
     <div className="max-w-5xl mx-auto pb-16 font-sans">
       {/* Header Title */}
-      <div className="mb-8 flex justify-between items-end">
+      <div className="mb-8 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
         <div>
+          <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-xs font-bold uppercase mb-4 hover:text-manga-red transition-colors dark:text-gray-400">
+             &larr; QUAY LẠI
+          </button>
           <h1 className="font-manga text-4xl md:text-5xl font-bold uppercase text-manga-ink leading-none dark:text-white">
             HỒ SƠ CÁ NHÂN
           </h1>
           <div className="h-1.5 w-24 bg-manga-red mt-3 mb-2" />
           <p className="text-sm font-bold text-gray-500 dark:text-gray-400">
-            Quản lý thông tin công khai và lịch sử đọc truyện của bạn
+            Quản lý thông tin công khai và các chỉ số hoạt động của bạn
           </p>
+        </div>
+        
+        <div>
+           {!isEditing ? (
+             <button onClick={() => setIsEditing(true)} className="flex items-center gap-2 bg-manga-ink text-white font-bold uppercase text-sm px-6 py-3 border-4 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:bg-manga-red hover:shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-y-[2px] transition-all">
+                <Edit2 className="w-4 h-4" /> CHỈNH SỬA HỒ SƠ
+             </button>
+           ) : (
+             <div className="flex gap-4">
+                <button onClick={handleSave} className="flex items-center gap-2 bg-manga-red text-white font-bold uppercase text-sm px-6 py-3 border-4 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:bg-red-600 transition-all">
+                  <Save className="w-4 h-4" /> LƯU THAY ĐỔI
+                </button>
+                <button onClick={() => {
+                  setIsEditing(false)
+                  setEditForm({
+                    fullName: profile.fullName || '',
+                    bio: profile.bio || '',
+                    favoriteGenres: profile.favoriteGenres || ''
+                  })
+                }} className="flex items-center gap-2 bg-black text-white font-bold uppercase text-sm px-6 py-3 border-4 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:bg-gray-800 transition-all">
+                  <X className="w-4 h-4" /> HỦY
+                </button>
+             </div>
+           )}
         </div>
       </div>
 
@@ -50,7 +115,7 @@ export default function UserProfilePage() {
           {/* Main Card */}
           <div className="bg-white border-4 border-manga-ink shadow-[8px_8px_0px_rgba(0,0,0,1)] p-6 flex flex-col items-center text-center dark:bg-zinc-800 dark:border-black dark:shadow-[8px_8px_0px_#000]">
             <div className="relative mb-6">
-              <div 
+              <div
                 className={`w-32 h-32 rounded-full border-4 border-manga-ink bg-zinc-900 overflow-hidden flex items-center justify-center text-white font-extrabold text-4xl shadow-[4px_4px_0px_rgba(0,0,0,1)] relative dark:border-black dark:shadow-[4px_4px_0px_#000]`}
               >
                 {profile.avatarUrl ? (
@@ -61,15 +126,27 @@ export default function UserProfilePage() {
               </div>
               <div className="absolute bottom-0 right-0 w-8 h-8 bg-green-400 border-2 border-manga-ink rounded-full dark:border-black" title="Đang hoạt động"></div>
             </div>
-            
-            <h2 className="font-manga text-3xl font-bold uppercase text-manga-ink leading-none mb-2 dark:text-white">
-              {profile.fullName || profile.username}
-            </h2>
+
+            {isEditing ? (
+              <div className="w-full text-left mb-4">
+                <label className="text-xs font-black uppercase text-gray-500 mb-1 block">HỌ TÊN</label>
+                <input 
+                  type="text" 
+                  value={editForm.fullName} 
+                  onChange={(e) => setEditForm({...editForm, fullName: e.target.value})}
+                  className="w-full border-2 border-manga-ink p-2 text-sm font-bold outline-none focus:border-manga-red bg-white"
+                />
+              </div>
+            ) : (
+              <h2 className="font-manga text-3xl font-bold uppercase text-manga-ink leading-none mb-2 dark:text-white">
+                {profile.fullName || profile.username}
+              </h2>
+            )}
 
             <div className="inline-block px-3 py-1 bg-manga-red text-white font-bold uppercase text-xs border-2 border-manga-ink mb-4 dark:border-black">
               {profile.role || 'MEMBER USER'}
             </div>
-            
+
             <div className="w-full space-y-3 mt-2 text-left">
               <div className="flex items-center gap-3 text-sm font-bold text-gray-700 p-2 bg-gray-50 border-2 border-dashed border-gray-300 dark:bg-zinc-900 dark:border-zinc-700 dark:text-gray-300">
                 <User className="w-4 h-4 text-manga-red shrink-0" />
@@ -87,71 +164,77 @@ export default function UserProfilePage() {
             <h3 className="font-bold text-lg uppercase border-b-2 border-manga-ink pb-2 mb-4 flex items-center gap-2 dark:border-zinc-700 dark:text-white">
               <Award className="w-5 h-5 text-manga-red" /> Tiểu sử
             </h3>
-            <p className="text-gray-700 font-medium text-sm leading-relaxed dark:text-gray-300">
-              {profile.bio || 'Độc giả yêu thích MangaFlow.'}
-            </p>
+            {isEditing ? (
+              <textarea 
+                value={editForm.bio} 
+                onChange={(e) => setEditForm({...editForm, bio: e.target.value})}
+                className="w-full border-2 border-manga-ink p-2 text-sm font-medium outline-none focus:border-manga-red bg-white h-24"
+                placeholder="Nhập tiểu sử..."
+              />
+            ) : (
+              <p className="text-gray-700 font-medium text-sm leading-relaxed dark:text-gray-300">
+                {profile.bio || 'Độc giả yêu thích MangaFlow.'}
+              </p>
+            )}
           </div>
         </div>
 
-        {/* Right Column: Stats & Activities */}
+        {/* Right Column: Activities & Preferences */}
         <div className="lg:col-span-2 space-y-8">
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {stats.map((stat, idx) => (
-              <div key={idx} className="bg-white border-4 border-manga-ink p-4 flex flex-col items-center text-center shadow-[4px_4px_0px_rgba(15,15,15,1)] dark:bg-zinc-800 dark:border-black dark:shadow-[4px_4px_0px_#000]">
-                <stat.icon className={`w-8 h-8 ${stat.color} mb-2`} />
-                <span className="text-3xl font-black font-manga dark:text-white">{stat.value}</span>
-                <span className="text-xs font-bold uppercase text-gray-500 mt-1 dark:text-gray-400">{stat.label}</span>
-              </div>
-            ))}
-          </div>
-
+          
           {/* Reading Preferences / Genres */}
           <div className="bg-white border-4 border-manga-ink p-6 shadow-[6px_6px_0px_rgba(15,15,15,1)] dark:bg-zinc-800 dark:border-black dark:shadow-[6px_6px_0px_#000]">
             <h3 className="font-manga text-2xl font-bold uppercase border-b-4 border-manga-ink pb-3 mb-6 flex items-center gap-3 dark:border-zinc-700 dark:text-white">
               <BookOpen className="w-6 h-6 text-manga-red" />
               Thể loại yêu thích
             </h3>
-            
-            <div className="flex flex-wrap gap-3">
-              {['Action', 'Adventure', 'Fantasy', 'Romance', 'Comedy'].map((item, idx) => (
-                <div 
-                  key={idx} 
-                  className="px-4 py-2 bg-gray-50 border-2 border-manga-ink font-bold text-sm uppercase shadow-[2px_2px_0px_rgba(15,15,15,1)] hover:bg-manga-red hover:text-white transition-colors cursor-default dark:bg-zinc-900 dark:border-black dark:shadow-[2px_2px_0px_#000] dark:text-gray-300"
-                >
-                  {item}
-                </div>
-              ))}
-            </div>
+
+            {isEditing ? (
+              <div>
+                <input 
+                  type="text" 
+                  value={editForm.favoriteGenres} 
+                  onChange={(e) => setEditForm({...editForm, favoriteGenres: e.target.value})}
+                  className="w-full border-2 border-manga-ink p-3 text-sm font-bold outline-none focus:border-manga-red bg-white"
+                  placeholder="Ví dụ: Action, Romance, Comedy (ngăn cách bằng dấu phẩy)"
+                />
+                <p className="text-xs text-gray-500 mt-2 font-medium">Nhập các thể loại bạn yêu thích, ngăn cách bằng dấu phẩy. Nếu để trống, hệ thống sẽ tự động lấy từ lịch sử đọc.</p>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-3">
+                {favoriteGenres.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="px-4 py-2 bg-gray-50 border-2 border-manga-ink font-bold text-sm uppercase shadow-[2px_2px_0px_rgba(15,15,15,1)] hover:bg-manga-red hover:text-white transition-colors cursor-default dark:bg-zinc-900 dark:border-black dark:shadow-[2px_2px_0px_#000] dark:text-gray-300"
+                  >
+                    {item}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-          
+
           {/* Recent Activity */}
           <div className="bg-white border-4 border-manga-ink p-6 shadow-[6px_6px_0px_rgba(15,15,15,1)] dark:bg-zinc-800 dark:border-black dark:shadow-[6px_6px_0px_#000]">
             <h3 className="font-manga text-2xl font-bold uppercase border-b-4 border-manga-ink pb-3 mb-6 dark:border-zinc-700 dark:text-white">
               Hoạt động gần đây
             </h3>
             <div className="space-y-4">
-              <div className="flex items-start gap-4 border-l-4 border-manga-red pl-4 py-1">
-                <div className="w-2 h-2 rounded-full bg-manga-red mt-1.5 -ml-[23px]"></div>
-                <div>
-                  <p className="font-bold text-sm dark:text-gray-200">Đã đọc xong - Cyber Ronin Chương 65</p>
-                  <span className="text-xs text-gray-500 font-bold uppercase dark:text-gray-400">2 giờ trước</span>
+              {history.length > 0 ? history.slice(0, 5).map((item, idx) => (
+                <div key={idx} className="flex items-start gap-4 border-l-4 border-manga-red pl-4 py-1">
+                  <div className="w-2 h-2 rounded-full bg-manga-red mt-1.5 -ml-[23px]"></div>
+                  <div>
+                    <p className="font-bold text-sm dark:text-gray-200">Đã đọc xong - {item.seriesTitle} {item.lastChapterTitle}</p>
+                    <span className="text-xs text-gray-500 font-bold uppercase dark:text-gray-400">
+                      {new Date(item.lastReadAt).toLocaleDateString('vi-VN')}
+                    </span>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-start gap-4 border-l-4 border-gray-300 pl-4 py-1 dark:border-zinc-700">
-                <div className="w-2 h-2 rounded-full bg-gray-300 mt-1.5 -ml-[23px] dark:bg-zinc-600"></div>
-                <div>
-                  <p className="font-bold text-sm text-gray-600 dark:text-gray-300">Thêm vào yêu thích - Void Walker</p>
-                  <span className="text-xs text-gray-500 font-bold uppercase dark:text-gray-400">1 ngày trước</span>
+              )) : (
+                <div className="text-sm font-bold text-gray-500 italic py-4">
+                  Bạn chưa đọc truyện nào.
                 </div>
-              </div>
-              <div className="flex items-start gap-4 border-l-4 border-gray-300 pl-4 py-1 dark:border-zinc-700">
-                <div className="w-2 h-2 rounded-full bg-gray-300 mt-1.5 -ml-[23px] dark:bg-zinc-600"></div>
-                <div>
-                  <p className="font-bold text-sm text-gray-600 dark:text-gray-300">Bình luận - Chuyển sinh thành Slime Ch. 12</p>
-                  <span className="text-xs text-gray-500 font-bold uppercase dark:text-gray-400">3 ngày trước</span>
-                </div>
-              </div>
+              )}
             </div>
           </div>
 

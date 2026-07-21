@@ -57,6 +57,7 @@ export interface Assistant {
   currentTasksCount: number;
   pendingSubmissionsCount: number;
   status: "Đang làm" | "Chờ duyệt" | "Nghỉ ngơi";
+  seriesCount: number;
 }
 
 export interface AssistantSubmission {
@@ -135,6 +136,7 @@ export interface RiskAlert {
   message: string;
   createdAt: string;
   isRead: boolean;
+  isAcknowledged?: boolean;
 }
 
 export interface RecoveryProposal {
@@ -352,30 +354,43 @@ const INITIAL_ASSISTANTS: Assistant[] = [
   {
     id: "as_001",
     name: "Tanaka",
-    role: "Line Art",
+    role: "Assistant (Line Art)",
     avatarUrl: "https://i.pravatar.cc/150?u=assistant_ken",
     currentTasksCount: 1,
     pendingSubmissionsCount: 0,
     status: "Đang làm",
+    seriesCount: 15,
   },
   {
     id: "as_002",
     name: "Sato",
-    role: "Background",
+    role: "Co-Mangaka",
     avatarUrl: "https://i.pravatar.cc/150?u=assistant_2",
     currentTasksCount: 1,
     pendingSubmissionsCount: 1,
     status: "Chờ duyệt",
+    seriesCount: 8,
   },
   {
     id: "as_003",
     name: "Kenji",
-    role: "Effects & SFX",
+    role: "Tantou Editor",
     avatarUrl: "https://i.pravatar.cc/150?u=assistant_3",
     currentTasksCount: 1,
     pendingSubmissionsCount: 0,
     status: "Nghỉ ngơi",
+    seriesCount: 5,
   },
+  {
+    id: "as_004",
+    name: "Yui",
+    role: "Assistant",
+    avatarUrl: "https://i.pravatar.cc/150?u=assistant_4",
+    currentTasksCount: 0,
+    pendingSubmissionsCount: 0,
+    status: "Nghỉ ngơi",
+    seriesCount: 2,
+  }
 ];
 
 const INITIAL_SUBMISSIONS: AssistantSubmission[] = [

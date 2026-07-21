@@ -3,6 +3,8 @@ import { useParams, Link } from 'react-router'
 import { Star, Heart, Award, User, Mail, Users, Briefcase, BookOpen } from 'lucide-react'
 import { readerService } from '@/services/reader.service'
 import { SeriesDetail, PublishedChapter } from '@/types/reader.types'
+import { useToast } from '@/contexts/ToastContext'
+import { calculateMangakaAverageRating, calculateMangakaLevel, calculateSeriesRating } from '@/utils/ratingUtils'
 
 const getLikeKey = () => {
   try {
@@ -17,6 +19,7 @@ const getLikeKey = () => {
 
 export default function SeriesDetailPage() {
   const { seriesId } = useParams()
+  const { showToast } = useToast()
   const [series, setSeries] = useState<SeriesDetail | null>(null)
   const [chapters, setChapters] = useState<PublishedChapter[]>([])
   const [comments, setComments] = useState<any[]>([])
@@ -33,7 +36,7 @@ export default function SeriesDetailPage() {
     e.preventDefault();
     const userStr = localStorage.getItem('mangaflow_user') || localStorage.getItem('user');
     if (!userStr) {
-      alert('Vui lòng đăng nhập để theo dõi!');
+      showToast('Vui lòng đăng nhập để theo dõi!', 'error');
       return;
     }
     const isCurrentlyLiked = !!likedChapters[chapterId];
@@ -74,12 +77,31 @@ export default function SeriesDetailPage() {
     } catch (err) {}
   }
 
-  const handleReplySubmit = (e: React.FormEvent) => {
+  const handleReplySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!replyContent.trim()) return;
-    alert(`Đã gửi phản hồi cho ${replyingTo?.name}: ${replyContent}`);
-    setReplyContent('');
-    setReplyingTo(null);
+    if (!replyContent.trim() || !replyingTo) return;
+
+    const userStr = localStorage.getItem('mangaflow_user') || localStorage.getItem('user');
+    if (!userStr) {
+      showToast('Vui lòng đăng nhập để bình luận!', 'error');
+      return;
+    }
+
+    if (!replyingTo.chapterId) {
+      showToast('Không thể xác định chương để bình luận.', 'error');
+      return;
+    }
+
+    const success = await readerService.postChapterComment(replyingTo.chapterId, replyContent, replyingTo.id);
+    if (success) {
+      setReplyContent('');
+      setReplyingTo(null);
+      if (seriesId) {
+        readerService.getSeriesComments(seriesId).then(setComments);
+      }
+    } else {
+      showToast('Đã có lỗi xảy ra, vui lòng thử lại sau.', 'error');
+    }
   }
 
   useEffect(() => {
@@ -147,7 +169,6 @@ export default function SeriesDetailPage() {
         }
       });
       readerService.getSeriesComments(seriesId).then(setComments)
-      readerService.getLatestUpdates(10).then(setAuthorWorks)
       
       const fetchHistory = () => {
         readerService.getReadingHistory().then(history => {
@@ -172,6 +193,17 @@ export default function SeriesDetailPage() {
     }
   }, [seriesId])
 
+  useEffect(() => {
+    if (selectedUser) {
+      if (selectedUser.userId) {
+        readerService.getSeriesByUser(selectedUser.userId, 10).then(works => setAuthorWorks(works));
+      } else {
+        // Fallback for mock/unknown users without ID
+        readerService.getLatestUpdates(10).then(works => setAuthorWorks(works));
+      }
+    }
+  }, [selectedUser])
+
   if (!series) return (
     <div className="min-h-[60vh] flex items-center justify-center bg-[#F5F5F5] dark:bg-zinc-900 transition-colors">
       <div className="font-manga text-2xl animate-pulse text-manga-ink uppercase dark:text-white">Đang tải dữ liệu...</div>
@@ -185,8 +217,9 @@ export default function SeriesDetailPage() {
   });
   const commentTree: any[] = [];
   comments.forEach(c => {
-    if (c.parent_id && commentMap.has(c.parent_id)) {
-      commentMap.get(c.parent_id).replies.push(commentMap.get(c.id || c.comment_id));
+    const parentId = c.parent_comment_id || c.parent_id; // Support both just in case
+    if (parentId && commentMap.has(parentId)) {
+      commentMap.get(parentId).replies.push(commentMap.get(c.id || c.comment_id));
     } else {
       commentTree.push(commentMap.get(c.id || c.comment_id));
     }
@@ -258,8 +291,7 @@ export default function SeriesDetailPage() {
                   onClick={() => {
                     const mangaka = series.teamMembers?.find(m => m.roleInSeries === 'mangaka' || m.roleInSeries === 'owner');
                     setSelectedUser({
-                      ...(mangaka || { name: series.authorName, avatarUrl: series.authorAvatarUrl, roleInSeries: 'Mangaka', bio: 'Mangaka tài ba', totalViews: series.totalViews || 50000 }),
-                      totalSeries: 3,
+                      ...(mangaka || { name: series.authorName, avatarUrl: series.authorAvatarUrl, roleInSeries: 'Mangaka' }),
                       isEditor: false
                     });
                   }}
@@ -286,8 +318,7 @@ export default function SeriesDetailPage() {
                     onClick={() => {
                       const editor = series.teamMembers?.find(m => ['editor', 'tantou_editor', 'tantou'].includes(m.roleInSeries));
                       setSelectedUser({
-                        ...(editor || { name: series.editorName, avatarUrl: series.editorAvatarUrl, roleInSeries: 'Biên tập viên', bio: 'Biên tập viên của hệ thống', totalViews: 120000 }),
-                        totalSeries: 1,
+                        ...(editor || { name: series.editorName, avatarUrl: series.editorAvatarUrl, roleInSeries: 'Biên tập viên' }),
                         isEditor: true
                       });
                     }}
@@ -327,7 +358,7 @@ export default function SeriesDetailPage() {
                 <div>
                   <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1 dark:text-gray-400">Đánh giá</p>
                   <p className="font-manga text-3xl font-bold flex items-center dark:text-white">
-                    {series.rating.toFixed(1)} <Star className="w-5 h-5 fill-manga-red text-manga-red ml-1 -mt-1" />
+                    {calculateSeriesRating(series.totalViews || series.viewCount || 0, localTotalLikes).toFixed(1)} <Star className="w-5 h-5 fill-manga-red text-manga-red ml-1 -mt-1" />
                   </p>
                 </div>
                 <div>
@@ -638,26 +669,22 @@ export default function SeriesDetailPage() {
                   {/* Right Column: Stats & Content */}
                   <div className="lg:col-span-2 space-y-8">
                       {/* Stats Grid */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="bg-white border-[3px] border-black p-4 text-center dark:bg-zinc-800 dark:border-black hover:-translate-y-1 hover:shadow-[4px_4px_0px_rgba(0,0,0,1)] transition-all">
                           <BookOpen className="w-6 h-6 text-manga-red mx-auto mb-2" />
                           <p className="text-xs text-gray-500 font-bold uppercase mb-1">Tác phẩm</p>
-                          <p className="text-xl font-manga font-bold dark:text-white">{selectedUser.totalSeries || 3}</p>
-                        </div>
-                        <div className="bg-white border-[3px] border-black p-4 text-center dark:bg-zinc-800 dark:border-black hover:-translate-y-1 hover:shadow-[4px_4px_0px_rgba(0,0,0,1)] transition-all">
-                          <Users className="w-6 h-6 text-manga-red mx-auto mb-2" />
-                          <p className="text-xs text-gray-500 font-bold uppercase mb-1">Người theo dõi</p>
-                          <p className="text-xl font-manga font-bold dark:text-white">{(selectedUser.totalViews || 1205).toLocaleString()}</p>
-                        </div>
-                        <div className="bg-white border-[3px] border-black p-4 text-center dark:bg-zinc-800 dark:border-black hover:-translate-y-1 hover:shadow-[4px_4px_0px_rgba(0,0,0,1)] transition-all">
-                          <Star className="w-6 h-6 text-manga-red mx-auto mb-2" />
-                          <p className="text-xs text-gray-500 font-bold uppercase mb-1">Đánh giá TB</p>
-                          <p className="text-xl font-manga font-bold dark:text-white">4.8</p>
+                          <p className="text-xl font-manga font-bold dark:text-white">{authorWorks.length}</p>
                         </div>
                         <div className="bg-white border-[3px] border-black p-4 text-center dark:bg-zinc-800 dark:border-black hover:-translate-y-1 hover:shadow-[4px_4px_0px_rgba(0,0,0,1)] transition-all">
                           <Award className="w-6 h-6 text-manga-red mx-auto mb-2" />
                           <p className="text-xs text-gray-500 font-bold uppercase mb-1">Cấp độ</p>
-                          <p className="text-xl font-manga font-bold dark:text-white">Lv.3</p>
+                          <p className="text-xl font-manga font-bold dark:text-white">
+                            Lv.{calculateMangakaLevel(
+                              authorWorks.reduce((acc, w) => acc + (w.viewCount || 0), 0), 
+                              authorWorks.reduce((acc, w) => acc + (w.totalLikes || w.likeCount || 0), 0), 
+                              authorWorks.length
+                            )}
+                          </p>
                         </div>
                       </div>
 
@@ -677,7 +704,7 @@ export default function SeriesDetailPage() {
                           <BookOpen className="w-5 h-5 text-manga-red" /> Tác phẩm nổi bật
                         </h3>
                         <div className="flex gap-4 overflow-x-auto pb-4 snap-x relative" style={{ scrollbarWidth: 'thin', scrollbarColor: '#E53935 transparent' }}>
-                          {(selectedUser.isEditor ? [series] : [series, ...authorWorks.filter(w => w.id !== series.id)]).slice(0, selectedUser.totalSeries || 3).map((work, index) => (
+                          {[series, ...authorWorks.filter(w => w.id !== series.id)].map((work, index) => (
                             <Link 
                               key={work.id || index}
                               to={`/series/${work.id}`}

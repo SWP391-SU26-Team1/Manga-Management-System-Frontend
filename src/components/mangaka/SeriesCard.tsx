@@ -16,6 +16,7 @@ export function SeriesCard({ series, chapterCount, onCreateChapter, onPublish }:
   
   const statusColors: Record<string, string> = {
     "draft": "bg-gray-100 text-gray-700 border-gray-400",
+    "rejected": "bg-red-100 text-red-800 border-red-300",
     "in_production": "bg-yellow-100 text-yellow-800 border-yellow-300",
     "under_review": "bg-blue-100 text-blue-800 border-blue-300",
     "pending_review": "bg-blue-100 text-blue-800 border-blue-300",
@@ -38,6 +39,7 @@ export function SeriesCard({ series, chapterCount, onCreateChapter, onPublish }:
           >
             {(statusKey === "in_production" || statusKey === "in production" || statusKey === "approved") ? "ĐANG VẼ" : 
              statusKey === "published" ? "ĐÃ XUẤT BẢN" :
+             statusKey === "rejected" ? "CẦN SỬA ĐỔI" :
              (statusKey === "under_review" || statusKey === "pending_review" || statusKey === "waiting review") ? "CHỜ DUYỆT" : "BẢN NHÁP"}
           </span>
           <div className="flex items-center gap-1 text-xs text-gray-500 font-bold">

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { PenTool, PencilRuler, FileSignature, Sparkles, Eye, EyeOff, ArrowLeft, Award } from 'lucide-react'
+import { PenTool, PencilRuler, FileSignature, Sparkles, Eye, EyeOff, ArrowLeft, Award, BookOpen } from 'lucide-react'
 import { validateUsername, validateEmail, validatePassword, validateConfirmPassword } from '@/utils/validators'
 import authService from '@/services/auth.service'
 
 export default function RegisterPage() {
   const navigate = useNavigate()
-  const [role, setRole] = useState<'mangaka' | 'assistant' | 'editor' | 'board'>('mangaka')
+  const [role, setRole] = useState<'reader' | 'mangaka' | 'assistant'>('reader')
   const [registerError, setRegisterError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
@@ -340,7 +340,21 @@ export default function RegisterPage() {
               </h2>
 
             {/* Roles Selection */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-10">
+            <div className="grid grid-cols-3 gap-3 md:gap-4 mb-10">
+              {/* Reader */}
+              <button
+                type="button"
+                onClick={() => setRole('reader')}
+                className={`flex flex-col items-center justify-center p-4 border-2 transition-all ${
+                  role === 'reader'
+                    ? 'border-manga-ink bg-manga-ink text-white'
+                    : 'border-manga-ink bg-white text-manga-ink hover:bg-gray-50'
+                }`}
+              >
+                <BookOpen className="w-6 h-6 mb-2" />
+                <span className="text-xs font-bold uppercase tracking-wider">Độc Giả</span>
+              </button>
+
               {/* Mangaka */}
               <button
                 type="button"
@@ -367,34 +381,6 @@ export default function RegisterPage() {
               >
                 <PencilRuler className="w-6 h-6 mb-2" />
                 <span className="text-xs font-bold uppercase tracking-wider">Trợ lý</span>
-              </button>
-
-              {/* Editor */}
-              <button
-                type="button"
-                onClick={() => setRole('editor')}
-                className={`flex flex-col items-center justify-center p-4 border-2 transition-all ${
-                  role === 'editor'
-                    ? 'border-manga-ink bg-manga-ink text-white'
-                    : 'border-manga-ink bg-white text-manga-ink hover:bg-gray-50'
-                }`}
-              >
-                <FileSignature className="w-6 h-6 mb-2" />
-                <span className="text-xs font-bold uppercase tracking-wider text-center">Biên tập viên</span>
-              </button>
-
-              {/* Board */}
-              <button
-                type="button"
-                onClick={() => setRole('board')}
-                className={`flex flex-col items-center justify-center p-4 border-2 transition-all ${
-                  role === 'board'
-                    ? 'border-manga-ink bg-manga-ink text-white'
-                    : 'border-manga-ink bg-white text-manga-ink hover:bg-gray-50'
-                }`}
-              >
-                <Award className="w-6 h-6 mb-2" />
-                <span className="text-xs font-bold uppercase tracking-wider text-center">Hội đồng</span>
               </button>
             </div>
 

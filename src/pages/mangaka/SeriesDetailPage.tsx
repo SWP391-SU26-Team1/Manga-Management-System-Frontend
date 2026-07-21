@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router'
 import {
   BookOpen, Clock, Layers, PlusSquare,
-  FileCheck, ClipboardList, CheckCircle, AlertCircle, BarChart2, AlertTriangle, Users, UserPlus, X
+  FileCheck, ClipboardList, CheckCircle, AlertCircle, BarChart2, AlertTriangle, Users, UserPlus, X, Edit3, Send, Upload, Trash2
 } from 'lucide-react'
 import { seriesService, SeriesAPI, getErrorMessage } from '@/services/series.service'
+import { uploadService } from '@/services/upload.service'
 import { chapterService, ChapterAPI } from '@/services/chapter.service'
 import { pageService, PageAPI } from '@/services/page.service'
 import { taskService } from '@/services/task.service'
@@ -189,6 +190,95 @@ export default function SeriesDetailPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [activeReaderChapter, readerCurrentPageIndex, readerPages.length])
 
+  // Series Edit States
+  const [showEditSeriesModal, setShowEditSeriesModal] = useState(false)
+  const [editTitle, setEditTitle] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editGenre, setEditGenre] = useState('')
+  const [editCoverImage, setEditCoverImage] = useState('')
+  const [editPublishSchedule, setEditPublishSchedule] = useState('Weekly')
+  const [editProposedStartDate, setEditProposedStartDate] = useState('')
+  const [isUpdatingSeries, setIsUpdatingSeries] = useState(false)
+  const [isSubmittingSeries, setIsSubmittingSeries] = useState(false)
+  const [showResubmitConfirm, setShowResubmitConfirm] = useState(false)
+  const [isUploadingCover, setIsUploadingCover] = useState(false)
+  const [uploadCoverError, setUploadCoverError] = useState('')
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadCoverError('Kích thước ảnh không được vượt quá 5MB')
+      return
+    }
+    setIsUploadingCover(true)
+    setUploadCoverError('')
+    try {
+      const res = await uploadService.uploadSingle(file, 'series_covers')
+      setEditCoverImage(res.secure_url)
+    } catch (err) {
+      setUploadCoverError(getErrorMessage(err))
+    } finally {
+      setIsUploadingCover(false)
+    }
+  }
+
+  const openEditSeriesModal = () => {
+    if (!series) return
+    setEditTitle(series.title)
+    setEditDescription(series.description || '')
+    setEditGenre(series.genre || '')
+    setEditCoverImage(series.cover_image || '')
+    setEditPublishSchedule(series.publishSchedule || 'Weekly')
+    setEditProposedStartDate(series.proposedStartDate || '')
+    setShowEditSeriesModal(true)
+  }
+
+  const handleUpdateSeries = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!seriesId || !series) return
+    setIsUpdatingSeries(true)
+    try {
+      const updated = await seriesService.update(seriesId, {
+        title: editTitle,
+        description: editDescription,
+        genre: editGenre,
+        cover_image: editCoverImage || null,
+        publishSchedule: editPublishSchedule,
+        proposedStartDate: editProposedStartDate || undefined
+      })
+      setSeries(updated)
+      setShowEditSeriesModal(false)
+      showAlert('Thành công', 'Cập nhật thông tin Series thành công!', 'success')
+      await fetchData()
+    } catch (err) {
+      showAlert('Lỗi', getErrorMessage(err), 'error')
+    } finally {
+      setIsUpdatingSeries(false)
+    }
+  }
+
+  const handleResubmitSeries = () => {
+    setShowResubmitConfirm(true)
+  }
+
+  const confirmResubmitSeries = async () => {
+    if (!seriesId || !series) return
+    setIsSubmittingSeries(true)
+    try {
+      const updated = await seriesService.submitReview(seriesId)
+      setSeries(updated)
+      showAlert('Thành công', 'Đã nộp đề xuất duyệt Series thành công!', 'success')
+      await fetchData()
+    } catch (err) {
+      showAlert('Lỗi', getErrorMessage(err), 'error')
+    } finally {
+      setIsSubmittingSeries(false)
+      setShowResubmitConfirm(false)
+    }
+  }
+
   const fetchData = async () => {
     if (!seriesId) return
     setIsLoading(true)
@@ -328,6 +418,7 @@ export default function SeriesDetailPage() {
       case 'under_review': return 'bg-orange-100 text-orange-700 border-orange-300'
       case 'in_production': return 'bg-green-100 text-green-700 border-green-300'
       case 'approved': return 'bg-purple-100 text-purple-700 border-purple-300'
+      case 'rejected': return 'bg-red-100 text-red-750 border-red-300'
       case 'draft': return 'bg-gray-100 text-gray-500 border-gray-300'
       default: return 'bg-gray-100 text-gray-500 border-gray-300'
     }
@@ -340,6 +431,7 @@ export default function SeriesDetailPage() {
       under_review: 'Chờ duyệt',
       approved: 'Đang vẽ',
       published: 'Đã xuất bản',
+      rejected: 'Cần sửa đổi',
     }
     return map[status] ?? status
   }
@@ -449,6 +541,23 @@ export default function SeriesDetailPage() {
 
               {/* Quick Actions */}
               <div className="pt-2 space-y-2">
+                {['draft', 'rejected'].includes(series.status) && (
+                  <>
+                    <button
+                      onClick={openEditSeriesModal}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 bg-yellow-400 text-black font-bold text-xs uppercase border-2 border-manga-ink hover:bg-yellow-500 transition-colors"
+                    >
+                      <Edit3 className="w-4 h-4" /> Sửa thông tin Series
+                    </button>
+                    <button
+                      onClick={handleResubmitSeries}
+                      disabled={isSubmittingSeries}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 bg-green-600 text-white font-bold text-xs uppercase border-2 border-manga-ink hover:bg-green-700 transition-colors"
+                    >
+                      <Send className="w-4 h-4" /> Nộp duyệt Series
+                    </button>
+                  </>
+                )}
                 <Link
                   to={`/dashboard/mangaka/series/${series._id}/create-chapter`}
                   className="w-full flex items-center justify-center gap-2 py-2.5 bg-manga-red text-white font-manga font-bold text-xs uppercase border-2 border-manga-ink hover:bg-red-700 transition-colors"
@@ -549,7 +658,7 @@ export default function SeriesDetailPage() {
                             {expandedChapterId === chapter._id ? 'Đóng chi tiết' : 'Chi tiết trang'}
                           </button>
 
-                          {['draft', 'rejected', 'need_fix'].includes(chapter.status.toLowerCase()) && (
+                          {chapter.status.toLowerCase() !== 'published' && (
                             <button
                               onClick={() => handleSubmitChapterReview(chapter._id)}
                               className="px-3 py-1.5 bg-[#E63946] text-white border-2 border-black font-bold text-xs uppercase hover:bg-red-700 transition-colors shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
@@ -1088,6 +1197,204 @@ export default function SeriesDetailPage() {
                   }`}
                 >
                   OK
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Series Modal */}
+      {showEditSeriesModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white border-4 border-manga-ink manga-shadow max-w-lg w-full max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150 text-black">
+            <div className="p-4 border-b-4 border-manga-ink bg-gray-50 flex justify-between items-center sticky top-0 bg-white z-10">
+              <h2 className="font-manga font-bold text-xl uppercase flex items-center gap-2 text-manga-ink">
+                <Edit3 className="w-5 h-5 text-manga-red" />
+                Chỉnh sửa thông tin Series
+              </h2>
+              <button 
+                onClick={() => setShowEditSeriesModal(false)} 
+                className="hover:text-red-500 cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleUpdateSeries} className="p-6 space-y-4">
+              <div className="space-y-1">
+                <label className="block text-xs font-black uppercase text-manga-ink">
+                  Tên tác phẩm (Series Title)
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editTitle}
+                  onChange={e => setEditTitle(e.target.value)}
+                  className="w-full px-3 py-2 border-2 border-manga-ink focus:outline-none focus:border-manga-red font-bold text-sm bg-white"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-black uppercase text-manga-ink">
+                  Mô tả chi tiết (Description)
+                </label>
+                <textarea
+                  rows={4}
+                  value={editDescription}
+                  onChange={e => setEditDescription(e.target.value)}
+                  className="w-full px-3 py-2 border-2 border-manga-ink focus:outline-none focus:border-manga-red font-bold text-sm bg-white"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-black uppercase text-manga-ink">
+                  Thể loại (Genre - Cách nhau bởi dấu phẩy)
+                </label>
+                <input
+                  type="text"
+                  value={editGenre}
+                  onChange={e => setEditGenre(e.target.value)}
+                  placeholder="Ví dụ: Action, Comedy, Fantasy"
+                  className="w-full px-3 py-2 border-2 border-manga-ink focus:outline-none focus:border-manga-red font-bold text-sm bg-white"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-black uppercase text-manga-ink">
+                  Ảnh bìa (Cover Image)
+                </label>
+                
+                {editCoverImage ? (
+                  <div className="relative w-32 h-44 border-4 border-manga-ink manga-shadow overflow-hidden group bg-gray-100 mt-1">
+                    <img src={editCoverImage} alt="Cover Preview" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setEditCoverImage('')}
+                      className="absolute top-2 right-2 p-1 bg-manga-red text-white border-2 border-manga-ink hover:bg-red-700 transition-colors shadow animate-in fade-in duration-200"
+                      title="Xóa ảnh"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative mt-1">
+                    <label className={`flex flex-col items-center justify-center w-full h-32 border-4 border-dashed border-manga-ink bg-gray-50/50 hover:bg-red-50/20 transition-all cursor-pointer ${
+                      isUploadingCover ? 'opacity-70 pointer-events-none' : ''
+                    }`}>
+                      {isUploadingCover ? (
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="w-6 h-6 border-4 border-manga-ink border-t-manga-red rounded-full animate-spin" />
+                          <span className="text-[10px] font-bold text-gray-500 uppercase">Đang tải ảnh lên...</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center gap-1 p-4 text-center">
+                          <Upload className="w-6 h-6 text-manga-ink animate-bounce" />
+                          <span className="text-[10px] font-black uppercase text-manga-ink">Click để tải ảnh bìa lên</span>
+                          <span className="text-[8px] font-bold text-gray-400 uppercase">JPG, PNG, WEBP tối đa 5MB</span>
+                        </div>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleCoverUpload}
+                        className="hidden"
+                        disabled={isUploadingCover}
+                      />
+                    </label>
+                  </div>
+                )}
+                {uploadCoverError && <p className="text-xs font-bold text-manga-red mt-1">{uploadCoverError}</p>}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="block text-xs font-black uppercase text-manga-ink">
+                    Lịch phát hành đề xuất
+                  </label>
+                  <select
+                    value={editPublishSchedule}
+                    onChange={e => setEditPublishSchedule(e.target.value)}
+                    className="w-full px-3 py-2 border-2 border-manga-ink focus:outline-none focus:border-manga-red font-bold text-sm bg-white"
+                  >
+                    <option value="Weekly">Hàng tuần (Weekly)</option>
+                    <option value="Bi-weekly">Nửa tháng (Bi-weekly)</option>
+                    <option value="Monthly">Hàng tháng (Monthly)</option>
+                    <option value="Special">Đặc biệt (Special)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-black uppercase text-manga-ink">
+                    Ngày bắt đầu dự kiến
+                  </label>
+                  <input
+                    type="date"
+                    value={editProposedStartDate}
+                    onChange={e => setEditProposedStartDate(e.target.value)}
+                    className="w-full px-3 py-2 border-2 border-manga-ink focus:outline-none focus:border-manga-red font-bold text-sm bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t-2 border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setShowEditSeriesModal(false)}
+                  className="px-4 py-2 border-2 border-manga-ink font-bold uppercase text-xs hover:bg-gray-100 transition-colors cursor-pointer"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdatingSeries}
+                  className="px-4 py-2 bg-yellow-400 border-2 border-manga-ink text-black font-bold uppercase text-xs hover:bg-yellow-500 transition-colors cursor-pointer"
+                >
+                  {isUpdatingSeries ? 'Đang lưu...' : 'Lưu thay đổi'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Resubmit Series Confirmation Modal */}
+      {showResubmitConfirm && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white border-4 border-manga-ink manga-shadow max-w-md w-full animate-in fade-in zoom-in-95 duration-150 text-black">
+            <div className="p-4 border-b-4 border-manga-ink bg-gray-50 flex justify-between items-center">
+              <h2 className="font-manga font-bold text-xl uppercase flex items-center gap-2 text-manga-red">
+                Xác nhận nộp duyệt Series
+              </h2>
+              <button 
+                onClick={() => setShowResubmitConfirm(false)} 
+                className="hover:text-red-500 cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm font-bold text-gray-700">
+                Bạn có chắc chắn muốn nộp đề xuất duyệt Series này lên Ban biên tập?
+              </p>
+              <div className="bg-amber-50 border-2 border-amber-300 p-3 text-xs text-amber-800 font-bold leading-relaxed">
+                ⚠️ Lưu ý: Sau khi nộp duyệt, bạn sẽ không thể chỉnh sửa thông tin cho đến khi Biên tập viên đánh giá xong.
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowResubmitConfirm(false)}
+                  className="px-4 py-2 border-2 border-manga-ink font-bold uppercase text-xs hover:bg-gray-100 transition-colors cursor-pointer"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="button"
+                  disabled={isSubmittingSeries}
+                  onClick={confirmResubmitSeries}
+                  className="px-4 py-2 bg-green-600 border-2 border-manga-ink text-white font-bold uppercase text-xs hover:bg-green-700 hover:text-white transition-colors cursor-pointer"
+                >
+                  {isSubmittingSeries ? 'Đang nộp...' : 'Xác nhận nộp'}
                 </button>
               </div>
             </div>

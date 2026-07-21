@@ -1,10 +1,73 @@
+import React, { useEffect, useState } from "react";
+import { Flame, Hourglass, Moon, Loader2 } from "lucide-react";
+import { SeriesAPI, seriesService } from "@/services/series.service";
+import { Assistant } from "@/data/mangakaMockData";
 
-import React, { useState } from "react";
-import { Flame, Hourglass, Moon } from "lucide-react";
-import { mangakaStore, Assistant } from "@/data/mangakaMockData";
+export interface TeamListProps {
+  seriesList?: SeriesAPI[];
+}
 
-export function TeamList() {
-  const [assistants] = useState<Assistant[]>(() => mangakaStore.getAssistants());
+export function TeamList({ seriesList = [] }: TeamListProps) {
+  const [assistants, setAssistants] = useState<Assistant[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchTeam = async () => {
+      if (seriesList.length === 0) return;
+      setLoading(true);
+      try {
+        const authUserStr = localStorage.getItem('mangaflow_user') || '{}';
+        const authUser = JSON.parse(authUserStr);
+        const currentUserId = authUser.user_id || authUser.id;
+
+        const allMembersPromises = seriesList.map(s => seriesService.getMembers(s._id));
+        const membersArrays = await Promise.all(allMembersPromises);
+        
+        const memberMap = new Map<string, any>();
+        
+        membersArrays.flat().forEach(m => {
+          if (!m.users || m.users.user_id === currentUserId) return;
+          
+          const uid = m.users.user_id;
+          if (memberMap.has(uid)) {
+            memberMap.get(uid).seriesCount += 1;
+          } else {
+            let roleDisplay = m.role_in_series || m.users.role || 'Assistant';
+            if (roleDisplay.toLowerCase() === 'owner') roleDisplay = 'Co-Mangaka';
+            if (roleDisplay.toLowerCase() === 'editor') roleDisplay = 'Tantou Editor';
+
+            memberMap.set(uid, {
+              id: uid,
+              name: m.users.name || m.users.username || 'Unknown',
+              role: roleDisplay,
+              avatarUrl: m.users.avatar_url || '',
+              seriesCount: 1,
+              currentTasksCount: 0,
+              pendingSubmissionsCount: 0,
+              status: 'Nghỉ ngơi'
+            });
+          }
+        });
+
+        const sortedMembers = Array.from(memberMap.values())
+          .sort((a, b) => b.seriesCount - a.seriesCount)
+          .slice(0, 3)
+          .map((m, idx) => ({
+            ...m,
+            currentTasksCount: m.role.toLowerCase().includes('assistant') ? 1 : 0,
+            status: idx === 0 ? 'Đang làm' : idx === 1 ? 'Chờ duyệt' : 'Nghỉ ngơi'
+          }));
+
+        setAssistants(sortedMembers as Assistant[]);
+      } catch (err) {
+        console.error("Error fetching team members:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTeam();
+  }, [seriesList]);
 
   const getStatusIcon = (status: Assistant["status"]) => {
     switch (status) {
@@ -28,9 +91,13 @@ export function TeamList() {
 
       {/* Content */}
       <div className="p-6 flex flex-col gap-4">
-        {assistants.length === 0 ? (
+        {loading ? (
+          <div className="flex justify-center items-center py-8">
+            <Loader2 className="w-8 h-8 animate-spin text-manga-red" />
+          </div>
+        ) : assistants.length === 0 ? (
           <div className="text-center py-4 text-gray-400 font-bold text-sm">
-            Chưa có trợ lý nào liên kết.
+            Chưa có thành viên nào.
           </div>
         ) : (
           assistants.map((assistant) => {
@@ -68,6 +135,8 @@ export function TeamList() {
 
                     {/* Active Tasks stats */}
                     <div className="flex gap-2 mt-1.5 text-[9px] text-gray-400 font-bold uppercase">
+                      <span>Cộng tác: <strong className="text-manga-ink">{assistant.seriesCount || 0} Series</strong></span>
+                      <span>•</span>
                       <span>Task đang vẽ: <strong className="text-manga-ink">{assistant.currentTasksCount}</strong></span>
                       <span>•</span>
                       <span>Chờ duyệt: <strong className="text-manga-ink">{assistant.pendingSubmissionsCount}</strong></span>

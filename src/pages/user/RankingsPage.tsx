@@ -2,15 +2,37 @@ import React, { useState, useEffect } from 'react'
 import { Trophy, TrendingUp, TrendingDown, Minus, ChevronLeft, ChevronRight, BookOpen, Eye, Users } from 'lucide-react'
 import { Link } from 'react-router'
 import { rankingService, BackendSeriesRanking } from '@/services/ranking.service'
+import api from '@/services/api'
 
 export default function RankingsPage() {
   const [rankingType, setRankingType] = useState<'view' | 'like'>('view')
   const [period, setPeriod] = useState<'week' | 'month'>('week')
   
   const [rankings, setRankings] = useState<any[]>([])
+  const [filterGenre, setFilterGenre] = useState<string>('')
+  const [totalSeries, setTotalSeries] = useState<number>(0)
+  const [platformTotalViews, setPlatformTotalViews] = useState<number>(0)
+  const [platformTotalLikes, setPlatformTotalLikes] = useState<number>(0)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    // Fetch total series and compute global stats
+    api.get('/api/series?status=published&limit=1000')
+      .then(res => {
+        const seriesList = res.data?.data?.data || res.data?.data || []
+        setTotalSeries(res.data?.pagination?.total || seriesList.length)
+        
+        let views = 0
+        let likes = 0
+        seriesList.forEach((s: any) => {
+          views += Number(s.view_count || 0)
+          likes += Number(s.total_likes || 0)
+        })
+        setPlatformTotalViews(views)
+        setPlatformTotalLikes(likes)
+      })
+      .catch(console.error)
+
     const fetchRankings = async () => {
       setIsLoading(true)
       try {
@@ -52,7 +74,7 @@ export default function RankingsPage() {
           title: item.series?.title || 'Chưa rõ tên truyện',
           coverImageUrl: item.series?.cover_image_url || `https://i.pravatar.cc/300?u=rank_${item.series_id}`,
           genre: item.series?.genre || 'N/A',
-          authorName: 'Đang cập nhật',
+          authorName: item.series?.author || 'Đang cập nhật',
           score: rankingType === 'view' ? (item.series?.view_count || 0).toString() : (item.total_vote || 0).toString(),
           totalVotes: item.total_vote || 0,
           viewCount: item.series?.view_count || 0,
@@ -257,7 +279,7 @@ export default function RankingsPage() {
           {/* Stats Box 1 */}
           <div className="bg-white border-4 border-black shadow-[4px_4px_0px_#000]">
             <div className="border-b-4 border-black px-4 py-3 font-black uppercase tracking-wider text-lg">
-              THỐNG KÊ TUẦN
+              THỐNG KÊ
             </div>
             <div className="p-4 space-y-4">
               <div className="flex items-center justify-between border-b-2 border-dashed border-gray-200 pb-2">
@@ -265,50 +287,26 @@ export default function RankingsPage() {
                   <div className="bg-black text-white p-1 rounded-sm"><BookOpen className="w-4 h-4" /></div>
                   TỔNG TÁC PHẨM
                 </div>
-                <div className="font-manga text-xl font-bold">1,402</div>
+                <div className="font-manga text-xl font-bold">{totalSeries.toLocaleString()}</div>
               </div>
               <div className="flex items-center justify-between border-b-2 border-dashed border-gray-200 pb-2">
                 <div className="flex items-center gap-2 text-sm font-bold text-gray-600">
                   <div className="bg-manga-red text-white p-1 rounded-sm"><Eye className="w-4 h-4" /></div>
-                  LƯỢT ĐỌC TUẦN NÀY
+                  TỔNG LƯỢT VIEW
                 </div>
-                <div className="font-manga text-xl font-bold">845.2K</div>
+                <div className="font-manga text-xl font-bold">
+                  {platformTotalViews.toLocaleString()}
+                </div>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-sm font-bold text-gray-600">
-                  <div className="bg-gray-300 text-black p-1 rounded-sm"><Users className="w-4 h-4" /></div>
-                  ĐỘC GIẢ MỚI
+                  <div className="bg-black text-white p-1 rounded-sm"><TrendingUp className="w-4 h-4" /></div>
+                  TỔNG LƯỢT LIKE
                 </div>
-                <div className="font-manga text-xl font-bold text-manga-red">+12%</div>
+                <div className="font-manga text-xl font-bold">
+                  {platformTotalLikes.toLocaleString()}
+                </div>
               </div>
-            </div>
-          </div>
-
-          {/* Stats Box 2: Genres */}
-          <div className="bg-white border-4 border-black shadow-[4px_4px_0px_#000]">
-            <div className="border-b-4 border-black px-4 py-3 font-black uppercase tracking-wider text-lg">
-              THỂ LOẠI DẪN ĐẦU
-            </div>
-            <div className="p-5 space-y-5">
-              {[
-                { name: 'HÀNH ĐỘNG', percent: 45 },
-                { name: 'VIỄN TƯỞNG', percent: 30 },
-                { name: 'TÌNH CẢM', percent: 15 },
-                { name: 'HÀI HƯỚC', percent: 10 },
-              ].map((genre) => (
-                <div key={genre.name}>
-                  <div className="flex justify-between text-xs font-bold uppercase mb-1">
-                    <span>{genre.name}</span>
-                    <span>{genre.percent}%</span>
-                  </div>
-                  <div className="w-full h-3 bg-gray-200 border-2 border-black overflow-hidden">
-                    <div 
-                      className={`h-full border-r-2 border-black ${genre.percent > 40 ? 'bg-manga-red' : 'bg-gray-400'}`} 
-                      style={{ width: `${genre.percent}%` }}
-                    ></div>
-                  </div>
-                </div>
-              ))}
             </div>
           </div>
 

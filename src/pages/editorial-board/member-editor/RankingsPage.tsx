@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react'
-import { Award, Trophy, TrendingUp, Calendar, ChevronDown } from 'lucide-react'
+import { Award, Trophy, TrendingUp, Calendar, ChevronDown, Eye } from 'lucide-react'
 import { boardService } from '@/services/board.service'
+import { rankingService, BackendSeriesRanking } from '@/services/ranking.service'
 
 export default function RankingsPage() {
   const [periods, setPeriods] = useState<any[]>([])
   const [activePeriod, setActivePeriod] = useState<string>('')
-  const [seriesRankings, setSeriesRankings] = useState<any[]>([])
-  const [chapterRankings, setChapterRankings] = useState<any[]>([])
-  const [activeTab, setActiveTab] = useState<'SERIES' | 'CHAPTERS'>('SERIES')
+  const [rankings, setRankings] = useState<BackendSeriesRanking[]>([])
+  const [activeTab, setActiveTab] = useState<'VIEW' | 'LIKE'>('VIEW')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -33,13 +33,8 @@ export default function RankingsPage() {
   const fetchRankingsForPeriod = async (periodId: string) => {
     setLoading(true)
     try {
-      const [seriesRes, chapterRes] = await Promise.all([
-        boardService.getSeriesRankings(periodId),
-        boardService.getChapterRankings(periodId)
-      ])
-      
-      setSeriesRankings(seriesRes || [])
-      setChapterRankings(chapterRes || [])
+      const data = await rankingService.getTopSeries(50, periodId)
+      setRankings(data || [])
     } catch (error) {
       console.error('Failed to load rankings:', error)
     } finally {
@@ -53,7 +48,12 @@ export default function RankingsPage() {
     }
   }, [activePeriod])
 
-  const currentRankings = activeTab === 'SERIES' ? seriesRankings : chapterRankings
+  const currentRankings = [...rankings].sort((a, b) => {
+    if (activeTab === 'VIEW') {
+      return (b.series?.view_count || 0) - (a.series?.view_count || 0)
+    }
+    return (b.total_vote || 0) - (a.total_vote || 0)
+  })
 
   return (
     <div className="max-w-6xl mx-auto pb-12 font-sans">
@@ -88,26 +88,26 @@ export default function RankingsPage() {
       {/* Tabs */}
       <div className="flex border-b-4 border-manga-ink mb-8">
         <button
-          onClick={() => setActiveTab('SERIES')}
+          onClick={() => setActiveTab('VIEW')}
           className={`flex-1 py-4 font-manga text-xl font-bold uppercase transition-colors flex items-center justify-center gap-2 ${
-            activeTab === 'SERIES'
+            activeTab === 'VIEW'
               ? 'bg-manga-ink text-white border-t-4 border-l-4 border-r-4 border-manga-ink'
               : 'bg-white text-gray-400 hover:bg-gray-50 border-t-4 border-l-4 border-r-4 border-transparent hover:border-gray-200'
           }`}
         >
-          <Award className="w-6 h-6" />
-          TOP SERIES
+          <Eye className="w-6 h-6" />
+          TOP VIEW
         </button>
         <button
-          onClick={() => setActiveTab('CHAPTERS')}
+          onClick={() => setActiveTab('LIKE')}
           className={`flex-1 py-4 font-manga text-xl font-bold uppercase transition-colors flex items-center justify-center gap-2 ${
-            activeTab === 'CHAPTERS'
+            activeTab === 'LIKE'
               ? 'bg-manga-ink text-white border-t-4 border-l-4 border-r-4 border-manga-ink'
               : 'bg-white text-gray-400 hover:bg-gray-50 border-t-4 border-l-4 border-r-4 border-transparent hover:border-gray-200'
           }`}
         >
           <TrendingUp className="w-6 h-6" />
-          TOP CHAPTERS
+          TOP LIKE
         </button>
       </div>
 
@@ -147,49 +147,49 @@ export default function RankingsPage() {
             }
 
             return (
-              <div 
-                key={item.id || index}
-                className={`flex items-center p-4 border-4 transition-transform hover:-translate-y-1 ${rankColor} ${shadow}`}
-              >
-                {/* Rank Number */}
-                <div className={`w-16 font-manga text-4xl font-black ${numberColor} flex justify-center items-center`}>
-                  #{index + 1}
-                </div>
-                
-                {/* Thumbnail */}
-                <div className="w-20 h-20 bg-gray-200 border-2 border-manga-ink flex-shrink-0 mx-4 overflow-hidden">
-                  <img 
-                    src={item.thumbnail_image_url || 'https://images.unsplash.com/photo-1578632292335-df3f3e8f4c64?w=200&h=200&fit=crop'} 
-                    alt="Cover"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                
-                {/* Info */}
-                <div className="flex-1">
-                  <h3 className="font-manga text-xl font-bold uppercase text-manga-ink">
-                    {item.title || item.series?.title || 'Unknown Title'}
-                  </h3>
-                  <div className="flex items-center gap-4 mt-2">
-                    <span className="text-xs font-bold text-gray-500 uppercase bg-gray-100 px-2 py-1 rounded-sm border border-gray-300">
-                      Tác giả: {item.author || item.series?.author || 'N/A'}
+                <div 
+                  key={item.series_id || index}
+                  className={`flex items-center p-4 border-4 transition-transform hover:-translate-y-1 ${rankColor} ${shadow}`}
+                >
+                  {/* Rank Number */}
+                  <div className={`w-16 font-manga text-4xl font-black ${numberColor} flex justify-center items-center`}>
+                    #{index + 1}
+                  </div>
+                  
+                  {/* Thumbnail */}
+                  <div className="w-20 h-20 bg-gray-200 border-2 border-manga-ink flex-shrink-0 mx-4 overflow-hidden">
+                    <img 
+                      src={item.series?.cover_image_url || `https://i.pravatar.cc/300?u=rank_${item.series_id}`} 
+                      alt="Cover"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  
+                  {/* Info */}
+                  <div className="flex-1 min-w-0 pr-4">
+                    <h3 className="font-manga text-xl font-bold uppercase text-manga-ink truncate">
+                      {item.series?.title || 'Unknown Title'}
+                    </h3>
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                      <span className="text-xs font-bold text-gray-500 uppercase bg-gray-100 px-2 py-1 rounded-sm border border-gray-300 whitespace-nowrap shrink-0">
+                      Tác giả: {(item.series as any)?.author || 'Đang cập nhật'}
                     </span>
-                    <span className="text-xs font-bold text-gray-500 uppercase bg-gray-100 px-2 py-1 rounded-sm border border-gray-300">
-                      Thể loại: {item.genre || item.series?.genre || 'Manga'}
-                    </span>
+                      <span className="text-xs font-bold text-gray-500 uppercase bg-gray-100 px-2 py-1 rounded-sm border border-gray-300 truncate max-w-full">
+                        Thể loại: {item.series?.genre || 'N/A'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Score */}
+                  <div className="text-right">
+                    <div className="text-3xl font-black text-manga-red font-manga">
+                      {activeTab === 'VIEW' ? (item.series?.view_count || 0).toLocaleString() : (item.total_vote || 0).toLocaleString()}
+                    </div>
+                    <div className="text-[10px] font-bold text-gray-500 uppercase">
+                      {activeTab === 'VIEW' ? 'LƯỢT VIEW' : 'LƯỢT LIKE'}
+                    </div>
                   </div>
                 </div>
-                
-                {/* Score */}
-                <div className="text-right">
-                  <div className="text-3xl font-black text-manga-red font-manga">
-                    {item.score || item.total_score || (Math.random() * 100).toFixed(1)}
-                  </div>
-                  <div className="text-[10px] font-bold text-gray-500 uppercase">
-                    ĐIỂM ĐÁNH GIÁ
-                  </div>
-                </div>
-              </div>
             )
           })}
         </div>

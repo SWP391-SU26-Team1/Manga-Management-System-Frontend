@@ -6,6 +6,7 @@ export default function HistoryPage() {
   const [proposals, setProposals] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
   
   const [sessionDetail, setSessionDetail] = useState<any>(null)
   const [sessionVotes, setSessionVotes] = useState<any[]>([])
@@ -87,7 +88,9 @@ export default function HistoryPage() {
             <div className="relative mt-3">
               <input 
                 type="text" 
-                placeholder="Tìm kiếm mã phiên..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Tìm kiếm mã phiên hoặc tên truyện..."
                 className="w-full border-2 border-manga-ink px-3 py-2 text-xs font-bold outline-none focus:border-manga-red"
               />
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -100,7 +103,15 @@ export default function HistoryPage() {
             ) : proposals.length === 0 ? (
               <div className="p-4 text-center text-xs font-bold text-gray-500">Không có dữ liệu</div>
             ) : (
-              proposals.map(p => (
+              proposals
+                .filter(p => {
+                  if (!searchQuery) return true;
+                  const query = searchQuery.toLowerCase();
+                  const sessionId = (p.session_id || p.id || '').toLowerCase();
+                  const seriesTitle = (p.series?.title || '').toLowerCase();
+                  return sessionId.includes(query) || seriesTitle.includes(query);
+                })
+                .map(p => (
                 <button
                   key={p.session_id || p.id}
                   onClick={() => handleSelectSession(p.session_id || p.id)}
@@ -117,6 +128,11 @@ export default function HistoryPage() {
                     <div className="text-xs font-bold truncate pr-2 mt-0.5">
                       {p.chapter_id ? `Review Chapter` : `Review Series`}
                     </div>
+                    {p.series?.title && (
+                      <div className="text-[10px] font-bold text-manga-red mt-1 truncate">
+                        {p.series.title} {p.chapter?.chapter_number ? `- Ch.${p.chapter.chapter_number}` : ''}
+                      </div>
+                    )}
                   </div>
                   <ArrowRight className={`w-4 h-4 shrink-0 ${activeSessionId === (p.session_id || p.id) ? 'text-white' : 'text-manga-red'}`} />
                 </button>

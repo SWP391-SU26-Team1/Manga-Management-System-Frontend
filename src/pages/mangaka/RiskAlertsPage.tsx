@@ -27,7 +27,7 @@ export default function RiskAlertsPage() {
 
       // Get system notifications (cảnh báo rủi ro hệ thống)
       const notifications = await rankingService.getNotifications()
-      const warningNotifs = notifications.filter(n => n.type === 'ranking_warning')
+      const warningNotifs = notifications.filter(n => n.type === 'ranking_warning' || n.type === 'ranking_warning_acknowledged')
 
       const notificationAlerts: RiskAlert[] = warningNotifs.map(n => {
         const matched = mySeries.find(s => n.content.includes(s.title) || n.title.includes(s.title))
@@ -42,31 +42,7 @@ export default function RiskAlertsPage() {
         } as any
       })
 
-      // Check dynamic series risk (tự động phân tích)
-      const dynamicRiskAlerts: RiskAlert[] = []
-      await Promise.all(
-        mySeries.map(async (series) => {
-          try {
-            const riskData = await rankingService.checkSeriesRisk(series._id)
-            if (riskData && riskData.at_risk) {
-              const level = riskData.low_score ? 'High' : 'Medium'
-              dynamicRiskAlerts.push({
-                id: `dynamic_${series._id}`,
-                seriesId: series.title,
-                seriesIdRaw: series._id,
-                level,
-                message: `Tác phẩm "${series.title}" đang gặp rủi ro ${level === 'High' ? 'cao' : 'trung bình'}. ${riskData.declining ? 'Xếp hạng đang giảm liên tiếp.' : ''} ${riskData.low_score ? 'Điểm tương tác thấp (< 5).' : ''}`,
-                createdAt: new Date().toISOString(),
-                isRead: false
-              } as any)
-            }
-          } catch (e) {
-            console.error('Error checking risk for series:', series.title, e)
-          }
-        })
-      )
-
-      setAlerts([...notificationAlerts, ...dynamicRiskAlerts])
+      setAlerts(notificationAlerts)
     } catch (err) {
       console.error('Lỗi khi tải cảnh báo rủi ro:', err)
     } finally {
@@ -77,7 +53,7 @@ export default function RiskAlertsPage() {
   const stats = [
     { label: "Tổng cảnh báo", value: alerts.length, icon: AlertCircle, color: "text-gray-600" },
     { label: "Rủi ro Cao", value: alerts.filter(a => a.level === 'High').length, icon: AlertTriangle, color: "text-red-600" },
-    { label: "Chưa đọc", value: alerts.filter(a => !a.isRead && !readAlerts.has(a.id)).length, icon: Info, color: "text-orange-500" },
+    { label: "Rủi ro Thấp", value: alerts.filter(a => a.level !== 'High').length, icon: Info, color: "text-orange-500" },
   ]
 
   const handleMarkAsRead = async (id: string, e?: React.MouseEvent) => {
@@ -153,7 +129,7 @@ export default function RiskAlertsPage() {
                         {alert.seriesId}
                         {(!alert.isRead && !readAlerts.has(alert.id)) && <span className="w-2 h-2 rounded-full bg-red-500 inline-block"></span>}
                       </h3>
-                      <p className="text-sm text-gray-700 font-bold mb-1">{alert.message}</p>
+                      <p className="text-sm text-gray-700 font-bold mb-1" style={{ whiteSpace: 'pre-line' }}>{alert.message}</p>
                       <p className="text-[11px] text-gray-400 font-bold uppercase">{new Date(alert.createdAt).toLocaleString()}</p>
                     </div>
                   </div>
@@ -218,7 +194,7 @@ export default function RiskAlertsPage() {
 
               <div className="mb-8">
                 <h3 className="text-sm font-bold text-gray-500 uppercase mb-2">Nội dung cảnh báo</h3>
-                <div className="p-4 border-l-4 border-red-500 bg-red-50 text-gray-800 font-bold">
+                <div className="p-4 border-l-4 border-red-500 bg-red-50 text-gray-800 font-bold" style={{ whiteSpace: 'pre-line' }}>
                   {selectedAlert.message}
                 </div>
               </div>

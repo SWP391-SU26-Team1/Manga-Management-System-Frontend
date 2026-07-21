@@ -175,6 +175,14 @@ export default function TasksPage() {
 
   useEffect(() => {
     loadTasksData()
+
+    const handleFocus = () => {
+      loadTasksData()
+    }
+    window.addEventListener('focus', handleFocus)
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+    }
   }, [])
 
   useEffect(() => {
@@ -237,7 +245,8 @@ export default function TasksPage() {
     try {
       const res = await assistantService.listMyTasks({ limit: 100 })
       if (res && res.success) {
-        const mapped = res.data.map(mapBackendTaskToAssistantTask)
+        const activeTasks = (res.data || []).filter((t: any) => t.status !== 'cancelled' && t.status !== 'deleted')
+        const mapped = activeTasks.map(mapBackendTaskToAssistantTask)
         setTasks(mapped)
         // Skip fetching detailed user profiles to avoid HTTP 403 Forbidden console errors
         // loadAvatars(mapped)

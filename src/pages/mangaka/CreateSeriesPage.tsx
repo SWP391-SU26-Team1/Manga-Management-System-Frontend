@@ -150,7 +150,7 @@ export default function CreateSeriesPage() {
 
       // Gửi thông báo đến toàn bộ các Tantou Editor phụ trách (vì series mới chưa phân editor)
       try {
-        const storedUser = sessionStorage.getItem('mangaflow_user')
+        const storedUser = localStorage.getItem('mangaflow_user')
         let mangakaName = 'Họa sĩ'
         if (storedUser) {
           const parsed = JSON.parse(storedUser)

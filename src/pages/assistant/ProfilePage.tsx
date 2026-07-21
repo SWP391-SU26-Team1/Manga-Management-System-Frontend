@@ -37,7 +37,7 @@ export default function ProfilePage() {
       setEditAvatarUrl(user.avatarUrl || '')
 
       // Sync to localStorage
-      const stored = sessionStorage.getItem('mangaflow_user')
+      const stored = localStorage.getItem('mangaflow_user')
       if (stored) {
         const parsed = JSON.parse(stored)
         const merged = {
@@ -48,7 +48,7 @@ export default function ProfilePage() {
           bio: user.bio,
           role: user.role,
         }
-        sessionStorage.setItem('mangaflow_user', JSON.stringify(merged))
+        localStorage.setItem('mangaflow_user', JSON.stringify(merged))
         window.dispatchEvent(new Event('mangaflow_profile_updated'))
       }
 
@@ -64,7 +64,7 @@ export default function ProfilePage() {
     } catch (err: any) {
       console.error('ProfilePage fetch error:', err)
       // Fallback to localStorage if offline or token issues
-      const stored = sessionStorage.getItem('mangaflow_user')
+      const stored = localStorage.getItem('mangaflow_user')
       if (stored) {
         const parsed = JSON.parse(stored)
         const fbProfile: UserProfileAPI = {
@@ -120,10 +120,10 @@ export default function ProfilePage() {
       setProfile(merged)
 
       // Sync updated data back to localStorage for real-time header/sidebar sync
-      const stored = sessionStorage.getItem('mangaflow_user')
+      const stored = localStorage.getItem('mangaflow_user')
       if (stored) {
         const parsed = JSON.parse(stored)
-        sessionStorage.setItem('mangaflow_user', JSON.stringify({
+        localStorage.setItem('mangaflow_user', JSON.stringify({
           ...parsed,
           fullName: merged.fullName,
           email: merged.email,
@@ -160,10 +160,10 @@ export default function ProfilePage() {
       setEditAvatarUrl(realUrl)
 
       // Sync avatar preview with localStorage instantly
-      const stored = sessionStorage.getItem('mangaflow_user')
+      const stored = localStorage.getItem('mangaflow_user')
       if (stored) {
         const parsed = JSON.parse(stored)
-        sessionStorage.setItem('mangaflow_user', JSON.stringify({ ...parsed, avatarUrl: realUrl }))
+        localStorage.setItem('mangaflow_user', JSON.stringify({ ...parsed, avatarUrl: realUrl }))
         window.dispatchEvent(new Event('mangaflow_profile_updated'))
       }
     } catch (err) {
@@ -182,10 +182,10 @@ export default function ProfilePage() {
       setEditAvatarUrl(profile.avatarUrl || '')
 
       // Revert sidebar preview
-      const stored = sessionStorage.getItem('mangaflow_user')
+      const stored = localStorage.getItem('mangaflow_user')
       if (stored) {
         const parsed = JSON.parse(stored)
-        sessionStorage.setItem('mangaflow_user', JSON.stringify({ ...parsed, avatarUrl: profile.avatarUrl }))
+        localStorage.setItem('mangaflow_user', JSON.stringify({ ...parsed, avatarUrl: profile.avatarUrl }))
         window.dispatchEvent(new Event('mangaflow_profile_updated'))
       }
     }

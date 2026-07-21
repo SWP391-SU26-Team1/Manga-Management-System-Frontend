@@ -13,7 +13,7 @@ export function Header() {
   const [notifications, setNotifications] = useState<any[]>([])
 
   const [user, setUser] = useState<any>(() => {
-    const storedUser = sessionStorage.getItem('mangaflow_user')
+    const storedUser = localStorage.getItem('mangaflow_user')
     return storedUser ? JSON.parse(storedUser) : null
   })
 
@@ -146,7 +146,7 @@ export function Header() {
 
   useEffect(() => {
     const handleProfileUpdate = () => {
-      const storedUser = sessionStorage.getItem('mangaflow_user')
+      const storedUser = localStorage.getItem('mangaflow_user')
       setUser(storedUser ? JSON.parse(storedUser) : null)
     }
     window.addEventListener('mangaflow_profile_updated', handleProfileUpdate)
@@ -159,7 +159,7 @@ export function Header() {
   const userInitials = displayName === 'Kenji Tanaka' ? 'KT' : (displayName.split(' ').pop()?.slice(0, 2).toUpperCase() || 'KT')
 
   const handleLogout = () => {
-    sessionStorage.removeItem('mangaflow_user')
+    localStorage.removeItem('mangaflow_user')
     navigate('/login')
   }
 

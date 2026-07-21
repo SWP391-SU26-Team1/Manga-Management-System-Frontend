@@ -232,7 +232,7 @@ export function Header() {
   const [feedbacks, setFeedbacks] = useState<EditorFeedback[]>([]);
 
   const [user, setUser] = useState<any>(() => {
-    const storedUser = sessionStorage.getItem('mangaflow_user')
+    const storedUser = localStorage.getItem('mangaflow_user')
     return storedUser ? JSON.parse(storedUser) : null
   });
 
@@ -285,7 +285,7 @@ export function Header() {
     document.addEventListener("mousedown", handleClickOutside);
 
     const handleProfileUpdate = () => {
-      const storedUser = sessionStorage.getItem('mangaflow_user')
+      const storedUser = localStorage.getItem('mangaflow_user')
       setUser(storedUser ? JSON.parse(storedUser) : null)
     }
     window.addEventListener('mangaflow_profile_updated', handleProfileUpdate)
@@ -309,7 +309,7 @@ export function Header() {
   const unreadFeedbacks = feedbacks.filter(f => f.status === "Open").length;
 
   const handleLogout = () => {
-    sessionStorage.removeItem('mangaflow_user');
+    localStorage.removeItem('mangaflow_user');
     navigate('/login');
   };
 

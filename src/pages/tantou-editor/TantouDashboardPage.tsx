@@ -30,7 +30,7 @@ export default function TantouDashboardPage() {
   }
 
   // Get user from localStorage
-  const storedUser = sessionStorage.getItem('mangaflow_user')
+  const storedUser = localStorage.getItem('mangaflow_user')
   const user = storedUser ? JSON.parse(storedUser) : null
   const userName = user?.fullName || user?.username || user?.user?.fullName || user?.user?.username || 'Editor'
 

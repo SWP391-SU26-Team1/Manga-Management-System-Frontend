@@ -5,7 +5,7 @@ import { DisputeCase } from '@/types/board.types'
 import { disputeService } from '@/services/dispute.service'
 // Helper to load current user
 const getStoredUser = () => {
-  const data = sessionStorage.getItem('mangaflow_user')
+  const data = localStorage.getItem('mangaflow_user')
   return data ? JSON.parse(data) : { fullName: 'Minamoto Shizuka', role: 'BOARD' }
 }
 

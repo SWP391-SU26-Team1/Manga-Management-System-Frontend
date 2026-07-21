@@ -7,7 +7,7 @@ export function PublicUserGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const checkAuth = () => {
-      const storedUser = sessionStorage.getItem('mangaflow_user')
+      const storedUser = localStorage.getItem('mangaflow_user')
       if (storedUser) {
         try {
           const user: any = JSON.parse(storedUser)

@@ -7,16 +7,18 @@ import { mangakaNav } from '@/configs/navigation/mangakaNav'
 import { assistantNav } from '@/configs/navigation/assistantNav'
 import { boardNav } from '@/configs/navigation/boardNav'
 import { tantouNav } from '@/configs/navigation/tantouNav'
+import { adminNav } from '@/configs/navigation/adminNav'
 import { userNav } from '@/configs/navigation/userNav'
 
 const getNavConfig = (role: string) => {
-  switch (role) {
+  switch (role?.toUpperCase()) {
     case 'MANGAKA': return mangakaNav;
     case 'ASSISTANT': return assistantNav;
     case 'EDITORIAL_BOARD':
     case 'BOARD': return boardNav;
     case 'TANTOU':
     case 'EDITOR': return tantouNav;
+    case 'ADMIN': return adminNav;
     case 'USER':
     case 'READER': return userNav;
     default: return [];
@@ -24,13 +26,14 @@ const getNavConfig = (role: string) => {
 }
 
 const getRoleText = (role: string) => {
-  switch (role) {
+  switch (role?.toUpperCase()) {
     case 'MANGAKA': return 'PHÒNG LÀM VIỆC MANGAKA';
     case 'ASSISTANT': return 'Phòng làm việc Trợ lý';
     case 'EDITORIAL_BOARD':
     case 'BOARD': return 'Editorial Board Panel';
     case 'TANTOU':
     case 'EDITOR': return 'Tantou Editor Panel';
+    case 'ADMIN': return 'HỆ THỐNG QUẢN TRỊ';
     case 'USER':
     case 'READER': return 'Reader Dashboard';
     default: return 'MANGAFLOW PANEL';
@@ -38,13 +41,14 @@ const getRoleText = (role: string) => {
 }
 
 const getDashboardPath = (role: string) => {
-  switch (role) {
+  switch (role?.toUpperCase()) {
     case 'MANGAKA': return '/dashboard/mangaka';
     case 'ASSISTANT': return '/dashboard/assistant';
     case 'EDITORIAL_BOARD':
     case 'BOARD': return '/dashboard/editorial-board';
     case 'TANTOU':
     case 'EDITOR': return '/dashboard/tantou-editor';
+    case 'ADMIN': return '/dashboard/admin';
     case 'USER':
     case 'READER': return '/dashboard/user';
     default: return '/';

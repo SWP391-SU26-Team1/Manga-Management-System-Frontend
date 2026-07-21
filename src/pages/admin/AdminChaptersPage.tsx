@@ -18,7 +18,7 @@ const statusLabel: Record<ChapterStatus, string> = {
 const emptyPagination: PaginationMeta = { page: 1, limit: 10, total: 0, totalPages: 1 }
 const inputClass = 'w-full border-2 border-manga-ink bg-white px-4 py-3 text-sm font-bold outline-none focus:shadow-[3px_3px_0_rgba(232,23,63,1)]'
 const labelClass = 'mb-2 block text-xs font-black uppercase text-gray-600'
-const iconClass = 'flex h-10 w-10 items-center justify-center border-2 border-manga-ink bg-white hover:bg-gray-100 disabled:opacity-50'
+const iconClass = 'flex h-10 w-10 items-center justify-center border-2 border-manga-ink disabled:opacity-50'
 type FormState = { series_id: string; chapter_number: string; title: string; thumbnail_image_url: string; status: ChapterStatus }
 const emptyForm: FormState = { series_id: '', chapter_number: '1', title: '', thumbnail_image_url: '', status: 'draft' }
 
@@ -115,6 +115,14 @@ export default function AdminChaptersPage() {
   useEffect(() => { load() }, [load])
   useEffect(() => { loadSupport() }, [loadSupport])
 
+  const resetFilters = () => {
+    setKeywordInput('')
+    setKeyword('')
+    setSeriesId('')
+    setStatus('all')
+    setPage(1)
+  }
+
   const openCreate = () => { setEditing(null); setForm(emptyForm); setFormOpen(true) }
   const openEdit = (item: Chapter) => { setEditing(item); setForm({ series_id: item.series_id, chapter_number: String(item.chapter_number), title: item.title || '', thumbnail_image_url: item.thumbnail_image_url || '', status: item.status }); setFormOpen(true) }
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -155,18 +163,48 @@ export default function AdminChaptersPage() {
         <AdminStatCard label="Bản nháp" value={stats?.by_status?.draft || 0} helper="Chưa gửi duyệt" icon={Edit3} dark />
       </div>
       <AdminTableFrame>
-        <div className="grid gap-4 border-b-2 border-manga-ink p-6 lg:grid-cols-[1fr_220px_220px_auto] lg:items-end">
-          <form onSubmit={(e) => { e.preventDefault(); setKeyword(keywordInput.trim()); setPage(1) }}><span className={labelClass}>Tìm kiếm</span><div className="flex gap-2"><input value={keywordInput} onChange={(e) => setKeywordInput(e.target.value)} className={inputClass} placeholder="Tên chương..." /><button className={iconClass}><Search /></button></div></form>
-          <label><span className={labelClass}>Series</span><select value={seriesId} onChange={(e) => { setSeriesId(e.target.value); setPage(1) }} className={inputClass}><option value="">Tất cả series</option>{series.map((item) => <option key={item.series_id} value={item.series_id}>{item.title}</option>)}</select></label>
-          <label><span className={labelClass}>Trạng thái</span><select value={status} onChange={(e) => { setStatus(e.target.value as 'all' | ChapterStatus); setPage(1) }} className={inputClass}><option value="all">Tất cả</option>{STATUSES.map((item) => <option key={item} value={item}>{statusLabel[item]}</option>)}</select></label>
-          <button onClick={load} className={iconClass} title="Tải lại"><RefreshCw className={loading ? 'animate-spin' : ''} /></button>
+        <div className="flex flex-col gap-4 border-b-2 border-manga-ink p-6 md:flex-row md:items-end md:justify-between">
+          <form onSubmit={(e) => { e.preventDefault(); setKeyword(keywordInput.trim()); setPage(1) }} className="flex-1 max-w-lg">
+            <span className={labelClass}>Tìm kiếm</span>
+            <div className="flex gap-2">
+              <input value={keywordInput} onChange={(e) => setKeywordInput(e.target.value)} className={inputClass} placeholder="Tên chương..." />
+              <button className={`${iconClass} bg-white hover:bg-gray-100`}><Search /></button>
+            </div>
+          </form>
+          <div className="flex gap-2">
+            <button onClick={load} className={`${iconClass} bg-white hover:bg-gray-100`} title="Tải lại"><RefreshCw className={loading ? 'animate-spin' : ''} /></button>
+            <button onClick={resetFilters} className={`${iconClass} bg-white hover:bg-gray-100`} title="Xóa bộ lọc"><X className="h-5 w-5" /></button>
+          </div>
         </div>
-        <div className="overflow-x-auto"><table className="w-full min-w-[1000px] text-left"><thead className="bg-[#282828] text-xs font-black uppercase text-white"><tr><th className="px-6 py-4">Chương</th><th className="px-5 py-4">Series</th><th className="px-5 py-4">Lượt xem</th><th className="px-5 py-4">Trạng thái</th><th className="px-5 py-4">Ngày tạo</th><th className="px-5 py-4 text-right">Thao tác</th></tr></thead><tbody>
+        <div className="overflow-x-auto"><table className="w-full min-w-[1000px] text-left"><thead className="bg-[#282828] text-xs font-black uppercase text-white"><tr>
+          <th className="px-6 py-4">Chương</th>
+          <th className="px-5 py-4 min-w-[200px]">
+            <div className="flex flex-col gap-1">
+              <span>Series</span>
+              <select value={seriesId} onChange={(e) => { setSeriesId(e.target.value); setPage(1) }} className="block w-full border border-gray-600 bg-[#3a3a3a] text-white px-2 py-1 text-xs font-bold outline-none focus:border-white">
+                <option value="">Tất cả series</option>
+                {series.map((item) => <option key={item.series_id} value={item.series_id}>{item.title}</option>)}
+              </select>
+            </div>
+          </th>
+          <th className="px-5 py-4">Lượt xem</th>
+          <th className="px-5 py-4 min-w-[160px]">
+            <div className="flex flex-col gap-1">
+              <span>Trạng thái</span>
+              <select value={status} onChange={(e) => { setStatus(e.target.value as 'all' | ChapterStatus); setPage(1) }} className="block w-full border border-gray-600 bg-[#3a3a3a] text-white px-2 py-1 text-xs font-bold outline-none focus:border-white">
+                <option value="all">Tất cả</option>
+                {STATUSES.map((item) => <option key={item} value={item}>{statusLabel[item]}</option>)}
+              </select>
+            </div>
+          </th>
+          <th className="px-5 py-4">Ngày tạo</th>
+          <th className="px-5 py-4 text-right">Thao tác</th>
+        </tr></thead><tbody>
           {loading ? <tr><td colSpan={6} className="p-12 text-center font-black">Đang tải...</td></tr> : chapters.length === 0 ? <tr><td colSpan={6} className="p-12 text-center font-black text-gray-500">Không có chương phù hợp.</td></tr> : chapters.map((item) => <tr key={item.chapter_id} className="border-b-2 border-manga-ink">
             <td className="px-6 py-5"><div className="flex items-center gap-4">{item.thumbnail_image_url ? <img src={item.thumbnail_image_url} alt="" className="h-16 w-12 border-2 border-manga-ink object-cover" /> : <div className="flex h-16 w-12 items-center justify-center border-2 border-manga-ink bg-gray-100"><ImageOff className="h-4 w-4" /></div>}<div><p className="font-black">Chương {item.chapter_number}</p><p className="text-sm text-gray-500">{item.title || 'Chưa đặt tên'}</p></div></div></td>
             <td className="px-5 py-5 font-bold">{item.series?.title || item.series_id}</td><td className="px-5 py-5 font-black">{(item.view_count || 0).toLocaleString('vi-VN')}</td>
             <td className="px-5 py-5"><div className="space-y-2"><AdminStatusBadge status={item.status} /><select value={item.status} disabled={busyId === item.chapter_id} onChange={(e) => changeStatus(item, e.target.value as ChapterStatus)} className="block border-2 border-manga-ink px-2 py-2 text-xs font-black">{STATUSES.map((value) => <option key={value} value={value}>{statusLabel[value]}</option>)}</select></div></td>
-            <td className="px-5 py-5 font-semibold text-gray-600">{formatDate(item.created_at)}</td><td className="px-5 py-5"><div className="flex justify-end gap-2"><button onClick={() => showDetail(item)} className={`${iconClass} bg-[#282828] text-white`}><Eye /></button><button onClick={() => openEdit(item)} className={iconClass}><Edit3 /></button><button disabled={busyId === item.chapter_id} onClick={() => remove(item)} className={`${iconClass} bg-manga-red text-white`}><Trash2 /></button></div></td>
+            <td className="px-5 py-5 font-semibold text-gray-600">{formatDate(item.created_at)}</td><td className="px-5 py-5"><div className="flex justify-end gap-2"><button onClick={() => showDetail(item)} className={`${iconClass} bg-[#282828] text-white hover:bg-gray-800`}><Eye /></button><button onClick={() => openEdit(item)} className={`${iconClass} bg-white hover:bg-gray-100`}><Edit3 /></button><button disabled={busyId === item.chapter_id} onClick={() => remove(item)} className={`${iconClass} bg-manga-red text-white hover:bg-red-600`}><Trash2 /></button></div></td>
           </tr>)}
         </tbody></table></div>
         <div className="flex flex-col gap-4 border-t-2 border-manga-ink px-6 py-5 md:flex-row md:items-center md:justify-between"><p className="text-sm font-black uppercase">Hiển thị {start}-{end} / {pagination.total}</p><AdminPagination page={pagination.page} totalPages={pagination.totalPages} onPageChange={setPage} disabled={loading} /></div>

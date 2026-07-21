@@ -11,22 +11,22 @@ export const getSessionId = (session: ReviewSession) => session.session_id || se
 
 export const getVoteId = (vote: Vote) => vote.vote_id || vote.id || ''
 
-export const getSessionName = (session: ReviewSession) => session.name || session.title || 'Untitled review session'
+export const getSessionName = (session: ReviewSession) => session.name || session.title || 'Phiên đánh giá chưa đặt tên'
 
-export const getSeriesLabel = (session: ReviewSession) => session.series?.title || 'Series not loaded'
+export const getSeriesLabel = (session: ReviewSession) => session.series?.title || 'Chưa tải bộ truyện'
 
 export const getChapterLabel = (session: ReviewSession) => {
   if (session.chapter?.title) return session.chapter.title
-  if (session.chapter?.chapter_number) return `Chapter ${session.chapter.chapter_number}`
-  return session.chapter_id || session.chapterId ? 'Chapter not loaded' : 'No chapter attached'
+  if (session.chapter?.chapter_number) return `Chương ${session.chapter.chapter_number}`
+  return session.chapter_id || session.chapterId ? 'Chưa tải chương' : 'Không đính kèm chương'
 }
 
 export const getCreatedByLabel = (session: ReviewSession) =>
   session.created_by?.name ||
   session.created_by?.username ||
-  'Unknown creator'
+  'Không rõ người tạo'
 
-export const getVoterLabel = (vote: Vote) => vote.users?.username || vote.users?.email || 'Unknown voter'
+export const getVoterLabel = (vote: Vote) => vote.users?.username || vote.users?.email || 'Không rõ người biểu quyết'
 
 export const isUuidLike = (value?: string | null) =>
   Boolean(value && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value))
@@ -92,7 +92,7 @@ export const getChapterSeriesOptionId = (chapter: {
   )
 
 export const getChapterOptionLabel = (chapter: { chapter_number?: number; title?: string | null }) =>
-  chapter.title || (chapter.chapter_number ? `Chapter ${chapter.chapter_number}` : 'Untitled chapter')
+  chapter.title || (chapter.chapter_number ? `Chương ${chapter.chapter_number}` : 'Chương chưa đặt tên')
 
 export const formatDateTime = (value?: string | null, fallback = 'N/A') => {
   if (!value) return fallback
@@ -152,7 +152,7 @@ export const normalizeListResponse = <T>(
 
 export const getErrorMessage = (error: unknown) => {
   const apiError = error as { response?: { data?: { message?: string } }; message?: string }
-  return apiError.response?.data?.message || apiError.message || 'Something went wrong. Please try again.'
+  return apiError.response?.data?.message || apiError.message || 'Đã xảy ra lỗi. Vui lòng thử lại.'
 }
 
 export const resultSummary = (result?: ReviewSessionProcessResult) => {

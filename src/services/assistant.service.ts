@@ -139,7 +139,7 @@ export const assistantService = {
   }): Promise<{ success: boolean; data: PageTask[]; pagination?: any }> => {
     const res = await api.get('/api/assistant/page-tasks', { params: filters })
     if (res.data && Array.isArray(res.data.data)) {
-      res.data.data = res.data.data.filter((t: any) => t.status !== 'pending')
+      res.data.data = res.data.data.filter((t: any) => t.status !== 'pending' && t.status !== 'cancelled' && t.status !== 'deleted')
     }
     return res.data
   },
@@ -358,7 +358,7 @@ export const assistantService = {
   },
 
   // --- AI Manga (Smart Coloring) ---
-  startAiColoring: async (taskId: string, payload?: { prompt?: string; reference_image_url?: string }): Promise<any> => {
+  startAiColoring: async (taskId: string, payload?: { prompt?: string; reference_image_url?: string; ai_model?: string }): Promise<any> => {
     const res = await api.post(`/api/page-tasks/${taskId}/ai/coloring`, payload || {})
     return res.data
   },

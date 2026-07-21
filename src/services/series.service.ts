@@ -64,11 +64,6 @@ export const seriesService = {
     return (res.data.data ?? []).map(mapSeries)
   },
 
-  /** GET /api/mangaka/series/:seriesId/members */
-  getMembers: async (seriesId: string): Promise<any[]> => {
-    const res = await api.get<{ success: boolean; data: any[] }>(`/api/mangaka/series/${seriesId}/members`)
-    return res.data.data ?? []
-  },
 
   /** GET /api/mangaka/series/:seriesId */
   getById: async (seriesId: string): Promise<SeriesAPI> => {

@@ -44,9 +44,9 @@ export default function UserHomePage() {
             <div className="relative animate-slide-up" style={{ animationDelay: '0.4s' }}>
               <div className="manga-border manga-shadow bg-gray-100 aspect-[4/3] relative overflow-hidden dark:bg-zinc-800 dark:border-black">
                 <img
-                  src="/images/hero.png"
+                  src="/images/be7e67a5-a979-43e8-b689-b9c2bb74ad64.png"
                   alt="Manga Studio"
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover relative z-10"
                   onError={(e) => {
                     (e.target as HTMLImageElement).style.display = 'none'
                   }}

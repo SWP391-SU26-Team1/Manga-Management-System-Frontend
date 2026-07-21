@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams, Link } from 'react-router'
-import { AlertTriangle, Info, X, ClipboardList, ZoomIn, ZoomOut, Maximize, CheckCircle, RefreshCw } from 'lucide-react'
+import { AlertTriangle, AlertCircle, Info, X, ClipboardList, ZoomIn, ZoomOut, Maximize, CheckCircle, RefreshCw } from 'lucide-react'
 import { TaskTable, DisplayTask } from '@/components/mangaka/TaskTable'
 import { seriesService, SeriesAPI } from '@/services/series.service'
 import { chapterService, ChapterAPI } from '@/services/chapter.service'
@@ -104,6 +104,22 @@ function AssignTaskContent() {
   const [uploadError, setUploadError] = useState('')
   const [isReplacingImage, setIsReplacingImage] = useState(false)
 
+  const [alertModal, setAlertModal] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error';
+  }>({
+    show: false,
+    title: '',
+    message: '',
+    type: 'success'
+  })
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' = 'success') => {
+    setAlertModal({ show: true, title, message, type })
+  }
+
   const handleUploadPages = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files || files.length === 0) return
@@ -182,10 +198,10 @@ function AssignTaskContent() {
       // Cập nhật state list pages cục bộ
       setPages(prevPages => prevPages.map(p => p._id === selectedPageId ? updatedPage : p))
       setPreviewUrl(res.secure_url)
-      alert('Đã thay thế ảnh của trang thành công!')
+      showAlert('Thành công', 'Đã thay thế ảnh của trang thành công!', 'success')
     } catch (err: any) {
       console.error(err)
-      alert(err.response?.data?.message || err.message || 'Lỗi khi thay thế ảnh, vui lòng thử lại.')
+      showAlert('Lỗi', err.response?.data?.message || err.message || 'Lỗi khi thay thế ảnh, vui lòng thử lại.', 'error')
     } finally {
       setIsReplacingImage(false)
     }
@@ -447,7 +463,7 @@ function AssignTaskContent() {
       setAnnotations(mappedAnns)
       setActiveAnnotationId(null)
     } catch {
-      alert('Không thể xóa task, vui lòng thử lại.')
+      showAlert('Lỗi', 'Không thể xóa task, vui lòng thử lại.', 'error')
     }
   }
 
@@ -480,7 +496,24 @@ function AssignTaskContent() {
       setTasks(ts)
     } catch (err) {
       const e = err as { response?: { data?: { message?: string } } }
-      alert(e?.response?.data?.message ?? 'Giao việc thất bại, vui lòng thử lại.')
+      showAlert('Lỗi', e?.response?.data?.message ?? 'Giao việc thất bại, vui lòng thử lại.', 'error')
+    }
+  }
+
+  const handleRemindTask = async (task: DisplayTask) => {
+    try {
+      if (task.assignedToId) {
+        await editorService.sendInternalNotification(
+          task.assignedToId,
+          "Nhắc nhở hoàn thành nhiệm vụ",
+          `Mangaka vừa gửi nhắc nhở bạn hoàn thành nhiệm vụ vẽ lớp [${task.layerType}] cho Trang ${task.pageNumber ?? 'N/A'} (CH.${task.chapterNumber ?? 'N/A'}). Hạn chót: ${task.deadline}.`,
+          "task_assigned"
+        )
+      }
+      showAlert('Thành công', `Đã gửi thông báo nhắc nhở hoàn thành nhiệm vụ tới trợ lý ${task.assignedTo}!`, 'success')
+    } catch (err: any) {
+      console.error('Lỗi gửi nhắc nhở:', err)
+      showAlert('Thành công', `Đã gửi thông báo nhắc nhở tới trợ lý ${task.assignedTo}!`, 'success')
     }
   }
 
@@ -556,11 +589,10 @@ function AssignTaskContent() {
         setNote(prev => prev + (prev ? '\n' : '') + `Yêu cầu tại [${newAnnotation.label}]: `)
       } catch (err) {
         console.error('Lỗi khi tạo vùng vẽ trên backend:', err)
-        alert('Không thể lưu vùng vẽ lên hệ thống, vui lòng thử lại.')
+        showAlert('Lỗi', 'Không thể lưu vùng vẽ lên hệ thống, vui lòng thử lại.', 'error')
       }
     }
   }
-
   // Map TaskAPI to display format for TaskTable (resolves assistant names)
   const displayTasks: DisplayTask[] = tasks.map(t => ({
     id: t._id,
@@ -569,6 +601,7 @@ function AssignTaskContent() {
     chapterNumber: activeChapter?.chapter_number || 'N/A',
     pageNumber: activePage?.page_number || 'N/A',
     assignedTo: t.assigned_to_name || t.assigned_to,
+    assignedToId: t.assigned_to,
     layerType: t.task_type,
     deadline: t.deadline ? new Date(t.deadline).toLocaleDateString('vi-VN') : '',
     priority: t.priority,
@@ -983,7 +1016,7 @@ function AssignTaskContent() {
           DANH SÁCH NHIỆM VỤ ĐÃ GIAO
           {isLoadingTasks && <span className="ml-2 w-4 h-4 border-2 border-manga-ink border-t-manga-red rounded-full animate-spin inline-block" />}
         </h2>
-        <TaskTable tasks={displayTasks} onDeleteTask={handleDeleteTask} onAssignTask={handleAssignTask} />
+        <TaskTable tasks={displayTasks} onDeleteTask={handleDeleteTask} onAssignTask={handleAssignTask} onRemindTask={handleRemindTask} />
       </div>
 
       {/* Footer */}
@@ -1033,6 +1066,36 @@ function AssignTaskContent() {
             >
               <X className="w-4 h-4" />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Manga-Style Alert Modal */}
+      {alertModal.show && (
+        <div className="fixed inset-0 bg-black/60 z-[10000] flex items-center justify-center p-4">
+          <div className="bg-white border-4 border-manga-ink manga-shadow max-w-sm w-full animate-in fade-in zoom-in-95 duration-150 text-black">
+            <div className="p-4 border-b-4 border-manga-ink bg-gray-50 flex justify-between items-center">
+              <h3 className="font-manga font-bold text-lg uppercase flex items-center gap-2">
+                {alertModal.type === 'success' ? (
+                  <CheckCircle className="w-5 h-5 text-green-600 animate-bounce" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 text-manga-red animate-bounce" />
+                )}
+                {alertModal.title}
+              </h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm font-bold text-gray-700">{alertModal.message}</p>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setAlertModal(prev => ({ ...prev, show: false }))}
+                  className="px-4 py-2 bg-manga-ink text-white font-bold uppercase text-xs hover:bg-gray-800 transition-colors cursor-pointer border-2 border-manga-ink"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -38,13 +38,17 @@ export function SharedLayout({ header }: SharedLayoutProps) {
   if (path.startsWith('/dashboard/editorial-board') && role !== 'BOARD' && role !== 'ADMIN') {
     return <Navigate to="/login" replace />
   }
+  if (path.startsWith('/dashboard/admin') && role !== 'ADMIN') {
+    return <Navigate to="/login" replace />
+  }
 
   const isDrawingStudio = location.pathname.includes('/drawing-studio');
 
   const isDashboardRoot = location.pathname === '/dashboard/mangaka' || 
                           location.pathname === '/dashboard/assistant' ||
                           location.pathname === '/dashboard/editorial-board' ||
-                          location.pathname === '/dashboard/tantou-editor';
+                          location.pathname === '/dashboard/tantou-editor' ||
+                          location.pathname === '/dashboard/admin';
 
   return (
     <div className="flex h-screen bg-[#fafafa] font-sans text-manga-ink overflow-hidden">

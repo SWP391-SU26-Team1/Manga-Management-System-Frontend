@@ -10,9 +10,13 @@ export interface Notification {
   title: string
   message: string
   time: string
-  type: 'REVIEW' | 'RISK' | 'RESUBMIT' | 'FEEDBACK' | 'OVERDUE' | 'VOTE' | 'RATING'
+  type: 'REVIEW' | 'RISK' | 'RESUBMIT' | 'FEEDBACK' | 'OVERDUE' | 'VOTE' | 'RATING' | 'ROLE_UPGRADE_REQUEST' | string
   category: 'rating_success' | 'rating_failed' | 'voting_success' | 'voting_failed' | 'standard'
   unread: boolean
+  actionUrl?: string
+  requesterId?: string
+  requestedRole?: string
+  content?: string
 }
 
 export interface ToastAlert {
@@ -95,14 +99,35 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           }
           seenToastIdsRef.current.add(notifId)
 
+          let message = newNotification.message || newNotification.content || ''
+          let actionUrl = newNotification.action_url || newNotification.actionUrl
+          let requesterId = newNotification.requester_id || newNotification.requesterId
+          let requestedRole = newNotification.requested_role || newNotification.requestedRole
+
+          if (newNotification.type === 'ROLE_UPGRADE_REQUEST' && newNotification.content) {
+            try {
+              const notifData = typeof newNotification.content === 'string' ? JSON.parse(newNotification.content) : newNotification.content
+              if (notifData.message) message = notifData.message
+              if (notifData.action_url) actionUrl = notifData.action_url
+              if (notifData.requester_id) requesterId = notifData.requester_id
+              if (notifData.requested_role) requestedRole = notifData.requested_role
+            } catch (err) {
+              console.error('Failed to parse ROLE_UPGRADE_REQUEST content JSON from socket:', err)
+            }
+          }
+
           const mappedNotif: Notification = {
             id: notifId,
-            title: newNotification.title || 'THÔNG BÁO MỚI',
-            message: newNotification.message || newNotification.content || '',
+            title: newNotification.title || (newNotification.type === 'ROLE_UPGRADE_REQUEST' ? 'YÊU CẦU NÂNG CẤP VAI TRÒ' : 'THÔNG BÁO MỚI'),
+            message,
             time: new Date(newNotification.created_at || Date.now()).toLocaleDateString('vi-VN'),
             type: newNotification.type || 'REVIEW',
             category: 'standard' as const,
-            unread: true
+            unread: true,
+            actionUrl,
+            requesterId,
+            requestedRole,
+            content: newNotification.content
           }
 
           setNotifications(prev => {
@@ -177,15 +202,38 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       }
 
       // Map API data to Notification interface
-      const mapped = data && Array.isArray(data) ? data.map((item: any) => ({
-        id: item.id || item.notification_id || Math.random().toString(),
-        title: item.title || 'THÔNG BÁO',
-        message: item.message || item.content,
-        time: new Date(item.created_at || Date.now()).toLocaleDateString('vi-VN'),
-        type: item.type || 'REVIEW',
-        category: 'standard' as const,
-        unread: !item.is_read
-      })) : []
+      const mapped = data && Array.isArray(data) ? data.map((item: any) => {
+        let message = item.message || item.content || ''
+        let actionUrl = item.action_url || item.actionUrl
+        let requesterId = item.requester_id || item.requesterId
+        let requestedRole = item.requested_role || item.requestedRole
+
+        if (item.type === 'ROLE_UPGRADE_REQUEST' && item.content) {
+          try {
+            const notifData = typeof item.content === 'string' ? JSON.parse(item.content) : item.content
+            if (notifData.message) message = notifData.message
+            if (notifData.action_url) actionUrl = notifData.action_url
+            if (notifData.requester_id) requesterId = notifData.requester_id
+            if (notifData.requested_role) requestedRole = notifData.requested_role
+          } catch (err) {
+            console.error('Failed to parse ROLE_UPGRADE_REQUEST content JSON:', err)
+          }
+        }
+
+        return {
+          id: item.id || item.notification_id || Math.random().toString(),
+          title: item.title || (item.type === 'ROLE_UPGRADE_REQUEST' ? 'YÊU CẦU NÂNG CẤP VAI TRÒ' : 'THÔNG BÁO'),
+          message,
+          time: new Date(item.created_at || Date.now()).toLocaleDateString('vi-VN'),
+          type: item.type || 'REVIEW',
+          category: 'standard' as const,
+          unread: !item.is_read,
+          actionUrl,
+          requesterId,
+          requestedRole,
+          content: item.content
+        }
+      }) : []
 
       if (role === 'EDITOR' || role === 'editor') {
         try {
@@ -288,6 +336,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // Fetch notifications once and listen to authentication changes
   useEffect(() => {
     fetchNotifications()
     const interval = setInterval(fetchNotifications, 5000)

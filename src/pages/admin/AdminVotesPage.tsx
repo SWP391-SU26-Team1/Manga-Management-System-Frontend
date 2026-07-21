@@ -1,5 +1,5 @@
 import React, { FormEvent, useCallback, useEffect, useState } from 'react'
-import { AlertCircle, CheckCircle2, Edit3, RefreshCw, Save, Trash2, Vote as VoteIcon, X } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Edit3, RefreshCw, Save, Search, Trash2, Vote as VoteIcon, X } from 'lucide-react'
 import { AdminButton } from '@/components/admin/AdminButton'
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader'
 import { AdminPagination } from '@/components/admin/AdminPagination'
@@ -12,7 +12,7 @@ import type { PaginationMeta, Vote, VoteStatus } from '@/services/admin/admin.ty
 const emptyPagination: PaginationMeta = { page: 1, limit: 10, total: 0, totalPages: 1 }
 const inputClass = 'w-full border-2 border-manga-ink bg-white px-4 py-3 text-sm font-bold outline-none'
 const labelClass = 'mb-2 block text-xs font-black uppercase text-gray-600'
-const iconClass = 'flex h-10 w-10 items-center justify-center border-2 border-manga-ink bg-white hover:bg-gray-100 disabled:opacity-50'
+const iconClass = 'flex h-10 w-10 items-center justify-center border-2 border-manga-ink disabled:opacity-50'
 const getError = (error: unknown) => {
   const value = error as { response?: { data?: { message?: string } }; message?: string }
   return value.response?.data?.message || value.message || 'Có lỗi xảy ra.'
@@ -55,6 +55,8 @@ export default function AdminVotesPage() {
   const [pagination, setPagination] = useState(emptyPagination)
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState<'all' | VoteStatus>('all')
+  const [keywordInput, setKeywordInput] = useState('')
+  const [keyword, setKeyword] = useState('')
   const [loading, setLoading] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [editing, setEditing] = useState<Vote | null>(null)
@@ -65,7 +67,7 @@ export default function AdminVotesPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await adminVotesService.list({ page, limit: 10, status: status === 'all' ? undefined : status })
+      const response = await adminVotesService.list({ page, limit: 10, status: status === 'all' ? undefined : status, keyword: keyword || undefined })
       setVotes(response.data)
       setPagination(response.pagination)
     } catch (error) {
@@ -73,9 +75,16 @@ export default function AdminVotesPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, status])
+  }, [page, status, keyword])
 
   useEffect(() => { load() }, [load])
+
+  const resetFilters = () => {
+    setKeywordInput('')
+    setKeyword('')
+    setStatus('all')
+    setPage(1)
+  }
 
   const openEdit = (vote: Vote) => {
     setEditing(vote)
@@ -136,13 +145,38 @@ export default function AdminVotesPage() {
         <AdminStatCard label="Điểm trung bình" value={average.toFixed(1)} helper="Các phiếu đang hiển thị" dark />
       </div>
       <AdminTableFrame>
-        <div className="flex items-end justify-between border-b-2 border-manga-ink p-6">
-          <label className="w-56"><span className={labelClass}>Trạng thái</span><select value={status} onChange={(e) => { setStatus(e.target.value as 'all' | VoteStatus); setPage(1) }} className={inputClass}><option value="all">Tất cả</option><option value="submitted">Đã gửi</option><option value="verified">Đã xác minh</option></select></label>
-          <button type="button" onClick={load} className={iconClass}><RefreshCw className={loading ? 'animate-spin' : ''} /></button>
+        <div className="flex flex-col gap-4 border-b-2 border-manga-ink p-6 md:flex-row md:items-end md:justify-between">
+          <form onSubmit={(e) => { e.preventDefault(); setKeyword(keywordInput.trim()); setPage(1) }} className="flex-1 max-w-lg">
+            <span className={labelClass}>Tìm kiếm</span>
+            <div className="flex gap-2">
+              <input value={keywordInput} onChange={(e) => setKeywordInput(e.target.value)} className={inputClass} placeholder="Tìm quyết định, ghi chú..." />
+              <button type="submit" className={`${iconClass} bg-white hover:bg-gray-100`}><Search className="h-5 w-5" /></button>
+            </div>
+          </form>
+          <div className="flex gap-2">
+            <button type="button" onClick={load} className={`${iconClass} bg-white hover:bg-gray-100`} title="Tải lại"><RefreshCw className={loading ? 'animate-spin' : ''} /></button>
+            <button type="button" onClick={resetFilters} className={`${iconClass} bg-white hover:bg-gray-100`} title="Xóa bộ lọc"><X className="h-5 w-5" /></button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[950px] text-left">
-            <thead className="bg-[#282828] text-xs font-black uppercase text-white"><tr><th className="px-6 py-4">Người bỏ phiếu</th><th className="px-5 py-4">Phiên</th><th className="px-5 py-4">Quyết định</th><th className="px-5 py-4">Điểm</th><th className="px-5 py-4">Trạng thái</th><th className="px-5 py-4 text-right">Thao tác</th></tr></thead>
+            <thead className="bg-[#282828] text-xs font-black uppercase text-white"><tr>
+              <th className="px-6 py-4">Người bỏ phiếu</th>
+              <th className="px-5 py-4">Phiên</th>
+              <th className="px-5 py-4">Quyết định</th>
+              <th className="px-5 py-4">Điểm</th>
+              <th className="px-5 py-4 min-w-[165px]">
+                <div className="flex flex-col gap-1">
+                  <span>Trạng thái</span>
+                  <select value={status} onChange={(e) => { setStatus(e.target.value as 'all' | VoteStatus); setPage(1) }} className="block w-full border border-gray-600 bg-[#3a3a3a] text-white px-2 py-1 text-xs font-bold outline-none focus:border-white">
+                    <option value="all">Tất cả</option>
+                    <option value="submitted">Đã gửi</option>
+                    <option value="verified">Đã xác minh</option>
+                  </select>
+                </div>
+              </th>
+              <th className="px-5 py-4 text-right">Thao tác</th>
+            </tr></thead>
             <tbody>
               {loading ? <tr><td colSpan={6} className="p-12 text-center font-black">Đang tải...</td></tr> : votes.length === 0 ? <tr><td colSpan={6} className="p-12 text-center font-black text-gray-500">Không có phiếu.</td></tr> : votes.map((vote) => (
                 <tr key={vote.vote_id} className="border-b-2 border-manga-ink">
@@ -151,7 +185,7 @@ export default function AdminVotesPage() {
                   <td className="px-5 py-5 font-black uppercase">{vote.decision || 'N/A'}</td>
                   <td className="px-5 py-5 text-2xl font-black">{vote.score ?? '-'}</td>
                   <td className="px-5 py-5"><AdminStatusBadge status={vote.status} /></td>
-                  <td className="px-5 py-5"><div className="flex justify-end gap-2">{vote.status === 'submitted' && <button disabled={busyId === vote.vote_id} onClick={() => verify(vote)} className={`${iconClass} bg-emerald-500 text-white`}><CheckCircle2 /></button>}<button onClick={() => openEdit(vote)} className={iconClass}><Edit3 /></button><button disabled={busyId === vote.vote_id} onClick={() => remove(vote)} className={`${iconClass} bg-manga-red text-white`}><Trash2 /></button></div></td>
+                  <td className="px-5 py-5"><div className="flex justify-end gap-2">{vote.status === 'submitted' && <button disabled={busyId === vote.vote_id} onClick={() => verify(vote)} className={`${iconClass} bg-emerald-500 text-white hover:bg-emerald-600`}><CheckCircle2 /></button>}<button onClick={() => openEdit(vote)} className={`${iconClass} bg-white hover:bg-gray-100`}><Edit3 /></button><button disabled={busyId === vote.vote_id} onClick={() => remove(vote)} className={`${iconClass} bg-manga-red text-white hover:bg-red-600`}><Trash2 /></button></div></td>
                 </tr>
               ))}
             </tbody>

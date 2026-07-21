@@ -16,17 +16,17 @@ type ReviewSessionWorkflowActionsProps = {
 
 const workflowByStatus: Record<string, Array<{ action: WorkflowAction; label: string; icon: typeof Play; className: string }>> = {
   pending: [
-    { action: 'start', label: 'Start', icon: Play, className: 'border-blue-600 bg-blue-600 text-white hover:bg-blue-700' },
-    { action: 'cancel', label: 'Cancel', icon: XCircle, className: 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100' },
+    { action: 'start', label: 'Bắt đầu', icon: Play, className: 'border-2 border-manga-ink bg-emerald-400 text-black shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_rgba(0,0,0,1)]' },
+    { action: 'cancel', label: 'Hủy bỏ', icon: XCircle, className: 'border-2 border-manga-ink bg-manga-red text-white shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_rgba(0,0,0,1)]' },
   ],
   in_progress: [
-    { action: 'pause', label: 'Pause', icon: Pause, className: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100' },
-    { action: 'finalize', label: 'Finalize', icon: CheckCircle2, className: 'border-green-600 bg-green-600 text-white hover:bg-green-700' },
-    { action: 'cancel', label: 'Cancel', icon: XCircle, className: 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100' },
+    { action: 'pause', label: 'Tạm dừng', icon: Pause, className: 'border-2 border-manga-ink bg-amber-400 text-black shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_rgba(0,0,0,1)]' },
+    { action: 'finalize', label: 'Hoàn tất', icon: CheckCircle2, className: 'border-2 border-manga-ink bg-sky-400 text-black shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_rgba(0,0,0,1)]' },
+    { action: 'cancel', label: 'Hủy bỏ', icon: XCircle, className: 'border-2 border-manga-ink bg-manga-red text-white shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_rgba(0,0,0,1)]' },
   ],
   paused: [
-    { action: 'start', label: 'Start', icon: Play, className: 'border-blue-600 bg-blue-600 text-white hover:bg-blue-700' },
-    { action: 'cancel', label: 'Cancel', icon: XCircle, className: 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100' },
+    { action: 'start', label: 'Tiếp tục', icon: Play, className: 'border-2 border-manga-ink bg-emerald-400 text-black shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_rgba(0,0,0,1)]' },
+    { action: 'cancel', label: 'Hủy bỏ', icon: XCircle, className: 'border-2 border-manga-ink bg-manga-red text-white shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_rgba(0,0,0,1)]' },
   ],
   completed: [],
   finished: [],
@@ -49,7 +49,7 @@ export function ReviewSessionWorkflowActions({
   const actions = workflowByStatus[session.status] || []
   const isBusy = Boolean(busyKey?.endsWith(sessionId))
   const isProcessing = processingSessionId === sessionId
-  const buttonSize = compact ? 'h-9 px-3 text-xs' : 'h-10 px-3 text-sm'
+  const buttonSize = compact ? 'h-9 px-3 text-xs' : 'h-10 px-4 text-sm'
 
   return (
     <div className="flex flex-wrap gap-2">
@@ -60,7 +60,7 @@ export function ReviewSessionWorkflowActions({
           title={label}
           disabled={isBusy}
           onClick={() => onWorkflowAction(session, action)}
-          className={`inline-flex items-center justify-center gap-2 rounded-md border font-semibold disabled:cursor-not-allowed disabled:opacity-60 ${buttonSize} ${className}`}
+          className={`inline-flex items-center justify-center gap-2 font-black uppercase tracking-wider disabled:cursor-not-allowed disabled:opacity-60 transition-all ${buttonSize} ${className}`}
         >
           <Icon className="h-4 w-4" />
           {label}
@@ -70,28 +70,29 @@ export function ReviewSessionWorkflowActions({
       {canManageVotes(session.status) && (
         <button
           type="button"
-          title="Manage votes"
+          title="Quản lý phiếu"
           disabled={isBusy}
           onClick={() => onManageVotes(session)}
-          className={`inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 ${buttonSize}`}
+          className={`inline-flex items-center justify-center gap-2 border-2 border-manga-ink bg-white font-black uppercase tracking-wider text-manga-ink shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_rgba(0,0,0,1)] disabled:cursor-not-allowed disabled:opacity-60 ${buttonSize}`}
         >
           <CheckCircle2 className="h-4 w-4" />
-          Manage Votes
+          Quản lý phiếu
         </button>
       )}
 
       {canProcessResult(session.status) && (
         <button
           type="button"
-          title="Process result"
+          title="Xử lý kết quả"
           disabled={isBusy || isProcessing}
           onClick={() => onProcessResult(session)}
-          className={`inline-flex items-center justify-center gap-2 rounded-md border border-blue-200 bg-blue-50 font-semibold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60 ${buttonSize}`}
+          className={`inline-flex items-center justify-center gap-2 border-2 border-manga-ink bg-purple-400 font-black uppercase tracking-wider text-black shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_rgba(0,0,0,1)] disabled:cursor-not-allowed disabled:opacity-60 ${buttonSize}`}
         >
           <BarChart3 className="h-4 w-4" />
-          {isProcessing ? 'Processing...' : 'Process Result'}
+          {isProcessing ? 'Đang xử lý...' : 'Xử lý kết quả'}
         </button>
       )}
     </div>
   )
 }
+

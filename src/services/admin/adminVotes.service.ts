@@ -2,7 +2,7 @@ import { adminDelete, adminGet, adminList, adminPatch, adminPost } from './admin
 import type { Vote, VoteStatus } from './admin.types'
 
 export const adminVotesService = {
-  list: (params?: { status?: VoteStatus; page?: number; limit?: number }) => adminList<Vote>('/api/admin/votes', params),
+  list: (params?: { status?: VoteStatus; page?: number; limit?: number; keyword?: string }) => adminList<Vote>('/api/admin/votes', params),
   getById: (voteId: string) => adminGet<Vote>(`/api/admin/votes/${voteId}`),
   create: (body: Partial<Vote>) => adminPost<Vote>('/api/votes', body),
   update: (voteId: string, body: Partial<Vote>) => adminPatch<Vote>(`/api/admin/votes/${voteId}`, body),

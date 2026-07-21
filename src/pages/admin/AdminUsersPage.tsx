@@ -1,4 +1,5 @@
 import React, { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import {
   AlertCircle,
   Ban,
@@ -102,7 +103,7 @@ const inputClass =
   'w-full border-2 border-manga-ink bg-white px-4 py-3 text-sm font-bold outline-none focus:shadow-[3px_3px_0_rgba(232,23,63,1)]'
 const labelClass = 'mb-2 block text-xs font-black uppercase tracking-widest text-gray-600'
 const iconButtonClass =
-  'flex h-11 w-11 items-center justify-center border-2 border-manga-ink bg-white shadow-[3px_3px_0_rgba(0,0,0,1)] transition-all hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-[2px_2px_0_rgba(0,0,0,1)]'
+  'flex h-11 w-11 items-center justify-center border-2 border-manga-ink shadow-[3px_3px_0_rgba(0,0,0,1)] transition-all hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-[2px_2px_0_rgba(0,0,0,1)]'
 
 const formatDate = (date?: string | null) => {
   if (!date) return 'N/A'
@@ -314,9 +315,31 @@ interface UserDetailsModalProps {
   user: User
   loading: boolean
   onClose: () => void
+  onRoleUpdate: (user: User, newRole: UserRole) => Promise<void>
 }
 
-function UserDetailsModal({ user, loading, onClose }: UserDetailsModalProps) {
+function UserDetailsModal({ user, loading, onClose, onRoleUpdate }: UserDetailsModalProps) {
+  const [selectedRole, setSelectedRole] = useState<UserRole>(user.role)
+  const [savingRole, setSavingRole] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
+
+  useEffect(() => {
+    setSelectedRole(user.role)
+  }, [user.role])
+
+  const handleSaveRole = async () => {
+    if (selectedRole === user.role) return
+    setSavingRole(true)
+    setSaveSuccess(false)
+    try {
+      await onRoleUpdate(user, selectedRole)
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 3000)
+    } finally {
+      setSavingRole(false)
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className="w-full max-w-3xl border-2 border-manga-ink bg-white shadow-[8px_8px_0_rgba(0,0,0,1)]">
@@ -345,10 +368,40 @@ function UserDetailsModal({ user, loading, onClose }: UserDetailsModalProps) {
               <p className="text-xs font-black uppercase text-gray-500">Email</p>
               <p className="mt-2 font-bold">{user.email}</p>
             </div>
-            <div className="border-2 border-manga-ink p-4">
-              <p className="text-xs font-black uppercase text-gray-500">Vai trò</p>
-              <p className="mt-2 font-black uppercase">{roleLabel[user.role]}</p>
+            
+            {/* Role selection & approval section */}
+            <div className="border-2 border-manga-ink p-4 bg-zinc-50">
+              <p className="text-xs font-black uppercase text-gray-500">Vai trò / Phân quyền</p>
+              <div className="mt-2 flex flex-col gap-2">
+                <select
+                  value={selectedRole}
+                  onChange={(e) => setSelectedRole(e.target.value as UserRole)}
+                  className="w-full border-2 border-manga-ink bg-white px-3 py-1.5 text-xs font-black uppercase outline-none"
+                >
+                  {USER_ROLES.map((role) => (
+                    <option key={role} value={role}>
+                      {roleLabel[role]}
+                    </option>
+                  ))}
+                </select>
+
+                <AdminButton
+                  type="button"
+                  variant={selectedRole !== user.role ? 'red' : 'white'}
+                  icon={Save}
+                  disabled={savingRole || selectedRole === user.role}
+                  onClick={handleSaveRole}
+                  className="w-full !py-1 text-xs"
+                >
+                  {savingRole ? 'Đang lưu...' : selectedRole !== user.role ? 'Lưu (Save)' : 'Đã lưu'}
+                </AdminButton>
+
+                {saveSuccess && (
+                  <p className="text-[10px] font-black text-emerald-600 uppercase">✓ Cập nhật vai trò thành công!</p>
+                )}
+              </div>
             </div>
+
             <div className="border-2 border-manga-ink p-4">
               <p className="text-xs font-black uppercase text-gray-500">Họ tên</p>
               <p className="mt-2 font-bold">{user.name || 'N/A'}</p>
@@ -382,6 +435,7 @@ function UserDetailsModal({ user, loading, onClose }: UserDetailsModalProps) {
 }
 
 export default function AdminUsersPage() {
+  const [searchParams] = useSearchParams()
   const [users, setUsers] = useState<User[]>([])
   const [pagination, setPagination] = useState<PaginationMeta>(emptyPagination)
   const [page, setPage] = useState(1)
@@ -399,6 +453,24 @@ export default function AdminUsersPage() {
   const [form, setForm] = useState<UserFormState>(emptyForm)
   const [detailUser, setDetailUser] = useState<User | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+
+  useEffect(() => {
+    const targetUserId = searchParams.get('userId') || searchParams.get('id') || searchParams.get('requester_id')
+    if (targetUserId) {
+      const fetchAndOpenUser = async () => {
+        setDetailLoading(true)
+        try {
+          const detail = await adminUsersService.getById(targetUserId)
+          setDetailUser(detail)
+        } catch (error) {
+          console.error('Không thể tải thông tin người dùng từ URL search param:', error)
+        } finally {
+          setDetailLoading(false)
+        }
+      }
+      fetchAndOpenUser()
+    }
+  }, [searchParams])
 
   const loadUsers = useCallback(async () => {
     setLoading(true)
@@ -544,11 +616,13 @@ export default function AdminUsersPage() {
     setActionUserId(user.user_id)
     setFeedback(null)
     try {
-      await adminUsersService.updateRole(user.user_id, role)
+      await adminUsersService.update(user.user_id, { role })
       setUsers((current) => current.map((item) => (item.user_id === user.user_id ? { ...item, role } : item)))
+      setDetailUser((current) => (current && current.user_id === user.user_id ? { ...current, role } : current))
       setFeedback({ type: 'success', message: `Đã đổi vai trò của ${user.username} thành ${roleLabel[role]}.` })
     } catch (error) {
       setFeedback({ type: 'error', message: getErrorMessage(error) })
+      throw error
     } finally {
       setActionUserId(null)
     }
@@ -634,17 +708,9 @@ export default function AdminUsersPage() {
 
       <AdminTableFrame>
         <div className="space-y-5 border-b-2 border-manga-ink p-6">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <AdminFilters
-              tabs={STATUS_TABS}
-              activeTab={statusTabLabel(statusFilter)}
-              onTabChange={(tab) => {
-                setStatusFilter(normalizeStatusTab(tab))
-                setPage(1)
-              }}
-            />
-            <form onSubmit={handleSearch} className="flex flex-col gap-3 md:flex-row">
-              <div className="relative min-w-0 md:w-80">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <form onSubmit={handleSearch} className="flex-1 max-w-lg">
+              <div className="relative">
                 <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500" />
                 <input
                   value={keywordInput}
@@ -653,33 +719,9 @@ export default function AdminUsersPage() {
                   className={`${inputClass} pl-12`}
                 />
               </div>
-              <AdminButton type="submit" icon={Search} disabled={loading}>
-                Tìm kiếm
-              </AdminButton>
             </form>
-          </div>
-
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <label className="min-w-48">
-                <span className={labelClass}>Vai trò</span>
-                <select
-                  value={roleFilter}
-                  onChange={(event) => {
-                    setRoleFilter(event.target.value as RoleFilter)
-                    setPage(1)
-                  }}
-                  className={inputClass}
-                >
-                  <option value="all">TẤT CẢ VAI TRÒ</option>
-                  {USER_ROLES.map((role) => (
-                    <option key={role} value={role}>
-                      {roleLabel[role]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="min-w-48">
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="min-w-44">
                 <span className={labelClass}>Sắp xếp</span>
                 <select
                   value={sortOrder}
@@ -687,20 +729,20 @@ export default function AdminUsersPage() {
                     setSortOrder(event.target.value as 'asc' | 'desc')
                     setPage(1)
                   }}
-                  className={inputClass}
+                  className={`${inputClass} !py-2`}
                 >
                   <option value="desc">MỚI NHẤT TRƯỚC</option>
                   <option value="asc">CŨ NHẤT TRƯỚC</option>
                 </select>
               </label>
-            </div>
-            <div className="flex gap-3">
-              <AdminButton type="button" variant="white" icon={RefreshCw} onClick={loadUsers} disabled={loading}>
-                Tải lại
-              </AdminButton>
-              <AdminButton type="button" variant="dark" icon={X} onClick={resetFilters}>
-                Xóa lọc
-              </AdminButton>
+              <div className="flex gap-2 self-end">
+                <AdminButton type="button" variant="white" icon={RefreshCw} onClick={loadUsers} disabled={loading}>
+                  Tải lại
+                </AdminButton>
+                <AdminButton type="button" variant="dark" icon={X} onClick={resetFilters}>
+                  Xóa lọc
+                </AdminButton>
+              </div>
             </div>
           </div>
         </div>
@@ -708,11 +750,49 @@ export default function AdminUsersPage() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1040px] border-collapse text-left">
             <thead className="bg-[#282828] text-white">
-              <tr className="text-sm font-black uppercase">
+              <tr className="text-sm font-black uppercase text-xs">
                 <th className="border-r-2 border-black px-8 py-5">Hồ sơ người dùng</th>
                 <th className="border-r-2 border-black px-7 py-5">Email liên hệ</th>
-                <th className="border-r-2 border-black px-7 py-5">Vai trò</th>
-                <th className="border-r-2 border-black px-7 py-5">Trạng thái</th>
+                <th className="border-r-2 border-black px-7 py-5 min-w-[200px]">
+                  <div className="flex flex-col gap-1">
+                    <span>Vai trò</span>
+                    <select
+                      value={roleFilter}
+                      onChange={(event) => {
+                        setRoleFilter(event.target.value as RoleFilter)
+                        setPage(1)
+                      }}
+                      className="block w-full border border-gray-600 bg-[#3a3a3a] text-white px-2 py-1 text-xs font-bold outline-none focus:border-white"
+                    >
+                      <option value="all">TẤT CẢ VAI TRÒ</option>
+                      {USER_ROLES.map((role) => (
+                        <option key={role} value={role}>
+                          {roleLabel[role]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </th>
+                <th className="border-r-2 border-black px-7 py-5 min-w-[190px]">
+                  <div className="flex flex-col gap-1">
+                    <span>Trạng thái</span>
+                    <select
+                      value={statusFilter}
+                      onChange={(event) => {
+                        setStatusFilter(event.target.value as StatusFilter)
+                        setPage(1)
+                      }}
+                      className="block w-full border border-gray-600 bg-[#3a3a3a] text-white px-2 py-1 text-xs font-bold outline-none focus:border-white"
+                    >
+                      <option value="all">TẤT CẢ TRẠNG THÁI</option>
+                      {USER_STATUSES.map((status) => (
+                        <option key={status} value={status}>
+                          {statusLabel[status]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </th>
                 <th className="px-7 py-5 text-right">Thao tác</th>
               </tr>
             </thead>
@@ -815,7 +895,7 @@ export default function AdminUsersPage() {
                             type="button"
                             aria-label={`Sửa ${user.username}`}
                             onClick={() => openEditModal(user)}
-                            className={iconButtonClass}
+                            className={`${iconButtonClass} bg-white`}
                           >
                             <Edit3 className="h-5 w-5" />
                           </button>
@@ -824,7 +904,7 @@ export default function AdminUsersPage() {
                             aria-label={`Vô hiệu hóa ${user.username}`}
                             disabled={isBusy || user.status === 'inactive'}
                             onClick={() => handleSoftDelete(user)}
-                            className={`${iconButtonClass} ${user.status === 'inactive' ? 'border-gray-300 text-gray-300 shadow-none' : 'bg-manga-red text-white'}`}
+                            className={`${iconButtonClass} ${user.status === 'inactive' ? 'bg-gray-50 border-gray-300 text-gray-300 shadow-none' : 'bg-manga-red text-white'}`}
                           >
                             <Trash2 className="h-5 w-5" />
                           </button>
@@ -898,6 +978,7 @@ export default function AdminUsersPage() {
           user={detailUser}
           loading={detailLoading}
           onClose={() => setDetailUser(null)}
+          onRoleUpdate={handleRoleChange}
         />
       )}
     </div>

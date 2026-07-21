@@ -108,8 +108,13 @@ export default function SubmissionForm({ taskId, onSuccess, onCancel }: Submissi
     setIsSubmitting(true)
     setError(null)
     try {
+      const apiURL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const absoluteUrl = fileUrl.startsWith('http://') || fileUrl.startsWith('https://') 
+        ? fileUrl 
+        : `${apiURL}${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`
+
       await assistantService.createSubmission(taskId, {
-        file_url: fileUrl,
+        file_url: absoluteUrl,
         submission_notes: notes.trim(),
       })
       setSuccess(true)
@@ -118,7 +123,7 @@ export default function SubmissionForm({ taskId, onSuccess, onCancel }: Submissi
       }, 1500)
     } catch (err: any) {
       console.error('Lỗi nộp bài:', err)
-      setError(err.response?.data?.message || 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.')
+      setError(err.response?.data?.message || err.message || 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.')
     } finally {
       setIsSubmitting(false)
     }

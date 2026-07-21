@@ -64,7 +64,6 @@ export const seriesService = {
     return (res.data.data ?? []).map(mapSeries)
   },
 
-  // getMembers removed from here as it is declared later
 
   /** GET /api/mangaka/series/:seriesId */
   getById: async (seriesId: string): Promise<SeriesAPI> => {

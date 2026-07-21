@@ -11,7 +11,7 @@ export function PublicUserGuard({ children }: { children: React.ReactNode }) {
       const storedUser = sessionStorage.getItem('mangaflow_user')
       if (storedUser) {
         try {
-          const user: UserProfile = JSON.parse(storedUser)
+          const user: any = JSON.parse(storedUser)
           // If the user is logged in but is NOT a regular user, redirect to their dashboard
           if (user.role && (user.role as any) !== 'USER' && (user.role as any) !== 'user') {
             if (user.role === 'MANGAKA') {

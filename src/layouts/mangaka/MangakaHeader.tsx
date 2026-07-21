@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router'
 import { Bell, MessageSquare, Send, User, Settings, LogOut } from 'lucide-react'
 import { mangakaStore, Notification, EditorFeedback } from '@/data/mangakaMockData'
 import { rankingService } from '@/services/ranking.service'
+import { feedbackService } from '@/services/feedback.service'
 
 const mapType = (backendType: string): "Assistant" | "Editor" | "Board" | "Ranking" | "System" => {
   const t = (backendType || '').toLowerCase();
@@ -259,16 +260,49 @@ export function Header() {
       });
       setNotifications(mapped);
     } catch (err) {
-      console.error('Lỗi tải thông báo của Mangaka:', err);
+      console.error('Lỗi tải thông báo:', err);
     }
   };
 
+  const loadRealFeedbacks = async () => {
+    try {
+      const rawFeedbacks = await feedbackService.getAll()
+      const storedUser = sessionStorage.getItem('mangaflow_user')
+      let currentUserId = ''
+      if (storedUser) {
+        try {
+          const parsed = JSON.parse(storedUser)
+          currentUserId = parsed.id || parsed.user_id || ''
+        } catch (e) {}
+      }
+      const filteredRaw = rawFeedbacks.filter(
+        (fb) => fb.mangaka_id !== null && fb.mangaka_id !== currentUserId
+      )
+      const mappedFeedbacks: EditorFeedback[] = filteredRaw.map((fb) => ({
+        id: fb.feedback_id,
+        sender: fb.mangaka?.name || fb.mangaka?.username || 'EDITOR',
+        seriesId: fb.submission?.page?.chapter?.series?.title || '',
+        seriesTitle: fb.submission?.page?.chapter?.series?.title || 'Bản thảo',
+        chapterNumber: fb.submission?.page?.chapter?.chapter_number || 1,
+        pageNumber: fb.submission?.page?.page_number,
+        content: fb.content,
+        severity: 'Medium',
+        status: (fb.status || 'Open') as any,
+        createdAt: fb.created_at,
+      }))
+      setFeedbacks(mappedFeedbacks)
+    } catch (err) {
+      setFeedbacks([])
+    }
+  }
+
   useEffect(() => {
     loadRealNotifications();
-    setFeedbacks(mangakaStore.getEditorFeedbacks());
+    loadRealFeedbacks();
 
     const interval = setInterval(() => {
       loadRealNotifications();
+      loadRealFeedbacks();
     }, 15000);
 
     const handleClickOutside = (event: MouseEvent) => {

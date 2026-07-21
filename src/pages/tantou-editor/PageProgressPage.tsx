@@ -299,7 +299,7 @@ export default function PageProgressPage() {
             
             let latestChapNum = 0;
             const seriesInfo = seriesMap[series.id];
-            let lastPublishDateStr = seriesInfo?.proposedStartDate || series.created_at || new Date().toISOString();
+            let lastPublishDateStr = seriesInfo?.proposedStartDate || (series as any).created_at || new Date().toISOString();
             
             if (publishedChaps.length > 0) {
               publishedChaps.sort((a, b) => b.chapter_number - a.chapter_number);

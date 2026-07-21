@@ -102,7 +102,7 @@ export default function UserProfilePage() {
   if (profile.favoriteGenres) {
     favoriteGenres = profile.favoriteGenres.split(',').map((g: string) => g.trim()).filter(Boolean)
   } else {
-    const allGenres = history.flatMap(h => (h.seriesGenre || '').split(',').map(g => g.trim())).filter(Boolean)
+    const allGenres = history.flatMap(h => (h.seriesGenre || '').split(',').map((g: string) => g.trim())).filter(Boolean)
     favoriteGenres = Array.from(new Set(allGenres)).slice(0, 5)
   }
 

@@ -98,10 +98,10 @@ export function InteractionStats({ seriesList = [] }: InteractionStatsProps) {
           Xếp hạng tuần
         </h3>
         
-        {rankingData.series?.cover_image_url && (
+        {(rankingData.series?.cover_image_url || (rankingData.series as any)?.cover_image) && (
           <div className="w-20 h-28 border-2 border-manga-ink mb-3 overflow-hidden shadow-[4px_4px_0px_rgba(0,0,0,1)] bg-gray-100">
             <img 
-              src={rankingData.series.cover_image_url} 
+              src={rankingData.series?.cover_image_url || (rankingData.series as any)?.cover_image} 
               alt={seriesTitle} 
               className="w-full h-full object-cover"
             />

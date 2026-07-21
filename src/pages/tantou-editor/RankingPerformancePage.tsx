@@ -5,6 +5,8 @@ import { editorService, ApiRankingEntry, ApiRankingPeriod } from '@/services/edi
 
 interface DisplayRanking {
   rank: number
+  globalViewRank: number
+  globalLikeRank: number
   prevRank: number
   series: string
   seriesId: string

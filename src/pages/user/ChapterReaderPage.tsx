@@ -13,7 +13,7 @@ const getLikeKey = () => {
       const user = JSON.parse(userStr);
       if (user.id) return `mangaflow_liked_chapters_${user.id}`;
     }
-  } catch (e) {}
+  } catch (e) { }
   return 'mangaflow_liked_chapters_guest';
 }
 
@@ -21,7 +21,7 @@ export default function ChapterReaderPage() {
   const { seriesId, chapterId } = useParams()
   const navigate = useNavigate()
   const { showToast } = useToast()
-  
+
   const [pages, setPages] = useState<MangaPage[]>([])
   const [chapter, setChapter] = useState<PublishedChapter | null>(null)
   const [allChapters, setAllChapters] = useState<PublishedChapter[]>([])
@@ -42,7 +42,7 @@ export default function ChapterReaderPage() {
       return false;
     }
   })
-  
+
   const bottomRef = useRef<HTMLDivElement>(null)
   const viewLoggedRef = useRef<string | null>(null)
 
@@ -57,22 +57,22 @@ export default function ChapterReaderPage() {
         const current = chapters.find(c => c.id === chapterId)
         if (current) setChapter(current)
       })
-      
+
       // Chống StrictMode double-mount: chỉ log view 1 lần mỗi chapterId
       if (viewLoggedRef.current !== chapterId) {
         viewLoggedRef.current = chapterId
         readerService.logView(seriesId, chapterId)
       }
-      
+
       // Immediately mark as read when user opens the chapter
       readerService.saveReadingProgress({ series_id: seriesId, chapter_id: chapterId, page_number: 1 });
 
-      
+
       try {
         const stored = localStorage.getItem(getLikeKey());
         const parsed = stored ? JSON.parse(stored) : {};
         setIsLiked(!!parsed[chapterId]);
-        
+
         // Sync with API
         const userStr = localStorage.getItem('mangaflow_user') || localStorage.getItem('user');
         if (userStr) {
@@ -95,14 +95,14 @@ export default function ChapterReaderPage() {
             });
           }
         }
-      } catch (err) {}
-      
+      } catch (err) { }
+
       setCurrentPageIndex(0);
     }
   }, [chapterId, seriesId])
 
   const currentChapterIndex = allChapters.findIndex(c => c.id === chapterId)
-  
+
   // Array is descending (newest first). 
   // Next chapter (newer) has a smaller index.
   // Prev chapter (older) has a larger index.
@@ -164,21 +164,21 @@ export default function ChapterReaderPage() {
       setShowNav(!showNav)
       return
     }
-    
+
     // Horizontal mode
     const rect = e.currentTarget.getBoundingClientRect()
     const x = e.clientX - rect.left
     if (x < rect.width * 0.3) {
       if (currentPageIndex > 0) {
-         setCurrentPageIndex(p => p - 1)
+        setCurrentPageIndex(p => p - 1)
       } else {
-         handlePrevChapter(e)
+        handlePrevChapter(e)
       }
     } else if (x > rect.width * 0.7) {
       if (currentPageIndex < pages.length - 1) {
-         setCurrentPageIndex(p => p + 1)
+        setCurrentPageIndex(p => p + 1)
       } else {
-         handleNextChapter(e)
+        handleNextChapter(e)
       }
     } else {
       setShowNav(!showNav)
@@ -206,9 +206,9 @@ export default function ChapterReaderPage() {
         }
         localStorage.setItem(getLikeKey(), JSON.stringify(parsed));
         window.dispatchEvent(new Event('mangaflow_like_update'));
-        
+
         await readerService.toggleChapterLike(chapterId);
-      } catch (err) {}
+      } catch (err) { }
     }
   }
 
@@ -244,26 +244,26 @@ export default function ChapterReaderPage() {
         {readDirection === 'vertical' ? (
           <>
             {pages.map((page, index) => (
-              <img 
-                key={page.id} 
-                src={page.imageUrl} 
+              <img
+                key={page.id}
+                src={page.imageUrl}
                 alt={`Page ${page.pageNumber}`}
                 className={`block select-none ${bgColor === 'dark' ? 'bg-[#2a2a2a]' : 'bg-gray-200'} min-h-[300px] ${imageWidth === 'full' ? 'w-full h-auto' : 'max-w-full h-auto'}`}
                 loading={index < 3 ? "eager" : "lazy"}
               />
             ))}
-            
+
             <div ref={bottomRef} className={`w-full p-12 text-center border-t-2 mt-8 ${bgColor === 'dark' ? 'border-[#333] bg-[#1a1a1a]' : 'border-gray-300 bg-white'}`}>
               <h3 className={`font-manga text-2xl uppercase mb-6 ${bgColor === 'dark' ? 'text-white' : 'text-black'}`}>Hết chương</h3>
               <div className="flex justify-center gap-4">
-                <button 
+                <button
                   onClick={handlePrevChapter}
                   disabled={!hasPrev}
                   className={`px-6 py-3 border-2 font-bold uppercase transition-colors flex items-center gap-2 ${hasPrev ? (bgColor === 'dark' ? 'border-[#555] hover:bg-white hover:text-black cursor-pointer' : 'border-black hover:bg-black hover:text-white cursor-pointer') : 'border-gray-500 text-gray-500 opacity-50 cursor-not-allowed'}`}
                 >
                   <ChevronLeft className="w-5 h-5" /> Chương trước
                 </button>
-                <button 
+                <button
                   onClick={handleNextChapter}
                   disabled={!hasNext}
                   className={`px-6 py-3 border-2 font-bold uppercase transition-colors flex items-center gap-2 ${hasNext ? 'bg-manga-red text-white border-manga-red hover:bg-red-600 cursor-pointer' : 'bg-gray-700 text-gray-500 border-gray-700 cursor-not-allowed'}`}
@@ -276,10 +276,10 @@ export default function ChapterReaderPage() {
         ) : (
           pages.length > 0 && (
             <div className="relative w-full h-[85vh] flex flex-col items-center justify-center">
-              <img 
-                src={pages[currentPageIndex]?.imageUrl} 
-                alt={`Page ${pages[currentPageIndex]?.pageNumber}`} 
-                className={`select-none max-h-full ${imageWidth === 'full' ? 'w-full object-contain' : 'max-w-full object-contain'}`} 
+              <img
+                src={pages[currentPageIndex]?.imageUrl}
+                alt={`Page ${pages[currentPageIndex]?.pageNumber}`}
+                className={`select-none max-h-full ${imageWidth === 'full' ? 'w-full object-contain' : 'max-w-full object-contain'}`}
               />
               <div className="absolute bottom-4 right-4 bg-black text-white px-3 py-1 text-sm font-bold border-2 border-white shadow-[2px_2px_0px_#fff]">
                 {currentPageIndex + 1} / {pages.length}
@@ -292,24 +292,24 @@ export default function ChapterReaderPage() {
       {/* Bottom Navbar */}
       <div className={`fixed bottom-0 left-0 right-0 ${bgColor === 'dark' ? 'bg-[#1a1a1a] border-black' : 'bg-white border-manga-ink'} border-t-2 z-50 transition-transform duration-300 flex items-center justify-center px-4 h-16 ${showNav ? 'translate-y-0' : 'translate-y-full'}`}>
         <div className="flex items-center gap-8 w-full max-w-[800px] justify-between">
-          <button 
+          <button
             onClick={handlePrevChapter}
             disabled={!hasPrev}
             className={`flex items-center gap-2 font-bold uppercase text-sm ${hasPrev ? (bgColor === 'dark' ? 'text-gray-400 hover:text-white cursor-pointer' : 'text-gray-600 hover:text-black cursor-pointer') : 'text-gray-500 cursor-not-allowed'}`}
           >
             <ChevronLeft className="w-5 h-5" /> Trước
           </button>
-          
+
           <div className="flex items-center gap-8">
-            <button 
+            <button
               onClick={handleChapterLike}
               className="text-gray-400 hover:text-white flex flex-col items-center gap-1 group"
             >
               <Heart className={`w-5 h-5 ${isLiked ? 'fill-manga-red text-manga-red' : 'group-hover:text-manga-red'}`} />
               <span className={`text-[10px] uppercase font-bold ${isLiked ? 'text-manga-red' : ''}`}>{isLiked ? 'Đã theo dõi' : 'Theo dõi'}</span>
             </button>
-            
-            <button 
+
+            <button
               onClick={() => setShowComments(true)}
               className={`flex flex-col items-center gap-1 group transition-colors ${bgColor === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-black'}`}
             >
@@ -317,8 +317,8 @@ export default function ChapterReaderPage() {
               <span className="text-[10px] uppercase font-bold">Bình luận</span>
             </button>
           </div>
-          
-          <button 
+
+          <button
             onClick={handleNextChapter}
             disabled={!hasNext}
             className={`flex items-center gap-2 font-bold uppercase text-sm ${hasNext ? (bgColor === 'dark' ? 'text-gray-400 hover:text-white cursor-pointer' : 'text-gray-600 hover:text-black cursor-pointer') : 'text-gray-500 cursor-not-allowed'}`}
@@ -328,10 +328,10 @@ export default function ChapterReaderPage() {
         </div>
       </div>
 
-      <ChapterCommentsPanel 
-        isOpen={showComments} 
-        onClose={() => setShowComments(false)} 
-        chapterId={chapterId || ''} 
+      <ChapterCommentsPanel
+        isOpen={showComments}
+        onClose={() => setShowComments(false)}
+        chapterId={chapterId || ''}
         chapterTitle={chapter ? `Chương ${chapter.chapterNumber}` : ''}
       />
       {/* Chapter List Modal */}
@@ -388,25 +388,25 @@ export default function ChapterReaderPage() {
             <div className="absolute -top-[34px] left-0 bg-black text-white px-6 py-2 font-manga text-xl font-bold uppercase z-10" style={{ clipPath: 'polygon(0 0, 100% 0, 90% 100%, 0% 100%)', paddingRight: '2rem' }}>
               CÀI ĐẶT
             </div>
-            <button 
+            <button
               onClick={() => setShowSettings(false)}
               className="absolute -top-[22px] -right-[10px] bg-manga-red text-white border-4 border-black p-2 hover:bg-red-700 transition-colors z-20 shadow-[4px_4px_0px_rgba(0,0,0,1)]"
             >
               <X className="w-5 h-5 stroke-[3]" />
             </button>
-            
+
             <div className="bg-white border-[6px] border-black p-6 relative shadow-[12px_12px_0px_rgba(0,0,0,1)]">
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-bold text-gray-500 uppercase mb-3">Chiều đọc</label>
                   <div className="grid grid-cols-2 gap-3">
-                    <button 
+                    <button
                       onClick={() => setReadDirection('vertical')}
                       className={`py-3 px-4 font-bold text-sm border-2 transition-all ${readDirection === 'vertical' ? 'bg-manga-red text-white border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] -translate-y-[2px]' : 'bg-gray-100 text-black border-transparent hover:border-black'}`}
                     >
                       Cuộn dọc
                     </button>
-                    <button 
+                    <button
                       onClick={() => setReadDirection('horizontal')}
                       className={`py-3 px-4 font-bold text-sm border-2 transition-all ${readDirection === 'horizontal' ? 'bg-manga-red text-white border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] -translate-y-[2px]' : 'bg-gray-100 text-black border-transparent hover:border-black'}`}
                     >
@@ -418,13 +418,13 @@ export default function ChapterReaderPage() {
                 <div>
                   <label className="block text-sm font-bold text-gray-500 uppercase mb-3">Kích cỡ ảnh</label>
                   <div className="grid grid-cols-2 gap-3">
-                    <button 
+                    <button
                       onClick={() => setImageWidth('full')}
                       className={`py-3 px-4 font-bold text-sm border-2 transition-all ${imageWidth === 'full' ? 'bg-manga-red text-white border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] -translate-y-[2px]' : 'bg-gray-100 text-black border-transparent hover:border-black'}`}
                     >
                       Vừa màn hình
                     </button>
-                    <button 
+                    <button
                       onClick={() => setImageWidth('original')}
                       className={`py-3 px-4 font-bold text-sm border-2 transition-all ${imageWidth === 'original' ? 'bg-manga-red text-white border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] -translate-y-[2px]' : 'bg-gray-100 text-black border-transparent hover:border-black'}`}
                     >
@@ -436,13 +436,13 @@ export default function ChapterReaderPage() {
                 <div>
                   <label className="block text-sm font-bold text-gray-500 uppercase mb-3">Màu nền</label>
                   <div className="grid grid-cols-2 gap-3">
-                    <button 
+                    <button
                       onClick={() => setBgColor('dark')}
                       className={`py-3 px-4 font-bold text-sm border-2 transition-all ${bgColor === 'dark' ? 'bg-[#1a1a1a] text-white border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] -translate-y-[2px]' : 'bg-gray-100 text-black border-transparent hover:border-black'}`}
                     >
                       Tối
                     </button>
-                    <button 
+                    <button
                       onClick={() => setBgColor('light')}
                       className={`py-3 px-4 font-bold text-sm border-2 transition-all ${bgColor === 'light' ? 'bg-white text-black border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] -translate-y-[2px]' : 'bg-gray-100 text-black border-transparent hover:border-black'}`}
                     >

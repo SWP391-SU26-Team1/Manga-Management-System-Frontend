@@ -62,9 +62,12 @@ export default function LoginPage() {
   }
 
   React.useEffect(() => {
+    let initialized = false;
+
     const initGoogleSignIn = () => {
       const w = window as any
-      if (w.google) {
+      if (w.google && !initialized) {
+        initialized = true;
         const clientId = import.meta.env.GOOGLE_CLIENT_ID || import.meta.env.VITE_GOOGLE_CLIENT_ID || "1032120760447-placeholder.apps.googleusercontent.com"
         w.google.accounts.id.initialize({
           client_id: clientId,
@@ -87,8 +90,16 @@ export default function LoginPage() {
     }
 
     initGoogleSignIn()
-    const timer = setTimeout(initGoogleSignIn, 1000)
-    return () => clearTimeout(timer)
+    
+    // In case google script is loaded asynchronously and not ready yet
+    const timer = setInterval(() => {
+      if ((window as any).google && !initialized) {
+        initGoogleSignIn()
+        clearInterval(timer)
+      }
+    }, 500)
+
+    return () => clearInterval(timer);
   }, [])
 
   const handleGoogleFallbackClick = () => {

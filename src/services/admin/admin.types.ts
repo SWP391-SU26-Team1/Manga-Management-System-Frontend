@@ -216,8 +216,8 @@ export type Vote = {
   note?: string | null
   created_at: string
   status: VoteStatus
-  users?: Pick<User, 'user_id' | 'username' | 'email'> | null
-  voter?: Pick<User, 'user_id' | 'username' | 'name' | 'email'> | null
+  users?: Pick<User, 'user_id' | 'username' | 'name' | 'email' | 'avatar_url'> | null
+  voter?: Pick<User, 'user_id' | 'username' | 'name' | 'email' | 'avatar_url'> | null
   session?: Pick<ReviewSession, 'session_id' | 'name' | 'status' | 'series_id' | 'chapter_id'> | null
 }
 

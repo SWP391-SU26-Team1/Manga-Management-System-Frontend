@@ -15,8 +15,13 @@ const mapSeries = (s: any): PublishedSeries => {
   // If the backend returns chapter array, we can calculate these, otherwise default to 0
   const totalChapters = s.chapter ? s.chapter.length : 0;
   let latestChapterNumber = 0;
+  let latestChapterDate = s.updated_at;
   if (s.chapter && s.chapter.length > 0) {
-    latestChapterNumber = Math.max(...s.chapter.map((c: any) => c.chapter_number));
+    const latestChapter = s.chapter.reduce((prev: any, current: any) => 
+      (prev.chapter_number > current.chapter_number) ? prev : current
+    );
+    latestChapterNumber = latestChapter.chapter_number;
+    latestChapterDate = latestChapter.publish_date || latestChapter.created_at || s.updated_at;
   }
 
   // If the backend returns series_member array, find the mangaka
@@ -41,12 +46,12 @@ const mapSeries = (s: any): PublishedSeries => {
     totalLikes: s.total_likes || s.like_count || s.likes || 0,
     totalChapters,
     latestChapterNumber,
-    latestChapterDate: s.updated_at,
+    latestChapterDate: latestChapterDate || s.updated_at,
     rating: s.rating || 0,
     ratingCount: s.rating_count || 0,
     authorName,
     authorAvatarUrl,
-    createdAt: s.created_at,
+    createdAt: s.publish_date || s.created_at,
     updatedAt: s.updated_at
   }
 }

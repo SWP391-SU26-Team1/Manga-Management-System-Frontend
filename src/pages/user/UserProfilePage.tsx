@@ -10,7 +10,8 @@ const AVAILABLE_GENRES = [
   'Isekai', 'Shounen', 'Shoujo', 'Seinen', 'Josei'
 ]
 import { useNavigate } from 'react-router'
-import { readerService, ReadingHistoryItem } from '@/services/reader.service'
+import { readerService } from '@/services/reader.service'
+import { ReadingHistoryItem } from '@/types/reader.types'
 
 export default function UserProfilePage() {
   const [profile, setProfile] = useState<any>(null)

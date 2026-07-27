@@ -1,7 +1,7 @@
 import React from 'react'
 import { CheckCircle2, Edit3, Trash2 } from 'lucide-react'
 import type { Vote } from '@/services/admin/admin.types'
-import { formatDateTime, formatScore, getVoteId, getVoterLabel } from './helpers'
+import { formatDateTime, formatScore, getVoteId, getVoterLabel, getVoterAvatar } from './helpers'
 import { AdminStatusBadge } from '@/components/admin/AdminStatusBadge'
 import type { VoteHandler } from './types'
 
@@ -39,8 +39,23 @@ export function VoteTable({ votes, busyVoteId, onEdit, onVerify, onDelete }: Vot
             return (
               <tr key={voteId} className="align-top border-b-2 border-manga-ink last:border-b-0 hover:bg-[#fafafa]">
                 <td className="border-r-2 border-manga-ink px-4 py-3">
-                  <p className="font-black text-manga-ink">{getVoterLabel(vote)}</p>
-                  {vote.users?.email && <p className="mt-1 text-xs font-bold text-gray-500">{vote.users.email}</p>}
+                  <div className="flex items-center gap-3">
+                    <img 
+                      src={getVoterAvatar(vote)} 
+                      alt="Avatar" 
+                      className="w-10 h-10 rounded-full border-2 border-manga-ink bg-white object-cover shadow-[2px_2px_0px_rgba(0,0,0,1)] flex-shrink-0" 
+                    />
+                    <div>
+                      <p className="font-black text-manga-ink line-clamp-1" title={getVoterLabel(vote)}>
+                        {getVoterLabel(vote)}
+                      </p>
+                      {(vote.voter?.email || vote.users?.email) && (
+                        <p className="mt-0.5 text-xs font-bold text-gray-500 line-clamp-1" title={vote.voter?.email || vote.users?.email}>
+                          {vote.voter?.email || vote.users?.email}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </td>
                 <td className="border-r-2 border-manga-ink px-4 py-3 capitalize text-manga-ink font-black">{vote.decision || 'N/A'}</td>
                 <td className="border-r-2 border-manga-ink px-4 py-3 text-manga-ink font-black">{formatScore(vote.score)}</td>

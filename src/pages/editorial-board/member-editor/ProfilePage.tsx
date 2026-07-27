@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { User, Mail, Award, BookOpen, Star, Briefcase, Edit3, Save, X, Camera } from 'lucide-react'
 import { MOCK_USERS, UserProfile } from '@/data/mockUsers'
+import { boardService } from '@/services/board.service'
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
@@ -28,6 +29,52 @@ export default function ProfilePage() {
       setEditEmail(loadedProfile.email)
       setEditAvatarUrl(loadedProfile.avatarUrl || '')
     }
+  }, [])
+
+  const [activeSessionCount, setActiveSessionCount] = useState(0)
+  const [completedSessionCount, setCompletedSessionCount] = useState(0)
+  const [recentActivities, setRecentActivities] = useState<any[]>([])
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const res = await boardService.getProposals(1, 100)
+        const items = res?.data?.data || res?.data || []
+        
+        let active = 0
+        let completed = 0
+        const activities: any[] = []
+        
+        items.forEach((p: any, idx: number) => {
+          if (p.status === 'open' || p.status === 'in_progress' || p.status === 'pending') {
+            active++
+          } else if (p.status === 'approved' || p.status === 'rejected' || p.status === 'completed' || p.status === 'closed') {
+            completed++
+          }
+          
+          if (idx < 5) {
+             const title = p.series?.title || p.title || 'Dự án mới'
+             const actionText = p.status === 'completed' || p.status === 'approved' || p.status === 'rejected' 
+                ? 'Đã chốt phiếu duyệt' 
+                : 'Tham gia hội đồng duyệt'
+             
+             activities.push({
+               id: p.review_session_id || p.id || idx,
+               title: `${actionText} - ${title}`,
+               time: new Date(p.created_at || new Date()).toLocaleString('vi-VN'),
+               isRecent: idx === 0
+             })
+          }
+        })
+        
+        setActiveSessionCount(active)
+        setCompletedSessionCount(completed)
+        setRecentActivities(activities)
+      } catch (err) {
+        console.error('Error fetching board stats', err)
+      }
+    }
+    fetchStats()
   }, [])
 
   const handleSave = async () => {
@@ -124,7 +171,7 @@ export default function ProfilePage() {
     : (profile.fullName.split(' ').pop()?.slice(0, 2).toUpperCase() || 'ME')
 
   // Board Member specialized skills
-  const boardSkills = ['Editorial Strategy', 'Manga Pacing', 'Market Context', 'Art Evaluation', 'Script Doctoring']
+  const boardSkills = ['Phân Tích Cốt Truyện', 'Đánh Giá Nét Vẽ', 'Nghiên Cứu Thị Trường', 'Biên Tập Nội Dung', 'Phát Triển Nhân Vật']
 
   return (
     <div className="max-w-5xl mx-auto pb-16 font-sans">
@@ -261,12 +308,12 @@ export default function ProfilePage() {
             </div>
             <div className="bg-white border-4 border-manga-ink p-4 flex flex-col items-center text-center shadow-[4px_4px_0px_rgba(15,15,15,1)]">
               <Briefcase className="w-8 h-8 text-manga-red mb-2" />
-              <span className="text-3xl font-black font-manga">{profile.stats?.activeProjects || 32}</span>
+              <span className="text-3xl font-black font-manga">{activeSessionCount}</span>
               <span className="text-xs font-bold uppercase text-gray-500 mt-1">Session Đang Làm</span>
             </div>
             <div className="bg-white border-4 border-manga-ink p-4 flex flex-col items-center text-center shadow-[4px_4px_0px_rgba(15,15,15,1)]">
               <BookOpen className="w-8 h-8 text-green-500 mb-2" />
-              <span className="text-3xl font-black font-manga">{profile.stats?.projectsCompleted || 240}</span>
+              <span className="text-3xl font-black font-manga">{completedSessionCount}</span>
               <span className="text-xs font-bold uppercase text-gray-500 mt-1">Đã Hoàn Thành</span>
             </div>
           </div>
@@ -296,27 +343,21 @@ export default function ProfilePage() {
               Hoạt động gần đây
             </h3>
             <div className="space-y-4">
-              <div className="flex items-start gap-4 border-l-4 border-manga-red pl-4 py-1">
-                <div className="w-2 h-2 rounded-full bg-manga-red mt-1.5 -ml-[23px]"></div>
-                <div>
-                  <p className="font-bold text-sm">Gửi ý kiến biểu quyết - Cyber Ronin Chương 65</p>
-                  <span className="text-xs text-gray-500 font-bold uppercase">2 giờ trước</span>
-                </div>
-              </div>
-              <div className="flex items-start gap-4 border-l-4 border-gray-300 pl-4 py-1">
-                <div className="w-2 h-2 rounded-full bg-gray-300 mt-1.5 -ml-[23px]"></div>
-                <div>
-                  <p className="font-bold text-sm text-gray-600">Gửi ý kiến tham mưu - Case #MF-8492</p>
-                  <span className="text-xs text-gray-500 font-bold uppercase">1 ngày trước</span>
-                </div>
-              </div>
-              <div className="flex items-start gap-4 border-l-4 border-gray-300 pl-4 py-1">
-                <div className="w-2 h-2 rounded-full bg-gray-300 mt-1.5 -ml-[23px]"></div>
-                <div>
-                  <p className="font-bold text-sm text-gray-600">Bình luận thảo luận - Void Walker Ch. 12</p>
-                  <span className="text-xs text-gray-500 font-bold uppercase">3 ngày trước</span>
-                </div>
-              </div>
+              {recentActivities.length > 0 ? (
+                recentActivities.map((act) => (
+                  <div key={act.id} className={`flex items-start gap-4 border-l-4 ${act.isRecent ? 'border-manga-red' : 'border-gray-300'} pl-4 py-1`}>
+                    <div className={`w-2 h-2 rounded-full ${act.isRecent ? 'bg-manga-red' : 'bg-gray-300'} mt-1.5 -ml-[23px]`}></div>
+                    <div>
+                      <p className={`font-bold text-sm ${act.isRecent ? 'text-manga-ink' : 'text-gray-600'}`}>
+                        {act.title}
+                      </p>
+                      <span className="text-xs text-gray-500 font-bold uppercase">{act.time}</span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-sm text-gray-500 italic">Chưa có hoạt động nào gần đây.</div>
+              )}
             </div>
           </div>
 

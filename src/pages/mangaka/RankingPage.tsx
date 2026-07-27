@@ -6,6 +6,7 @@ import { RankingStat, RiskAlert } from '@/data/mangakaMockData'
 import { rankingService } from '@/services/ranking.service'
 import { seriesService } from '@/services/series.service'
 import { chapterService } from '@/services/chapter.service'
+import { readerService } from '@/services/reader.service'
 
 const RISK_LEVEL_CONFIG = {
   High: {
@@ -90,11 +91,24 @@ export default function RankingPage() {
             ? matchedRanking.rank_position
             : (latestTrend ? latestTrend.rank : 99)
 
-          const rating = matchedRanking
-            ? matchedRanking.score
-            : (latestTrend ? latestTrend.score : 0)
-
           const rankChange = latestTrend ? latestTrend.change : 0
+
+          let viewCount = series.view_count || 0;
+          let totalLikes = 0;
+          
+          if (matchedRanking) {
+             viewCount = matchedRanking.series?.view_count ?? viewCount;
+             totalLikes = matchedRanking.total_vote ?? 0;
+          }
+          
+          let ratingValue = 0.0;
+          if (viewCount >= 50) {
+             const baseRatio = (totalLikes / viewCount) * 100;
+             const popularityBonus = Math.log10(totalLikes + 1) * 0.2; 
+             let rawRating = (baseRatio * 0.35) + popularityBonus;
+             if (rawRating > 5.0) rawRating = 5.0;
+             ratingValue = Number(rawRating.toFixed(1));
+          }
 
           // Format numbers
           const formatNum = (val: number) => {
@@ -103,11 +117,10 @@ export default function RankingPage() {
             return val.toString()
           }
 
-          const viewCount = series.view_count || 0
           const views = formatNum(viewCount)
-          const likes = formatNum(Math.floor(viewCount * 0.08))
+          const likes = formatNum(totalLikes)
           const comments = formatNum(Math.floor(viewCount * 0.02))
-          const followers = formatNum(Math.floor(viewCount * 0.12))
+          const followers = "0"
 
           let hotChapter = 'N/A'
           if (chapters.length > 0) {
@@ -124,7 +137,7 @@ export default function RankingPage() {
             likes,
             comments,
             followers,
-            rating,
+            rating: ratingValue,
             rankChange,
             hotChapter,
           }

@@ -16,6 +16,7 @@ export default function FeedbackPage() {
   const [severityFilter, setSeverityFilter] = useState<'All' | 'Critical' | 'High' | 'Medium' | 'Low'>('All')
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
   const [alertModal, setAlertModal] = useState<{
     show: boolean;
@@ -314,15 +315,20 @@ export default function FeedbackPage() {
     }
   }
 
-  const handleDeleteNotification = async (id: string) => {
-    if (!confirm('Bạn có chắc chắn muốn xóa nhận xét đề xuất series này?')) return
+  const confirmDelete = async (id: string) => {
     try {
       await rankingService.deleteNotification(id)
       await loadFeedbacks()
     } catch (err) {
       console.error(err)
       showAlert('Lỗi', 'Không thể xóa nhận xét.', 'error')
+    } finally {
+      setDeleteConfirmId(null)
     }
+  }
+
+  const handleDeleteNotification = (id: string) => {
+    setDeleteConfirmId(id)
   }
 
   // Calculate statistics
@@ -468,6 +474,41 @@ export default function FeedbackPage() {
                   className="px-4 py-2 bg-manga-ink text-white font-bold uppercase text-xs hover:bg-gray-800 transition-colors cursor-pointer"
                 >
                   Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
+          <div className="bg-white border-4 border-manga-ink manga-shadow max-w-sm w-full animate-in fade-in zoom-in-95 duration-150 text-black">
+            <div className="p-4 border-b-4 border-manga-ink bg-gray-50 flex justify-between items-center">
+              <h3 className="font-manga font-bold text-lg uppercase flex items-center gap-2 text-manga-red">
+                <AlertCircle className="w-5 h-5 text-manga-red animate-bounce" />
+                Xác nhận xóa
+              </h3>
+            </div>
+            <div className="p-6 space-y-6">
+              <p className="text-sm font-bold text-gray-700 text-center">
+                Bạn có chắc chắn muốn xóa nhận xét đề xuất series này không?
+              </p>
+              <div className="flex justify-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirmId(null)}
+                  className="px-6 py-2 bg-gray-200 text-gray-800 font-bold uppercase text-xs hover:bg-gray-300 transition-colors cursor-pointer border-2 border-manga-ink"
+                >
+                  Huỷ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => confirmDelete(deleteConfirmId)}
+                  className="px-6 py-2 bg-manga-red text-white font-bold uppercase text-xs hover:bg-red-700 transition-colors cursor-pointer border-2 border-manga-ink shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 active:shadow-none"
+                >
+                  Xóa
                 </button>
               </div>
             </div>

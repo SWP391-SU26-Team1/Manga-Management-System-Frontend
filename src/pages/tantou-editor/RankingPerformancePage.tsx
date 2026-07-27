@@ -5,6 +5,8 @@ import { editorService, ApiRankingEntry, ApiRankingPeriod } from '@/services/edi
 
 interface DisplayRanking {
   rank: number
+  globalViewRank: number
+  globalLikeRank: number
   prevRank: number
   series: string
   seriesId: string
@@ -17,6 +19,7 @@ interface DisplayRanking {
 
 export default function RankingPerformancePage() {
   const [activeTab, setActiveTab] = useState<'ALL' | 'MINE'>('MINE')
+  const [rankingType, setRankingType] = useState<'view' | 'like'>('view')
   const [rankings, setRankings] = useState<DisplayRanking[]>([])
   const [periods, setPeriods] = useState<ApiRankingPeriod[]>([])
   const [selectedPeriod, setSelectedPeriod] = useState<string>('')
@@ -56,7 +59,12 @@ export default function RankingPerformancePage() {
 
       // Periods
       const periodsData = periodsRes.data || periodsRes
-      const periodsList: ApiRankingPeriod[] = Array.isArray(periodsData) ? periodsData : (periodsData.periods || periodsData.items || [])
+      let periodsList: ApiRankingPeriod[] = Array.isArray(periodsData) ? periodsData : (periodsData.periods || periodsData.items || [])
+      
+      // Filter out future periods (start_date > today)
+      const todayStr = new Date().toISOString().split('T')[0]
+      periodsList = periodsList.filter(p => p.start_date <= todayStr)
+      
       setPeriods(periodsList)
 
       // My series IDs
@@ -65,10 +73,12 @@ export default function RankingPerformancePage() {
       const myIds = seriesList.map((s: any) => s.series_id)
       setMySeriesIds(myIds)
 
-      // Set default period
+      // Set default period: find the one that covers today's date
       let defaultPeriod = ''
       if (periodsList.length > 0) {
-        defaultPeriod = periodsList[0].period_id
+        const todayStr = new Date().toISOString().split('T')[0] // e.g., '2026-07-21'
+        const matchedPeriod = periodsList.find(p => p.start_date <= todayStr && p.end_date >= todayStr)
+        defaultPeriod = matchedPeriod ? matchedPeriod.period_id : periodsList[0].period_id
         setSelectedPeriod(defaultPeriod)
       }
 
@@ -97,8 +107,12 @@ export default function RankingPerformancePage() {
       const myIds = currentMySeriesIds || mySeriesIds
       const mapped: DisplayRanking[] = list.map((r: any, idx: number) => {
         const sId = r.series_id || r.series?.series_id || ''
+        const gViewRank = r.global_view_rank || r.rank_position || idx + 1
+        const gLikeRank = r.global_like_rank || r.rank_position || idx + 1
         return {
-          rank: r.rank_position || idx + 1,
+          rank: gViewRank,
+          globalViewRank: gViewRank,
+          globalLikeRank: gLikeRank,
           prevRank: r.prev_rank || r.rank_position || idx + 1,
           series: r.series?.title || r.title || '—',
           seriesId: sId,
@@ -168,15 +182,24 @@ export default function RankingPerformancePage() {
     }
   }
 
-  const displayRankings = rankings.filter(r =>
-    r.series.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    r.mangaka.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const displayRankings = [...rankings]
+    .filter(r =>
+      r.series.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.mangaka.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (rankingType === 'view') {
+        return b.views - a.views
+      } else {
+        return b.likes - a.likes
+      }
+    })
 
   // Compute overview stats from data
   const myRankings = rankings.filter(r => r.isMine)
-  const bestSeries = myRankings.length > 0 ? myRankings.reduce((best, r) => r.rank < best.rank ? r : best, myRankings[0]) : null
-  const worstSeries = myRankings.length > 0 ? myRankings.reduce((worst, r) => r.rank > worst.rank ? r : worst, myRankings[0]) : null
+  const getActiveRank = (r: DisplayRanking) => rankingType === 'view' ? r.globalViewRank : r.globalLikeRank
+  const bestSeries = myRankings.length > 0 ? myRankings.reduce((best, r) => getActiveRank(r) < getActiveRank(best) ? r : best, myRankings[0]) : null
+  const worstSeries = myRankings.length > 0 ? myRankings.reduce((worst, r) => getActiveRank(r) > getActiveRank(worst) ? r : worst, myRankings[0]) : null
   const totalViews = myRankings.reduce((sum, r) => sum + r.views, 0)
   const totalLikes = myRankings.reduce((sum, r) => sum + r.likes, 0)
 
@@ -237,7 +260,7 @@ export default function RankingPerformancePage() {
               <>
                 <h2 className="font-manga text-3xl font-bold text-yellow-400 mb-1">{bestSeries.series}</h2>
                 <div className="flex items-end gap-3">
-                  <span className="text-4xl font-black">#{bestSeries.rank}</span>
+                  <span className="text-4xl font-black">#{getActiveRank(bestSeries)}</span>
                 </div>
               </>
             ) : (
@@ -255,7 +278,7 @@ export default function RankingPerformancePage() {
               <>
                 <h2 className="font-manga text-xl font-bold text-manga-ink mb-2">{worstSeries.series}</h2>
                 <div className="flex items-end gap-3">
-                  <span className="text-3xl font-black text-gray-700">#{worstSeries.rank}</span>
+                  <span className="text-3xl font-black text-gray-700">#{getActiveRank(worstSeries)}</span>
                 </div>
               </>
             ) : (
@@ -266,10 +289,21 @@ export default function RankingPerformancePage() {
 
         <div className="bg-white border-4 border-manga-ink p-6 flex flex-col justify-between">
           <div className="flex items-center gap-2 mb-4 text-gray-500 text-xs font-bold uppercase">
-            <Eye className="w-4 h-4 text-orange-500" /> Tổng Lượt Đọc
+            {rankingType === 'view' ? (
+              <>
+                <Eye className="w-4 h-4 text-orange-500" /> Tổng Lượt Đọc
+              </>
+            ) : (
+              <>
+                <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" /> Tổng Lượt Thích
+              </>
+            )}
           </div>
           <div>
-            <div className="text-4xl font-black text-manga-ink mb-1">{totalViews.toLocaleString()} <span className="text-xl text-gray-400">lượt</span></div>
+            <div className="text-4xl font-black text-manga-ink mb-1">
+              {rankingType === 'view' ? totalViews.toLocaleString() : totalLikes.toLocaleString()} 
+              <span className="text-xl text-gray-400"> lượt</span>
+            </div>
             <div className="text-sm font-bold text-gray-500">
               Tổng {myRankings.length} series đang phát hành
             </div>
@@ -279,16 +313,39 @@ export default function RankingPerformancePage() {
 
 
 
-      {/* Table */}
-      <div className="mb-4 flex items-center bg-white border-2 border-manga-ink px-4 py-2 w-full max-w-md">
-        <Search className="w-5 h-5 text-gray-500 mr-2" />
-        <input
-          type="text"
-          placeholder="Tìm kiếm series hoặc mangaka..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="flex-1 text-sm font-bold focus:outline-none"
-        />
+      {/* Toggles and Search */}
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-6">
+        {/* View/Like toggle buttons */}
+        <div className="flex bg-white border-4 border-manga-ink shadow-[4px_4px_0px_#000] w-full sm:w-auto">
+          <button
+            onClick={() => setRankingType('view')}
+            className={`flex-1 sm:flex-initial px-6 py-2.5 font-bold uppercase text-xs transition-colors border-r-4 border-manga-ink ${
+              rankingType === 'view' ? 'bg-manga-ink text-white' : 'hover:bg-gray-100 text-manga-ink'
+            }`}
+          >
+            Ranking theo View
+          </button>
+          <button
+            onClick={() => setRankingType('like')}
+            className={`flex-1 sm:flex-initial px-6 py-2.5 font-bold uppercase text-xs transition-colors ${
+              rankingType === 'like' ? 'bg-manga-ink text-white' : 'hover:bg-gray-100 text-manga-ink'
+            }`}
+          >
+            Ranking theo Like
+          </button>
+        </div>
+
+        {/* Search Input */}
+        <div className="flex items-center bg-white border-4 border-manga-ink px-4 py-2 w-full sm:max-w-md shadow-[4px_4px_0px_#000]">
+          <Search className="w-5 h-5 text-gray-500 mr-2" />
+          <input
+            type="text"
+            placeholder="Tìm kiếm series hoặc mangaka..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1 text-sm font-bold focus:outline-none bg-transparent"
+          />
+        </div>
       </div>
 
       <div className="bg-white border-4 border-manga-ink">
@@ -298,23 +355,27 @@ export default function RankingPerformancePage() {
               <th className="px-6 py-4 text-xs font-black text-manga-ink uppercase tracking-wider whitespace-nowrap w-20">Hạng</th>
               <th className="px-6 py-4 text-xs font-black text-manga-ink uppercase tracking-wider whitespace-nowrap">Series</th>
               <th className="px-6 py-4 text-xs font-black text-manga-ink uppercase tracking-wider whitespace-nowrap">Mangaka</th>
-              <th className="px-6 py-4 text-xs font-black text-manga-ink uppercase tracking-wider whitespace-nowrap text-right">Lượt thích</th>
+              <th className="px-6 py-4 text-xs font-black text-manga-ink uppercase tracking-wider whitespace-nowrap text-right">
+                {rankingType === 'view' ? 'Lượt xem' : 'Lượt thích'}
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y-2 divide-gray-100">
             {displayRankings.map((r, i) => {
-              const diff = r.prevRank - r.rank
+              const activeRank = getActiveRank(r)
               return (
                 <tr key={i} className={`hover:bg-gray-50 transition-colors cursor-pointer ${r.isMine && activeTab === 'ALL' ? 'bg-yellow-50/50' : ''}`} onClick={() => handleSeriesClick(r)}>
                   <td className="px-6 py-5">
-                    <span className={`text-xl font-black ${r.rank <= 3 ? 'text-manga-red' : 'text-gray-700'}`}>#{r.rank}</span>
+                    <span className={`text-xl font-black ${activeRank <= 3 ? 'text-manga-red' : 'text-gray-700'}`}>#{activeRank}</span>
                   </td>
                   <td className="px-6 py-5">
                     <div className="font-bold text-base text-manga-ink">{r.series}</div>
                     {r.isMine && activeTab === 'ALL' && <div className="text-[10px] font-bold text-blue-600 uppercase mt-1">Series phụ trách</div>}
                   </td>
                   <td className="px-6 py-5 font-bold text-gray-600">{r.mangaka}</td>
-                  <td className="px-6 py-5 text-right text-sm font-bold text-gray-500">{r.likes.toLocaleString()}</td>
+                  <td className="px-6 py-5 text-right text-sm font-bold text-gray-500">
+                    {rankingType === 'view' ? r.views.toLocaleString() : r.likes.toLocaleString()}
+                  </td>
                 </tr>
               )
             })}

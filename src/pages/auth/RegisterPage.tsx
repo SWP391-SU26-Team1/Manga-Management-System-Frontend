@@ -66,7 +66,7 @@ export default function RegisterPage() {
       const w = window as any
       if (w.google && !initialized) {
         initialized = true;
-        const clientId = import.meta.env.GOOGLE_CLIENT_ID || import.meta.env.VITE_GOOGLE_CLIENT_ID || "1032120760447-placeholder.apps.googleusercontent.com"
+        const clientId = import.meta.env.GOOGLE_CLIENT_ID || import.meta.env.VITE_GOOGLE_CLIENT_ID || "1001261366651-62od3lrtat08lb5f47v527nviv2k0l4n.apps.googleusercontent.com"
         w.google.accounts.id.initialize({
           client_id: clientId,
           callback: handleGoogleCallback,

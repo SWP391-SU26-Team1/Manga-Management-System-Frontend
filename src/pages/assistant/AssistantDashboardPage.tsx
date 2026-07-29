@@ -150,7 +150,8 @@ export default function AssistantDashboardPage() {
 
   const formatTimeAgo = (dateStr: string) => {
     if (!dateStr) return ''
-    const date = new Date(dateStr)
+    const safeDateStr = dateStr.endsWith('Z') || dateStr.includes('+') ? dateStr : `${dateStr}Z`
+    const date = new Date(safeDateStr)
     const now = new Date()
     const diffMs = now.getTime() - date.getTime()
     const diffMins = Math.floor(diffMs / 60000)

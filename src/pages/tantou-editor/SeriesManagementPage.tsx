@@ -402,18 +402,7 @@ export default function SeriesManagementPage() {
                     <ChevronRight className="w-4 h-4 text-manga-red" /> Ranking
                   </button>
                 </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                  <button onClick={() => handleAction('hide')} className="px-3 py-2 text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 border-2 border-transparent transition-colors">
-                    Ẩn tác phẩm
-                  </button>
-                  <button onClick={() => handleAction('archive')} className="px-3 py-2 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 border-2 border-transparent transition-colors">
-                    Lưu trữ
-                  </button>
-                  <button onClick={() => handleAction('republish')} className="px-3 py-2 text-xs font-bold text-green-600 bg-green-50 hover:bg-green-100 border-2 border-transparent transition-colors">
-                    Tái xuất bản
-                  </button>
-                </div>
+                {/* Bottom row of buttons removed */}
               </div>
             </div>
 

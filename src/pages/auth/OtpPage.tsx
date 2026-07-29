@@ -211,11 +211,11 @@ export default function OtpPage() {
   const isOtpComplete = otp.every(val => val !== '')
 
   return (
-    <div className="min-h-screen bg-[#fcfcfc] w-full relative flex items-center justify-center p-4 md:p-8 font-sans overflow-hidden">
+    <div className="min-h-screen bg-[#fcfcfc] dark:bg-zinc-900 w-full relative flex items-center justify-center p-4 md:p-8 font-sans overflow-hidden transition-colors">
       {/* Back Button */}
       <button 
         onClick={() => navigate('/register')} 
-        className="absolute top-6 left-6 md:top-10 md:left-10 z-50 p-2 bg-white text-manga-ink manga-border manga-shadow-sm hover:translate-y-1 hover:manga-shadow-none transition-all flex items-center justify-center"
+        className="absolute top-6 left-6 md:top-10 md:left-10 z-50 p-2 bg-white dark:bg-zinc-800 text-manga-ink dark:text-white manga-border manga-shadow-sm hover:translate-y-1 hover:manga-shadow-none transition-all flex items-center justify-center"
         aria-label="Quay lại"
       >
         <ArrowLeft className="w-6 h-6" />
@@ -228,7 +228,7 @@ export default function OtpPage() {
       </div>
 
       {/* Card Wrapper */}
-      <div className="w-full max-w-md z-10 bg-white manga-border manga-shadow p-8 relative overflow-hidden">
+      <div className="w-full max-w-md z-10 bg-white dark:bg-zinc-800 manga-border manga-shadow p-8 relative overflow-hidden transition-colors">
         {/* Manga accent top line */}
         <div className="absolute top-0 left-0 right-0 h-2 bg-manga-red" />
         
@@ -241,12 +241,12 @@ export default function OtpPage() {
 
           {/* Heading */}
           <div className="space-y-2">
-            <h1 className="font-manga text-3xl font-extrabold tracking-tight uppercase text-manga-ink">
+            <h1 className="font-manga text-3xl font-extrabold tracking-tight uppercase text-manga-ink dark:text-white">
               XÁC THỰC TÀI KHOẢN
             </h1>
-            <div className="flex items-center justify-center gap-2 text-xs font-semibold text-gray-500">
+            <div className="flex items-center justify-center gap-2 text-xs font-semibold text-gray-500 dark:text-gray-400">
               <Mail className="w-3.5 h-3.5" />
-              <span>Gửi đến: <strong className="text-manga-ink font-bold">{email}</strong></span>
+              <span>Gửi đến: <strong className="text-manga-ink dark:text-white font-bold">{email}</strong></span>
             </div>
           </div>
 
@@ -272,10 +272,11 @@ export default function OtpPage() {
                     ref={(el) => { inputRefs.current[idx] = el; }}
                     onChange={(e) => handleChange(e.target.value, idx)}
                     onKeyDown={(e) => handleKeyDown(e, idx)}
-                    className={`w-12 h-14 text-center font-manga text-2xl font-bold bg-manga-paper border-2 manga-shadow-sm focus:outline-none transition-all
+                    disabled={loading}
+                    className={`w-12 h-14 text-center font-manga text-2xl font-bold bg-manga-paper dark:bg-zinc-900 text-manga-ink dark:text-white border-2 manga-shadow-sm focus:outline-none transition-all
                       ${activeInput === idx 
                         ? 'border-manga-red scale-105 shadow-[3px_3px_0px_0px_rgba(230,57,70,1)]' 
-                        : 'border-manga-ink'
+                        : 'border-manga-ink dark:border-gray-600 hover:bg-gray-50'
                       }`}
                   />
                 ))}
@@ -306,9 +307,10 @@ export default function OtpPage() {
           </form>
 
           {/* Resend and Counter */}
-          <div className="pt-2 text-xs font-bold text-manga-ink">
+          <div className="pt-2 text-xs font-bold text-manga-ink dark:text-gray-300 text-center">
             {canResend ? (
               <button 
+                type="button"
                 onClick={handleResend}
                 className="inline-flex items-center gap-1.5 text-manga-red hover:underline uppercase decoration-2 underline-offset-4"
               >
@@ -316,7 +318,7 @@ export default function OtpPage() {
               </button>
             ) : (
               <span className="text-gray-400">
-                Gửi lại mã OTP sau: <span className="text-manga-ink font-extrabold">{timer}s</span>
+                Gửi lại mã OTP sau: <span className="text-manga-ink dark:text-white font-extrabold">{timer}s</span>
               </span>
             )}
           </div>
@@ -325,8 +327,8 @@ export default function OtpPage() {
 
       {/* Manga-style Success/Info Modal */}
       {modal.show && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white border-[4px] border-manga-ink manga-shadow p-6 max-w-sm w-full relative transform scale-100 transition-all animate-bounce-short">
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-800 border-[4px] border-manga-ink dark:border-black manga-shadow p-6 max-w-sm w-full relative transform scale-100 transition-all animate-bounce-short">
             {/* Manga accent corner tag */}
             <div className="absolute -top-3.5 left-4 bg-manga-ink text-white text-[10px] font-extrabold uppercase px-3 py-1 tracking-widest border-2 border-white">
               Thông báo
@@ -342,11 +344,11 @@ export default function OtpPage() {
                 {modal.type === 'success' ? '✨' : modal.type === 'info' ? 'ℹ️' : '⚠️'}
               </div>
               
-              <h2 className="font-manga text-xl font-bold uppercase tracking-tight text-manga-ink">
+              <h2 className="font-manga text-xl font-bold uppercase tracking-tight text-manga-ink dark:text-white">
                 {modal.title}
               </h2>
               
-              <p className="text-xs font-bold text-gray-500 leading-relaxed">
+              <p className="text-xs font-bold text-gray-500 dark:text-gray-400 leading-relaxed">
                 {modal.message}
               </p>
               

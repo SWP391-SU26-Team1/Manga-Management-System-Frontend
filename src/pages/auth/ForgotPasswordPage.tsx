@@ -85,8 +85,7 @@ export default function ForgotPasswordPage() {
         borderClass = 'border-green-500 focus:border-green-500'
       }
     }
-    
-    return `w-full pl-8 ${extraPaddingRight} py-2 border-b-2 bg-transparent focus:outline-none transition-colors ${borderClass}`
+    return `w-full pl-8 ${extraPaddingRight} py-2 border-b-2 bg-transparent focus:outline-none transition-colors text-manga-ink dark:text-white ${borderClass}`
   }
 
   const validateField = (field: string) => {
@@ -321,12 +320,12 @@ export default function ForgotPasswordPage() {
   const isResetFormValid = newPassword && confirmPassword && !errors.newPassword && !errors.confirmPassword
 
   return (
-    <div className="min-h-screen bg-white relative flex items-center justify-center p-4 font-sans overflow-hidden">
+    <div className="min-h-screen bg-white dark:bg-zinc-900 relative flex items-center justify-center p-4 font-sans overflow-hidden transition-colors">
       {/* Back Button */}
       <button
         onClick={handleBackAction}
         disabled={loading}
-        className="absolute top-6 left-6 md:top-10 md:left-10 z-50 p-2 bg-white text-manga-ink manga-border manga-shadow-sm hover:translate-y-1 hover:manga-shadow-none transition-all flex items-center justify-center disabled:opacity-50"
+        className="absolute top-6 left-6 md:top-10 md:left-10 z-50 p-2 bg-white dark:bg-zinc-800 text-manga-ink dark:text-white manga-border manga-shadow-sm hover:translate-y-1 hover:manga-shadow-none transition-all flex items-center justify-center disabled:opacity-50"
         aria-label="Quay lại"
       >
         <ArrowLeft className="w-6 h-6" />
@@ -334,18 +333,18 @@ export default function ForgotPasswordPage() {
 
       {/* Background Decorative */}
       <div className="absolute inset-0 pointer-events-none opacity-20">
-        <div className="absolute top-10 left-10 w-64 h-80 border-4 border-manga-ink -rotate-6 bg-gray-50" />
-        <div className="absolute bottom-20 right-20 w-96 h-64 border-4 border-manga-ink rotate-3 bg-gray-50" />
+        <div className="absolute top-10 left-10 w-64 h-80 border-4 border-manga-ink -rotate-6 bg-gray-50 dark:bg-zinc-800" />
+        <div className="absolute bottom-20 right-20 w-96 h-64 border-4 border-manga-ink rotate-3 bg-gray-50 dark:bg-zinc-800" />
       </div>
 
       <div className="w-full max-w-lg z-10">
-        <div className="manga-border manga-shadow bg-white flex flex-col">
+        <div className="manga-border manga-shadow bg-white dark:bg-zinc-800 flex flex-col transition-colors">
           {/* Header */}
-          <div className="bg-manga-ink p-8 text-white relative">
-            <div className="absolute -top-4 left-6 bg-white text-manga-ink font-manga font-bold px-3 py-1 text-sm manga-border">
+          <div className="bg-manga-ink dark:bg-black p-8 text-white relative">
+            <div className="absolute -top-4 left-6 bg-white dark:bg-zinc-800 text-manga-ink dark:text-white font-manga font-bold px-3 py-1 text-sm manga-border">
               MANGAFLOW
             </div>
-            <h1 className="font-manga text-4xl font-bold uppercase mt-2 mb-2 tracking-wide">
+            <h1 className="font-manga text-4xl font-bold uppercase mt-2 mb-2 tracking-wide text-white">
               {step === 1 && 'Khôi phục mật khẩu'}
               {step === 2 && 'Xác thực mã OTP'}
               {step === 3 && 'Đặt lại mật khẩu'}
@@ -363,7 +362,7 @@ export default function ForgotPasswordPage() {
             {step === 1 && (
               <form onSubmit={handleEmailSubmit} className="space-y-6">
                 <div className="space-y-2">
-                  <label className="block text-sm font-bold uppercase tracking-wider text-manga-ink">
+                  <label className="block text-sm font-bold uppercase tracking-wider text-manga-ink dark:text-gray-300">
                     Email đăng ký
                   </label>
                   <div className="relative">
@@ -391,9 +390,9 @@ export default function ForgotPasswordPage() {
                   {loading ? 'Đang gửi...' : 'Gửi mã OTP'} <ArrowRight className="w-4 h-4" />
                 </button>
 
-                <div className="text-center text-sm font-medium">
+                <div className="text-center text-sm font-medium text-manga-ink dark:text-gray-300">
                   Đã nhớ mật khẩu?{' '}
-                  <Link to="/login" className="font-bold underline decoration-2 underline-offset-4 hover:text-manga-red transition-colors">
+                  <Link to="/login" className="font-bold underline decoration-2 underline-offset-4 hover:text-manga-red text-manga-ink dark:text-white transition-colors">
                     Đăng nhập
                   </Link>
                 </div>
@@ -404,7 +403,7 @@ export default function ForgotPasswordPage() {
             {step === 2 && (
               <form onSubmit={handleOtpSubmit} className="space-y-6">
                 <div className="space-y-3">
-                  <label className="block text-xs font-extrabold uppercase tracking-wider text-manga-ink">
+                  <label className="block text-xs font-extrabold uppercase tracking-wider text-manga-ink dark:text-gray-300">
                     Nhập mã OTP 6 số:
                   </label>
                   
@@ -420,10 +419,10 @@ export default function ForgotPasswordPage() {
                         onChange={(e) => handleOtpChange(e.target.value, idx)}
                         onKeyDown={(e) => handleOtpKeyDown(e, idx)}
                         disabled={loading}
-                        className={`w-12 h-14 text-center font-manga text-2xl font-bold bg-manga-paper border-2 manga-shadow-sm focus:outline-none transition-all
+                        className={`w-12 h-14 text-center font-manga text-2xl font-bold bg-manga-paper dark:bg-zinc-900 text-manga-ink dark:text-white border-2 manga-shadow-sm focus:outline-none transition-all
                           ${activeInput === idx 
                             ? 'border-manga-red scale-105 shadow-[3px_3px_0px_0px_rgba(230,57,70,1)]' 
-                            : 'border-manga-ink'
+                            : 'border-manga-ink dark:border-gray-600'
                           }`}
                       />
                     ))}
@@ -441,7 +440,7 @@ export default function ForgotPasswordPage() {
                   {loading ? 'Đang xác thực...' : 'Xác nhận OTP'} <ArrowRight className="w-4 h-4" />
                 </button>
 
-                <div className="text-center text-xs font-bold text-manga-ink pt-2">
+                <div className="text-center text-xs font-bold text-manga-ink dark:text-gray-300 pt-2">
                   {canResend ? (
                     <button 
                       type="button"
@@ -465,7 +464,7 @@ export default function ForgotPasswordPage() {
               <form onSubmit={handleResetSubmit} className="space-y-6">
                 {/* New Password Input */}
                 <div className="space-y-2">
-                  <label className="block text-sm font-bold uppercase tracking-wider text-manga-ink">
+                  <label className="block text-sm font-bold uppercase tracking-wider text-manga-ink dark:text-gray-300">
                     Mật khẩu mới
                   </label>
                   <div className="relative">
@@ -498,7 +497,7 @@ export default function ForgotPasswordPage() {
 
                 {/* Confirm Password Input */}
                 <div className="space-y-2">
-                  <label className="block text-sm font-bold uppercase tracking-wider text-manga-ink">
+                  <label className="block text-sm font-bold uppercase tracking-wider text-manga-ink dark:text-gray-300">
                     Xác nhận mật khẩu mới
                   </label>
                   <div className="relative">

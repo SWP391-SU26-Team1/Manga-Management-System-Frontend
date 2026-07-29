@@ -138,7 +138,8 @@ export default function PageProgressPage() {
           title: s.title, 
           status: String(s.status || '').toLowerCase(),
           publishSchedule: s.publishSchedule || 'Weekly',
-          proposedStartDate: s.proposedStartDate
+          proposedStartDate: s.proposedStartDate,
+          extensions: s.extensions || {}
         }
         activeSeriesIds.add(s.series_id || s.id)
       })
@@ -211,27 +212,71 @@ export default function PageProgressPage() {
         pages.sort((a, b) => a.page.localeCompare(b.page))
 
         const approvedCount = pages.filter(p => p.status === 'APPROVED' || p.status === 'COMPLETED').length
-        const progress = pages.length > 0 ? Math.round((approvedCount / pages.length) * 100) : 0
+        let progress = pages.length > 0 ? Math.round((approvedCount / pages.length) * 100) : 0
+        if (['pending_review', 'under_review', 'approved', 'completed', 'published'].includes(String(ch.status || '').toLowerCase())) {
+          progress = 100
+        }
 
         // Tính toán deadline chương truyện và kiểm tra trễ hạn
         let chapterDeadline = '—'
         let chapterDeadlineDate: Date | null = null;
 
-        if (seriesInfo && seriesInfo.proposedStartDate) {
-          const startDate = new Date(seriesInfo.proposedStartDate)
-          if (!isNaN(startDate.getTime())) {
-            let intervalDays = 7
-            const schedule = String(seriesInfo.publishSchedule || '').toLowerCase()
-            if (schedule.includes('bi-weekly')) {
-              intervalDays = 14
-            } else if (schedule.includes('monthly')) {
-              intervalDays = 30
+        // Find all chapters of this series to find the latest published one
+        const seriesChapters = chaptersList.filter((c: any) => c.series_id === ch.series_id)
+        const publishedChaps = seriesChapters.filter((c: any) => 
+          ['approved', 'completed', 'published', 'đã hoàn thành', 'đã xuất bản'].includes(String(c.status || '').toLowerCase())
+        )
+
+        let latestPublishedChap: any = null
+        if (publishedChaps.length > 0) {
+          publishedChaps.sort((a: any, b: any) => (b.chapter_number || 0) - (a.chapter_number || 0))
+          latestPublishedChap = publishedChaps[0]
+        }
+
+        let baselineDate: Date | null = null
+        let chapNumDiff = 0
+
+        if (latestPublishedChap) {
+          if (ch.chapter_number <= latestPublishedChap.chapter_number) {
+            const thisChapPublished = seriesChapters.find((c: any) => c.chapter_id === ch.chapter_id && ['approved', 'completed', 'published', 'đã hoàn thành', 'đã xuất bản'].includes(String(c.status || '').toLowerCase()))
+            if (thisChapPublished) {
+              baselineDate = new Date(thisChapPublished.publish_date || thisChapPublished.created_at || thisChapPublished.updated_at)
+              chapNumDiff = 0
+            } else {
+              baselineDate = new Date(latestPublishedChap.publish_date || latestPublishedChap.created_at || latestPublishedChap.updated_at)
+              chapNumDiff = ch.chapter_number - latestPublishedChap.chapter_number
             }
-            const chapNum = ch.chapter_number || 1
-            // Chapter 1 uses proposedStartDate, Chapter 2 is + intervalDays, etc.
-            chapterDeadlineDate = new Date(startDate.getTime() + (chapNum - 1) * intervalDays * 24 * 60 * 60 * 1000)
-            chapterDeadline = chapterDeadlineDate.toLocaleDateString('vi-VN')
+          } else {
+            baselineDate = new Date(latestPublishedChap.publish_date || latestPublishedChap.created_at || latestPublishedChap.updated_at)
+            chapNumDiff = ch.chapter_number - latestPublishedChap.chapter_number
           }
+        } else {
+          const proposedStr = seriesInfo?.proposedStartDate || seriesInfo?.created_at || ch.series?.created_at
+          if (proposedStr) {
+            baselineDate = new Date(proposedStr)
+            chapNumDiff = (ch.chapter_number || 1) - 1
+          }
+        }
+
+        if (baselineDate && !isNaN(baselineDate.getTime())) {
+          let intervalDays = 7
+          const schedule = String(seriesInfo?.publishSchedule || ch.series?.publishSchedule || 'Weekly').toLowerCase()
+          if (schedule.includes('bi-weekly')) {
+            intervalDays = 14
+          } else if (schedule.includes('monthly')) {
+            intervalDays = 30
+          }
+          chapterDeadlineDate = new Date(baselineDate.getTime() + chapNumDiff * intervalDays * 24 * 60 * 60 * 1000)
+          
+          const extDateStr = seriesInfo?.extensions?.[ch.chapter_id || ch.id]
+          if (extDateStr) {
+            const extDate = new Date(extDateStr)
+            if (!isNaN(extDate.getTime())) {
+              chapterDeadlineDate = extDate
+            }
+          }
+          
+          chapterDeadline = chapterDeadlineDate.toLocaleDateString('vi-VN')
         }
 
         // Fallback if no proposedStartDate was found or parsed
@@ -263,6 +308,33 @@ export default function PageProgressPage() {
             })
             if (latePagesCount === 0) latePagesCount = 1
           }
+        }
+
+        // Align with backend overdue alert logic: if chapter has any task that is past deadline and not completed
+        const chapterPageIds = rawPages.map((p: any) => p.page_id)
+        const isChapCompletedOrPublished = ['completed', 'published'].includes(String(ch.status || '').toLowerCase())
+        const hasOverdueTask = !isChapCompletedOrPublished && tasksList.some((t: any) => 
+          chapterPageIds.includes(t.page_id) && 
+          t.deadline && 
+          new Date(t.deadline) < now && 
+          String(t.status || '').toLowerCase() !== 'completed'
+        )
+
+        if (hasOverdueTask) {
+          isLate = true
+          // Calculate latePagesCount
+          rawPages.forEach((p: any) => {
+            const hasOverduePageTask = tasksList.some((t: any) => 
+              t.page_id === p.page_id && 
+              t.deadline && 
+              new Date(t.deadline) < now && 
+              String(t.status || '').toLowerCase() !== 'completed'
+            )
+            if (hasOverduePageTask) {
+              latePagesCount++
+            }
+          })
+          if (latePagesCount === 0) latePagesCount = 1
         }
 
         seriesProgressMap[seriesId].chapters.push({
@@ -319,7 +391,14 @@ export default function PageProgressPage() {
               intervalDays = 30;
             }
             
-            const virtualDeadlineDate = new Date(lastDate.getTime() + intervalDays * 24 * 60 * 60 * 1000);
+            let virtualDeadlineDate = new Date(lastDate.getTime() + intervalDays * 24 * 60 * 60 * 1000);
+            const extDateStr = seriesInfo?.extensions?.[`virtual_${series.id}`];
+            if (extDateStr) {
+              const extDate = new Date(extDateStr);
+              if (!isNaN(extDate.getTime())) {
+                virtualDeadlineDate = extDate;
+              }
+            }
             const isLate = virtualDeadlineDate < currentDate;
             
             series.chapters.push({
@@ -851,6 +930,29 @@ export default function PageProgressPage() {
                   }`}
                 >
                   Nộp lên Hội đồng
+                </button>
+              )}
+              {selectedProgressChapter.isLate && (
+                <button 
+                  onClick={() => {
+                    const seriesInfo = progressData.find(s => s.id === selectedProgressChapter.series_id)
+                    const seriesTitle = seriesInfo ? seriesInfo.series : ''
+                    let daysLate = 'vài'
+                    if (selectedProgressChapter.deadline) {
+                      const parts = selectedProgressChapter.deadline.split('/')
+                      if (parts.length === 3) {
+                        const deadlineDate = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]))
+                        const now = new Date()
+                        if (now > deadlineDate) {
+                          daysLate = String(Math.floor((now.getTime() - deadlineDate.getTime()) / (1000 * 60 * 60 * 24)))
+                        }
+                      }
+                    }
+                    navigate(`/dashboard/tantou-editor/series-defense?tab=deadline&series=${encodeURIComponent(seriesTitle)}&chapter=${encodeURIComponent(selectedProgressChapter.chapter)}&msg=late&daysLate=${daysLate}`)
+                  }}
+                  className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 border-2 border-black font-extrabold text-xs uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
+                >
+                  Nhắc deadline
                 </button>
               )}
               <button 

@@ -443,26 +443,6 @@ export const editorService = {
   },
 
   // ---------- Page Tasks (Editor) ----------
-  getEditorReviewTasks: async (params?: { status?: string; assistant_id?: string; series_id?: string; limit?: number }) => {
-    const res = await api.get('/api/editor/review/page-tasks', { params })
-    return res.data
-  },
-
-  getPendingReviewTasks: async () => {
-    const res = await api.get('/api/editor/review/page-tasks/pending')
-    return res.data
-  },
-
-  getReviewTaskDetail: async (taskId: string) => {
-    const res = await api.get(`/api/editor/review/page-tasks/${taskId}/detail`)
-    return res.data
-  },
-
-  startReviewTask: async (taskId: string) => {
-    const res = await api.patch(`/api/editor/page-tasks/${taskId}/start-review`)
-    return res.data
-  },
-
   approveTask: async (taskId: string) => {
     const res = await api.patch(`/api/editor/page-tasks/${taskId}/approve`)
     return res.data
@@ -473,49 +453,14 @@ export const editorService = {
     return res.data
   },
 
-  rejectTask: async (taskId: string) => {
-    const res = await api.patch(`/api/editor/page-tasks/${taskId}/reject`)
-    return res.data
-  },
-
-  completeTask: async (taskId: string) => {
-    const res = await api.patch(`/api/editor/page-tasks/${taskId}/complete`)
-    return res.data
-  },
-
   overrideTaskStatus: async (taskId: string, status: string) => {
     const res = await api.patch(`/api/editor/page-tasks/${taskId}/override-status`, { status })
-    return res.data
-  },
-
-  bulkApproveTasks: async (taskIds: string[], note?: string) => {
-    const res = await api.patch('/api/editor/page-tasks/bulk/approve', { task_ids: taskIds, note })
-    return res.data
-  },
-
-  bulkRejectTasks: async (taskIds: string[], note?: string) => {
-    const res = await api.patch('/api/editor/page-tasks/bulk/reject', { task_ids: taskIds, note })
-    return res.data
-  },
-
-  bulkRequestTaskRevision: async (taskIds: string[], note?: string) => {
-    const res = await api.patch('/api/editor/page-tasks/bulk/request-revision', { task_ids: taskIds, note })
-    return res.data
-  },
-
-  bulkUpdateTaskStatus: async (taskIds: string[], status: string, note?: string) => {
-    const res = await api.patch('/api/editor/page-tasks/bulk/status', { task_ids: taskIds, status, note })
     return res.data
   },
 
   // ---------- Page Tasks (General) ----------
   getPageTasks: async (params?: { pageId?: string; status?: string; page?: number; limit?: number }) => {
     const res = await api.get('/api/page-tasks', { params })
-    return res.data
-  },
-
-  getReviewTaskById: async (taskId: string) => {
-    const res = await api.get(`/api/editor/review/page-tasks/${taskId}`)
     return res.data
   },
 

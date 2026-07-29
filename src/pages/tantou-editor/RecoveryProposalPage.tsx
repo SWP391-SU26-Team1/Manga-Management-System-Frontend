@@ -52,9 +52,10 @@ export default function RecoveryProposalPage() {
       const res = await editorService.getSeries()
       if (res.success && Array.isArray(res.data) && res.data.length > 0) {
         setSeriesList(res.data)
+        const seriesParam = searchParams.get('series')
         const firstTitle = res.data[0].title
-        setRecSeries(firstTitle)
-        setRemindSeries(firstTitle)
+        setRecSeries(seriesParam || firstTitle)
+        setRemindSeries(seriesParam || firstTitle)
       }
     } catch (err) {
       console.error('Không thể tải danh sách series', err)

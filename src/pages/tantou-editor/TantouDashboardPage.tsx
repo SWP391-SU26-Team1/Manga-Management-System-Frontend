@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { FileText, AlertTriangle, RefreshCw, MessageSquareText, TrendingUp, CheckCircle2, AlertCircle, ArrowRight, Loader2 } from 'lucide-react'
+import { FileText, AlertTriangle, RefreshCw, MessageSquareText, TrendingUp, CheckCircle2, AlertCircle, ArrowRight, Loader2, BookOpen } from 'lucide-react'
 import { editorService } from '@/services/editor.service'
 
 export default function TantouDashboardPage() {
@@ -83,11 +83,12 @@ export default function TantouDashboardPage() {
     try {
       setLoading(true)
       setError(null)
-      const [overviewRes, seriesRes, manuscriptsRes, notificationsRes] = await Promise.all([
+      const [overviewRes, seriesRes, manuscriptsRes, notificationsRes, alertsRes] = await Promise.all([
         editorService.getDashboardOverview(),
         editorService.getSeries(),
         editorService.getManuscripts().catch(() => ({ data: [] })),
-        editorService.getNotifications().catch(() => ({ data: [] }))
+        editorService.getNotifications().catch(() => ({ data: [] })),
+        editorService.getAlerts().catch(() => ({ data: [] }))
       ])
 
       const overview = overviewRes.data || overviewRes
@@ -101,13 +102,23 @@ export default function TantouDashboardPage() {
       overview.active_paused_count = activeSeries.filter((s: any) => ['hidden', 'archived'].includes(s.status)).length
 
       // Calculate actual pending review manuscripts
+      const pendingSeries = seriesList.filter((s: any) => s.status?.toLowerCase() === 'pending_review')
       const manuscriptsData = manuscriptsRes.data || manuscriptsRes
       const manuscriptsList = Array.isArray(manuscriptsData) ? manuscriptsData : (manuscriptsData.manuscripts || manuscriptsData.items || [])
       const pendingManuscripts = manuscriptsList.filter((m: any) => ['submitted', 'in_review'].includes(m.status?.toLowerCase()))
       const revisionManuscripts = manuscriptsList.filter((m: any) => ['needs_revision', 'rejected'].includes(m.status?.toLowerCase()))
 
-      overview.actual_pending_review = pendingManuscripts.length
+      overview.actual_pending_review = pendingManuscripts.length + pendingSeries.length
+      overview.pending_series_count = pendingSeries.length
+      overview.pending_chapters_count = pendingManuscripts.length
       overview.actual_need_revision = revisionManuscripts.length
+
+      // Calculate correct overdue alerts count from active alerts
+      const alertsData = alertsRes.data || alertsRes
+      const alertsList = Array.isArray(alertsData) ? alertsData : []
+      const criticalOrHighAlerts = alertsList.filter((a: any) => a.type === 'CRITICAL' || a.type === 'HIGH')
+      overview.overdue_count = criticalOrHighAlerts.length
+      overview.risk_alerts = criticalOrHighAlerts.length
 
       // Process notifications
       const notificationsData = notificationsRes.data || notificationsRes
@@ -142,7 +153,9 @@ export default function TantouDashboardPage() {
       paused: dashboardData?.managingSeries?.paused ?? dashboardData?.active_paused_count ?? dashboardData?.paused_count ?? 0,
     },
     pendingReview: {
-      total: dashboardData?.pendingReview?.total ?? dashboardData?.actual_pending_review ?? ((dashboardData?.submitted ?? 0) + (dashboardData?.in_review ?? 0)),
+      total: dashboardData?.actual_pending_review ?? 0,
+      pendingSeriesCount: dashboardData?.pending_series_count ?? 0,
+      pendingChaptersCount: dashboardData?.pending_chapters_count ?? 0,
       deadlineThisWeek: dashboardData?.pendingReview?.deadlineThisWeek ?? dashboardData?.deadline_this_week ?? 0,
     },
     needRevision: {
@@ -161,7 +174,8 @@ export default function TantouDashboardPage() {
       ranking: dashboardData?.atRiskSeries?.ranking ?? dashboardData?.at_risk_series_ranking ?? 0,
     },
     todayOverview: {
-      chaptersToReview: dashboardData?.todayOverview?.chaptersToReview ?? dashboardData?.actual_pending_review ?? (dashboardData?.submitted ?? 0) ?? 0,
+      chaptersToReview: dashboardData?.pending_chapters_count ?? 0,
+      seriesToReview: dashboardData?.pending_series_count ?? 0,
       newResubmissions: dashboardData?.todayOverview?.newResubmissions ?? dashboardData?.new_resubmissions ?? 0,
       riskAlerts: dashboardData?.todayOverview?.riskAlerts ?? dashboardData?.risk_alerts ?? 0,
       reportsToSend: dashboardData?.todayOverview?.reportsToSend ?? dashboardData?.reports_to_send ?? 0,
@@ -221,8 +235,8 @@ export default function TantouDashboardPage() {
           )}
         </div>
 
-        {/* 6 Stat Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* 4 Stat Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="border-2 border-manga-ink bg-white p-4">
             <div className="flex items-center gap-2 text-manga-red font-bold text-[10px] uppercase mb-2">
               <FileText className="w-3.5 h-3.5" /> Series Đang Phụ Trách
@@ -239,17 +253,7 @@ export default function TantouDashboardPage() {
             </div>
             <div className="text-4xl font-black text-blue-600 leading-none mb-2">{pendingReview.total}</div>
             <div className="text-xs text-gray-500 font-medium">
-              {pendingReview.deadlineThisWeek} deadline tuần này
-            </div>
-          </div>
-
-          <div className="border-2 border-manga-ink bg-white p-4">
-            <div className="flex items-center gap-2 text-orange-500 font-bold text-[10px] uppercase mb-2">
-              <MessageSquareText className="w-3.5 h-3.5" /> Bản Thảo Cần Sửa
-            </div>
-            <div className="text-4xl font-black text-orange-500 leading-none mb-2">{needRevision.total}</div>
-            <div className="text-xs text-gray-500 font-medium">
-              Mangaka chờ feedback của bạn
+              Gồm {pendingReview.pendingSeriesCount} truyện & {pendingReview.pendingChaptersCount} bản thảo
             </div>
           </div>
 
@@ -270,16 +274,6 @@ export default function TantouDashboardPage() {
             <div className="text-4xl font-black text-red-600 leading-none mb-2">{overdue.total}</div>
             <div className="text-xs text-red-500 font-bold">
               {overdue.total > 0 ? 'Cần xử lý ngay!' : 'Không có trễ hạn'}
-            </div>
-          </div>
-
-          <div className="border-2 border-manga-ink bg-white p-4">
-            <div className="flex items-center gap-2 text-orange-600 font-bold text-[10px] uppercase mb-2">
-              <AlertTriangle className="w-3.5 h-3.5" /> Series At Risk
-            </div>
-            <div className="text-4xl font-black text-orange-600 leading-none mb-2">{atRiskSeries.total}</div>
-            <div className="text-xs text-orange-500 font-bold">
-              {atRiskSeries.seriesName !== '—' ? `${atRiskSeries.seriesName} – hạng #${atRiskSeries.ranking}` : 'Không có series at risk'}
             </div>
           </div>
         </div>
@@ -347,6 +341,16 @@ export default function TantouDashboardPage() {
               <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
             </Link>
 
+            <Link to="/dashboard/tantou-editor/series" className="flex items-center justify-between p-2 text-sm font-bold text-blue-600 hover:bg-blue-50 transition-colors group rounded">
+              <span className="flex items-center gap-2"><BookOpen className="w-4 h-4 text-blue-500" /> Xem Series phụ trách</span>
+              <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </Link>
+
+            <Link to="/dashboard/tantou-editor/alerts" className="flex items-center justify-between p-2 text-sm font-bold text-blue-600 hover:bg-blue-50 transition-colors group rounded">
+              <span className="flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-red-500" /> Xem Cảnh báo rủi ro</span>
+              <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </Link>
+
           </div>
         </div>
 
@@ -354,6 +358,10 @@ export default function TantouDashboardPage() {
         <div className="border-4 border-manga-ink bg-manga-ink text-white p-5">
           <h2 className="font-bold uppercase text-white text-sm mb-4 border-b border-white/20 pb-2">Tổng Quan Hôm Nay</h2>
           <div className="space-y-3 text-sm font-bold">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-300">Truyện chờ duyệt đề xuất</span>
+              <span className="text-blue-400">{todayOverview.seriesToReview} truyện</span>
+            </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-300">Chapter chờ review</span>
               <span className="text-blue-400">{todayOverview.chaptersToReview} chapter</span>

@@ -260,7 +260,7 @@ export default function NotificationsPage() {
            id: n.notification_id,
            type,
            title,
-           message,
+           message: message.replace(/\[meta:.*?\]/g, '').trim(),
            createdAt: n.created_at,
            isRead: n.is_read,
            link: link || undefined,

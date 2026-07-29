@@ -660,11 +660,16 @@ export default function SeriesDetailPage() {
 
                           {chapter.status.toLowerCase() !== 'published' && (
                             <button
+                              disabled={['pending_review', 'under_review', 'approved'].includes(chapter.status.toLowerCase())}
                               onClick={() => handleSubmitChapterReview(chapter._id)}
-                              className="px-3 py-1.5 bg-[#E63946] text-white border-2 border-black font-bold text-xs uppercase hover:bg-red-700 transition-colors shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
-                              title="Nộp chapter lên Editor duyệt"
+                              className={`px-3 py-1.5 border-2 border-black font-bold text-xs uppercase transition-colors shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none ${
+                                ['pending_review', 'under_review', 'approved'].includes(chapter.status.toLowerCase())
+                                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none translate-x-[1px] translate-y-[1px]'
+                                  : 'bg-[#E63946] text-white hover:bg-red-700 cursor-pointer'
+                              }`}
+                              title={['pending_review', 'under_review', 'approved'].includes(chapter.status.toLowerCase()) ? "Đã nộp chapter lên Editor duyệt" : "Nộp chapter lên Editor duyệt"}
                             >
-                              Nộp Chapter
+                              {['pending_review', 'under_review', 'approved'].includes(chapter.status.toLowerCase()) ? 'Đã nộp' : 'Nộp Chapter'}
                             </button>
                           )}
 

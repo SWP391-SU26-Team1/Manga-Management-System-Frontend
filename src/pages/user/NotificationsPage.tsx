@@ -27,10 +27,11 @@ export default function NotificationsPage() {
   }, [])
 
   const formatTimeAgo = (dateString: string) => {
-    const date = new Date(dateString)
+    if (!dateString) return ''
+    const safeDateString = dateString.endsWith('Z') || dateString.includes('+') ? dateString : `${dateString}Z`
+    const date = new Date(safeDateString)
     const now = new Date()
     const diff = Math.floor((now.getTime() - date.getTime()) / 1000)
-    
     if (diff < 60) return 'Vừa xong'
     if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`
     if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`

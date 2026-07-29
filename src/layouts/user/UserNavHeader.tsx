@@ -78,7 +78,8 @@ export default function UserNavHeader() {
 
   const formatTimeAgo = (dateString: string) => {
     if (!dateString) return ''
-    const date = new Date(dateString)
+    const safeDateString = dateString.endsWith('Z') || dateString.includes('+') ? dateString : `${dateString}Z`
+    const date = new Date(safeDateString)
     const now = new Date()
     const diff = Math.floor((now.getTime() - date.getTime()) / 1000)
     if (diff < 60) return 'Vừa xong'

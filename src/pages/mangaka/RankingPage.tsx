@@ -164,7 +164,7 @@ export default function RankingPage() {
           id: n.notification_id,
           seriesId: matched ? matched._id : '',
           level: (n.content.toLowerCase().includes('high') || n.title.toLowerCase().includes('nguy cơ') || n.content.toLowerCase().includes('rủi ro')) ? 'High' : 'Medium',
-          message: n.content,
+          message: (n.content || '').replace(/\[meta:.*?\]/g, '').trim(),
           createdAt: n.created_at,
           isRead: n.is_read,
           isAcknowledged: isAck

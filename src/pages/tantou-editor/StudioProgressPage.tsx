@@ -50,7 +50,7 @@ export default function StudioProgressPage() {
         chapter: ch.title || `Chapter ${ch.chapter_number || ''}`,
         status: mapChapterStatus(ch.status),
         mangaka: ch.series?.owner?.username || ch.mangaka || '—',
-        progress: ch.progress ?? 0,
+        progress: ['pending_review', 'under_review', 'approved', 'completed', 'published'].includes(String(ch.status || '').toLowerCase()) ? 100 : (ch.progress ?? 0),
         deadline: ch.deadline ? new Date(ch.deadline).toLocaleDateString('vi-VN') : '—',
         isLate: ch.is_overdue || ch.isLate || false,
       }))

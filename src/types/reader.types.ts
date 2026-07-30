@@ -77,6 +77,8 @@ export interface ReadingHistoryItem {
   progressPercent: number
   lastReadAt: string
   isCompleted: boolean
+  isLiked?: boolean
+  totalSeriesChapters?: number
 }
 
 export interface ContinueReading {

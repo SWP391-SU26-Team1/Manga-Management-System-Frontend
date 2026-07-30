@@ -82,6 +82,7 @@ export const authService = {
       // Ignored if API logout fails, we still clean up client-side
     } finally {
       localStorage.removeItem('mangaflow_user')
+      localStorage.removeItem('user') // Clear legacy key
     }
   },
 

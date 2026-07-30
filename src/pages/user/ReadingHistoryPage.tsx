@@ -21,9 +21,17 @@ export default function ReadingHistoryPage() {
 
   const tabs = ['TẤT CẢ', 'ĐANG ĐỌC', 'ĐÃ HOÀN THÀNH', 'YÊU THÍCH']
 
-  // Split history into featured (first item) and the rest
-  const featuredItem = history.length > 0 ? history[0] : null
-  const recentItems = history.length > 1 ? history.slice(1) : []
+  // Filter history based on active tab
+  const filteredHistory = history.filter(item => {
+    if (activeTab === 'ĐANG ĐỌC') return !item.isCompleted;
+    if (activeTab === 'ĐÃ HOÀN THÀNH') return item.isCompleted;
+    if (activeTab === 'YÊU THÍCH') return item.isLiked;
+    return true; // 'TẤT CẢ' or default
+  });
+
+  // Split filtered history into featured (first item) and the rest
+  const featuredItem = filteredHistory.length > 0 ? filteredHistory[0] : null
+  const recentItems = filteredHistory.length > 1 ? filteredHistory.slice(1) : []
 
   return (
     <div className="min-h-screen bg-[#F5F5F5] py-8 px-4 sm:px-6 lg:px-8 relative overflow-hidden dark:bg-zinc-900 transition-colors" style={{ backgroundImage: 'radial-gradient(#d1d5db 2px, transparent 2px)', backgroundSize: '32px 32px' }}>
@@ -77,6 +85,11 @@ export default function ReadingHistoryPage() {
               <Link to="/search" className="inline-block bg-manga-red text-white font-bold uppercase border-[3px] border-black px-8 py-3 shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-[0px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[4px] hover:translate-x-[4px] transition-all dark:border-black dark:shadow-[4px_4px_0px_#000] dark:hover:shadow-none">
                 Khám phá truyện
               </Link>
+            </div>
+          ) : filteredHistory.length === 0 ? (
+             <div className="bg-white border-[4px] border-black p-12 text-center shadow-[8px_8px_0px_rgba(0,0,0,1)] dark:bg-zinc-800 dark:border-black dark:shadow-[8px_8px_0px_#000]">
+              <h3 className="font-manga text-2xl font-bold uppercase mb-2 dark:text-white">Không có dữ liệu</h3>
+              <p className="text-gray-500 font-bold mb-6 dark:text-gray-400">Không tìm thấy truyện nào phù hợp với bộ lọc hiện tại.</p>
             </div>
           ) : (
             <>
@@ -134,7 +147,9 @@ export default function ReadingHistoryPage() {
                     <div className="mt-8 mb-6">
                       <div className="flex justify-between text-sm font-bold uppercase mb-2 dark:text-gray-300">
                         <span>Tiến độ</span>
-                        <span className="text-manga-red">Trang {featuredItem.lastPageNumber}/{featuredItem.totalPages}</span>
+                        <span className="text-manga-red">
+                          Chương {featuredItem.lastChapterNumber}/{featuredItem.totalSeriesChapters || '?'}
+                        </span>
                       </div>
                       <div className="w-full h-3 bg-gray-200 border-[2px] border-black dark:bg-zinc-700 dark:border-black">
                         <div className="h-full bg-manga-red border-r-[2px] border-black" style={{ width: `${featuredItem.progressPercent}%` }}></div>
@@ -187,7 +202,7 @@ export default function ReadingHistoryPage() {
                               style={{ transform: 'translateZ(1px)' }}
                             />
                             <div className="absolute top-0 left-0 bg-manga-red text-white text-[10px] font-bold uppercase px-2 py-1 border-r-[2px] border-b-[2px] border-black z-20 dark:border-black" style={{ transform: 'translateZ(2px)' }}>
-                              {item.isCompleted ? `Hoàn thành` : `Ch.${item.lastChapterNumber} - Tr.${item.lastPageNumber}`}
+                              {item.isCompleted ? `Hoàn thành` : `Chương ${item.lastChapterNumber}/${item.totalSeriesChapters || '?'}`}
                             </div>
                           </Link>
                         </div>

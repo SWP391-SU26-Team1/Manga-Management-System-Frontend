@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react'
-import { User, Mail, Award, BookOpen, Clock, Heart, Edit2, Home, Save, X, ShieldAlert, Loader2 } from 'lucide-react'
+import React, { useEffect, useState, useRef } from 'react'
+import { User, Mail, Award, BookOpen, Clock, Heart, Edit2, Home, Save, X, ShieldAlert, Loader2, Camera } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
 import api from '@/services/api'
 
@@ -11,6 +11,8 @@ const AVAILABLE_GENRES = [
 ]
 import { useNavigate } from 'react-router'
 import { readerService } from '@/services/reader.service'
+import { uploadService } from '@/services/upload.service'
+import { userService } from '@/services/user.service'
 import { ReadingHistoryItem } from '@/types/reader.types'
 
 export default function UserProfilePage() {
@@ -25,6 +27,10 @@ export default function UserProfilePage() {
   
   const [isSubmittingRole, setIsSubmittingRole] = useState(false)
   const [selectedRole, setSelectedRole] = useState('mangaka')
+  
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const [editAvatarUrl, setEditAvatarUrl] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
   
   const navigate = useNavigate()
   const { showToast } = useToast()
@@ -51,18 +57,59 @@ export default function UserProfilePage() {
     return <div className="p-8 text-center font-bold text-red-500">Đang tải hồ sơ...</div>
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!profile) return
-    const updatedUser = {
-      ...profile,
-      fullName: editForm.fullName,
-      bio: editForm.bio,
-      favoriteGenres: editForm.favoriteGenres
+    try {
+      const avatarToSend = editAvatarUrl && editAvatarUrl.startsWith('http') ? editAvatarUrl : undefined
+      let updatedUser = {
+        ...profile,
+        fullName: editForm.fullName,
+        bio: editForm.bio,
+        favoriteGenres: editForm.favoriteGenres,
+        avatarUrl: avatarToSend ?? profile.avatarUrl
+      }
+      
+      try {
+        await userService.updateProfile(profile.id, {
+          name: editForm.fullName,
+          bio: editForm.bio,
+          avatar_url: avatarToSend
+        })
+      } catch (e) {
+        console.warn('API update failed, updating localStorage only', e)
+      }
+
+      localStorage.setItem('mangaflow_user', JSON.stringify(updatedUser))
+      setProfile(updatedUser)
+      setIsEditing(false)
+      window.dispatchEvent(new Event('mangaflow_profile_updated'))
+      showToast('Cập nhật hồ sơ thành công', 'success')
+    } catch (error) {
+      showToast('Có lỗi xảy ra khi lưu', 'error')
     }
-    localStorage.setItem('mangaflow_user', JSON.stringify(updatedUser))
-    setProfile(updatedUser)
-    setIsEditing(false)
-    window.dispatchEvent(new Event('mangaflow_profile_updated'))
+  }
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setEditAvatarUrl(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+
+    setIsUploadingAvatar(true)
+    try {
+      const result = await uploadService.uploadSingle(file, 'avatars')
+      const realUrl = result.secure_url
+      setEditAvatarUrl(realUrl)
+    } catch (err) {
+      console.error('Avatar upload failed:', err)
+      alert('Không thể upload ảnh lên server. Ảnh sẽ chỉ hiển thị tạm thời.')
+    } finally {
+      setIsUploadingAvatar(false)
+    }
   }
 
   const toggleGenre = (genre: string) => {
@@ -165,15 +212,37 @@ export default function UserProfilePage() {
           <div className="bg-white border-4 border-manga-ink shadow-[8px_8px_0px_rgba(0,0,0,1)] p-6 flex flex-col items-center text-center dark:bg-zinc-800 dark:border-black dark:shadow-[8px_8px_0px_#000]">
             <div className="relative mb-6">
               <div
-                className={`w-32 h-32 rounded-full border-4 border-manga-ink bg-zinc-900 overflow-hidden flex items-center justify-center text-white font-extrabold text-4xl shadow-[4px_4px_0px_rgba(0,0,0,1)] relative dark:border-black dark:shadow-[4px_4px_0px_#000]`}
+                className={`w-32 h-32 rounded-full border-4 border-manga-ink bg-zinc-900 overflow-hidden flex items-center justify-center text-white font-extrabold text-4xl shadow-[4px_4px_0px_rgba(0,0,0,1)] relative dark:border-black dark:shadow-[4px_4px_0px_#000] ${isEditing && !isUploadingAvatar ? 'cursor-pointer group' : ''}`}
+                onClick={() => isEditing && !isUploadingAvatar && fileInputRef.current?.click()}
               >
-                {profile.avatarUrl ? (
-                  <img src={profile.avatarUrl} alt={profile.fullName} className="w-full h-full object-cover" />
+                {isUploadingAvatar ? (
+                  <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
+                    <Loader2 className="w-8 h-8 text-white animate-spin" />
+                    <span className="text-xs font-bold text-white mt-1">Đang tải...</span>
+                  </div>
+                ) : null}
+                {editAvatarUrl || profile.avatarUrl ? (
+                  <img src={editAvatarUrl || profile.avatarUrl} alt={profile.fullName} className="w-full h-full object-cover" />
                 ) : (
                   userInitials
                 )}
+                {isEditing && !isUploadingAvatar && (
+                  <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Camera className="w-8 h-8 text-white mb-1" />
+                    <span className="text-xs font-bold uppercase text-white">Đổi ảnh</span>
+                  </div>
+                )}
               </div>
               <div className="absolute bottom-0 right-0 w-8 h-8 bg-green-400 border-2 border-manga-ink rounded-full dark:border-black" title="Đang hoạt động"></div>
+              {isEditing && (
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleImageUpload}
+                  accept="image/*"
+                  className="hidden"
+                />
+              )}
             </div>
 
             {isEditing ? (

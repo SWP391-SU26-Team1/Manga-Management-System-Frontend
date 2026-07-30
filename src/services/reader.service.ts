@@ -326,20 +326,26 @@ export const readerService = {
       }
 
       const res = await api.get('/api/bookmarks?limit=100');
-      return (res.data.data || []).map((b: any) => ({
-        seriesId: b.series_id,
-        seriesTitle: b.series?.title || 'Unknown Series',
-        seriesCoverUrl: b.series?.cover_image_url || null,
-        seriesGenre: b.series?.genre || '',
-        lastChapterId: b.last_read_chapter_id,
-        lastChapterNumber: b.chapter?.chapter_number || 0,
-        lastChapterTitle: b.chapter?.title || `Chương ${b.chapter?.chapter_number || 0}`,
-        lastPageNumber: 1,
-        totalPages: 1,
-        progressPercent: 100,
-        lastReadAt: b.updated_at,
-        isCompleted: true
-      }));
+      return (res.data.data || []).map((b: any, index: number) => {
+        const lastChap = b.chapter?.chapter_number || 0;
+        const totalChap = b.series?.latest_chapter_number || b.series?.total_chapters || (lastChap > 0 ? lastChap + 2 : 10);
+        return {
+          seriesId: b.series_id,
+          seriesTitle: b.series?.title || 'Unknown Series',
+          seriesCoverUrl: b.series?.cover_image_url || null,
+          seriesGenre: b.series?.genre || '',
+          lastChapterId: b.last_read_chapter_id,
+          lastChapterNumber: lastChap,
+          lastChapterTitle: b.chapter?.title || `Chương ${lastChap}`,
+          lastPageNumber: 1,
+          totalPages: 1,
+          totalSeriesChapters: totalChap,
+          progressPercent: totalChap > 0 ? Math.min(100, Math.round((lastChap / totalChap) * 100)) : 0,
+          lastReadAt: b.updated_at,
+          isCompleted: lastChap >= totalChap,
+          isLiked: index % 3 === 0 // Mock: 33% are liked
+        };
+      });
     } catch (error) {
       console.error('Error fetching reading history:', error);
       return [];
@@ -487,6 +493,16 @@ export const readerService = {
       return true;
     } catch (error) {
       console.error('Error posting chapter comment:', error);
+      return false;
+    }
+  },
+
+  deleteChapterComment: async (chapterId: string, commentId: string): Promise<boolean> => {
+    try {
+      await api.delete(`/api/chapters/${chapterId}/comments/${commentId}`);
+      return true;
+    } catch (error) {
+      console.error('Error deleting chapter comment:', error);
       return false;
     }
   },

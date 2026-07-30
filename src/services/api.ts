@@ -24,6 +24,7 @@ const getStoredUser = (): { token?: string } | null => {
 
 const clearSession = () => {
   localStorage.removeItem('mangaflow_user')
+  localStorage.removeItem('user')
 }
 
 const updateStoredToken = (token: string) => {

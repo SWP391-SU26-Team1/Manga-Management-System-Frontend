@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, Send, User } from 'lucide-react';
+import { X, Send, User, Trash2, MessageSquare } from 'lucide-react';
 import { readerService } from '@/services/reader.service';
 import { useToast } from '@/contexts/ToastContext';
 
 interface Comment {
   id?: string;
   comment_id?: string;
+  user_id?: string;
   parent_comment_id?: string;
   user_name?: string;
   content: string;
@@ -29,7 +30,9 @@ interface Props {
   chapterTitle?: string;
 }
 
-const CommentItem = ({ comment, depth = 0, onReply }: { comment: CommentNode, depth?: number, onReply: (id: string, name: string) => void }) => {
+const CommentItem = ({ comment, depth = 0, onReply, onDelete, currentUser }: { comment: CommentNode, depth?: number, onReply: (id: string, name: string) => void, onDelete?: (id: string) => void, currentUser?: any }) => {
+  const isOwner = currentUser && (comment.user_id === currentUser.id || comment.user?.name === currentUser.name || comment.user?.username === currentUser.username);
+  
   return (
     <div className={`mt-2 ${depth > 0 ? 'ml-4 sm:ml-8 border-l-[3px] border-gray-300 dark:border-zinc-700 pl-3 sm:pl-4' : ''}`}>
       <div className="bg-white dark:bg-zinc-800 border-2 border-black dark:border-zinc-700 p-3 shadow-[4px_4px_0px_#000] dark:shadow-[4px_4px_0px_#111]">
@@ -47,12 +50,24 @@ const CommentItem = ({ comment, depth = 0, onReply }: { comment: CommentNode, de
               <div className="text-[10px] text-gray-500 uppercase font-bold">{comment.created_at ? new Date(comment.created_at).toLocaleString('vi-VN') : 'Vừa xong'}</div>
             </div>
           </div>
-          <button 
-            onClick={() => onReply(comment.comment_id || comment.id || '', comment.user?.name || comment.user?.username || 'Người dùng ẩn danh')}
-            className="text-[10px] sm:text-xs font-bold uppercase bg-gray-200 dark:bg-zinc-700 hover:bg-manga-red hover:text-white dark:hover:bg-manga-red px-2 py-1 transition-colors border border-black dark:border-zinc-600 shadow-[2px_2px_0px_#000] hover:translate-y-[1px] hover:translate-x-[1px] hover:shadow-none"
-          >
-            Trả lời
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => onReply(comment.comment_id || comment.id || '', comment.user?.name || comment.user?.username || 'Người dùng ẩn danh')}
+              className="text-[10px] sm:text-xs font-bold uppercase bg-gray-200 dark:bg-zinc-700 hover:bg-manga-red hover:text-white dark:hover:bg-manga-red px-2 py-1 transition-colors border border-black dark:border-zinc-600 shadow-[2px_2px_0px_#000] hover:translate-y-[1px] hover:translate-x-[1px] hover:shadow-none flex items-center justify-center"
+              title="Trả lời"
+            >
+              <MessageSquare className="w-4 h-4" />
+            </button>
+            {isOwner && (
+              <button 
+                onClick={() => onDelete && onDelete(comment.comment_id || comment.id || '')}
+                className="text-[10px] sm:text-xs font-bold uppercase text-manga-red hover:text-white bg-white hover:bg-manga-red px-2 py-1 transition-colors border border-black dark:border-zinc-600 dark:bg-zinc-800 dark:hover:bg-manga-red shadow-[2px_2px_0px_#000] hover:translate-y-[1px] hover:translate-x-[1px] hover:shadow-none flex items-center justify-center"
+                title="Xóa"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
         <p className="text-sm text-zinc-800 dark:text-gray-200 leading-relaxed">
           {comment.content}
@@ -62,7 +77,7 @@ const CommentItem = ({ comment, depth = 0, onReply }: { comment: CommentNode, de
       {comment.replies && comment.replies.length > 0 && (
         <div className="mt-2">
           {comment.replies.map(reply => (
-            <CommentItem key={reply.id || reply.comment_id} comment={reply} depth={depth + 1} onReply={onReply} />
+            <CommentItem key={reply.id || reply.comment_id} comment={reply} depth={depth + 1} onReply={onReply} onDelete={onDelete} currentUser={currentUser} />
           ))}
         </div>
       )}
@@ -75,6 +90,7 @@ export default function ChapterCommentsPanel({ isOpen, onClose, chapterId, chapt
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{id: string, name: string} | null>(null);
+  const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
   const { showToast } = useToast();
 
   const fetchComments = async () => {
@@ -112,9 +128,29 @@ export default function ChapterCommentsPanel({ isOpen, onClose, chapterId, chapt
     }
   };
 
+  const confirmDelete = (id: string) => {
+    setCommentToDelete(id);
+  };
+
+  const executeDelete = async () => {
+    if (!commentToDelete) return;
+    const success = await readerService.deleteChapterComment(chapterId, commentToDelete);
+    if (success) {
+      setComments(prev => prev.filter(c => (c.comment_id || c.id) !== commentToDelete));
+      showToast('Đã xóa bình luận', 'success');
+      fetchComments(); // Refresh if possible
+    } else {
+      showToast('Xóa bình luận thất bại', 'error');
+    }
+    setCommentToDelete(null);
+  };
+
   const handleReply = (id: string, name: string) => {
     setReplyingTo({ id, name });
   };
+
+  const userStr = localStorage.getItem('mangaflow_user') || localStorage.getItem('user');
+  const currentUser = userStr ? JSON.parse(userStr) : null;
 
   const buildCommentTree = (flatComments: Comment[]): CommentNode[] => {
     const map = new Map<string, CommentNode>();
@@ -188,7 +224,7 @@ export default function ChapterCommentsPanel({ isOpen, onClose, chapterId, chapt
             </div>
           ) : (
             commentTree.map((comment) => (
-              <CommentItem key={comment.id || comment.comment_id} comment={comment} onReply={handleReply} />
+              <CommentItem key={comment.id || comment.comment_id} comment={comment} onReply={handleReply} onDelete={confirmDelete} currentUser={currentUser} />
             ))
           )}
         </div>
@@ -221,6 +257,29 @@ export default function ChapterCommentsPanel({ isOpen, onClose, chapterId, chapt
           </form>
         </div>
       </div>
+
+      {commentToDelete && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+          <div className="bg-white dark:bg-zinc-800 border-4 border-black p-6 shadow-[8px_8px_0px_#000] w-full max-w-sm">
+            <h3 className="text-xl font-manga font-bold uppercase mb-4 text-zinc-900 dark:text-white">Xóa bình luận</h3>
+            <p className="text-sm font-bold text-gray-600 dark:text-gray-300 mb-6">Bạn có chắc chắn muốn xóa bình luận này không? Hành động này không thể hoàn tác.</p>
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={() => setCommentToDelete(null)}
+                className="px-4 py-2 bg-gray-200 dark:bg-zinc-700 text-black dark:text-white font-bold uppercase text-xs border-2 border-black hover:bg-gray-300 shadow-[2px_2px_0px_#000] transition-transform hover:translate-y-[1px] hover:translate-x-[1px] hover:shadow-none"
+              >
+                Hủy
+              </button>
+              <button 
+                onClick={executeDelete}
+                className="px-4 py-2 bg-manga-red text-white font-bold uppercase text-xs border-2 border-black shadow-[2px_2px_0px_#000] transition-transform hover:translate-y-[1px] hover:translate-x-[1px] hover:shadow-none"
+              >
+                Đồng ý xóa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router'
-import { Star, Heart, Award, User, Mail, Users, Briefcase, BookOpen } from 'lucide-react'
+import { Star, Heart, Award, User, Mail, Users, Briefcase, BookOpen, Trash2, MessageSquare } from 'lucide-react'
 import { readerService } from '@/services/reader.service'
 import { SeriesDetail, PublishedChapter } from '@/types/reader.types'
 import { useToast } from '@/contexts/ToastContext'
@@ -30,6 +30,7 @@ export default function SeriesDetailPage() {
   const [likedChapters, setLikedChapters] = useState<Record<string, boolean>>({})
   const [selectedUser, setSelectedUser] = useState<any | null>(null)
   const [replyingTo, setReplyingTo] = useState<{id: string, name: string, chapterId?: string} | null>(null)
+  const [commentToDelete, setCommentToDelete] = useState<{chapterId: string, commentId: string} | null>(null)
   const [replyContent, setReplyContent] = useState('')
 
   const handleChapterLike = async (e: React.MouseEvent, chapterId: string) => {
@@ -102,7 +103,25 @@ export default function SeriesDetailPage() {
     } else {
       showToast('Đã có lỗi xảy ra, vui lòng thử lại sau.', 'error');
     }
-  }
+  };
+
+  const confirmDeleteComment = (chapterId: string, commentId: string) => {
+    setCommentToDelete({chapterId, commentId});
+  };
+
+  const executeDeleteComment = async () => {
+    if (!commentToDelete) return;
+    const { chapterId, commentId } = commentToDelete;
+    const success = await readerService.deleteChapterComment(chapterId, commentId);
+    if (success) {
+      setComments(prev => prev.filter(c => (c.comment_id || c.id) !== commentId));
+      showToast('Đã xóa bình luận', 'success');
+      // readerService.getSeriesComments(seriesId).then(setComments); // API doesn't return replies, avoid fetching
+    } else {
+      showToast('Xóa bình luận thất bại', 'error');
+    }
+    setCommentToDelete(null);
+  };
 
   useEffect(() => {
     const handleStorageChange = () => {
@@ -583,12 +602,29 @@ export default function SeriesDetailPage() {
                                 </p>
                               </div>
                             </div>
-                            <button 
-                              onClick={() => setReplyingTo({id: c.comment_id || c.id || '', name: c.user?.name || c.user?.username || 'Người dùng ẩn danh', chapterId: c.chapter_id})}
-                              className="text-[10px] sm:text-xs font-bold uppercase bg-gray-200 dark:bg-zinc-700 hover:bg-manga-red hover:text-white dark:hover:bg-manga-red px-2 py-1 transition-colors border border-black dark:border-zinc-600 shadow-[2px_2px_0px_#000] hover:translate-y-[1px] hover:translate-x-[1px] hover:shadow-none"
-                            >
-                              Trả lời
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button 
+                                onClick={() => setReplyingTo({id: c.comment_id || c.id || '', name: c.user?.name || c.user?.username || 'Người dùng ẩn danh', chapterId: c.chapter_id})}
+                                className="text-[10px] sm:text-xs font-bold uppercase bg-gray-200 dark:bg-zinc-700 hover:bg-manga-red hover:text-white dark:hover:bg-manga-red px-2 py-1 transition-colors border border-black dark:border-zinc-600 shadow-[2px_2px_0px_#000] hover:translate-y-[1px] hover:translate-x-[1px] hover:shadow-none flex items-center justify-center"
+                                title="Trả lời"
+                              >
+                                <MessageSquare className="w-4 h-4" />
+                              </button>
+                              {(() => {
+                                const userStr = localStorage.getItem('mangaflow_user');
+                                const currentUser = userStr ? JSON.parse(userStr) : null;
+                                const isOwner = currentUser && (c.user_id === currentUser.id || c.user?.name === currentUser.name || c.user?.username === currentUser.username);
+                                return isOwner ? (
+                                  <button 
+                                    onClick={() => confirmDeleteComment(c.chapter_id, c.comment_id || c.id || '')}
+                                    className="text-[10px] sm:text-xs font-bold uppercase text-manga-red hover:text-white bg-white hover:bg-manga-red px-2 py-1 transition-colors border border-black dark:border-zinc-600 dark:bg-zinc-800 dark:hover:bg-manga-red shadow-[2px_2px_0px_#000] hover:translate-y-[1px] hover:translate-x-[1px] hover:shadow-none flex items-center justify-center"
+                                    title="Xóa"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                ) : null;
+                              })()}
+                            </div>
                           </div>
                           <p className="text-sm text-zinc-800 dark:text-gray-200 leading-relaxed mt-2">
                             {c.content}
@@ -806,6 +842,29 @@ export default function SeriesDetailPage() {
                       </div>
                   </div>
                </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {commentToDelete && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+          <div className="bg-white dark:bg-zinc-800 border-4 border-black p-6 shadow-[8px_8px_0px_#000] w-full max-w-sm">
+            <h3 className="text-xl font-manga font-bold uppercase mb-4 text-zinc-900 dark:text-white">Xóa bình luận</h3>
+            <p className="text-sm font-bold text-gray-600 dark:text-gray-300 mb-6">Bạn có chắc chắn muốn xóa bình luận này không? Hành động này không thể hoàn tác.</p>
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={() => setCommentToDelete(null)}
+                className="px-4 py-2 bg-gray-200 dark:bg-zinc-700 text-black dark:text-white font-bold uppercase text-xs border-2 border-black hover:bg-gray-300 shadow-[2px_2px_0px_#000] transition-transform hover:translate-y-[1px] hover:translate-x-[1px] hover:shadow-none"
+              >
+                Hủy
+              </button>
+              <button 
+                onClick={executeDeleteComment}
+                className="px-4 py-2 bg-manga-red text-white font-bold uppercase text-xs border-2 border-black shadow-[2px_2px_0px_#000] transition-transform hover:translate-y-[1px] hover:translate-x-[1px] hover:shadow-none"
+              >
+                Đồng ý xóa
+              </button>
             </div>
           </div>
         </div>

@@ -61,8 +61,8 @@ export default function UserLayout() {
             <ul className="space-y-2 text-sm font-semibold text-zinc-400">
               <li><Link to="/dashboard/mangaka" className="hover:text-white transition-colors">Phòng Làm Việc Mangaka</Link></li>
               <li><Link to="/dashboard/assistant" className="hover:text-white transition-colors">Góc Trợ Lý Sáng Tác</Link></li>
-              <li><a href="#" className="hover:text-white transition-colors">Quy Trình Xuất Bản</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Hướng Dẫn Nộp Bản Thảo</a></li>
+              <li><Link to="/publishing-workflow" className="hover:text-white transition-colors">Quy Trình Xuất Bản</Link></li>
+              <li><Link to="/submission-guidelines" className="hover:text-white transition-colors">Hướng Dẫn Nộp Bản Thảo</Link></li>
             </ul>
           </div>
 

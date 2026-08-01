@@ -25,6 +25,8 @@ import TermsPage from '@/pages/public-docs/TermsPage'
 import CopyrightPage from '@/pages/public-docs/CopyrightPage'
 import PrivacyPage from '@/pages/public-docs/PrivacyPage'
 import ContactPage from '@/pages/public-docs/ContactPage'
+import PublishingWorkflowPage from '@/pages/public-docs/PublishingWorkflowPage'
+import SubmissionGuidelinesPage from '@/pages/public-docs/SubmissionGuidelinesPage'
 
 import { PublicUserGuard } from '@/components/common/PublicUserGuard'
 
@@ -51,6 +53,8 @@ export default function AppRoutes() {
         <Route path="/copyright" element={<CopyrightPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/contact" element={<ContactPage />} />
+        <Route path="/publishing-workflow" element={<PublishingWorkflowPage />} />
+        <Route path="/submission-guidelines" element={<SubmissionGuidelinesPage />} />
       </Route>
 
       {/* Reader - Full-screen (không có Header/Footer) */}

@@ -324,7 +324,7 @@ export default function ContactPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <MapPin className="w-5 h-5 text-manga-red" />
-                  <span className="text-gray-700 dark:text-zinc-200">Khu Công Nghệ Cao Hòa Lạc, Thạch Thất, Hà Nội</span>
+                  <span className="text-gray-700 dark:text-zinc-200">Khu Công Nghệ Cao, Quận 9, Thành Phố Hồ Chí Minh</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <Clock className="w-5 h-5 text-manga-red" />

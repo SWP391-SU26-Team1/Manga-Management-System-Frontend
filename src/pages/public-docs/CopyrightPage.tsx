@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { ShieldAlert, Award, FileText, UserCheck, EyeOff, Trash2, HelpCircle, ChevronDown, CheckCircle2, ArrowRight } from 'lucide-react'
+import { ShieldAlert, Award, FileText, UserCheck, EyeOff, Trash2, HelpCircle, ChevronDown, CheckCircle2, ArrowRight, RefreshCw, Cpu, Undo, Users } from 'lucide-react'
 
 export default function CopyrightPage() {
   const [activeSection, setActiveSection] = useState('section-1')
@@ -10,6 +10,8 @@ export default function CopyrightPage() {
     { id: 'section-2', title: '2. Cam kết của MangaFlow', icon: CheckCircle2 },
     { id: 'section-3', title: '3. Quy trình báo cáo vi phạm', icon: FileText },
     { id: 'section-4', title: '4. Hình thức xử lý', icon: ShieldAlert },
+    { id: 'section-5', title: '5. Chính sách Fanart & Doujinshi', icon: Users },
+    { id: 'section-6', title: '6. Tuyên bố về AI Content', icon: Cpu },
   ]
 
   const steps = [
@@ -17,8 +19,8 @@ export default function CopyrightPage() {
     { num: '02', title: 'Gửi báo cáo', desc: 'Cung cấp bằng chứng sở hữu và liên kết vi phạm thông qua biểu mẫu hỗ trợ.' },
     { num: '03', title: 'Xác minh thông tin', desc: 'Đội ngũ kiểm duyệt kiểm tra tính xác thực của bằng chứng trong 24h.' },
     { num: '04', title: 'Tạm ẩn tác phẩm', desc: 'Tác phẩm bị báo cáo sẽ tạm thời ẩn đi để tránh phát sinh tranh chấp.' },
-    { num: '05', title: 'Kết luận & Giải quyết', desc: 'Hai bên đưa ra phản hồi đối chứng trước khi có quyết định chính thức.' },
-    { num: '06', title: 'Khôi phục hoặc Xóa', desc: 'Gỡ bỏ vĩnh viễn nội dung vi phạm hoặc khôi phục nếu báo cáo không chính xác.' }
+    { num: '05', title: 'Kết luận hoặc Khiếu nại ngược', desc: 'Người bị báo cáo gửi Khiếu nại ngược kèm file sketch/PSD chứng minh nguồn gốc.' },
+    { num: '06', title: 'Khôi phục hoặc Xóa', desc: 'Gỡ bỏ vĩnh viễn nội dung vi phạm hoặc khôi phục lại truyện nếu khiếu nại thành công.' }
   ]
 
   const faqs = [
@@ -74,7 +76,7 @@ export default function CopyrightPage() {
           <div className="absolute right-0 top-0 opacity-10 translate-x-12 -translate-y-6">
             <Award className="w-96 h-96" />
           </div>
-          <div className="relative z-10 max-w-2xl space-y-4">
+          <div className="relative z-10 max-w-3xl space-y-4">
             <span className="uppercase tracking-widest font-bold bg-white text-manga-red px-3 py-1 text-xs rounded-full">
               Sở Hữu Trí Tuệ
             </span>
@@ -83,6 +85,14 @@ export default function CopyrightPage() {
             </h1>
             <p className="text-sm md:text-base font-semibold opacity-90 leading-relaxed">
               Chúng tôi tôn trọng tuyệt đối quyền sở hữu trí tuệ của mọi tác giả. Hãy cùng MangaFlow xây dựng sân chơi văn minh, an toàn và công bằng cho cộng đồng sáng tác.
+            </p>
+            <div className="flex flex-wrap items-center gap-4 text-xs font-bold bg-[#b51724] inline-block px-4 py-2 rounded-md">
+              <span>Có hiệu lực kể từ: 01/08/2026</span>
+              <span className="opacity-60">|</span>
+              <span className="flex items-center gap-1"><RefreshCw className="w-3.5 h-3.5" /> Phiên bản 1.1</span>
+            </div>
+            <p className="text-[11px] font-bold opacity-75 italic">
+              * Chúng tôi có quyền cập nhật chính sách này. Những thay đổi quan trọng sẽ được thông báo qua email hoặc banner trên trang chủ 30 ngày trước khi chính thức có hiệu lực.
             </p>
           </div>
         </div>
@@ -97,7 +107,7 @@ export default function CopyrightPage() {
             </h3>
             <nav className="space-y-1">
               {sections.map((sec) => {
-                const Icon = sec.icon
+                const Icon = sec.icon || Users
                 return (
                   <button
                     key={sec.id}
@@ -172,10 +182,10 @@ export default function CopyrightPage() {
           {/* Section 3 */}
           <section id="section-3" className="bg-white dark:bg-zinc-800 p-6 md:p-8 manga-border manga-shadow rounded-lg space-y-6">
             <h2 className="font-manga text-2xl font-black uppercase border-b-2 border-manga-ink pb-2 flex items-center gap-3 text-manga-red">
-              <FileText className="w-6 h-6" /> 3. Quy trình báo cáo vi phạm
+              <FileText className="w-6 h-6" /> 3. Quy trình báo cáo & Khiếu nại ngược
             </h2>
             <p className="text-gray-600 dark:text-zinc-300 font-medium">
-              Khi phát hiện hành vi xâm phạm bản quyền, tác giả thực hiện theo quy trình chuẩn sau:
+              Quy trình tiếp nhận xử lý tranh chấp bản quyền và cơ chế khiếu nại ngược dành cho tác giả:
             </p>
             
             {/* Horizontal Timeline */}
@@ -189,12 +199,22 @@ export default function CopyrightPage() {
                     <h4 className="font-bold text-sm text-manga-ink dark:text-white flex items-center gap-2">
                       {step.title}
                     </h4>
-                    <p className="text-xs font-semibold text-gray-500 dark:text-zinc-300">
+                    <p className="text-xs font-semibold text-gray-500 dark:text-zinc-300 leading-relaxed">
                       {step.desc}
                     </p>
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* Counter Notice Information Box */}
+            <div className="bg-amber-50 dark:bg-amber-950/20 border-2 border-amber-300 dark:border-amber-900 p-5 rounded-lg space-y-2 mt-6">
+              <h4 className="font-bold text-sm text-amber-800 dark:text-amber-400 flex items-center gap-2">
+                <Undo className="w-4 h-4" /> Cơ chế Khiếu nại ngược (Counter-Notice) cho tác giả bị báo cáo oan
+              </h4>
+              <p className="text-xs text-amber-700 dark:text-zinc-300 leading-relaxed font-semibold">
+                Nếu tác phẩm của bạn bị tạm ẩn do báo cáo đạo nhái không chính xác, bạn có quyền gửi <strong>Đơn khiếu nại ngược</strong> kèm theo các bằng chứng xác thực (bao gồm: file phác thảo sketch thô, file phân cảnh PSD/Clip Studio, tệp tin chứa dữ liệu ngày tạo gốc). MangaFlow sẽ tiến hành đối chất công khai giữa hai bên trước khi đưa ra quyết định khôi phục lại truyện.
+              </p>
             </div>
           </section>
 
@@ -238,6 +258,54 @@ export default function CopyrightPage() {
                   </tr>
                 </tbody>
               </table>
+            </div>
+          </section>
+
+          {/* Section 5 */}
+          <section id="section-5" className="bg-white dark:bg-zinc-800 p-6 md:p-8 manga-border manga-shadow rounded-lg space-y-6">
+            <h2 className="font-manga text-2xl font-black uppercase border-b-2 border-manga-ink pb-2 flex items-center gap-3 text-manga-red">
+              <Users className="w-6 h-6" /> 5. Chính sách đối với tác phẩm phái sinh (Fanart / Doujinshi)
+            </h2>
+            <p className="text-gray-600 dark:text-zinc-300 font-medium leading-relaxed">
+              MangaFlow khuyến khích tinh thần sáng tạo phong phú, tuy nhiên có ranh giới rõ ràng về bản quyền phái sinh:
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="bg-emerald-50 dark:bg-emerald-950/20 p-5 rounded-lg border-2 border-emerald-300 dark:border-emerald-900 space-y-3 font-semibold text-xs leading-relaxed">
+                <h4 className="font-bold text-emerald-800 dark:text-emerald-400">🟢 Được phép đăng tải (Tôn vinh tác phẩm gốc)</h4>
+                <p className="text-gray-600 dark:text-zinc-300">
+                  - Các nét vẽ Fanart cá nhân phi thương mại.
+                  <br />
+                  - Truyện chế vui, Doujinshi đăng tải miễn phí cho cộng đồng, không khóa chương trả phí.
+                  <br />
+                  - Có gắn tag/ghi nhận tác giả và liên kết đến bộ truyện gốc.
+                </p>
+              </div>
+              <div className="bg-rose-50 dark:bg-rose-950/20 p-5 rounded-lg border-2 border-rose-300 dark:border-rose-900 space-y-3 font-semibold text-xs leading-relaxed">
+                <h4 className="font-bold text-rose-700 dark:text-rose-400">❌ Nghiêm cấm (Vi phạm bản quyền trục lợi)</h4>
+                <p className="text-gray-600 dark:text-zinc-300">
+                  - Khóa chương Premium thu tiền đối với truyện phái sinh sử dụng tài sản trí tuệ của tác giả khác khi chưa xin phép.
+                  <br />
+                  - Kinh doanh thương mại các ấn phẩm phái sinh lạm dụng bản quyền.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* Section 6 */}
+          <section id="section-6" className="bg-white dark:bg-zinc-800 p-6 md:p-8 manga-border manga-shadow rounded-lg space-y-6">
+            <h2 className="font-manga text-2xl font-black uppercase border-b-2 border-manga-ink pb-2 flex items-center gap-3 text-manga-red">
+              <Cpu className="w-6 h-6" /> 6. Tuyên bố về tác phẩm do trí tuệ nhân tạo tạo ra (AI-Generated Content)
+            </h2>
+            <p className="text-gray-600 dark:text-zinc-300 font-medium leading-relaxed">
+              MangaFlow tôn trọng tính nguyên bản của nghệ thuật thủ công, đồng thời quy chuẩn hóa nội dung AI:
+            </p>
+            <div className="bg-[#111115] text-white p-5 rounded-lg manga-border space-y-3 font-semibold text-xs leading-relaxed">
+              <p>
+                🤖 <strong>Quy định gắn thẻ bắt buộc:</strong> Các bộ truyện sử dụng ảnh vẽ hoàn toàn bằng AI (Midjourney, Stable Diffusion, NovelAI...) hoặc có sự hỗ trợ đáng kể từ AI bắt buộc phải bật tag phân loại <code>AI-Generated</code> hoặc <code>AI-Assisted</code> khi đăng tải truyện.
+              </p>
+              <p>
+                ⚠️ <strong>Bản quyền tranh chấp AI:</strong> MangaFlow không hỗ trợ giải quyết bản quyền cho các tác phẩm AI tự động không chứng minh được tính sáng tạo của con người. Tác giả tự chịu mọi rủi ro pháp lý nếu tác phẩm AI xâm phạm dữ liệu tranh của họa sĩ khác.
+              </p>
             </div>
           </section>
 

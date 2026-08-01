@@ -115,16 +115,14 @@ export default function UserNavHeader() {
 
   return (
     <header className="sticky top-0 z-50 bg-white border-b-4 border-manga-ink w-full dark:bg-zinc-900 dark:border-black transition-colors duration-200">
-      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div className="w-full px-4 md:px-8 h-24 flex items-center justify-between">
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-2">
-          <span className="font-manga text-2xl font-black uppercase text-manga-ink tracking-tight hover:-translate-y-0.5 transition-transform dark:text-white">
-            MangaFlow
-          </span>
+        <Link to="/" className="flex items-center justify-start py-0">
+          <img src="/images/acc76da3-e3ea-4f2c-ada1-7798cd6b7fbd.png" alt="MangaFlow" className="h-24 md:h-28 w-auto object-contain object-left hover:-translate-y-0.5 transition-transform" />
         </Link>
 
         {/* Center Nav */}
-        <nav className="hidden md:flex items-center gap-8 font-bold text-sm">
+        <nav className="hidden md:flex items-center gap-10 font-bold text-base md:text-lg">
           <Link to="/" className={linkClass('/')}>
             Khám Phá
             <span className={`absolute -bottom-1 left-0 h-0.5 bg-manga-red transition-all ${isActive('/') ? 'w-full' : 'w-0 group-hover:w-full'}`}></span>

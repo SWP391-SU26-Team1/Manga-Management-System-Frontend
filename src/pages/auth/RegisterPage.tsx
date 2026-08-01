@@ -281,9 +281,9 @@ export default function RegisterPage() {
           <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: "url('https://www.transparenttextures.com/patterns/cubes.png')" }} />
 
           <div className="relative z-10">
-            <div className="inline-block font-manga font-bold text-xl tracking-widest text-white mb-2">
-              MANGAFLOW
-            </div>
+            <Link to="/" className="inline-block mb-4">
+              <img src="/images/acc76da3-e3ea-4f2c-ada1-7798cd6b7fbd.png" alt="MangaFlow" className="h-16 w-auto object-contain" />
+            </Link>
             <div className="w-12 h-1 bg-manga-red mb-12" />
 
             <h1 className="font-manga text-5xl md:text-6xl font-bold uppercase leading-[0.9] tracking-wide mb-6">

@@ -109,15 +109,13 @@ export default function BoardSidebar() {
       <aside className="w-64 h-screen bg-white border-r-4 border-manga-ink flex flex-col justify-between fixed top-0 left-0 z-40 font-sans">
         <div>
           {/* Logo Section */}
-          <div className="p-5 border-b-2 border-manga-ink bg-white">
-            <Link to="/dashboard/editorial-board" className="block">
-              <h1 className="font-manga text-3xl font-bold uppercase text-manga-red tracking-wide">
-                MANGAFLOW
-              </h1>
+          <div className="p-2 border-b-2 border-manga-ink bg-white">
+            <Link to="/dashboard/editorial-board" className="block text-left">
+              <img src="/images/acc76da3-e3ea-4f2c-ada1-7798cd6b7fbd.png" alt="MangaFlow" className="h-24 w-auto object-contain object-left mb-1 pl-1" />
+              <p className="font-bold text-manga-ink text-xs leading-tight pl-1">
+                Hội đồng biên tập
+              </p>
             </Link>
-            <p className="font-bold text-manga-ink mt-1 text-sm leading-tight">
-              Hội đồng biên tập
-            </p>
           </div>
 
           {/* Navigation Items */}

@@ -231,8 +231,10 @@ export default function LoginPage() {
         <div className="manga-border manga-shadow bg-white dark:bg-zinc-800 flex flex-col transition-colors">
           {/* Header Card */}
           <div className="bg-manga-ink p-8 text-white relative">
-            <div className="absolute -top-4 left-6 bg-white text-manga-ink font-manga font-bold px-3 py-1 text-sm manga-border">
-              MANGAFLOW
+            <div className="absolute -top-6 left-6 bg-white p-1.5 manga-border">
+              <Link to="/">
+                <img src="/images/acc76da3-e3ea-4f2c-ada1-7798cd6b7fbd.png" alt="MangaFlow" className="h-8 w-auto object-contain" />
+              </Link>
             </div>
             <h1 className="font-manga text-4xl font-bold uppercase mt-2 mb-2 tracking-wide">
               Tiếp tục hành trình

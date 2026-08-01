@@ -72,10 +72,10 @@ export default function UserLayout() {
               <ShieldCheck className="w-4 h-4" /> Chính Sách
             </h4>
             <ul className="space-y-2 text-sm font-semibold text-zinc-400">
-              <li><a href="#" className="hover:text-white transition-colors">Điều Khoản Sử Dụng</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Bản Quyền Tác Phẩm</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Chính Sách Bảo Mật</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Liên Hệ Hợp Tác</a></li>
+              <li><Link to="/terms" className="hover:text-white transition-colors">Điều Khoản Sử Dụng</Link></li>
+              <li><Link to="/copyright" className="hover:text-white transition-colors">Bản Quyền Tác Phẩm</Link></li>
+              <li><Link to="/privacy" className="hover:text-white transition-colors">Chính Sách Bảo Mật</Link></li>
+              <li><Link to="/contact" className="hover:text-white transition-colors">Liên Hệ Hợp Tác</Link></li>
             </ul>
           </div>
 

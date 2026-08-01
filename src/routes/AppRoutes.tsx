@@ -20,6 +20,12 @@ import ReadingHistoryPage from '@/pages/user/ReadingHistoryPage'
 import WebPreferencesPage from '@/pages/user/WebPreferencesPage'
 import UserLayout from '@/layouts/user/UserLayout'
 
+// Public Doc pages
+import TermsPage from '@/pages/public-docs/TermsPage'
+import CopyrightPage from '@/pages/public-docs/CopyrightPage'
+import PrivacyPage from '@/pages/public-docs/PrivacyPage'
+import ContactPage from '@/pages/public-docs/ContactPage'
+
 import { PublicUserGuard } from '@/components/common/PublicUserGuard'
 
 // Role Routes
@@ -41,6 +47,10 @@ export default function AppRoutes() {
         <Route path="/rankings" element={<RankingsPage />} />
         <Route path="/history" element={<ReadingHistoryPage />} />
         <Route path="/preferences" element={<WebPreferencesPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/copyright" element={<CopyrightPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/contact" element={<ContactPage />} />
       </Route>
 
       {/* Reader - Full-screen (không có Header/Footer) */}

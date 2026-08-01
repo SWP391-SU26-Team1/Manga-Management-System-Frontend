@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Shield, BookOpen, AlertTriangle, UserCheck, XOctagon, UserX, Info, HelpCircle, ChevronDown, Check } from 'lucide-react'
+import { Shield, BookOpen, AlertTriangle, UserCheck, XOctagon, UserX, Info, HelpCircle, ChevronDown, Check, Coins, Scale, RefreshCw } from 'lucide-react'
 
 export default function TermsPage() {
   const [activeSection, setActiveSection] = useState('section-1')
@@ -9,9 +9,11 @@ export default function TermsPage() {
     { id: 'section-1', title: '1. Đối tượng áp dụng', icon: UserCheck },
     { id: 'section-2', title: '2. Điều kiện sử dụng', icon: Shield },
     { id: 'section-3', title: '3. Nội dung bị cấm', icon: XOctagon },
-    { id: 'section-4', title: '4. Quyền và trách nhiệm', icon: BookOpen },
+    { id: 'section-4', title: '4. Quyền và trách nhiệm & UGC', icon: BookOpen },
     { id: 'section-5', title: '5. Chấm dứt tài khoản', icon: UserX },
     { id: 'section-6', title: '6. Miễn trừ trách nhiệm', icon: Info },
+    { id: 'section-7', title: '7. Thanh toán & Tiền ảo', icon: Coins },
+    { id: 'section-8', title: '8. Luật áp dụng & Tranh chấp', icon: Scale },
   ]
 
   const faqs = [
@@ -67,7 +69,7 @@ export default function TermsPage() {
           <div className="absolute right-0 top-0 opacity-10 translate-x-12 -translate-y-6">
             <Shield className="w-96 h-96" />
           </div>
-          <div className="relative z-10 max-w-2xl space-y-4">
+          <div className="relative z-10 max-w-3xl space-y-4">
             <span className="uppercase tracking-widest font-bold bg-white text-manga-red px-3 py-1 text-xs rounded-full">
               Pháp lý & Cộng đồng
             </span>
@@ -77,9 +79,14 @@ export default function TermsPage() {
             <p className="text-sm md:text-base font-semibold opacity-90 leading-relaxed">
               Chào mừng bạn đến với MangaFlow. Khi sử dụng nền tảng của chúng tôi, bạn đồng ý tuân thủ các điều khoản dưới đây nhằm xây dựng một cộng đồng sáng tạo manga an toàn, minh bạch và tôn trọng bản quyền.
             </p>
-            <div className="text-xs font-bold bg-[#b51724] inline-block px-4 py-2 rounded-md">
-              Có hiệu lực kể từ: 01/08/2026
+            <div className="flex flex-wrap items-center gap-4 text-xs font-bold bg-[#b51724] inline-block px-4 py-2 rounded-md">
+              <span>Có hiệu lực kể từ: 01/08/2026</span>
+              <span className="opacity-60">|</span>
+              <span className="flex items-center gap-1"><RefreshCw className="w-3.5 h-3.5" /> Phiên bản 1.1</span>
             </div>
+            <p className="text-[11px] font-bold opacity-75 italic">
+              * Chúng tôi có quyền cập nhật Điều khoản này. Những thay đổi quan trọng sẽ được thông báo qua email hoặc banner trên trang chủ 30 ngày trước khi chính thức có hiệu lực.
+            </p>
           </div>
         </div>
       </div>
@@ -189,7 +196,7 @@ export default function TermsPage() {
           {/* Section 4 */}
           <section id="section-4" className="bg-white dark:bg-zinc-800 p-6 md:p-8 manga-border manga-shadow rounded-lg space-y-6">
             <h2 className="font-manga text-2xl font-black uppercase border-b-2 border-manga-ink pb-2 flex items-center gap-3 text-manga-red">
-              <BookOpen className="w-6 h-6" /> 4. Quyền và trách nhiệm
+              <BookOpen className="w-6 h-6" /> 4. Quyền, trách nhiệm & Giấy phép UGC
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
@@ -212,6 +219,16 @@ export default function TermsPage() {
                   <li className="flex items-center gap-2">🔴 Xóa bỏ mọi nội dung vi phạm mà không cần báo trước.</li>
                 </ul>
               </div>
+            </div>
+
+            {/* UGC License Content Box */}
+            <div className="bg-amber-50 dark:bg-amber-950/20 border-2 border-amber-300 dark:border-amber-900 p-5 rounded-lg space-y-3 mt-4">
+              <h4 className="font-bold text-sm text-amber-800 dark:text-amber-400 flex items-center gap-2">
+                📝 Giấy phép nội dung tự sinh (User Generated Content - UGC)
+              </h4>
+              <p className="text-xs font-semibold text-amber-700 dark:text-zinc-300 leading-relaxed">
+                Tác giả đăng truyện luôn giữ <strong>100% bản quyền sở hữu trí tuệ gốc</strong>. Tuy nhiên, bằng việc đăng tải nội dung lên MangaFlow, tác giả đồng ý cấp cho nền tảng một giấy phép <em>phi độc quyền, miễn phí bản quyền, trên phạm vi toàn thế giới</em> để thực hiện các thao tác: lưu trữ trên máy chủ, hiển thị, sao chép tạm thời vào bộ nhớ cache, định dạng lại và phân phối tác phẩm trực tiếp trên website/ứng dụng di động của MangaFlow nhằm phục vụ nhu cầu đọc của cộng đồng.
+              </p>
             </div>
           </section>
 
@@ -255,6 +272,54 @@ export default function TermsPage() {
                 <span>Sự cố mất dữ liệu tạm thời do lỗi đường truyền mạng hoặc sự kiện bất khả kháng.</span>
               </li>
             </ul>
+          </section>
+
+          {/* Section 7 */}
+          <section id="section-7" className="bg-white dark:bg-zinc-800 p-6 md:p-8 manga-border manga-shadow rounded-lg space-y-6">
+            <h2 className="font-manga text-2xl font-black uppercase border-b-2 border-manga-ink pb-2 flex items-center gap-3 text-manga-red">
+              <Coins className="w-6 h-6" /> 7. Chính sách Thanh toán & Tiền ảo
+            </h2>
+            <p className="text-gray-600 dark:text-zinc-300 font-medium leading-relaxed">
+              MangaFlow cung cấp hệ thống tiền ảo (Coin/Token) để hỗ trợ donate, mua chương Premium. Quy chuẩn thanh toán gồm:
+            </p>
+            <div className="space-y-4 text-sm font-semibold">
+              <div className="p-4 bg-gray-50 dark:bg-zinc-700 rounded-lg border-l-4 border-manga-red">
+                <h4 className="font-bold text-manga-ink dark:text-white">🛑 Chính sách Không Hoàn Tiền (No Refund Policy)</h4>
+                <p className="text-xs text-gray-500 dark:text-zinc-300 mt-1 leading-relaxed">
+                  Tất cả các giao dịch nạp Coin, mua Token hoặc ủng hộ tác giả đều là giao dịch cuối cùng và không được phép hoàn trả, trừ phi xảy ra lỗi kỹ thuật trực tiếp do hệ thống của MangaFlow đã được xác nhận.
+                </p>
+              </div>
+              <div className="p-4 bg-gray-50 dark:bg-zinc-700 rounded-lg border-l-4 border-emerald-500">
+                <h4 className="font-bold text-manga-ink dark:text-white">💰 Tỷ lệ chia sẻ doanh thu (Revenue Share)</h4>
+                <p className="text-xs text-gray-500 dark:text-zinc-300 mt-1 leading-relaxed">
+                  Đối với các chương truyện Premium có trả phí và doanh thu donate: Tác giả nhận được 70% doanh thu thực tế sau thuế và chi phí cổng thanh toán; MangaFlow nhận 30% phí vận hành nền tảng.
+                </p>
+              </div>
+              <div className="p-4 bg-gray-50 dark:bg-zinc-700 rounded-lg border-l-4 border-amber-500">
+                <h4 className="font-bold text-manga-ink dark:text-white">📅 Thời gian đối soát & Thanh toán (Payout Terms)</h4>
+                <p className="text-xs text-gray-500 dark:text-zinc-300 mt-1 leading-relaxed">
+                  Số dư ví của tác giả sẽ được đối soát vào cuối mỗi tháng. Tác giả gửi yêu cầu rút tiền từ ngày 01 đến ngày 05, hệ thống sẽ thực hiện chi trả qua tài khoản ngân hàng liên kết từ ngày 05 đến ngày 10 hàng tháng.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* Section 8 */}
+          <section id="section-8" className="bg-white dark:bg-zinc-800 p-6 md:p-8 manga-border manga-shadow rounded-lg space-y-6">
+            <h2 className="font-manga text-2xl font-black uppercase border-b-2 border-manga-ink pb-2 flex items-center gap-3 text-manga-red">
+              <Scale className="w-6 h-6" /> 8. Luật áp dụng và Giải quyết tranh chấp
+            </h2>
+            <p className="text-gray-600 dark:text-zinc-300 font-medium leading-relaxed">
+              Các điều khoản sử dụng này được điều chỉnh và giải thích theo các quy định hiện hành của hệ thống luật pháp:
+            </p>
+            <div className="bg-[#111115] text-white p-5 rounded-lg manga-border space-y-3 font-semibold text-xs leading-relaxed">
+              <p>
+                ⚖️ <strong>Luật áp dụng:</strong> Người dùng đồng ý rằng mọi hoạt động đăng ký, sử dụng, giao dịch và đăng tải trên nền tảng tuân thủ hoàn toàn theo Luật pháp nước Cộng hòa Xã hội Chủ nghĩa Việt Nam (bao gồm Luật Sở hữu Trí tuệ và Luật An ninh mạng).
+              </p>
+              <p>
+                🏢 <strong>Thẩm quyền giải quyết tranh chấp:</strong> Mọi tranh chấp phát sinh từ hoặc liên quan đến việc sử dụng dịch vụ của MangaFlow trước hết sẽ được giải quyết thông qua thương lượng hòa giải. Trong trường hợp không đạt được thỏa thuận, tranh chấp sẽ được đưa ra giải quyết tại Tòa án nhân dân có thẩm quyền tại Thành phố Hà Nội, Việt Nam.
+              </p>
+            </div>
           </section>
 
           {/* FAQ Accordion Section */}

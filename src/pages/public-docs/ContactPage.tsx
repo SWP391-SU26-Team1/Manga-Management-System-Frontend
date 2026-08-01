@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Mail, HelpCircle, ChevronDown, Send, MessageSquare, MapPin, Clock, Upload, Handshake, Users, Sparkles, Code, Globe, Volume2 } from 'lucide-react'
+import { Mail, HelpCircle, ChevronDown, Send, MessageSquare, MapPin, Clock, Upload, Handshake, Users, Sparkles, Code, Globe, Volume2, Download, BarChart2, Star, Quote, RefreshCw } from 'lucide-react'
 
 export default function ContactPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(null)
@@ -41,6 +41,19 @@ export default function ContactPage() {
     { title: 'Chương trình Affiliate', tag: 'Partnership' }
   ]
 
+  const testimonials = [
+    {
+      author: 'Mangaka Phong Trương',
+      work: 'Tác giả bộ truyện "Lửa Đêm Đông"',
+      quote: 'MangaFlow đã giúp tôi tối ưu hóa hoàn toàn quy trình bàn giao phân cảnh cho trợ lý. Doanh thu Premium từ nền tảng giúp tôi an tâm sống với nghề sáng tác.'
+    },
+    {
+      author: 'Trưởng nhóm dịch ComicVibe',
+      work: 'Hơn 50 bộ truyện chuyển ngữ',
+      quote: 'Hệ thống quản lý bản thảo và phân chia tác vụ thông minh của MangaFlow giúp nhóm dịch của chúng tôi tăng 40% hiệu suất làm việc so với trước.'
+    }
+  ]
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitted(true)
@@ -75,15 +88,32 @@ export default function ContactPage() {
             <p className="text-base md:text-lg font-semibold opacity-90 leading-relaxed max-w-xl mx-auto">
               Hợp tác cùng MangaFlow để xây dựng cộng đồng sáng tác manga lớn mạnh, đưa tác phẩm Việt Nam tiếp cận hàng triệu độc giả.
             </p>
-            <div className="pt-2">
+            <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
               <button
                 onClick={() => {
                   document.getElementById('contact-form')?.scrollIntoView({ behavior: 'smooth' })
                 }}
-                className="bg-manga-ink hover:bg-zinc-800 text-white font-bold uppercase py-4 px-10 tracking-widest manga-border manga-shadow hover:translate-y-1 hover:manga-shadow-sm transition-all"
+                className="bg-manga-ink hover:bg-zinc-800 text-white font-bold uppercase py-4 px-8 tracking-widest manga-border manga-shadow hover:translate-y-1 hover:manga-shadow-sm transition-all"
               >
-                Liên Hệ Hợp Tác Ngay
+                Liên Hệ Ngay
               </button>
+              {/* Media Kit Download Button */}
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault()
+                  alert('Tải xuống gói Media Kit (Logo vector, mã màu thương hiệu MangaFlow) thành công!')
+                }}
+                className="bg-white hover:bg-gray-100 text-manga-ink font-bold uppercase py-4 px-8 tracking-widest manga-border manga-shadow hover:translate-y-1 hover:manga-shadow-sm transition-all flex items-center gap-2 text-sm"
+              >
+                <Download className="w-4 h-4" /> Tải Media Kit
+              </a>
+            </div>
+            
+            <div className="flex flex-wrap items-center justify-center gap-4 text-xs font-bold bg-[#b51724] inline-block px-4 py-2 rounded-md">
+              <span>Cập nhật ngày: 01/08/2026</span>
+              <span className="opacity-60">|</span>
+              <span className="flex items-center gap-1"><RefreshCw className="w-3.5 h-3.5" /> Phiên bản 1.1</span>
             </div>
           </div>
         </div>
@@ -91,6 +121,28 @@ export default function ContactPage() {
 
       <div className="max-w-7xl mx-auto space-y-16">
         
+        {/* Social Proof / Stats Strip */}
+        <section className="bg-manga-ink text-white p-6 rounded-lg manga-border manga-shadow">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center divide-y md:divide-y-0 md:divide-x divide-zinc-700">
+            <div className="pt-4 md:pt-0">
+              <h3 className="font-manga text-3xl md:text-5xl font-black text-manga-red">100+</h3>
+              <p className="text-xs uppercase tracking-wider font-bold text-zinc-400 mt-1">Tác giả hoạt động</p>
+            </div>
+            <div className="pt-4 md:pt-0">
+              <h3 className="font-manga text-3xl md:text-5xl font-black text-manga-red">50,000+</h3>
+              <p className="text-xs uppercase tracking-wider font-bold text-zinc-400 mt-1">Độc giả đăng ký</p>
+            </div>
+            <div className="pt-4 md:pt-0">
+              <h3 className="font-manga text-3xl md:text-5xl font-black text-manga-red">500,000+</h3>
+              <p className="text-xs uppercase tracking-wider font-bold text-zinc-400 mt-1">Lượt đọc hàng tháng</p>
+            </div>
+            <div className="pt-4 md:pt-0">
+              <h3 className="font-manga text-3xl md:text-5xl font-black text-manga-red">5,000+</h3>
+              <p className="text-xs uppercase tracking-wider font-bold text-zinc-400 mt-1">Chương truyện sáng tác</p>
+            </div>
+          </div>
+        </section>
+
         {/* Section 1: Partners we work with */}
         <section className="space-y-6">
           <div className="text-center max-w-xl mx-auto space-y-2">
@@ -132,6 +184,32 @@ export default function ContactPage() {
               <div key={idx} className="bg-gray-100 dark:bg-zinc-800 p-4 rounded-lg manga-border text-center space-y-2 flex flex-col justify-between">
                 <span className="text-[10px] uppercase font-bold tracking-widest text-manga-red">{form.tag}</span>
                 <h4 className="font-bold text-xs text-manga-ink dark:text-white leading-tight">{form.title}</h4>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Testimonials section */}
+        <section className="space-y-6">
+          <div className="text-center max-w-xl mx-auto space-y-2">
+            <h2 className="font-manga text-3xl font-black uppercase text-manga-red">
+              Đồng Hành Cùng Thành Công
+            </h2>
+            <p className="text-sm font-semibold text-gray-500 dark:text-zinc-400">
+              Chia sẻ từ các họa sĩ và đối tác đã tin tưởng và đồng hành cùng sự phát triển của MangaFlow.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {testimonials.map((t, idx) => (
+              <div key={idx} className="bg-white dark:bg-zinc-800 p-6 rounded-lg manga-border manga-shadow relative space-y-4">
+                <Quote className="w-12 h-12 text-zinc-200 dark:text-zinc-700 absolute right-4 top-4" />
+                <p className="text-sm font-semibold italic text-gray-600 dark:text-zinc-300 leading-relaxed relative z-10">
+                  "{t.quote}"
+                </p>
+                <div className="border-t border-gray-100 dark:border-zinc-700 pt-3">
+                  <h4 className="font-bold text-sm text-manga-ink dark:text-white">{t.author}</h4>
+                  <p className="text-xs font-semibold text-manga-red">{t.work}</p>
+                </div>
               </div>
             ))}
           </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { ShieldAlert, Key, User, Database, Settings, HelpCircle, ChevronDown, CheckSquare, EyeOff, ShieldCheck } from 'lucide-react'
+import { ShieldAlert, Key, User, Database, Settings, HelpCircle, ChevronDown, CheckSquare, EyeOff, ShieldCheck, RefreshCw, Heart, Info } from 'lucide-react'
 
 export default function PrivacyPage() {
   const [activeSection, setActiveSection] = useState('section-1')
@@ -8,9 +8,10 @@ export default function PrivacyPage() {
   const sections = [
     { id: 'section-1', title: '1. Dữ liệu thu thập', icon: User },
     { id: 'section-2', title: '2. Mục đích sử dụng', icon: Database },
-    { id: 'section-3', title: '3. Chia sẻ dữ liệu', icon: EyeOff },
-    { id: 'section-4', title: '4. Quyền của người dùng', icon: CheckSquare },
+    { id: 'section-3', title: '3. Chia sẻ dữ liệu & Bên thứ 3', icon: EyeOff },
+    { id: 'section-4', title: '4. Quyền của người dùng & Lưu trữ', icon: CheckSquare },
     { id: 'section-5', title: '5. Cơ chế bảo mật', icon: Key },
+    { id: 'section-6', title: '6. Bảo vệ trẻ em (COPPA)', icon: Heart },
   ]
 
   const faqs = [
@@ -62,7 +63,7 @@ export default function PrivacyPage() {
           <div className="absolute right-0 top-0 opacity-10 translate-x-12 -translate-y-6">
             <ShieldCheck className="w-96 h-96" />
           </div>
-          <div className="relative z-10 max-w-2xl space-y-4">
+          <div className="relative z-10 max-w-3xl space-y-4">
             <span className="uppercase tracking-widest font-bold bg-white text-manga-red px-3 py-1 text-xs rounded-full">
               Quyền Riêng Tư
             </span>
@@ -71,6 +72,14 @@ export default function PrivacyPage() {
             </h1>
             <p className="text-sm md:text-base font-semibold opacity-90 leading-relaxed">
               Chúng tôi cam kết bảo mật tuyệt đối thông tin cá nhân và dữ liệu hoạt động sáng tác của người dùng trên toàn bộ hệ thống MangaFlow.
+            </p>
+            <div className="flex flex-wrap items-center gap-4 text-xs font-bold bg-[#b51724] inline-block px-4 py-2 rounded-md">
+              <span>Có hiệu lực kể từ: 01/08/2026</span>
+              <span className="opacity-60">|</span>
+              <span className="flex items-center gap-1"><RefreshCw className="w-3.5 h-3.5" /> Phiên bản 1.1</span>
+            </div>
+            <p className="text-[11px] font-bold opacity-75 italic">
+              * Chúng tôi có quyền cập nhật chính sách bảo mật này. Những thay đổi quan trọng sẽ được thông báo qua email hoặc banner trên trang chủ 30 ngày trước khi chính thức có hiệu lực.
             </p>
           </div>
         </div>
@@ -161,7 +170,7 @@ export default function PrivacyPage() {
           {/* Section 3 */}
           <section id="section-3" className="bg-white dark:bg-zinc-800 p-6 md:p-8 manga-border manga-shadow rounded-lg space-y-6">
             <h2 className="font-manga text-2xl font-black uppercase border-b-2 border-manga-ink pb-2 flex items-center gap-3 text-manga-red">
-              <EyeOff className="w-6 h-6" /> 3. Cam kết chia sẻ dữ liệu
+              <EyeOff className="w-6 h-6" /> 3. Cam kết chia sẻ dữ liệu & Dịch vụ Bên thứ ba
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-rose-50 dark:bg-rose-950/20 border-2 border-rose-300 dark:border-rose-900 p-6 rounded-lg space-y-4">
@@ -185,12 +194,27 @@ export default function PrivacyPage() {
                 </ul>
               </div>
             </div>
+
+            {/* Third Party Services Box */}
+            <div className="bg-zinc-900 text-white p-5 rounded-lg manga-border space-y-3 font-semibold text-xs leading-relaxed mt-4">
+              <h4 className="font-manga text-sm text-manga-red uppercase tracking-wider">
+                🔌 Dịch vụ của Bên thứ ba (Third-party Services)
+              </h4>
+              <p className="text-zinc-400">
+                Chúng tôi có hợp tác với các nhà cung cấp dịch vụ bên ngoài để vận hành hệ thống. Các bên này chỉ được phép truy cập dữ liệu đã ẩn danh hóa hoặc xử lý bảo mật cho các tác vụ cụ thể:
+              </p>
+              <ul className="space-y-2 text-zinc-300 list-disc pl-4">
+                <li><strong>Google Analytics:</strong> Sử dụng cookie ẩn danh để phân tích lưu lượng truy cập và thói quen trải nghiệm trên website.</li>
+                <li><strong>VNPay / Stripe:</strong> Cổng thanh toán bên thứ ba xử lý trực tiếp các giao dịch nạp ví Coin đảm bảo an toàn tuyệt đối.</li>
+                <li><strong>Firebase Cloud Messaging:</strong> Gửi thông báo đẩy (Push notification) về tiến độ công việc và cập nhật chương mới.</li>
+              </ul>
+            </div>
           </section>
 
           {/* Section 4 */}
           <section id="section-4" className="bg-white dark:bg-zinc-800 p-6 md:p-8 manga-border manga-shadow rounded-lg space-y-6">
             <h2 className="font-manga text-2xl font-black uppercase border-b-2 border-manga-ink pb-2 flex items-center gap-3 text-manga-red">
-              <CheckSquare className="w-6 h-6" /> 4. Quyền của người dùng
+              <CheckSquare className="w-6 h-6" /> 4. Quyền của người dùng & Lưu trữ dữ liệu
             </h2>
             <p className="text-gray-600 dark:text-zinc-300 font-medium">
               Bạn có toàn quyền kiểm soát và định đoạt dữ liệu cá nhân của mình trên MangaFlow:
@@ -210,6 +234,16 @@ export default function PrivacyPage() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* Data Retention Content Box */}
+            <div className="bg-amber-50 dark:bg-amber-950/20 border-2 border-amber-300 dark:border-amber-900 p-5 rounded-lg space-y-2 mt-4 font-semibold text-xs leading-relaxed">
+              <h4 className="font-bold text-sm text-amber-800 dark:text-amber-400 flex items-center gap-2">
+                ⏳ Thời gian lưu trữ dữ liệu (Data Retention Lifecycle)
+              </h4>
+              <p className="text-amber-700 dark:text-zinc-300">
+                Khi người dùng chọn lệnh <strong>"Xóa tài khoản"</strong>, tài khoản của bạn sẽ được chuyển sang trạng thái chờ xóa. Toàn bộ dữ liệu được lưu giữ an toàn trên máy chủ thêm <strong>30 ngày</strong> đề phòng trường hợp bạn thay đổi ý định và muốn khôi phục lại tài khoản. Hết thời hạn 30 ngày này, hệ thống sẽ thực hiện xóa vĩnh viễn hoặc ẩn danh hóa hoàn toàn dữ liệu cá nhân của bạn không thể khôi phục.
+              </p>
             </div>
           </section>
 
@@ -234,6 +268,19 @@ export default function PrivacyPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </section>
+
+          {/* Section 6 */}
+          <section id="section-6" className="bg-white dark:bg-zinc-800 p-6 md:p-8 manga-border manga-shadow rounded-lg space-y-6">
+            <h2 className="font-manga text-2xl font-black uppercase border-b-2 border-manga-ink pb-2 flex items-center gap-3 text-manga-red">
+              <Info className="w-6 h-6" /> 6. Bảo vệ Trẻ em (COPPA & GDPR-K Compliance)
+            </h2>
+            <div className="bg-emerald-50 dark:bg-emerald-950/20 border-2 border-emerald-300 dark:border-emerald-900 p-5 rounded-lg space-y-3 font-semibold text-xs leading-relaxed">
+              <h4 className="font-bold text-emerald-800 dark:text-emerald-400">🛡️ Cam kết bảo vệ trẻ vị thành niên</h4>
+              <p className="text-gray-600 dark:text-zinc-300">
+                MangaFlow cam kết tuân thủ các quy tắc bảo vệ trẻ em trên không gian mạng quốc tế. Chúng tôi <strong>không cố tình thu thập dữ liệu cá nhân của trẻ em dưới 13 tuổi</strong> mà không có sự đồng ý của phụ huynh. Nếu chúng tôi phát hiện bất kỳ tài khoản nào được tạo bởi người dùng dưới 13 tuổi khai gian tuổi đăng ký, chúng tôi sẽ lập tức khóa tài khoản và tiến hành gỡ bỏ toàn bộ dữ liệu liên quan khỏi máy chủ lưu trữ ngay lập tức.
+              </p>
             </div>
           </section>
 
